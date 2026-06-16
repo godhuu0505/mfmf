@@ -76,7 +76,7 @@ npm run dev   # http://localhost:3000
 Supabase 側の準備（初回のみ）:
 
 1. Supabase プロジェクトを用意する。
-2. `supabase/migrations/` の SQL を連番順に SQL Editor で実行（`0001_init.sql`=テーブル / RLS / Storage バケット、`0002_record_metadata.sql`=記録元・記入者・体重の列追加）。
+2. `supabase/migrations/` の SQL を連番順に SQL Editor で実行（`0001_init.sql`=テーブル / RLS / Storage バケット、`0002_record_metadata.sql`=記録元・記入者・体重の列追加、`0003_feedback.sql`=ご意見・不具合フォームの保存テーブル / RLS）。
 3. ユーザーを Authentication > Users から手動発行する（サインアップ UI は無し）。共有方針は (A) 1アカウント共用のため、**夫婦で共有する 1 つのログイン**を発行して 2 人で使う（RLS が `owner_id` ベースのため、ユーザーを分けると記録が共有されない）。
 
 接続情報（URL / anon key）は Supabase ダッシュボード > **Project Settings > API** から取得します。
@@ -98,14 +98,26 @@ mfmf は **フロントエンドを Vercel、バックエンド（認証 / DB / 
 デプロイ済みアプリや Supabase バックエンドの **確認手順**は
 **[docs/supabase.md](./docs/supabase.md)** にまとめています。
 
-### デプロイ（Vercel）
+### デプロイ（Vercel / CI・CD）
 
-1. リポジトリを Vercel に接続。
-2. 環境変数 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定。
-3. （任意）ご意見・不具合フォームを GitHub Issue へ自動転記する場合は、サーバー側専用の環境変数 `GITHUB_TOKEN`（対象リポジトリの Issues に書き込める Fine-grained PAT）と、必要なら `GITHUB_FEEDBACK_REPO`（既定: `godhuu0505/mfmf`）を設定。未設定でもフォームは動作し、内容は `feedback` テーブルに保存される。
-4. デプロイ。利用者がアクセスするのは Vercel の URL（その裏で Supabase が動く）。
+デプロイは **GitHub Actions から Vercel CLI で明示的に**行う（Vercel の Git 連携自動デプロイは
+`vercel.json` の `git.deploymentEnabled: false` で無効化）。
+
+| トリガ | デプロイ先 | ワークフロー |
+| --- | --- | --- |
+| PR | （CI のみ：lint / typecheck / build） | `ci.yml` |
+| main へマージ(push) | Vercel **Preview** | `deploy-preview.yml` |
+| タグ付き Release 公開 | Vercel **Production** | `deploy-production.yml` |
+
+- main はマージしても **Preview 止まり**。**本番反映はタグ付き Release の公開がトリガ**。
+- どちらも CI（`ci.yml` を再利用）が緑のときだけデプロイされる。
+- （任意）ご意見・不具合フォームを GitHub Issue へ自動転記する場合は、Vercel にサーバー側専用の環境変数 `GITHUB_TOKEN`（対象リポジトリの Issues に書き込める Fine-grained PAT）と、必要なら `GITHUB_FEEDBACK_REPO`（既定: `godhuu0505/mfmf`）を設定する。未設定でもフォームは動作し、内容は `feedback` テーブルに保存される。
+
+初回セットアップ（`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` の登録）と本番リリース手順は
+**[docs/deploy.md](./docs/deploy.md)** を参照。
 
 ## ドキュメント
 
 - [docs/local-setup.md](./docs/local-setup.md) — ローカル環境構築（リモート Supabase / ローカルスタックの両対応・トラブルシュート）
 - [docs/supabase.md](./docs/supabase.md) — Supabase バックエンド構成とデプロイ済みアプリの確認手順
+- [docs/deploy.md](./docs/deploy.md) — デプロイ / CI・CD（main→Preview、Release→Production）と初回セットアップ

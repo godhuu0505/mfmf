@@ -1,0 +1,53 @@
+name: Deploy Preview
+
+# main にマージ（push）されたら Vercel の Preview 環境へデプロイする。
+# 本番（Production）には出さない。本番は Release 公開時の deploy-production.yml が担当。
+on:
+  push:
+    branches: [main]
+
+# 同一ブランチの古いデプロイはキャンセルして無駄を省く。
+concurrency:
+  group: deploy-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # まず CI（lint / typecheck / build）を再利用して緑を確認する。
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Vercel Preview
+    needs: verify
+    runs-on: ubuntu-latest
+    # GitHub Environment（保護ルール / Secrets のスコープ用）。
+    environment:
+      name: preview
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # Vercel プロジェクト設定と Preview 用環境変数を取得する。
+      - name: Pull Vercel environment (preview)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      # ソースを Vercel に渡さず Actions 上でビルドする（.vercel/output を生成）。
+      - name: Build (preview)
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      # ビルド済み成果物だけをアップロードして Preview デプロイする。
+      - name: Deploy prebuilt to Vercel (preview)
+        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}

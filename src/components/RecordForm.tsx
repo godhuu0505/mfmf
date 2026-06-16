@@ -1,22 +1,15 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useMemo, useRef, useState, useTransition } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { resizeImages } from "@/lib/imageResize";
-import { RECORD_SOURCES, SOURCE_LABEL, type RecordSource } from "@/types/database";
-
-function SubmitButton({ label, disabled }: { label: string; disabled?: boolean }) {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      disabled={pending || disabled}
-      className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition hover:bg-slate-700 disabled:opacity-60"
-    >
-      {pending ? "保存中…" : label}
-    </button>
-  );
-}
+import { buildStoragePath } from "@/lib/storagePath";
+import {
+  PHOTO_BUCKET,
+  RECORD_SOURCES,
+  SOURCE_LABEL,
+  type RecordSource,
+} from "@/types/database";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -27,6 +20,10 @@ function formatBytes(bytes: number): string {
 
 type Props = {
   action: (formData: FormData) => void | Promise<void>;
+  /** ログイン中ユーザーの id（Storage パスと RLS の前提） */
+  ownerId: string;
+  /** 編集時は既存 record id。新規時は内部生成して record_id として送る。 */
+  recordId?: string;
   defaultDate: string; // YYYY-MM-DD
   defaultBody?: string;
   defaultSource?: RecordSource;
@@ -38,6 +35,8 @@ type Props = {
 
 export default function RecordForm({
   action,
+  ownerId,
+  recordId: existingRecordId,
   defaultDate,
   defaultBody = "",
   defaultSource = "daycare",
@@ -46,16 +45,29 @@ export default function RecordForm({
   submitLabel,
   cancelHref,
 }: Props) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [processing, setProcessing] = useState(false);
-  const [summary, setSummary] = useState<string | null>(null);
+  // 新規作成時も先に id を確定し、Storage パス {owner_id}/{record_id}/... と一致させる。
+  const recordId = useMemo(
+    () => existingRecordId ?? crypto.randomUUID(),
+    [existingRecordId],
+  );
   const [source, setSource] = useState<RecordSource>(defaultSource);
 
-  // 選択された画像をアップロード前に縮小・圧縮し、input.files を差し替える。
+  const formRef = useRef<HTMLFormElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const busy = processing || uploading || isPending;
+
+  // 選択画像をアップロード前に縮小・圧縮し、送信用に保持する。
   async function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const input = e.currentTarget;
-    const selected = Array.from(input.files ?? []);
+    const selected = Array.from(e.currentTarget.files ?? []);
+    setError(null);
     if (selected.length === 0) {
+      setFiles([]);
       setSummary(null);
       return;
     }
@@ -66,11 +78,7 @@ export default function RecordForm({
       const before = selected.reduce((sum, f) => sum + f.size, 0);
       const resized = await resizeImages(selected);
       const after = resized.reduce((sum, f) => sum + f.size, 0);
-
-      // 圧縮後のファイルを input に戻す（フォーム送信でそのまま使われる）
-      const dt = new DataTransfer();
-      resized.forEach((f) => dt.items.add(f));
-      if (fileInputRef.current) fileInputRef.current.files = dt.files;
+      setFiles(resized);
 
       const saved = before > 0 ? Math.round((1 - after / before) * 100) : 0;
       setSummary(
@@ -80,14 +88,61 @@ export default function RecordForm({
       );
     } catch {
       // 失敗しても元の選択ファイルで送信できるので致命的ではない
+      setFiles(selected);
       setSummary("画像の最適化をスキップしました（そのままアップロードします）");
     } finally {
       setProcessing(false);
     }
   }
 
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    setError(null);
+
+    // 1. 写真は Supabase Storage へブラウザから直接アップロード（Vercel の本体 4.5MB 制限を回避）。
+    const supabase = createClient();
+    const paths: string[] = [];
+    try {
+      setUploading(true);
+      for (const file of files) {
+        if (!file || file.size === 0) continue;
+        const path = buildStoragePath(ownerId, recordId, file.name);
+        const { error: uploadError } = await supabase.storage
+          .from(PHOTO_BUCKET)
+          .upload(path, file, { contentType: file.type, upsert: false });
+        if (uploadError) throw uploadError;
+        paths.push(path);
+      }
+    } catch (err) {
+      // 途中まで成功したアップロードはオーファンになるため取り消す。
+      if (paths.length > 0) {
+        await supabase.storage
+          .from(PHOTO_BUCKET)
+          .remove(paths)
+          .catch(() => {});
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      setError(`写真のアップロードに失敗しました: ${message}`);
+      setUploading(false);
+      return;
+    }
+    setUploading(false);
+
+    // 2. メタデータ（日付・本文・record_id・アップロード済みパス）だけを Server Action へ送る。
+    const fd = new FormData(form);
+    fd.delete("photos"); // 画像本体は送らない
+    fd.set("record_id", recordId);
+    paths.forEach((p) => fd.append("photo_paths", p));
+
+    // action を await して、リダイレクト完了まで isPending=true を維持し二重送信を防ぐ。
+    startTransition(async () => {
+      await action(fd);
+    });
+  }
+
   return (
-    <form action={action} className="space-y-5">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
       <div>
         <span className="mb-1 block text-sm font-medium text-slate-700">
           記録元
@@ -199,7 +254,6 @@ export default function RecordForm({
           写真を追加（複数選択可）
         </label>
         <input
-          ref={fileInputRef}
           id="photos"
           name="photos"
           type="file"
@@ -215,8 +269,20 @@ export default function RecordForm({
         </p>
       </div>
 
+      {error && (
+        <p className="text-sm text-red-600" role="alert">
+          {error}
+        </p>
+      )}
+
       <div className="flex items-center gap-3 pt-2">
-        <SubmitButton label={submitLabel} disabled={processing} />
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition hover:bg-slate-700 disabled:opacity-60"
+        >
+          {uploading ? "写真を保存中…" : isPending ? "保存中…" : submitLabel}
+        </button>
         <a
           href={cancelHref}
           className="text-sm text-slate-500 transition hover:text-slate-800"

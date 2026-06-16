@@ -1,11 +1,19 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
 import { createRecord } from "@/app/records/actions";
 
 export const dynamic = "force-dynamic";
 
-export default function NewRecordPage() {
+export default async function NewRecordPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -21,6 +29,7 @@ export default function NewRecordPage() {
 
         <RecordForm
           action={createRecord}
+          ownerId={user.id}
           defaultDate={today}
           submitLabel="保存する"
           cancelHref="/"

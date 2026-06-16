@@ -32,5 +32,8 @@ yarn-error.log*
 .branches
 .temp
 
+# vercel
+.vercel
+
 # claude code (個人ローカルの上書き設定はコミットしない)
 .claude/settings.local.json
