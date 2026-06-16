@@ -72,7 +72,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon または publishable key>
 ### A-4. ログイン用ユーザーを発行
 
 サインアップ UI は無いため、ダッシュボードで手動発行します。
-**Authentication > Users > Add user** から email / password を登録してください（夫婦で最大 2 人）。
+**Authentication > Users > Add user** から email / password を登録してください。
+
+> ⚠️ 本アプリの共有方針は **(A) 1アカウント共用**（README 参照）。RLS が `owner_id = auth.uid()` ベースのため、
+> ユーザーを別々に分けると互いの記録が見えません。**夫婦で共有する 1 つのログインを発行し、それを 2 人で使ってください。**
+> （世帯共有を別アカウントで実現するには `household_id` 導入が必要で、フェーズ1 では未対応です。）
 
 ### A-5. 開発サーバー起動
 
@@ -103,8 +107,11 @@ supabase --version
 ### B-2. ローカルスタックを起動
 
 リポジトリ直下（`supabase/` がある場所）で実行します。
+このリポジトリは `supabase/migrations/` のみを追跡しており `supabase/config.toml` を含まないため、
+**初回は `supabase init` で config を生成してから** `supabase start` します。
 
 ```bash
+supabase init   # supabase/config.toml を生成（既に存在する場合はスキップ／このコマンドはエラーになるだけで無害）
 supabase start
 ```
 
@@ -127,6 +134,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase status が表示する anon key>
 ### B-4. ログイン用ユーザーを発行
 
 ローカル Studio の **Authentication > Users** から、もしくは CLI で作成します。
+A-4 と同様、**共有する 1 アカウント**を発行して 2 人で使います（RLS によりユーザーを分けるとデータが分離されます）。
 
 ### B-5. 開発サーバー起動
 

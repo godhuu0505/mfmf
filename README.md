@@ -72,7 +72,7 @@ Supabase 側の準備（初回のみ）:
 
 1. Supabase プロジェクトを用意する。
 2. `supabase/migrations/0001_init.sql` を SQL Editor で実行（テーブル / RLS / Storage バケット）。
-3. ユーザーを Authentication > Users から手動発行する（夫婦の最大2人。サインアップ UI は無し）。
+3. ユーザーを Authentication > Users から手動発行する（サインアップ UI は無し）。共有方針は (A) 1アカウント共用のため、**夫婦で共有する 1 つのログイン**を発行して 2 人で使う（RLS が `owner_id` ベースのため、ユーザーを分けると記録が共有されない）。
 
 接続情報（URL / anon key）は Supabase ダッシュボード > **Project Settings > API** から取得します。
 

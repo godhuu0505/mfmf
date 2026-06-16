@@ -48,8 +48,10 @@ mfmf は 2 つのサービスに分かれてデプロイされます。
 
 ### 2-3. 認証ユーザー
 
-**Authentication > Users** に、ログインに使うユーザー（夫婦で最大 2 人）が存在すること。
+**Authentication > Users** に、ログインに使うユーザーが存在すること。
 サインアップ UI は無いため、ここから手動で発行する。
+共有方針は **(A) 1アカウント共用**なので、**夫婦で共有する 1 つのログイン**を発行して 2 人で使う
+（RLS が `owner_id = auth.uid()` ベースのため、ユーザーを分けると互いの記録が見えない）。
 
 ### 2-4. Storage
 
@@ -57,10 +59,18 @@ mfmf は 2 つのサービスに分かれてデプロイされます。
 画像は署名付き URL（期限 1 時間）で配信される。
 オブジェクトパス規約: `{owner_id}/{record_id}/{filename}`。
 
-### 2-5. マイグレーション
+### 2-5. スキーマ（テーブル / RLS / Storage）の適用
 
-**Database > Migrations** に `0001_init`（テーブル / RLS / Storage / トリガ）が適用されていること。
+スキーマ一式（`0001_init`: テーブル / RLS / Storage / トリガ）が適用済みであることを確認する。
+**確認は実体（2-2〜2-4 のテーブル・RLS・バケット）で行うのが確実**。
 未適用なら `supabase/migrations/0001_init.sql` を **SQL Editor** で実行する。
+
+> ⚠️ **Database > Migrations の履歴には注意**。Supabase のマイグレーション履歴は
+> Supabase CLI（`supabase db push` 等）や MCP の `apply_migration` で適用したときのみ記録される。
+> **ダッシュボードの SQL Editor で実行した場合は履歴に残らない**ため、SQL Editor で適用したのに
+> `0001_init` が一覧に出ない、という状態は正常。履歴の有無ではなく、テーブル/ポリシー/バケットの
+> 実体が揃っているかで判断する。CLI ベースで履歴を揃えたい場合は `supabase db push` や
+> `supabase migration repair` を使う。
 
 ### 2-6. セキュリティ / パフォーマンス advisor
 
