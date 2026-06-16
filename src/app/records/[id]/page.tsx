@@ -64,6 +64,8 @@ export default async function RecordDetailPage({
             <h1 className="mb-6 text-xl font-bold text-slate-900">記録を編集</h1>
             <RecordForm
               action={updateRecord.bind(null, record.id)}
+              ownerId={record.owner_id}
+              recordId={record.id}
               defaultDate={record.record_date}
               defaultBody={record.body}
               submitLabel="更新する"

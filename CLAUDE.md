@@ -39,7 +39,11 @@
 - パスエイリアスは `@/*` → `src/*`。
 - 型は `src/types/database.ts`。Storage バケット名は定数 `PHOTO_BUCKET`。
 - 画像は送信前にブラウザで長辺 1600px へ縮小・JPEG 再圧縮（`src/lib/imageResize.ts`）。
-- Storage オブジェクトパス規約: `{owner_id}/{record_id}/{filename}`。
+- **写真はクライアントから Supabase Storage へ直接アップロード**する（`RecordForm`）。Server Action
+  には画像本体を渡さず、アップロード済みのオブジェクトパスだけを送って `record_photos` に登録する
+  （Vercel の Function ボディ上限 4.5MB を超えないため）。新規作成時は `record_id` をクライアントで
+  生成し、パス規約と DB 行の id を一致させる。
+- Storage オブジェクトパス規約: `{owner_id}/{record_id}/{filename}`（生成/検証は `src/lib/storagePath.ts`）。
 - 画面: `/login`, `/`（一覧）, `/records/new`, `/records/[id]`（`?edit=1` で編集）。
 
 ## セキュリティ（厳守）

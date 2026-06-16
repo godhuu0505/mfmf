@@ -4,34 +4,33 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/types/database";
+import { isOwnedStoragePath } from "@/lib/storagePath";
 
-// ファイル名のサニタイズ + 衝突回避
-function buildStoragePath(ownerId: string, recordId: string, fileName: string) {
-  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-  return `${ownerId}/${recordId}/${crypto.randomUUID()}-${safe}`;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// 写真はクライアントから Storage へ直接アップロード済み。
+// ここではそのオブジェクトパスを record_photos に登録するだけ。
+// Vercel の Function ボディ上限（4.5MB）を避けるため画像本体は受け取らない。
+function readPhotoPaths(formData: FormData): string[] {
+  return formData.getAll("photo_paths").map(String).filter(Boolean);
 }
 
-async function uploadPhotos(
+async function attachPhotoPaths(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ownerId: string,
   recordId: string,
-  files: File[],
+  paths: string[],
 ) {
-  for (const file of files) {
-    if (!file || file.size === 0) continue;
-    const path = buildStoragePath(ownerId, recordId, file.name);
-    const { error: uploadError } = await supabase.storage
-      .from(PHOTO_BUCKET)
-      .upload(path, file, { contentType: file.type, upsert: false });
-    if (uploadError) {
-      throw new Error(`写真のアップロードに失敗しました: ${uploadError.message}`);
-    }
-    const { error: insertError } = await supabase
-      .from("record_photos")
-      .insert({ record_id: recordId, storage_path: path });
-    if (insertError) {
-      throw new Error(`写真情報の保存に失敗しました: ${insertError.message}`);
-    }
+  // 本人フォルダ配下のパスのみ受理（防御的サニタイズ）。
+  const valid = paths.filter((p) => isOwnedStoragePath(p, ownerId));
+  if (valid.length === 0) return;
+
+  const { error } = await supabase
+    .from("record_photos")
+    .insert(valid.map((storage_path) => ({ record_id: recordId, storage_path })));
+  if (error) {
+    throw new Error(`写真情報の保存に失敗しました: ${error.message}`);
   }
 }
 
@@ -42,24 +41,26 @@ export async function createRecord(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // record_id はクライアント生成（Storage パス {owner_id}/{record_id}/... と一致させる）。
+  const recordId = String(formData.get("record_id") || "");
+  if (!UUID_RE.test(recordId)) {
+    throw new Error("不正なリクエストです");
+  }
   const record_date = String(formData.get("record_date") || "");
   const body = String(formData.get("body") || "");
-  const files = formData.getAll("photos").filter((f): f is File => f instanceof File);
 
-  const { data: record, error } = await supabase
+  const { error } = await supabase
     .from("daycare_records")
-    .insert({ owner_id: user.id, record_date, body })
-    .select("id")
-    .single();
+    .insert({ id: recordId, owner_id: user.id, record_date, body });
 
-  if (error || !record) {
-    throw new Error(`記録の作成に失敗しました: ${error?.message}`);
+  if (error) {
+    throw new Error(`記録の作成に失敗しました: ${error.message}`);
   }
 
-  await uploadPhotos(supabase, user.id, record.id, files);
+  await attachPhotoPaths(supabase, user.id, recordId, readPhotoPaths(formData));
 
   revalidatePath("/");
-  redirect(`/records/${record.id}`);
+  redirect(`/records/${recordId}`);
 }
 
 export async function updateRecord(recordId: string, formData: FormData) {
@@ -71,7 +72,6 @@ export async function updateRecord(recordId: string, formData: FormData) {
 
   const record_date = String(formData.get("record_date") || "");
   const body = String(formData.get("body") || "");
-  const files = formData.getAll("photos").filter((f): f is File => f instanceof File);
 
   const { error } = await supabase
     .from("daycare_records")
@@ -82,7 +82,7 @@ export async function updateRecord(recordId: string, formData: FormData) {
     throw new Error(`記録の更新に失敗しました: ${error.message}`);
   }
 
-  await uploadPhotos(supabase, user.id, recordId, files);
+  await attachPhotoPaths(supabase, user.id, recordId, readPhotoPaths(formData));
 
   revalidatePath("/");
   revalidatePath(`/records/${recordId}`);
