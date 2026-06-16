@@ -16,7 +16,13 @@ export function buildStoragePath(
   return `${ownerId}/${recordId}/${crypto.randomUUID()}-${sanitizeFileName(fileName)}`;
 }
 
-// クライアント由来のパスが本人フォルダ配下かを検証する（防御的サニタイズ）。
-export function isOwnedStoragePath(path: string, ownerId: string): boolean {
-  return path.startsWith(`${ownerId}/`);
+// クライアント由来のパスが当該 owner_id / record_id 配下かを検証する（防御的サニタイズ）。
+// owner プレフィックスだけだと別 record のパスを紐付けられてしまうため、
+// 規約 {owner_id}/{record_id}/... の 2 セグメントまで一致を要求する。
+export function isPathForRecord(
+  path: string,
+  ownerId: string,
+  recordId: string,
+): boolean {
+  return path.startsWith(`${ownerId}/${recordId}/`);
 }

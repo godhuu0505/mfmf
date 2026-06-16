@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET, toSource } from "@/types/database";
-import { isOwnedStoragePath } from "@/lib/storagePath";
+import { isPathForRecord } from "@/lib/storagePath";
 
 // フォームから記録メタデータ（記録元・記入者・体重）を取り出す。
 function parseRecordFields(formData: FormData) {
@@ -39,8 +39,8 @@ async function attachPhotoPaths(
   recordId: string,
   paths: string[],
 ) {
-  // 本人フォルダ配下のパスのみ受理（防御的サニタイズ）。
-  const valid = paths.filter((p) => isOwnedStoragePath(p, ownerId));
+  // {owner_id}/{record_id}/... 配下のパスのみ受理（防御的サニタイズ）。
+  const valid = paths.filter((p) => isPathForRecord(p, ownerId, recordId));
   if (valid.length === 0) return;
 
   const { error } = await supabase

@@ -101,11 +101,10 @@ export default function RecordForm({
     setError(null);
 
     // 1. 写真は Supabase Storage へブラウザから直接アップロード（Vercel の本体 4.5MB 制限を回避）。
-    let paths: string[];
+    const supabase = createClient();
+    const paths: string[] = [];
     try {
       setUploading(true);
-      const supabase = createClient();
-      paths = [];
       for (const file of files) {
         if (!file || file.size === 0) continue;
         const path = buildStoragePath(ownerId, recordId, file.name);
@@ -116,6 +115,13 @@ export default function RecordForm({
         paths.push(path);
       }
     } catch (err) {
+      // 途中まで成功したアップロードはオーファンになるため取り消す。
+      if (paths.length > 0) {
+        await supabase.storage
+          .from(PHOTO_BUCKET)
+          .remove(paths)
+          .catch(() => {});
+      }
       const message = err instanceof Error ? err.message : String(err);
       setError(`写真のアップロードに失敗しました: ${message}`);
       setUploading(false);
@@ -129,8 +135,9 @@ export default function RecordForm({
     fd.set("record_id", recordId);
     paths.forEach((p) => fd.append("photo_paths", p));
 
-    startTransition(() => {
-      action(fd);
+    // action を await して、リダイレクト完了まで isPending=true を維持し二重送信を防ぐ。
+    startTransition(async () => {
+      await action(fd);
     });
   }
 
