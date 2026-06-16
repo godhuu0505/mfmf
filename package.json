@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "feedback:issues": "node scripts/feedback-to-issues.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

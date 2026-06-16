@@ -19,7 +19,7 @@
 - **② テキストの保管・表示**: 記録の CRUD（日付＋本文）、一覧 / 詳細 / 編集 / 削除。
 - **③ 画像の紐付け**: 1記録に複数枚アップロード → Storage 保存 → テキストと並べて表示、一覧にサムネ。
 - **④ 記録メタデータ**: 記録元（🏫 保育園 / 🏠 おうち）・記入者・体重(kg)を任意で残せる。保育園とおうち（両親）どちらのノートも同じ仕組みで登録でき、一覧は記録元で絞り込み、詳細・一覧に記録元バッジと体重を表示して後から振り返れる。
-- **⑤ ご意見・不具合フォーム**: どの画面でも右下に出るフローティングボタンから、障害報告・機能要望を送れる。必須は内容のみで、任意項目（種類・困り度・頻度・期待/実際の動きなど）で詳しく聞ける。送信時に開いていた画面・端末情報などのアプリの状況を自動で添付。内容は `feedback` テーブルに保存し、GitHub トークンを設定していれば GitHub Issue へ自動転記する（`src/components/FeedbackWidget.tsx` / `src/app/feedback/actions.ts`）。
+- **⑤ ご意見・不具合フォーム**: どの画面でも右下に出るフローティングボタンから、障害報告・機能要望を送れる。必須は内容のみで、任意項目（種類・困り度・頻度・期待/実際の動きなど）で詳しく聞ける。送信時に開いていた画面・端末情報などのアプリの状況を自動で添付。内容は **Supabase の `feedback` テーブル（非公開・RLS 保護）にのみ保存** し、アプリからは GitHub に何も送らない。GitHub Issue 化が必要なときは、`npm run feedback:issues`（`scripts/feedback-to-issues.mjs`）で個人情報・秘匿情報をマスクし、**非公開リポジトリ宛て**に転記する（`src/components/FeedbackWidget.tsx` / `src/app/feedback/actions.ts`）。
 
 意図的に外すもの: LINE 自動取り込み / カレンダー連携 / Google ドライブ・フォト連携 / プッシュ通知 / ネイティブアプリ。
 
@@ -90,7 +90,30 @@ npm run start      # 本番ビルドの起動
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
 npm run icons      # PWA アイコン再生成
+npm run feedback:issues  # フィードバックをマスクして非公開リポに Issue 化
 ```
+
+### ご意見・不具合フォームの Issue 化（運用）
+
+公開リポジトリに内容が漏れないよう、アプリは GitHub に何も送らず、送信内容は Supabase の
+`feedback` テーブルにのみ保存します。GitHub Issue 化が必要になったら、個人情報・秘匿情報を
+マスクしたうえで **非公開(private)リポジトリ宛て** に転記するスクリプトを手元で実行します。
+
+```bash
+# 1. .env.local に以下を設定（.env.local.example 参照）
+#    FEEDBACK_USER_EMAIL / FEEDBACK_USER_PASSWORD … 夫婦共用ログイン（RLS 経由で取得）
+#    GITHUB_TOKEN … Issues 書き込み権の Fine-grained PAT
+#    GITHUB_FEEDBACK_REPO … 登録先 owner/repo（★ 必ず非公開リポジトリ）
+
+# 2. まずマスク結果を目視確認（GitHub には登録しない）
+node --env-file=.env.local scripts/feedback-to-issues.mjs --dry-run
+
+# 3. 問題なければ登録（登録済みは github_issue_number で重複登録を防止）
+node --env-file=.env.local scripts/feedback-to-issues.mjs
+```
+
+メール・電話番号・トークン/API キー・URL のクエリ等は自動でマスクしますが、名前など一般語は
+自動検出できないため、`--dry-run` で必ず内容を確認してから登録してください。
 
 ## デプロイと確認
 
@@ -111,7 +134,7 @@ mfmf は **フロントエンドを Vercel、バックエンド（認証 / DB / 
 
 - main はマージしても **Preview 止まり**。**本番反映はタグ付き Release の公開がトリガ**。
 - どちらも CI（`ci.yml` を再利用）が緑のときだけデプロイされる。
-- （任意）ご意見・不具合フォームを GitHub Issue へ自動転記する場合は、Vercel にサーバー側専用の環境変数 `GITHUB_TOKEN`（対象リポジトリの Issues に書き込める Fine-grained PAT）と、必要なら `GITHUB_FEEDBACK_REPO`（既定: `godhuu0505/mfmf`）を設定する。未設定でもフォームは動作し、内容は `feedback` テーブルに保存される。
+- ご意見・不具合フォームの内容は Supabase に保存されるだけで、デプロイ環境に GitHub 関連の環境変数は不要（アプリは GitHub に送らない）。Issue 化は下記スクリプトを手元で実行する。
 
 初回セットアップ（`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` の登録）と本番リリース手順は
 **[docs/deploy.md](./docs/deploy.md)** を参照。
