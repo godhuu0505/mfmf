@@ -94,13 +94,25 @@ mfmf は **フロントエンドを Vercel、バックエンド（認証 / DB / 
 デプロイ済みアプリや Supabase バックエンドの **確認手順**は
 **[docs/supabase.md](./docs/supabase.md)** にまとめています。
 
-### デプロイ（Vercel）
+### デプロイ（Vercel / CI・CD）
 
-1. リポジトリを Vercel に接続。
-2. 環境変数 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定。
-3. デプロイ。利用者がアクセスするのは Vercel の URL（その裏で Supabase が動く）。
+デプロイは **GitHub Actions から Vercel CLI で明示的に**行う（Vercel の Git 連携自動デプロイは
+`vercel.json` の `git.deploymentEnabled: false` で無効化）。
+
+| トリガ | デプロイ先 | ワークフロー |
+| --- | --- | --- |
+| PR | （CI のみ：lint / typecheck / build） | `ci.yml` |
+| main へマージ(push) | Vercel **Preview** | `deploy-preview.yml` |
+| タグ付き Release 公開 | Vercel **Production** | `deploy-production.yml` |
+
+- main はマージしても **Preview 止まり**。**本番反映はタグ付き Release の公開がトリガ**。
+- どちらも CI（`ci.yml` を再利用）が緑のときだけデプロイされる。
+
+初回セットアップ（`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` の登録）と本番リリース手順は
+**[docs/deploy.md](./docs/deploy.md)** を参照。
 
 ## ドキュメント
 
 - [docs/local-setup.md](./docs/local-setup.md) — ローカル環境構築（リモート Supabase / ローカルスタックの両対応・トラブルシュート）
 - [docs/supabase.md](./docs/supabase.md) — Supabase バックエンド構成とデプロイ済みアプリの確認手順
+- [docs/deploy.md](./docs/deploy.md) — デプロイ / CI・CD（main→Preview、Release→Production）と初回セットアップ
