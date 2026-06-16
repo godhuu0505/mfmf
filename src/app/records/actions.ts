@@ -3,8 +3,25 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PHOTO_BUCKET } from "@/types/database";
+import { PHOTO_BUCKET, toSource } from "@/types/database";
 import { isOwnedStoragePath } from "@/lib/storagePath";
+
+// フォームから記録メタデータ（記録元・記入者・体重）を取り出す。
+function parseRecordFields(formData: FormData) {
+  const record_date = String(formData.get("record_date") || "");
+  const body = String(formData.get("body") || "");
+  const source = toSource(formData.get("source"));
+  const author = String(formData.get("author") || "").trim();
+
+  const rawWeight = String(formData.get("weight_kg") || "").trim();
+  const parsedWeight = rawWeight === "" ? null : Number(rawWeight);
+  const weight_kg =
+    parsedWeight !== null && Number.isFinite(parsedWeight) && parsedWeight > 0
+      ? parsedWeight
+      : null;
+
+  return { record_date, body, source, author, weight_kg };
+}
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -46,12 +63,11 @@ export async function createRecord(formData: FormData) {
   if (!UUID_RE.test(recordId)) {
     throw new Error("不正なリクエストです");
   }
-  const record_date = String(formData.get("record_date") || "");
-  const body = String(formData.get("body") || "");
+  const fields = parseRecordFields(formData);
 
   const { error } = await supabase
     .from("daycare_records")
-    .insert({ id: recordId, owner_id: user.id, record_date, body });
+    .insert({ id: recordId, owner_id: user.id, ...fields });
 
   if (error) {
     throw new Error(`記録の作成に失敗しました: ${error.message}`);
@@ -70,12 +86,11 @@ export async function updateRecord(recordId: string, formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const record_date = String(formData.get("record_date") || "");
-  const body = String(formData.get("body") || "");
+  const fields = parseRecordFields(formData);
 
   const { error } = await supabase
     .from("daycare_records")
-    .update({ record_date, body })
+    .update(fields)
     .eq("id", recordId);
 
   if (error) {

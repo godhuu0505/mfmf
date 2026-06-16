@@ -3,7 +3,11 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { withSignedUrls } from "@/lib/photos";
-import type { DaycareRecord, RecordPhoto } from "@/types/database";
+import {
+  SOURCE_LABEL,
+  type DaycareRecord,
+  type RecordPhoto,
+} from "@/types/database";
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
 import { updateRecord, deletePhoto, deleteRecord } from "@/app/records/actions";
@@ -68,6 +72,9 @@ export default async function RecordDetailPage({
               recordId={record.id}
               defaultDate={record.record_date}
               defaultBody={record.body}
+              defaultSource={record.source}
+              defaultAuthor={record.author}
+              defaultWeightKg={record.weight_kg}
               submitLabel="更新する"
               cancelHref={`/records/${record.id}`}
             />
@@ -113,13 +120,38 @@ export default async function RecordDetailPage({
           </>
         ) : (
           <>
-            <div className="mb-4 flex items-center justify-between">
-              <h1 className="text-xl font-bold text-slate-900">
-                {formatDate(record.record_date)}
-              </h1>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <span
+                    className={
+                      "rounded-full px-2.5 py-0.5 text-xs font-medium " +
+                      (record.source === "home"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-sky-100 text-sky-700")
+                    }
+                  >
+                    {record.source === "home" ? "🏠 " : "🏫 "}
+                    {SOURCE_LABEL[record.source]}
+                  </span>
+                  {record.weight_kg != null && (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                      ⚖️ {record.weight_kg}kg
+                    </span>
+                  )}
+                </div>
+                <h1 className="text-xl font-bold text-slate-900">
+                  {formatDate(record.record_date)}
+                </h1>
+                {record.author && (
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    記入者: {record.author}
+                  </p>
+                )}
+              </div>
               <Link
                 href={`/records/${record.id}?edit=1`}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                className="shrink-0 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
               >
                 編集
               </Link>
