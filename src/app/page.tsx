@@ -96,12 +96,20 @@ export default async function HomePage({
       <main className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-slate-900">記録一覧</h1>
-          <Link
-            href="/records/new"
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-          >
-            ＋ 新規
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/weight"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            >
+              ⚖️ 体重
+            </Link>
+            <Link
+              href="/records/new"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+            >
+              ＋ 新規
+            </Link>
+          </div>
         </div>
 
         <nav className="mb-4 inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
