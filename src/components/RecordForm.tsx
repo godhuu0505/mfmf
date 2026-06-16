@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImages } from "@/lib/imageResize";
 import { buildStoragePath } from "@/lib/storagePath";
+import TagInput from "@/components/TagInput";
 import {
   PHOTO_BUCKET,
   RECORD_SOURCES,
@@ -29,6 +30,10 @@ type Props = {
   defaultSource?: RecordSource;
   defaultAuthor?: string;
   defaultWeightKg?: number | null;
+  /** この記録に付与済みのタグ名 */
+  defaultTags?: string[];
+  /** サジェスト用の既存タグ名（オーナーの辞書） */
+  tagSuggestions?: string[];
   submitLabel: string;
   cancelHref: string;
 };
@@ -42,6 +47,8 @@ export default function RecordForm({
   defaultSource = "daycare",
   defaultAuthor = "",
   defaultWeightKg = null,
+  defaultTags = [],
+  tagSuggestions = [],
   submitLabel,
   cancelHref,
 }: Props) {
@@ -245,6 +252,8 @@ export default function RecordForm({
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
         />
       </div>
+
+      <TagInput defaultTags={defaultTags} suggestions={tagSuggestions} />
 
       <div>
         <label
