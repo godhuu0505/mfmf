@@ -1,18 +1,27 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { resizeImages } from "@/lib/imageResize";
 
-function SubmitButton({ label }: { label: string }) {
+function SubmitButton({ label, disabled }: { label: string; disabled?: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition hover:bg-slate-700 disabled:opacity-60"
     >
       {pending ? "保存中…" : label}
     </button>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(0)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
 }
 
 type Props = {
@@ -30,6 +39,45 @@ export default function RecordForm({
   submitLabel,
   cancelHref,
 }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [processing, setProcessing] = useState(false);
+  const [summary, setSummary] = useState<string | null>(null);
+
+  // 選択された画像をアップロード前に縮小・圧縮し、input.files を差し替える。
+  async function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.currentTarget;
+    const selected = Array.from(input.files ?? []);
+    if (selected.length === 0) {
+      setSummary(null);
+      return;
+    }
+
+    setProcessing(true);
+    setSummary(null);
+    try {
+      const before = selected.reduce((sum, f) => sum + f.size, 0);
+      const resized = await resizeImages(selected);
+      const after = resized.reduce((sum, f) => sum + f.size, 0);
+
+      // 圧縮後のファイルを input に戻す（フォーム送信でそのまま使われる）
+      const dt = new DataTransfer();
+      resized.forEach((f) => dt.items.add(f));
+      if (fileInputRef.current) fileInputRef.current.files = dt.files;
+
+      const saved = before > 0 ? Math.round((1 - after / before) * 100) : 0;
+      setSummary(
+        `${resized.length}枚を最適化しました（${formatBytes(before)} → ${formatBytes(after)}` +
+          (saved > 0 ? ` / -${saved}%` : "") +
+          "）",
+      );
+    } catch {
+      // 失敗しても元の選択ファイルで送信できるので致命的ではない
+      setSummary("画像の最適化をスキップしました（そのままアップロードします）");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
   return (
     <form action={action} className="space-y-5">
       <div>
@@ -74,17 +122,24 @@ export default function RecordForm({
           写真を追加（複数選択可）
         </label>
         <input
+          ref={fileInputRef}
           id="photos"
           name="photos"
           type="file"
           accept="image/*"
           multiple
+          onChange={handleFilesChange}
           className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
         />
+        <p className="mt-1.5 text-xs text-slate-400" aria-live="polite">
+          {processing
+            ? "画像を最適化しています…"
+            : summary ?? "アップロード時に自動で縮小・圧縮します（長辺 1600px）。"}
+        </p>
       </div>
 
       <div className="flex items-center gap-3 pt-2">
-        <SubmitButton label={submitLabel} />
+        <SubmitButton label={submitLabel} disabled={processing} />
         <a
           href={cancelHref}
           className="text-sm text-slate-500 transition hover:text-slate-800"
