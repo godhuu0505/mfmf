@@ -2,6 +2,7 @@
 
 このファイルは Claude Code が **mfmf**（ペット保育園記録アプリ）で作業するための指針です。
 全体像は `README.md`、DB/RLS は `supabase/migrations/0001_init.sql` を正とします。
+ツール非依存の要点版は `AGENTS.md`、各種手順・仕様は `docs/`（索引は `docs/README.md`）にあります。
 
 ## プロジェクト概要
 
