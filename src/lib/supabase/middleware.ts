@@ -31,9 +31,12 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
+  const { pathname } = request.nextUrl;
+  const isAuthRoute = pathname.startsWith("/login");
+  // 認証不要で表示するページ（オフライン用フォールバック等）
+  const isPublicRoute = pathname === "/offline";
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isPublicRoute) {
     // 未ログイン → /login へ
     const url = request.nextUrl.clone();
     url.pathname = "/login";

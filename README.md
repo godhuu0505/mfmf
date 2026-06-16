@@ -21,6 +21,13 @@
 
 意図的に外すもの: LINE 自動取り込み / カレンダー連携 / Google ドライブ・フォト連携 / プッシュ通知 / ネイティブアプリ。
 
+### UX 改善（フェーズ1.5）
+
+- **PWA 化**: `manifest.webmanifest`（Next.js metadata route）+ Service Worker（`public/sw.js`）でホーム画面に追加でき、スタンドアロン表示・オフラインフォールバック（`/offline`）に対応。
+  - Service Worker は本番ビルドでのみ登録。静的アセットは stale-while-revalidate、ページ遷移は network-first。**Supabase の API レスポンスや署名付き写真 URL（private / 期限付き）はキャッシュしない**。
+  - アイコンは `npm run icons`（`scripts/generate-icons.mjs`）で生成。外部の画像ライブラリに依存せず、Node 標準の zlib で肉球モチーフの PNG を直接エンコードする。
+- **画像のアップロード時リサイズ・圧縮**: 選択された画像をブラウザ側で長辺 1600px に縮小し JPEG 再圧縮（`src/lib/imageResize.ts`）してから Storage へ送る。EXIF の向きも反映。Storage 使用量と通信量を抑える。
+
 ### 共有方針: (A) 1アカウント共用
 
 夫婦で同じログインを共用する前提。`household_id` は持たず、`owner_id (= auth.uid())` ベースで RLS を設定。
