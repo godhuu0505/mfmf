@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import FeedbackWidget from "@/components/FeedbackWidget";
 
 export const metadata: Metadata = {
   applicationName: "mfmf",
@@ -39,6 +40,7 @@ export default function RootLayout({
     <html lang="ja">
       <body className="min-h-screen">
         {children}
+        <FeedbackWidget />
         <ServiceWorkerRegister />
       </body>
     </html>
