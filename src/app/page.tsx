@@ -7,7 +7,15 @@ import {
   type RecordSource,
   type RecordWithPhotos,
 } from "@/types/database";
+import {
+  buildIlikeOr,
+  buildQueryString,
+  hasActiveFilters,
+  PAGE_SIZE,
+  parseFilters,
+} from "@/lib/recordQuery";
 import AppHeader from "@/components/AppHeader";
+import RecordFilters from "@/components/RecordFilters";
 
 export const dynamic = "force-dynamic";
 
@@ -41,35 +49,56 @@ function SourceBadge({ source }: { source: RecordSource }) {
   );
 }
 
-// フィルタタブの定義（値 / ラベル）
-const FILTERS: { value: "all" | RecordSource; label: string }[] = [
-  { value: "all", label: "すべて" },
-  { value: "daycare", label: "保育園" },
-  { value: "home", label: "おうち" },
-];
-
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { source: sourceParam } = await searchParams;
-  const filter: "all" | RecordSource =
-    sourceParam === "daycare" || sourceParam === "home" ? sourceParam : "all";
+  const filters = parseFilters(await searchParams);
 
   const supabase = await createClient();
 
+  // RLS（owner_id = auth.uid()）の範囲内で検索・絞り込み・並び替え・ページングする
   let query = supabase
     .from("daycare_records")
-    .select("*, record_photos(*)")
-    .order("record_date", { ascending: false })
-    .order("created_at", { ascending: false });
+    .select("*, record_photos(*)", { count: "exact" });
 
-  if (filter !== "all") query = query.eq("source", filter);
+  if (filters.source !== "all") query = query.eq("source", filters.source);
+  if (filters.from) query = query.gte("record_date", filters.from);
+  if (filters.to) query = query.lte("record_date", filters.to);
+  if (filters.q) query = query.or(buildIlikeOr(filters.q));
 
-  const { data: records } = await query.returns<RecordWithPhotos[]>();
+  switch (filters.sort) {
+    case "date_asc":
+      query = query
+        .order("record_date", { ascending: true })
+        .order("created_at", { ascending: true });
+      break;
+    case "weight_desc":
+      query = query
+        .order("weight_kg", { ascending: false, nullsFirst: false })
+        .order("record_date", { ascending: false });
+      break;
+    case "weight_asc":
+      query = query
+        .order("weight_kg", { ascending: true, nullsFirst: false })
+        .order("record_date", { ascending: false });
+      break;
+    default:
+      query = query
+        .order("record_date", { ascending: false })
+        .order("created_at", { ascending: false });
+  }
+
+  const fromIdx = (filters.page - 1) * PAGE_SIZE;
+  query = query.range(fromIdx, fromIdx + PAGE_SIZE - 1);
+
+  const { data: records, count } = await query.returns<RecordWithPhotos[]>();
 
   const list = records ?? [];
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const active = hasActiveFilters(filters);
 
   // 各記録の先頭写真サムネに署名付き URL を付与
   const thumbPaths = list
@@ -89,6 +118,9 @@ export default async function HomePage({
   signed?.forEach((s) => {
     if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
   });
+
+  const prevHref = `/${buildQueryString(filters, { page: filters.page - 1 })}`;
+  const nextHref = `/${buildQueryString(filters, { page: filters.page + 1 })}`;
 
   return (
     <>
@@ -112,38 +144,31 @@ export default async function HomePage({
           </div>
         </div>
 
-        <nav className="mb-4 inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-          {FILTERS.map((f) => {
-            const active = filter === f.value;
-            const href = f.value === "all" ? "/" : `/?source=${f.value}`;
-            return (
-              <Link
-                key={f.value}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={
-                  "rounded-md px-4 py-1.5 text-sm font-medium transition " +
-                  (active
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:bg-slate-100")
-                }
-              >
-                {f.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {/* key で絞り込み変更時に再マウントし、入力欄を現在の URL 条件に同期する */}
+        <RecordFilters key={buildQueryString(filters)} filters={filters} />
+
+        {total > 0 && (
+          <p className="mb-3 text-sm text-slate-500">
+            全 {total} 件
+            {totalPages > 1 && (
+              <span>
+                {" "}
+                / {filters.page} ページ目（全 {totalPages} ページ）
+              </span>
+            )}
+          </p>
+        )}
 
         {list.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
-            {filter === "all" ? (
+            {active ? (
+              <>条件に該当する記録はありません。</>
+            ) : (
               <>
                 まだ記録がありません。
                 <br />
                 「＋ 新規」から最初の記録を追加しましょう。
               </>
-            ) : (
-              <>この絞り込みに該当する記録はありません。</>
             )}
           </div>
         ) : (
@@ -201,6 +226,40 @@ export default async function HomePage({
               );
             })}
           </ul>
+        )}
+
+        {totalPages > 1 && (
+          <nav className="mt-6 flex items-center justify-between">
+            {filters.page > 1 ? (
+              <Link
+                href={prevHref}
+                rel="prev"
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              >
+                ← 前へ
+              </Link>
+            ) : (
+              <span className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-300">
+                ← 前へ
+              </span>
+            )}
+            <span className="text-sm text-slate-500">
+              {filters.page} / {totalPages}
+            </span>
+            {filters.page < totalPages ? (
+              <Link
+                href={nextHref}
+                rel="next"
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              >
+                次へ →
+              </Link>
+            ) : (
+              <span className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-300">
+                次へ →
+              </span>
+            )}
+          </nav>
         )}
       </main>
     </>

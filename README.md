@@ -38,6 +38,7 @@
 ## データモデル
 
 `auth.users`（Supabase 標準）に加えて以下3テーブル。詳細は `supabase/migrations/0001_init.sql`・`0002_record_metadata.sql`・`0003_feedback.sql`。
+検索高速化のインデックスは `0004_record_search.sql`（`pg_trgm` による本文・記入者の部分一致 + 体重の並び替え）で追加する。
 
 - `daycare_records` — 日々の記録（`owner_id`, `record_date`, `source`=daycare/home, `author`, `weight_kg`, `body`, タイムスタンプ）
 - `record_photos` — 記録に紐づく写真（`record_id`, `storage_path`）
@@ -49,7 +50,7 @@ RLS は `owner_id` ベース。Storage バケット `daycare-photos` は private
 ## 画面
 
 1. `/login` — メール + パスワード
-2. `/` — 記録一覧（日付降順、サムネ + 抜粋）
+2. `/` — 記録一覧（サムネ + 抜粋）。本文・記入者のキーワード検索、記録元・期間での絞り込み、日付/体重での並び替え、ページネーションに対応。条件は URL クエリ（`?q=&from=&to=&source=&sort=&page=`）に同期され、共有・リロードで再現できる。
 3. `/records/new` — 新規作成
 4. `/records/[id]` — 詳細 / `?edit=1` で編集
 
@@ -76,7 +77,7 @@ npm run dev   # http://localhost:3000
 Supabase 側の準備（初回のみ）:
 
 1. Supabase プロジェクトを用意する。
-2. `supabase/migrations/` の SQL を連番順に SQL Editor で実行（`0001_init.sql`=テーブル / RLS / Storage バケット、`0002_record_metadata.sql`=記録元・記入者・体重の列追加、`0003_feedback.sql`=ご意見・不具合フォームの保存テーブル / RLS）。
+2. `supabase/migrations/` の SQL を連番順に SQL Editor で実行（`0001_init.sql`=テーブル / RLS / Storage バケット、`0002_record_metadata.sql`=記録元・記入者・体重の列追加、`0003_feedback.sql`=ご意見・不具合フォームの保存テーブル / RLS、`0004_record_search.sql`=検索高速化インデックス（`pg_trgm`）の追加）。
 3. ユーザーを Authentication > Users から手動発行する（サインアップ UI は無し）。共有方針は (A) 1アカウント共用のため、**夫婦で共有する 1 つのログイン**を発行して 2 人で使う（RLS が `owner_id` ベースのため、ユーザーを分けると記録が共有されない）。
 
 接続情報（URL / anon key）は Supabase ダッシュボード > **Project Settings > API** から取得します。
