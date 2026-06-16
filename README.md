@@ -18,6 +18,7 @@
 - **① ログイン**: email / password（Supabase Auth）。サインアップ UI は無し（アカウントはダッシュボードで手動発行）。
 - **② テキストの保管・表示**: 記録の CRUD（日付＋本文）、一覧 / 詳細 / 編集 / 削除。
 - **③ 画像の紐付け**: 1記録に複数枚アップロード → Storage 保存 → テキストと並べて表示、一覧にサムネ。
+- **④ 記録メタデータ**: 記録元（🏫 保育園 / 🏠 おうち）・記入者・体重(kg)を任意で残せる。保育園とおうち（両親）どちらのノートも同じ仕組みで登録でき、一覧は記録元で絞り込み、詳細・一覧に記録元バッジと体重を表示して後から振り返れる。
 
 意図的に外すもの: LINE 自動取り込み / カレンダー連携 / Google ドライブ・フォト連携 / プッシュ通知 / ネイティブアプリ。
 
@@ -35,9 +36,9 @@
 
 ## データモデル
 
-`auth.users`（Supabase 標準）に加えて以下2テーブル。詳細は `supabase/migrations/0001_init.sql`。
+`auth.users`（Supabase 標準）に加えて以下2テーブル。詳細は `supabase/migrations/0001_init.sql` と `0002_record_metadata.sql`。
 
-- `daycare_records` — 保育園からの記録（`owner_id`, `record_date`, `body`, タイムスタンプ）
+- `daycare_records` — 日々の記録（`owner_id`, `record_date`, `source`=daycare/home, `author`, `weight_kg`, `body`, タイムスタンプ）
 - `record_photos` — 記録に紐づく写真（`record_id`, `storage_path`）
 
 RLS は `owner_id` ベース。Storage バケット `daycare-photos` は private、署名付き URL で配信。
@@ -71,7 +72,7 @@ npm run dev   # http://localhost:3000
 Supabase 側の準備（初回のみ）:
 
 1. Supabase プロジェクトを用意する。
-2. `supabase/migrations/0001_init.sql` を SQL Editor で実行（テーブル / RLS / Storage バケット）。
+2. `supabase/migrations/` の SQL を連番順に SQL Editor で実行（`0001_init.sql`=テーブル / RLS / Storage バケット、`0002_record_metadata.sql`=記録元・記入者・体重の列追加）。
 3. ユーザーを Authentication > Users から手動発行する（サインアップ UI は無し）。共有方針は (A) 1アカウント共用のため、**夫婦で共有する 1 つのログイン**を発行して 2 人で使う（RLS が `owner_id` ベースのため、ユーザーを分けると記録が共有されない）。
 
 接続情報（URL / anon key）は Supabase ダッシュボード > **Project Settings > API** から取得します。
