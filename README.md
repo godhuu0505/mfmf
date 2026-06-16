@@ -50,38 +50,56 @@ RLS は `owner_id` ベース。Storage バケット `daycare-photos` は private
 3. `/records/new` — 新規作成
 4. `/records/[id]` — 詳細 / `?edit=1` で編集
 
-## セットアップ
+## ローカル環境構築（クイックスタート）
 
-### 1. 依存インストール
+最短の手順は以下。詳細・トラブルシュートや Supabase CLI を使うローカルスタック構成は
+**[docs/local-setup.md](./docs/local-setup.md)** を参照してください。
 
 ```bash
+# 1. 依存インストール
 npm install
+
+# 2. 環境変数を用意し、Supabase の URL / anon key を設定
+cp .env.local.example .env.local
+#   NEXT_PUBLIC_SUPABASE_URL=https://<PROJECT_REF>.supabase.co
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon または publishable key>
+
+# 3. 開発サーバー
+npm run dev   # http://localhost:3000
 ```
 
-### 2. Supabase
+Supabase 側の準備（初回のみ）:
 
 1. Supabase プロジェクトを用意する。
 2. `supabase/migrations/0001_init.sql` を SQL Editor で実行（テーブル / RLS / Storage バケット）。
-3. ユーザーを Authentication > Users から手動発行する（夫婦の最大2人）。
+3. ユーザーを Authentication > Users から手動発行する（夫婦の最大2人。サインアップ UI は無し）。
 
-### 3. 環境変数
+接続情報（URL / anon key）は Supabase ダッシュボード > **Project Settings > API** から取得します。
 
-`.env.local.example` を `.env.local` にコピーし、Supabase の URL と anon key を設定。
-
-```bash
-cp .env.local.example .env.local
-```
-
-### 4. 開発サーバー
+### npm スクリプト
 
 ```bash
-npm run dev
+npm run dev        # 開発サーバー
+npm run build      # 本番ビルド
+npm run start      # 本番ビルドの起動
+npm run lint       # ESLint
+npm run typecheck  # tsc --noEmit
+npm run icons      # PWA アイコン再生成
 ```
 
-http://localhost:3000 を開く。
+## デプロイと確認
 
-## デプロイ（Vercel）
+mfmf は **フロントエンドを Vercel、バックエンド（認証 / DB / 画像）を Supabase** に分けてデプロイします。
+デプロイ済みアプリや Supabase バックエンドの **確認手順**は
+**[docs/supabase.md](./docs/supabase.md)** にまとめています。
+
+### デプロイ（Vercel）
 
 1. リポジトリを Vercel に接続。
 2. 環境変数 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定。
-3. デプロイ。
+3. デプロイ。利用者がアクセスするのは Vercel の URL（その裏で Supabase が動く）。
+
+## ドキュメント
+
+- [docs/local-setup.md](./docs/local-setup.md) — ローカル環境構築（リモート Supabase / ローカルスタックの両対応・トラブルシュート）
+- [docs/supabase.md](./docs/supabase.md) — Supabase バックエンド構成とデプロイ済みアプリの確認手順
