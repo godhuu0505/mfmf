@@ -19,9 +19,31 @@ jobs:
   verify:
     uses: ./.github/workflows/ci.yml
 
+  # Vercel のシークレットが設定されているかを確認する。
+  # 未設定（VERCEL_TOKEN が空）の環境ではデプロイを実行できないため、
+  # ここで判定して deploy ジョブを skip させ、ワークフロー全体が赤くならないようにする。
+  # secrets コンテキストは job-level の if では参照できないので、専用ジョブで output 化する。
+  check-secrets:
+    name: Check Vercel secrets
+    runs-on: ubuntu-latest
+    outputs:
+      has_vercel: ${{ steps.check.outputs.has_vercel }}
+    steps:
+      - id: check
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -n "$VERCEL_TOKEN" ]; then
+            echo "has_vercel=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_vercel=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::VERCEL_TOKEN が未設定のため Vercel Preview デプロイをスキップします。"
+          fi
+
   deploy:
     name: Vercel Preview
-    needs: verify
+    needs: [verify, check-secrets]
+    if: needs.check-secrets.outputs.has_vercel == 'true'
     runs-on: ubuntu-latest
     # GitHub Environment（保護ルール / Secrets のスコープ用）。
     environment:
