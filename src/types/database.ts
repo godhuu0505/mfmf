@@ -106,6 +106,19 @@ export function toFeedbackFrequency(value: unknown): FeedbackFrequency | null {
     : null;
 }
 
+// ---------------------------------------------------------------
+// ユーザープロフィール / アカウント設定 (profiles)
+// ---------------------------------------------------------------
+
+// 1 ユーザーにつき 1 行。owner_id (= auth.uid()) ベースの RLS で保護される。
+export type Profile = {
+  owner_id: string;
+  display_name: string | null;
+  default_author: string | null; // 記録フォームの「記入者」の既定値
+  created_at: string;
+  updated_at: string;
+};
+
 // 送信時に自動収集するアプリの状況。
 export type FeedbackContext = {
   page_path?: string; // 開いていた画面のパス (例: /records/123)

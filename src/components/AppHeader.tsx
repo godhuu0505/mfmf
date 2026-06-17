@@ -20,14 +20,24 @@ export default function AppHeader() {
           />
           mfmf
         </Link>
-        <form action="/auth/signout" method="post">
-          <button
-            type="submit"
+        <div className="flex items-center gap-4">
+          <Link
+            href="/settings"
             className="text-sm text-slate-500 transition hover:text-slate-800"
+            aria-label="設定"
+            title="設定"
           >
-            ログアウト
-          </button>
-        </form>
+            ⚙️
+          </Link>
+          <form action="/auth/signout" method="post">
+            <button
+              type="submit"
+              className="text-sm text-slate-500 transition hover:text-slate-800"
+            >
+              ログアウト
+            </button>
+          </form>
+        </div>
       </div>
     </header>
   );

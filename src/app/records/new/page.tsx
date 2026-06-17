@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/profile";
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
 import { createRecord } from "@/app/records/actions";
@@ -15,6 +16,7 @@ export default async function NewRecordPage() {
   if (!user) redirect("/login");
 
   const today = new Date().toISOString().slice(0, 10);
+  const profile = await getCurrentProfile();
 
   return (
     <>
@@ -31,6 +33,7 @@ export default async function NewRecordPage() {
           action={createRecord}
           ownerId={user.id}
           defaultDate={today}
+          defaultAuthor={profile?.default_author ?? ""}
           submitLabel="保存する"
           cancelHref="/"
         />
