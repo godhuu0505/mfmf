@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { withSignedUrls } from "@/lib/photos";
+import { listPets } from "@/lib/pets";
 import {
   SOURCE_LABEL,
   type DaycareRecord,
@@ -52,6 +53,7 @@ export default async function RecordDetailPage({
     .returns<RecordPhoto[]>();
 
   const photos = await withSignedUrls(photoRows ?? []);
+  const pets = isEdit ? await listPets() : [];
 
   return (
     <>
@@ -75,6 +77,8 @@ export default async function RecordDetailPage({
               defaultSource={record.source}
               defaultAuthor={record.author}
               defaultWeightKg={record.weight_kg}
+              pets={pets.map((p) => ({ id: p.id, name: p.name }))}
+              defaultPetId={record.pet_id}
               submitLabel="更新する"
               cancelHref={`/records/${record.id}`}
             />

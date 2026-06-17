@@ -22,7 +22,19 @@ export type DaycareRecord = {
   source: RecordSource;
   author: string;
   weight_kg: number | null;
+  pet_id: string | null; // 対象ペット。未設定は null（段階導入）
   body: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// 飼っているペット（多頭飼いに備える素地）。owner_id ベースの RLS で保護。
+export type Pet = {
+  id: string;
+  owner_id: string;
+  name: string;
+  species: string | null;
+  birthday: string | null; // YYYY-MM-DD
   created_at: string;
   updated_at: string;
 };

@@ -18,6 +18,8 @@ function formatBytes(bytes: number): string {
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
+type PetOption = { id: string; name: string };
+
 type Props = {
   action: (formData: FormData) => void | Promise<void>;
   /** ログイン中ユーザーの id（Storage パスと RLS の前提） */
@@ -29,6 +31,9 @@ type Props = {
   defaultSource?: RecordSource;
   defaultAuthor?: string;
   defaultWeightKg?: number | null;
+  /** 選択可能なペット一覧（owner_id スコープ）。空ならペット欄を出さない。 */
+  pets?: PetOption[];
+  defaultPetId?: string | null;
   submitLabel: string;
   cancelHref: string;
 };
@@ -42,6 +47,8 @@ export default function RecordForm({
   defaultSource = "daycare",
   defaultAuthor = "",
   defaultWeightKg = null,
+  pets = [],
+  defaultPetId = null,
   submitLabel,
   cancelHref,
 }: Props) {
@@ -167,6 +174,26 @@ export default function RecordForm({
           ))}
         </div>
       </div>
+
+      {pets.length > 0 && (
+        <div>
+          <label htmlFor="pet_id" className="mb-1 block text-sm font-medium text-slate-700">
+            ペット
+          </label>
+          <select
+            id="pet_id"
+            name="pet_id"
+            defaultValue={defaultPetId ?? pets[0]?.id ?? ""}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+          >
+            {pets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div>
         <label
