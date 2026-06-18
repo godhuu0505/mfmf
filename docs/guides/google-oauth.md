@@ -33,9 +33,17 @@ Supabase ダッシュボード → **Authentication → URL Configuration → Re
 | 環境 | 登録する Redirect URL |
 | --- | --- |
 | ローカル開発 | `http://localhost:3000/auth/callback` |
-| Vercel Preview | `https://*.vercel.app/auth/callback`（またはプレビュー固有のドメイン） |
+| Vercel Preview | `https://*-<team-or-account-slug>.vercel.app/**`（自分のチーム / アカウント slug に限定） |
 | 本番 | `https://YOUR_PRODUCTION_DOMAIN/auth/callback` |
 
+> ⚠️ **`https://*.vercel.app/...` のような広いワイルドカードは登録しないでください。**
+> `NEXT_PUBLIC_SUPABASE_URL` / anon key は公開値のため、広すぎる許可リストだと
+> **無関係な別の Vercel アプリ**がこの Supabase プロジェクト向けの OAuth フローを開始し、
+> コールバックを横取り（`code` を交換）できてしまいます。Supabase の `*` は区切り以外の
+> 任意文字にマッチするため、プレビューは **自分のプロジェクト固有のプレフィックス**で
+> 絞り込みます（例: `https://mfmf-<slug>-*.vercel.app/**`）。確実を期すなら
+> プレビュー固有のドメインを**完全一致**で登録してください。
+>
 > アプリは `window.location.origin + /auth/callback` を `redirectTo` に渡すため、
 > アクセス元のオリジンに対応する URL を登録しておく必要があります。
 > Site URL（既定の戻り先）も併せて本番ドメインに設定しておくと安全です。
@@ -46,6 +54,20 @@ Supabase ダッシュボード → **Authentication → URL Configuration → Re
 2. Google の同意画面 → `/auth/v1/callback`（Supabase）→ アプリの `/auth/callback`
    へ戻り、`code` がセッションに交換されて一覧（`/`）へ遷移すれば成功。
 3. 失敗時は `/login?error=oauth` に戻り、ログイン画面にエラーが表示されます。
+
+## ⚠️ 重要: 共有する 1 つの Google アカウントで使う
+
+本アプリは共有方針 **(A) 夫婦で 1 アカウント共用**（`owner_id = auth.uid()`、世帯概念なし）です。
+**各自が別々の Google アカウントでログインすると、それぞれ別の `auth.uid()` になり、
+相手の記録・写真が一切見えなくなります**（別々の空データセットになる）。
+
+- Google ログインは、**ご夫婦で共有する 1 つの Google アカウント**でのみ使ってください。
+- 既存のメール / パスワード共有アカウントと**同じ人物（同じデータ）**として使いたい場合は、
+  当面はメール / パスワードログインの利用を推奨します（Google は別 `auth.uid()` になり得るため）。
+- 複数ユーザーでの世帯共有・個別アカウントは **Phase 4「世帯共有（household_id）」(#33)** で
+  対応予定です。それまでは 1 共有アカウント運用を維持します。
+- 運用を厳密にしたい場合は、Google Cloud の OAuth 同意画面で**テストユーザーを共有
+  アカウントのみ**に限定すると、想定外のアカウントでのログインを抑止できます。
 
 ## 補足
 

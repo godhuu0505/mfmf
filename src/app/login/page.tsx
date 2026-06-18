@@ -162,6 +162,8 @@ function LoginForm() {
 
         <p className="mt-4 text-center text-xs text-slate-400">
           アカウントは管理者が発行します。
+          <br />
+          Google ログインは、ご夫婦で共有する 1 つの Google アカウントでご利用ください。
         </p>
       </div>
     </main>
