@@ -103,3 +103,41 @@ begin
     where owner_id = r.owner_id and pet_id is null;
   end loop;
 end $$;
+
+-- ---------------------------------------------------------------
+-- 5. daycare_records の insert/update ポリシーを pet 所有チェックで強化
+--    Server Action を経由せず直接 API を叩いても、他人のペット ID を参照する
+--    記録を作成 / 更新できないようにする DB 層での強制。既存の owner_id
+--    チェックは維持し、pet_id が NULL でないときのみ「その pet が自分のもの」
+--    であることを追加で要求する（既存ポリシーを弱めない・強化のみ）。
+-- ---------------------------------------------------------------
+drop policy if exists "records_insert_own" on public.daycare_records;
+create policy "records_insert_own"
+  on public.daycare_records for insert
+  with check (
+    auth.uid() = owner_id
+    and (
+      pet_id is null
+      or exists (
+        select 1 from public.pets p
+        where p.id = daycare_records.pet_id
+          and p.owner_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "records_update_own" on public.daycare_records;
+create policy "records_update_own"
+  on public.daycare_records for update
+  using (auth.uid() = owner_id)
+  with check (
+    auth.uid() = owner_id
+    and (
+      pet_id is null
+      or exists (
+        select 1 from public.pets p
+        where p.id = daycare_records.pet_id
+          and p.owner_id = auth.uid()
+      )
+    )
+  );

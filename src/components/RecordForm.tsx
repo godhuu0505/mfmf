@@ -183,9 +183,12 @@ export default function RecordForm({
           <select
             id="pet_id"
             name="pet_id"
-            defaultValue={defaultPetId ?? pets[0]?.id ?? ""}
+            defaultValue={defaultPetId ?? ""}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
           >
+            {/* 未設定を明示。pet_id=null の既存記録を勝手に付け替えないため、
+                fallback で先頭ペットを選ばない。 */}
+            <option value="">（未設定）</option>
             {pets.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}

@@ -36,6 +36,7 @@ export default async function NewRecordPage() {
           defaultDate={today}
           defaultAuthor={profile?.default_author ?? ""}
           pets={pets.map((p) => ({ id: p.id, name: p.name }))}
+          defaultPetId={pets[0]?.id ?? null}
           submitLabel="保存する"
           cancelHref="/"
         />
