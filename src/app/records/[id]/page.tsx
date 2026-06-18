@@ -11,6 +11,7 @@ import {
 } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
+import PhotoGallery from "@/components/PhotoGallery";
 import { updateRecord, deletePhoto, deleteRecord } from "@/app/records/actions";
 
 export const dynamic = "force-dynamic";
@@ -168,24 +169,12 @@ export default async function RecordDetailPage({
             </article>
 
             {photos.length > 0 && (
-              <section className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {photos.map((p) => (
-                  <div
-                    key={p.id}
-                    className="relative aspect-square overflow-hidden rounded-xl bg-slate-100"
-                  >
-                    {p.url && (
-                      <Image
-                        src={p.url}
-                        alt=""
-                        fill
-                        sizes="(max-width:640px) 50vw, 200px"
-                        className="object-cover"
-                        unoptimized
-                      />
-                    )}
-                  </div>
-                ))}
+              <section className="mt-6">
+                <PhotoGallery
+                  images={photos
+                    .filter((p) => p.url)
+                    .map((p) => ({ id: p.id, url: p.url as string }))}
+                />
               </section>
             )}
 

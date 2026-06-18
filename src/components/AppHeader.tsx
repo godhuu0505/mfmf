@@ -22,6 +22,14 @@ export default function AppHeader() {
         </Link>
         <div className="flex items-center gap-4">
           <Link
+            href="/gallery"
+            className="text-sm text-slate-500 transition hover:text-slate-800"
+            aria-label="ギャラリー"
+            title="ギャラリー"
+          >
+            🖼️
+          </Link>
+          <Link
             href="/calendar"
             className="text-sm text-slate-500 transition hover:text-slate-800"
             aria-label="カレンダー"
