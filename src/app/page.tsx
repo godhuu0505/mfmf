@@ -4,9 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import {
   PHOTO_BUCKET,
   SOURCE_LABEL,
+  tagsFromJoin,
   type RecordSource,
   type RecordWithPhotos,
 } from "@/types/database";
+import { getOwnerTags } from "@/lib/tags";
 import AppHeader from "@/components/AppHeader";
 
 export const dynamic = "force-dynamic";
@@ -51,25 +53,54 @@ const FILTERS: { value: "all" | RecordSource; label: string }[] = [
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string }>;
+  searchParams: Promise<{ source?: string; tag?: string }>;
 }) {
-  const { source: sourceParam } = await searchParams;
+  const { source: sourceParam, tag: tagParam } = await searchParams;
   const filter: "all" | RecordSource =
     sourceParam === "daycare" || sourceParam === "home" ? sourceParam : "all";
 
   const supabase = await createClient();
 
+  // 絞り込み UI 用にオーナーのタグ辞書を取得し、選択中タグを特定する。
+  const ownerTags = await getOwnerTags();
+  const activeTag = tagParam
+    ? ownerTags.find((t) => t.id === tagParam) ?? null
+    : null;
+
+  // 一覧 + 先頭写真 + 付与タグをまとめて取得。
   let query = supabase
     .from("daycare_records")
-    .select("*, record_photos(*)")
+    .select("*, record_photos(*), record_tags(tags(id, name))")
     .order("record_date", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (filter !== "all") query = query.eq("source", filter);
 
+  // タグ絞り込み: 該当タグを持つ記録 id に限定する（埋め込みタグはそのまま全件表示）。
+  if (activeTag) {
+    const { data: tagged } = await supabase
+      .from("record_tags")
+      .select("record_id")
+      .eq("tag_id", activeTag.id);
+    const ids = (tagged ?? []).map((t) => t.record_id);
+    // 該当が 0 件なら確実に空にする（in([]) は全件にならないよう注意）。
+    query = query.in("id", ids.length > 0 ? ids : [""]);
+  }
+
   const { data: records } = await query.returns<RecordWithPhotos[]>();
 
   const list = records ?? [];
+
+  // 選択中の絞り込みを保ったまま遷移する href を組み立てる。
+  function buildHref(next: { source?: "all" | RecordSource; tag?: string | null }) {
+    const params = new URLSearchParams();
+    const s = next.source ?? filter;
+    const t = next.tag === undefined ? activeTag?.id : next.tag;
+    if (s && s !== "all") params.set("source", s);
+    if (t) params.set("tag", t);
+    const qs = params.toString();
+    return qs ? `/?${qs}` : "/";
+  }
 
   // 各記録の先頭写真サムネに署名付き URL を付与
   const thumbPaths = list
@@ -115,7 +146,7 @@ export default async function HomePage({
         <nav className="mb-4 inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
           {FILTERS.map((f) => {
             const active = filter === f.value;
-            const href = f.value === "all" ? "/" : `/?source=${f.value}`;
+            const href = buildHref({ source: f.value });
             return (
               <Link
                 key={f.value}
@@ -134,9 +165,42 @@ export default async function HomePage({
           })}
         </nav>
 
+        {ownerTags.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-1.5">
+            {activeTag ? (
+              <Link
+                href={buildHref({ tag: null })}
+                className="rounded-full border border-slate-300 px-3 py-0.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+              >
+                ✕ タグ解除
+              </Link>
+            ) : (
+              <span className="text-xs font-medium text-slate-400">タグで絞り込み:</span>
+            )}
+            {ownerTags.map((t) => {
+              const active = activeTag?.id === t.id;
+              return (
+                <Link
+                  key={t.id}
+                  href={active ? buildHref({ tag: null }) : buildHref({ tag: t.id })}
+                  aria-current={active ? "page" : undefined}
+                  className={
+                    "rounded-full px-2.5 py-0.5 text-xs font-medium transition " +
+                    (active
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200")
+                  }
+                >
+                  #{t.name}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
         {list.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
-            {filter === "all" ? (
+            {filter === "all" && !activeTag ? (
               <>
                 まだ記録がありません。
                 <br />
@@ -190,6 +254,21 @@ export default async function HomePage({
                       <p className="mt-0.5 text-sm text-slate-600">
                         {excerpt(r.body) || "（本文なし）"}
                       </p>
+                      {(() => {
+                        const recordTags = tagsFromJoin(r.record_tags);
+                        return recordTags.length > 0 ? (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {recordTags.map((t) => (
+                              <span
+                                key={t.id}
+                                className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
+                              >
+                                #{t.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
                       {photoCount > 0 && (
                         <p className="mt-1 text-xs text-slate-400">
                           📷 写真 {photoCount} 枚

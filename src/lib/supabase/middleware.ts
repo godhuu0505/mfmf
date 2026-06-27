@@ -33,10 +33,14 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith("/login");
-  // 認証不要で表示するページ（オフライン用フォールバック / 読み取り専用の共有ビュー）。
-  // 注: 共有「管理」画面 /shares は保護対象（/share/ では始まらない）。
+  // 認証不要で到達するルート:
+  // - /offline: オフライン用フォールバック
+  // - /auth/*: OAuth コールバック等（セッション確立前に到達する）
+  // - /share/*: 読み取り専用の共有ビュー（共有「管理」画面 /shares は保護対象）
   const isPublicRoute =
-    pathname === "/offline" || pathname.startsWith("/share/");
+    pathname === "/offline" ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/share/");
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     // 未ログイン → /login へ

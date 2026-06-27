@@ -6,6 +6,7 @@ import { listPets } from "@/lib/pets";
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
 import { createRecord } from "@/app/records/actions";
+import { getOwnerTags } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,12 @@ export default async function NewRecordPage() {
   if (!user) redirect("/login");
 
   const today = new Date().toISOString().slice(0, 10);
-  const [profile, pets] = await Promise.all([getCurrentProfile(), listPets()]);
+  const [profile, pets, ownerTags] = await Promise.all([
+    getCurrentProfile(),
+    listPets(),
+    getOwnerTags(),
+  ]);
+  const tagSuggestions = ownerTags.map((t) => t.name);
 
   return (
     <>
@@ -37,6 +43,7 @@ export default async function NewRecordPage() {
           defaultAuthor={profile?.default_author ?? ""}
           pets={pets.map((p) => ({ id: p.id, name: p.name }))}
           defaultPetId={pets[0]?.id ?? null}
+          tagSuggestions={tagSuggestions}
           submitLabel="保存する"
           cancelHref="/"
         />

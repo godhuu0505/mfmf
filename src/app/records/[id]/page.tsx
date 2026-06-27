@@ -4,10 +4,13 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { withSignedUrls } from "@/lib/photos";
 import { listPets } from "@/lib/pets";
+import { getOwnerTags } from "@/lib/tags";
 import {
   SOURCE_LABEL,
+  tagsFromJoin,
   type DaycareRecord,
   type RecordPhoto,
+  type RecordTagJoin,
 } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
@@ -56,6 +59,20 @@ export default async function RecordDetailPage({
   const photos = await withSignedUrls(photoRows ?? []);
   const pets = isEdit ? await listPets() : [];
 
+  // この記録に付与されたタグ
+  const { data: tagRows } = await supabase
+    .from("record_tags")
+    .select("tags(id, name)")
+    .eq("record_id", id)
+    .returns<RecordTagJoin[]>();
+  const tags = tagsFromJoin(tagRows);
+  const tagNames = tags.map((t) => t.name);
+
+  // 編集フォームのサジェスト用にオーナーのタグ辞書を取得
+  const tagSuggestions = isEdit
+    ? (await getOwnerTags()).map((t) => t.name)
+    : [];
+
   return (
     <>
       <AppHeader />
@@ -80,6 +97,8 @@ export default async function RecordDetailPage({
               defaultWeightKg={record.weight_kg}
               pets={pets.map((p) => ({ id: p.id, name: p.name }))}
               defaultPetId={record.pet_id}
+              defaultTags={tagNames}
+              tagSuggestions={tagSuggestions}
               submitLabel="更新する"
               cancelHref={`/records/${record.id}`}
             />
@@ -167,6 +186,20 @@ export default async function RecordDetailPage({
                 <span className="text-slate-400">（本文なし）</span>
               )}
             </article>
+
+            {tags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {tags.map((t) => (
+                  <Link
+                    key={t.id}
+                    href={`/?tag=${t.id}`}
+                    className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 transition hover:bg-slate-200"
+                  >
+                    #{t.name}
+                  </Link>
+                ))}
+              </div>
+            )}
 
             {photos.length > 0 && (
               <section className="mt-6">
