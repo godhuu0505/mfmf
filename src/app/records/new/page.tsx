@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
 import { createRecord } from "@/app/records/actions";
+import { getOwnerTags } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function NewRecordPage() {
   if (!user) redirect("/login");
 
   const today = new Date().toISOString().slice(0, 10);
+  const tagSuggestions = (await getOwnerTags()).map((t) => t.name);
 
   return (
     <>
@@ -31,6 +33,7 @@ export default async function NewRecordPage() {
           action={createRecord}
           ownerId={user.id}
           defaultDate={today}
+          tagSuggestions={tagSuggestions}
           submitLabel="保存する"
           cancelHref="/"
         />
