@@ -20,8 +20,26 @@ const SOURCE_OPTIONS: { value: RecordSourceFilter; label: string }[] = [
 // 記録一覧の検索・絞り込み・並び替えフォーム。
 // 送信時に空欄・既定値を除いた URL を組み立てて遷移するため、
 // 共有・リロードで同じ結果を再現できる（条件は URL クエリが正）。
-export default function RecordFilters({ filters }: { filters: Filters }) {
+export default function RecordFilters({
+  filters,
+  activeTagId = null,
+}: {
+  filters: Filters;
+  /** 選択中のタグ id（検索条件を変えても保持する）。 */
+  activeTagId?: string | null;
+}) {
   const router = useRouter();
+
+  // buildQueryString の結果に選択中タグを足してから遷移する。
+  function pushWithTag(qs: string) {
+    if (!activeTagId) {
+      router.push(`/${qs}`);
+      return;
+    }
+    const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : qs);
+    params.set("tag", activeTagId);
+    router.push(`/?${params.toString()}`);
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -43,7 +61,7 @@ export default function RecordFilters({ filters }: { filters: Filters }) {
       sort,
       page: 1,
     };
-    router.push(`/${buildQueryString(next)}`);
+    pushWithTag(buildQueryString(next));
   }
 
   const active = hasActiveFilters(filters);
@@ -138,7 +156,7 @@ export default function RecordFilters({ filters }: { filters: Filters }) {
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={() => router.push("/")}
+            onClick={() => pushWithTag("")}
             className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
           >
             条件をクリア

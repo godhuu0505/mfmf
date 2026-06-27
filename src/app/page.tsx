@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   PHOTO_BUCKET,
   SOURCE_LABEL,
+  tagsFromJoin,
   type RecordSource,
   type RecordWithPhotos,
 } from "@/types/database";
@@ -14,6 +15,7 @@ import {
   PAGE_SIZE,
   parseFilters,
 } from "@/lib/recordQuery";
+import { getOwnerTags } from "@/lib/tags";
 import AppHeader from "@/components/AppHeader";
 import RecordFilters from "@/components/RecordFilters";
 
@@ -54,19 +56,41 @@ export default async function HomePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const filters = parseFilters(await searchParams);
+  const sp = await searchParams;
+  const filters = parseFilters(sp);
+  const tagParam = Array.isArray(sp.tag) ? sp.tag[0] : sp.tag;
 
   const supabase = await createClient();
 
-  // RLS（owner_id = auth.uid()）の範囲内で検索・絞り込み・並び替え・ページングする
+  // 絞り込み UI 用にオーナーのタグ辞書を取得し、選択中タグを特定する。
+  const ownerTags = await getOwnerTags();
+  const activeTag = tagParam
+    ? ownerTags.find((t) => t.id === tagParam) ?? null
+    : null;
+
+  // RLS（owner_id = auth.uid()）の範囲内で検索・絞り込み・並び替え・ページングする。
+  // 一覧 + 先頭写真 + 付与タグをまとめて取得。
   let query = supabase
     .from("daycare_records")
-    .select("*, record_photos(*)", { count: "exact" });
+    .select("*, record_photos(*), record_tags(tags(id, name))", {
+      count: "exact",
+    });
 
   if (filters.source !== "all") query = query.eq("source", filters.source);
   if (filters.from) query = query.gte("record_date", filters.from);
   if (filters.to) query = query.lte("record_date", filters.to);
   if (filters.q) query = query.or(buildIlikeOr(filters.q));
+
+  // タグ絞り込み: 該当タグを持つ記録 id に限定する。
+  if (activeTag) {
+    const { data: tagged } = await supabase
+      .from("record_tags")
+      .select("record_id")
+      .eq("tag_id", activeTag.id);
+    const ids = (tagged ?? []).map((t) => t.record_id);
+    // 該当が 0 件なら確実に空にする（in([]) は全件にならないよう注意）。
+    query = query.in("id", ids.length > 0 ? ids : [""]);
+  }
 
   switch (filters.sort) {
     case "date_asc":
@@ -98,7 +122,25 @@ export default async function HomePage({
   const list = records ?? [];
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const active = hasActiveFilters(filters);
+  const active = hasActiveFilters(filters) || activeTag != null;
+
+  // タグチップのリンク（現在の検索条件は保ったまま tag だけ切り替え、ページは先頭へ戻す）。
+  function tagHref(tagId: string | null): string {
+    const qs = buildQueryString(filters, { page: 1 });
+    const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : qs);
+    if (tagId) params.set("tag", tagId);
+    const s = params.toString();
+    return s ? `/?${s}` : "/";
+  }
+
+  // ページネーションのリンク（選択中タグを保持）。
+  function pageHref(page: number): string {
+    const qs = buildQueryString(filters, { page });
+    const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : qs);
+    if (activeTag) params.set("tag", activeTag.id);
+    const s = params.toString();
+    return s ? `/?${s}` : "/";
+  }
 
   // 各記録の先頭写真サムネに署名付き URL を付与
   const thumbPaths = list
@@ -119,8 +161,8 @@ export default async function HomePage({
     if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
   });
 
-  const prevHref = `/${buildQueryString(filters, { page: filters.page - 1 })}`;
-  const nextHref = `/${buildQueryString(filters, { page: filters.page + 1 })}`;
+  const prevHref = pageHref(filters.page - 1);
+  const nextHref = pageHref(filters.page + 1);
 
   return (
     <>
@@ -145,7 +187,11 @@ export default async function HomePage({
         </div>
 
         {/* key で絞り込み変更時に再マウントし、入力欄を現在の URL 条件に同期する */}
-        <RecordFilters key={buildQueryString(filters)} filters={filters} />
+        <RecordFilters
+          key={buildQueryString(filters)}
+          filters={filters}
+          activeTagId={activeTag?.id ?? null}
+        />
 
         {total > 0 && (
           <p className="mb-3 text-sm text-slate-500">
@@ -157,6 +203,41 @@ export default async function HomePage({
               </span>
             )}
           </p>
+        )}
+
+        {ownerTags.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-1.5">
+            {activeTag ? (
+              <Link
+                href={tagHref(null)}
+                className="rounded-full border border-slate-300 px-3 py-0.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+              >
+                ✕ タグ解除
+              </Link>
+            ) : (
+              <span className="text-xs font-medium text-slate-400">
+                タグで絞り込み:
+              </span>
+            )}
+            {ownerTags.map((t) => {
+              const isActive = activeTag?.id === t.id;
+              return (
+                <Link
+                  key={t.id}
+                  href={isActive ? tagHref(null) : tagHref(t.id)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={
+                    "rounded-full px-2.5 py-0.5 text-xs font-medium transition " +
+                    (isActive
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200")
+                  }
+                >
+                  #{t.name}
+                </Link>
+              );
+            })}
+          </div>
         )}
 
         {list.length === 0 ? (
@@ -215,6 +296,21 @@ export default async function HomePage({
                       <p className="mt-0.5 text-sm text-slate-600">
                         {excerpt(r.body) || "（本文なし）"}
                       </p>
+                      {(() => {
+                        const recordTags = tagsFromJoin(r.record_tags);
+                        return recordTags.length > 0 ? (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {recordTags.map((t) => (
+                              <span
+                                key={t.id}
+                                className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
+                              >
+                                #{t.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
                       {photoCount > 0 && (
                         <p className="mt-1 text-xs text-slate-400">
                           📷 写真 {photoCount} 枚

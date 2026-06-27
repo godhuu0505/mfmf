@@ -34,12 +34,55 @@ export type RecordPhoto = {
   created_at: string;
 };
 
-// 一覧表示用: 記録 + 先頭写真のサムネ
-export type RecordWithPhotos = DaycareRecord & {
-  record_photos: RecordPhoto[];
+// 記録に付与する自由タグ（オーナーごとの辞書）
+export type Tag = {
+  id: string;
+  owner_id: string;
+  name: string;
+  created_at: string;
 };
 
+// タグ名の正規化（前後空白の除去）と妥当性の上限。
+// DB 制約（tags_name_not_blank: 1〜50 文字）と合わせる。
+export const TAG_NAME_MAX_LENGTH = 50;
+
+export function normalizeTagName(value: unknown): string {
+  return String(value ?? "").trim().slice(0, TAG_NAME_MAX_LENGTH);
+}
+
+// 一覧/詳細でタグを埋め込み取得するときの形（record_tags 経由の join）。
+export type RecordTagJoin = {
+  tags: Pick<Tag, "id" | "name"> | null;
+};
+
+// 一覧表示用: 記録 + 先頭写真のサムネ + タグ
+export type RecordWithPhotos = DaycareRecord & {
+  record_photos: RecordPhoto[];
+  record_tags?: RecordTagJoin[];
+};
+
+// 埋め込み join からタグ配列（名前順）を取り出すヘルパー。
+export function tagsFromJoin(
+  rows: RecordTagJoin[] | null | undefined,
+): Pick<Tag, "id" | "name">[] {
+  return (rows ?? [])
+    .map((r) => r.tags)
+    .filter((t): t is Pick<Tag, "id" | "name"> => Boolean(t))
+    .sort((a, b) => a.name.localeCompare(b.name, "ja"));
+}
+
 export const PHOTO_BUCKET = "daycare-photos";
+
+// ---------------------------------------------------------------
+// Google Drive 連携クレデンシャル (google_credentials)
+// refresh_token_enc はアプリ層で暗号化済みの文字列 (src/lib/google/crypto.ts)
+// ---------------------------------------------------------------
+export type GoogleCredential = {
+  owner_id: string;
+  refresh_token_enc: string;
+  created_at: string;
+  updated_at: string;
+};
 
 // ---------------------------------------------------------------
 // 障害報告・機能要望フォーム (feedback)
