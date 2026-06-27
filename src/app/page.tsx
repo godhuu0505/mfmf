@@ -8,8 +8,16 @@ import {
   type RecordSource,
   type RecordWithPhotos,
 } from "@/types/database";
+import {
+  buildIlikeOr,
+  buildQueryString,
+  hasActiveFilters,
+  PAGE_SIZE,
+  parseFilters,
+} from "@/lib/recordQuery";
 import { getOwnerTags } from "@/lib/tags";
 import AppHeader from "@/components/AppHeader";
+import RecordFilters from "@/components/RecordFilters";
 
 export const dynamic = "force-dynamic";
 
@@ -43,21 +51,14 @@ function SourceBadge({ source }: { source: RecordSource }) {
   );
 }
 
-// フィルタタブの定義（値 / ラベル）
-const FILTERS: { value: "all" | RecordSource; label: string }[] = [
-  { value: "all", label: "すべて" },
-  { value: "daycare", label: "保育園" },
-  { value: "home", label: "おうち" },
-];
-
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; tag?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { source: sourceParam, tag: tagParam } = await searchParams;
-  const filter: "all" | RecordSource =
-    sourceParam === "daycare" || sourceParam === "home" ? sourceParam : "all";
+  const sp = await searchParams;
+  const filters = parseFilters(sp);
+  const tagParam = Array.isArray(sp.tag) ? sp.tag[0] : sp.tag;
 
   const supabase = await createClient();
 
@@ -67,16 +68,20 @@ export default async function HomePage({
     ? ownerTags.find((t) => t.id === tagParam) ?? null
     : null;
 
+  // RLS（owner_id = auth.uid()）の範囲内で検索・絞り込み・並び替え・ページングする。
   // 一覧 + 先頭写真 + 付与タグをまとめて取得。
   let query = supabase
     .from("daycare_records")
-    .select("*, record_photos(*), record_tags(tags(id, name))")
-    .order("record_date", { ascending: false })
-    .order("created_at", { ascending: false });
+    .select("*, record_photos(*), record_tags(tags(id, name))", {
+      count: "exact",
+    });
 
-  if (filter !== "all") query = query.eq("source", filter);
+  if (filters.source !== "all") query = query.eq("source", filters.source);
+  if (filters.from) query = query.gte("record_date", filters.from);
+  if (filters.to) query = query.lte("record_date", filters.to);
+  if (filters.q) query = query.or(buildIlikeOr(filters.q));
 
-  // タグ絞り込み: 該当タグを持つ記録 id に限定する（埋め込みタグはそのまま全件表示）。
+  // タグ絞り込み: 該当タグを持つ記録 id に限定する。
   if (activeTag) {
     const { data: tagged } = await supabase
       .from("record_tags")
@@ -87,19 +92,54 @@ export default async function HomePage({
     query = query.in("id", ids.length > 0 ? ids : [""]);
   }
 
-  const { data: records } = await query.returns<RecordWithPhotos[]>();
+  switch (filters.sort) {
+    case "date_asc":
+      query = query
+        .order("record_date", { ascending: true })
+        .order("created_at", { ascending: true });
+      break;
+    case "weight_desc":
+      query = query
+        .order("weight_kg", { ascending: false, nullsFirst: false })
+        .order("record_date", { ascending: false });
+      break;
+    case "weight_asc":
+      query = query
+        .order("weight_kg", { ascending: true, nullsFirst: false })
+        .order("record_date", { ascending: false });
+      break;
+    default:
+      query = query
+        .order("record_date", { ascending: false })
+        .order("created_at", { ascending: false });
+  }
+
+  const fromIdx = (filters.page - 1) * PAGE_SIZE;
+  query = query.range(fromIdx, fromIdx + PAGE_SIZE - 1);
+
+  const { data: records, count } = await query.returns<RecordWithPhotos[]>();
 
   const list = records ?? [];
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const active = hasActiveFilters(filters) || activeTag != null;
 
-  // 選択中の絞り込みを保ったまま遷移する href を組み立てる。
-  function buildHref(next: { source?: "all" | RecordSource; tag?: string | null }) {
-    const params = new URLSearchParams();
-    const s = next.source ?? filter;
-    const t = next.tag === undefined ? activeTag?.id : next.tag;
-    if (s && s !== "all") params.set("source", s);
-    if (t) params.set("tag", t);
-    const qs = params.toString();
-    return qs ? `/?${qs}` : "/";
+  // タグチップのリンク（現在の検索条件は保ったまま tag だけ切り替え、ページは先頭へ戻す）。
+  function tagHref(tagId: string | null): string {
+    const qs = buildQueryString(filters, { page: 1 });
+    const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : qs);
+    if (tagId) params.set("tag", tagId);
+    const s = params.toString();
+    return s ? `/?${s}` : "/";
+  }
+
+  // ページネーションのリンク（選択中タグを保持）。
+  function pageHref(page: number): string {
+    const qs = buildQueryString(filters, { page });
+    const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : qs);
+    if (activeTag) params.set("tag", activeTag.id);
+    const s = params.toString();
+    return s ? `/?${s}` : "/";
   }
 
   // 各記録の先頭写真サムネに署名付き URL を付与
@@ -120,6 +160,9 @@ export default async function HomePage({
   signed?.forEach((s) => {
     if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
   });
+
+  const prevHref = pageHref(filters.page - 1);
+  const nextHref = pageHref(filters.page + 1);
 
   return (
     <>
@@ -143,50 +186,49 @@ export default async function HomePage({
           </div>
         </div>
 
-        <nav className="mb-4 inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-          {FILTERS.map((f) => {
-            const active = filter === f.value;
-            const href = buildHref({ source: f.value });
-            return (
-              <Link
-                key={f.value}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={
-                  "rounded-md px-4 py-1.5 text-sm font-medium transition " +
-                  (active
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:bg-slate-100")
-                }
-              >
-                {f.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {/* key で絞り込み変更時に再マウントし、入力欄を現在の URL 条件に同期する */}
+        <RecordFilters
+          key={buildQueryString(filters)}
+          filters={filters}
+          activeTagId={activeTag?.id ?? null}
+        />
+
+        {total > 0 && (
+          <p className="mb-3 text-sm text-slate-500">
+            全 {total} 件
+            {totalPages > 1 && (
+              <span>
+                {" "}
+                / {filters.page} ページ目（全 {totalPages} ページ）
+              </span>
+            )}
+          </p>
+        )}
 
         {ownerTags.length > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-1.5">
             {activeTag ? (
               <Link
-                href={buildHref({ tag: null })}
+                href={tagHref(null)}
                 className="rounded-full border border-slate-300 px-3 py-0.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
               >
                 ✕ タグ解除
               </Link>
             ) : (
-              <span className="text-xs font-medium text-slate-400">タグで絞り込み:</span>
+              <span className="text-xs font-medium text-slate-400">
+                タグで絞り込み:
+              </span>
             )}
             {ownerTags.map((t) => {
-              const active = activeTag?.id === t.id;
+              const isActive = activeTag?.id === t.id;
               return (
                 <Link
                   key={t.id}
-                  href={active ? buildHref({ tag: null }) : buildHref({ tag: t.id })}
-                  aria-current={active ? "page" : undefined}
+                  href={isActive ? tagHref(null) : tagHref(t.id)}
+                  aria-current={isActive ? "page" : undefined}
                   className={
                     "rounded-full px-2.5 py-0.5 text-xs font-medium transition " +
-                    (active
+                    (isActive
                       ? "bg-slate-900 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200")
                   }
@@ -200,14 +242,14 @@ export default async function HomePage({
 
         {list.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
-            {filter === "all" && !activeTag ? (
+            {active ? (
+              <>条件に該当する記録はありません。</>
+            ) : (
               <>
                 まだ記録がありません。
                 <br />
                 「＋ 新規」から最初の記録を追加しましょう。
               </>
-            ) : (
-              <>この絞り込みに該当する記録はありません。</>
             )}
           </div>
         ) : (
@@ -280,6 +322,40 @@ export default async function HomePage({
               );
             })}
           </ul>
+        )}
+
+        {totalPages > 1 && (
+          <nav className="mt-6 flex items-center justify-between">
+            {filters.page > 1 ? (
+              <Link
+                href={prevHref}
+                rel="prev"
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              >
+                ← 前へ
+              </Link>
+            ) : (
+              <span className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-300">
+                ← 前へ
+              </span>
+            )}
+            <span className="text-sm text-slate-500">
+              {filters.page} / {totalPages}
+            </span>
+            {filters.page < totalPages ? (
+              <Link
+                href={nextHref}
+                rel="next"
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              >
+                次へ →
+              </Link>
+            ) : (
+              <span className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-300">
+                次へ →
+              </span>
+            )}
+          </nav>
         )}
       </main>
     </>
