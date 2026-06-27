@@ -116,7 +116,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 ## 4. データベースを更新
 
-`supabase/migrations/0004_google_credentials.sql` を適用します（連携トークンの保存先）。
+`supabase/migrations/0008_google_credentials.sql` を適用します（連携トークンの保存先）。
 
 - ローカル/CLI: `supabase db push`（または `supabase migration up`）
 - リモート直適用する場合は migration の SQL を Supabase の SQL Editor で実行。
