@@ -38,6 +38,15 @@ export type RecordFilters = {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// YYYY-MM-DD 形式かつ実在するカレンダー日付か（例: 2026-02-31 は弾く）。
+// 形式だけ合っていても Postgres の date 列にそのまま渡すとクエリエラーになり、
+// 一覧が空に見えてしまうため、ここで丸めて未指定扱いにする。
+function isValidIsoDate(s: string): boolean {
+  if (!DATE_RE.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
 type SearchParamValue = string | string[] | undefined;
 
 // URL の searchParams から検索条件を取り出す（不正値は安全な既定に丸める）。
@@ -66,8 +75,8 @@ export function parseFilters(
 
   return {
     q: get("q").trim().slice(0, MAX_QUERY_LENGTH),
-    from: DATE_RE.test(fromRaw) ? fromRaw : "",
-    to: DATE_RE.test(toRaw) ? toRaw : "",
+    from: isValidIsoDate(fromRaw) ? fromRaw : "",
+    to: isValidIsoDate(toRaw) ? toRaw : "",
     source,
     sort,
     page,

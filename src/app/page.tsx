@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   PHOTO_BUCKET,
@@ -77,12 +78,14 @@ export default async function HomePage({
     case "weight_desc":
       query = query
         .order("weight_kg", { ascending: false, nullsFirst: false })
-        .order("record_date", { ascending: false });
+        .order("record_date", { ascending: false })
+        .order("created_at", { ascending: false });
       break;
     case "weight_asc":
       query = query
         .order("weight_kg", { ascending: true, nullsFirst: false })
-        .order("record_date", { ascending: false });
+        .order("record_date", { ascending: false })
+        .order("created_at", { ascending: false });
       break;
     default:
       query = query
@@ -95,9 +98,16 @@ export default async function HomePage({
 
   const { data: records, count } = await query.returns<RecordWithPhotos[]>();
 
-  const list = records ?? [];
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // 古い/手動で大きすぎる page は範囲外の空スライスを返すため、
+  // 該当ページがあるのに空一覧を見せないよう最終ページへ寄せる。
+  if (filters.page > totalPages) {
+    redirect(`/${buildQueryString(filters, { page: totalPages })}`);
+  }
+
+  const list = records ?? [];
   const active = hasActiveFilters(filters);
 
   // 各記録の先頭写真サムネに署名付き URL を付与
