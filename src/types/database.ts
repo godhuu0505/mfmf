@@ -28,6 +28,32 @@ export type DaycareRecord = {
   updated_at: string;
 };
 
+// 読み取り専用の共有リンク。owner_id ベースの RLS で保護。
+export type ShareLink = {
+  id: string;
+  owner_id: string;
+  token: string;
+  label: string | null;
+  from_date: string | null;
+  to_date: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
+
+// 共有ビュー（匿名閲覧）に出す最小の記録。写真・id・owner は含めない。
+export type SharedRecord = {
+  record_date: string;
+  source: RecordSource;
+  author: string;
+  weight_kg: number | null;
+  body: string;
+};
+
+export type SharedView =
+  | { valid: false }
+  | { valid: true; label: string | null; records: SharedRecord[] };
+
 // 飼っているペット（多頭飼いに備える素地）。owner_id ベースの RLS で保護。
 export type Pet = {
   id: string;
