@@ -46,6 +46,14 @@ export default function AppHeader() {
             🐾
           </Link>
           <Link
+            href="/shares"
+            className="text-sm text-slate-500 transition hover:text-slate-800"
+            aria-label="共有リンク"
+            title="共有リンク"
+          >
+            🔗
+          </Link>
+          <Link
             href="/settings"
             className="text-sm text-slate-500 transition hover:text-slate-800"
             aria-label="設定"
