@@ -23,6 +23,26 @@ function parseRecordFields(formData: FormData) {
   return { record_date, body, source, author, weight_kg };
 }
 
+// pet_id を取り出し、本人所有のペットのみ受理する（横取り防止の防御）。
+// 未指定・不正・他人のペットは null。
+async function resolvePetId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ownerId: string,
+  formData: FormData,
+): Promise<string | null> {
+  const petId = String(formData.get("pet_id") || "").trim();
+  if (!UUID_RE.test(petId)) return null;
+
+  const { data } = await supabase
+    .from("pets")
+    .select("id")
+    .eq("id", petId)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+
+  return data ? petId : null;
+}
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -64,10 +84,11 @@ export async function createRecord(formData: FormData) {
     throw new Error("不正なリクエストです");
   }
   const fields = parseRecordFields(formData);
+  const pet_id = await resolvePetId(supabase, user.id, formData);
 
   const { error } = await supabase
     .from("daycare_records")
-    .insert({ id: recordId, owner_id: user.id, ...fields });
+    .insert({ id: recordId, owner_id: user.id, ...fields, pet_id });
 
   if (error) {
     throw new Error(`記録の作成に失敗しました: ${error.message}`);
@@ -87,10 +108,11 @@ export async function updateRecord(recordId: string, formData: FormData) {
   if (!user) redirect("/login");
 
   const fields = parseRecordFields(formData);
+  const pet_id = await resolvePetId(supabase, user.id, formData);
 
   const { error } = await supabase
     .from("daycare_records")
-    .update(fields)
+    .update({ ...fields, pet_id })
     .eq("id", recordId);
 
   if (error) {
