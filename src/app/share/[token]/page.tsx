@@ -1,0 +1,111 @@
+import { createClient } from "@/lib/supabase/server";
+import { SOURCE_LABEL, type SharedView } from "@/types/database";
+
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "共有された記録",
+  // 共有ページは検索エンジンにインデックスさせない。
+  robots: { index: false, follow: false },
+};
+
+function formatDate(d: string) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  }).format(new Date(d));
+}
+
+export default async function SharePage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
+  const { token } = await params;
+
+  const supabase = await createClient();
+  // SECURITY DEFINER 関数でトークンを検証し、有効な場合のみ記録を取得する。
+  const { data } = await supabase.rpc("get_shared_view", { p_token: token });
+  const view = (data as SharedView | null) ?? { valid: false };
+
+  if (!view.valid) {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-4">
+        <div className="w-full max-w-sm text-center">
+          <p className="mb-2 text-4xl">🔒</p>
+          <h1 className="mb-1 text-lg font-bold text-slate-900">
+            この共有リンクは利用できません
+          </h1>
+          <p className="text-sm text-slate-500">
+            リンクの期限が切れているか、無効化された可能性があります。
+            <br />
+            共有した人にもう一度確認してください。
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const records = view.records;
+
+  return (
+    <main className="mx-auto max-w-2xl px-4 py-8">
+      <header className="mb-6 text-center">
+        <p className="text-2xl">🐾</p>
+        <h1 className="mt-1 text-xl font-bold text-slate-900">
+          {view.label?.trim() ? view.label : "ペットの記録"}
+        </h1>
+        <p className="mt-1 text-xs text-slate-400">閲覧専用で共有されています</p>
+      </header>
+
+      {records.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
+          共有できる記録がまだありません。
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {records.map((r, i) => (
+            <li
+              key={`${r.record_date}-${i}`}
+              className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200"
+            >
+              <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                <span
+                  className={
+                    "rounded-full px-2 py-0.5 text-xs font-medium " +
+                    (r.source === "home"
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-sky-100 text-sky-700")
+                  }
+                >
+                  {r.source === "home" ? "🏠 " : "🏫 "}
+                  {SOURCE_LABEL[r.source]}
+                </span>
+                {r.weight_kg != null && (
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                    ⚖️ {r.weight_kg}kg
+                  </span>
+                )}
+                <span className="text-sm font-semibold text-slate-900">
+                  {formatDate(r.record_date)}
+                </span>
+              </div>
+              {r.author && (
+                <p className="mb-1 text-xs text-slate-500">記入者: {r.author}</p>
+              )}
+              <p className="whitespace-pre-wrap text-sm text-slate-800">
+                {r.body || "（本文なし）"}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="mt-8 text-center text-xs text-slate-400">
+        mfmf — ペットの記録
+      </p>
+    </main>
+  );
+}

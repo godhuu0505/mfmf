@@ -22,7 +22,45 @@ export type DaycareRecord = {
   source: RecordSource;
   author: string;
   weight_kg: number | null;
+  pet_id: string | null; // 対象ペット。未設定は null（段階導入）
   body: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// 読み取り専用の共有リンク。owner_id ベースの RLS で保護。
+export type ShareLink = {
+  id: string;
+  owner_id: string;
+  token: string;
+  label: string | null;
+  from_date: string | null;
+  to_date: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
+
+// 共有ビュー（匿名閲覧）に出す最小の記録。写真・id・owner は含めない。
+export type SharedRecord = {
+  record_date: string;
+  source: RecordSource;
+  author: string;
+  weight_kg: number | null;
+  body: string;
+};
+
+export type SharedView =
+  | { valid: false }
+  | { valid: true; label: string | null; records: SharedRecord[] };
+
+// 飼っているペット（多頭飼いに備える素地）。owner_id ベースの RLS で保護。
+export type Pet = {
+  id: string;
+  owner_id: string;
+  name: string;
+  species: string | null;
+  birthday: string | null; // YYYY-MM-DD
   created_at: string;
   updated_at: string;
 };
@@ -148,6 +186,19 @@ export function toFeedbackFrequency(value: unknown): FeedbackFrequency | null {
     ? (value as FeedbackFrequency)
     : null;
 }
+
+// ---------------------------------------------------------------
+// ユーザープロフィール / アカウント設定 (profiles)
+// ---------------------------------------------------------------
+
+// 1 ユーザーにつき 1 行。owner_id (= auth.uid()) ベースの RLS で保護される。
+export type Profile = {
+  owner_id: string;
+  display_name: string | null;
+  default_author: string | null; // 記録フォームの「記入者」の既定値
+  created_at: string;
+  updated_at: string;
+};
 
 // 送信時に自動収集するアプリの状況。
 export type FeedbackContext = {

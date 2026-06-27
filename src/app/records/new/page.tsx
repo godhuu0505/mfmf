@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/profile";
+import { listPets } from "@/lib/pets";
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
 import { createRecord } from "@/app/records/actions";
@@ -16,7 +18,12 @@ export default async function NewRecordPage() {
   if (!user) redirect("/login");
 
   const today = new Date().toISOString().slice(0, 10);
-  const tagSuggestions = (await getOwnerTags()).map((t) => t.name);
+  const [profile, pets, ownerTags] = await Promise.all([
+    getCurrentProfile(),
+    listPets(),
+    getOwnerTags(),
+  ]);
+  const tagSuggestions = ownerTags.map((t) => t.name);
 
   return (
     <>
@@ -33,6 +40,9 @@ export default async function NewRecordPage() {
           action={createRecord}
           ownerId={user.id}
           defaultDate={today}
+          defaultAuthor={profile?.default_author ?? ""}
+          pets={pets.map((p) => ({ id: p.id, name: p.name }))}
+          defaultPetId={pets[0]?.id ?? null}
           tagSuggestions={tagSuggestions}
           submitLabel="保存する"
           cancelHref="/"

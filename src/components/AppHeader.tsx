@@ -20,14 +20,56 @@ export default function AppHeader() {
           />
           mfmf
         </Link>
-        <form action="/auth/signout" method="post">
-          <button
-            type="submit"
+        <div className="flex items-center gap-4">
+          <Link
+            href="/gallery"
             className="text-sm text-slate-500 transition hover:text-slate-800"
+            aria-label="ギャラリー"
+            title="ギャラリー"
           >
-            ログアウト
-          </button>
-        </form>
+            🖼️
+          </Link>
+          <Link
+            href="/calendar"
+            className="text-sm text-slate-500 transition hover:text-slate-800"
+            aria-label="カレンダー"
+            title="カレンダー"
+          >
+            📅
+          </Link>
+          <Link
+            href="/pets"
+            className="text-sm text-slate-500 transition hover:text-slate-800"
+            aria-label="ペット"
+            title="ペット"
+          >
+            🐾
+          </Link>
+          <Link
+            href="/shares"
+            className="text-sm text-slate-500 transition hover:text-slate-800"
+            aria-label="共有リンク"
+            title="共有リンク"
+          >
+            🔗
+          </Link>
+          <Link
+            href="/settings"
+            className="text-sm text-slate-500 transition hover:text-slate-800"
+            aria-label="設定"
+            title="設定"
+          >
+            ⚙️
+          </Link>
+          <form action="/auth/signout" method="post">
+            <button
+              type="submit"
+              className="text-sm text-slate-500 transition hover:text-slate-800"
+            >
+              ログアウト
+            </button>
+          </form>
+        </div>
       </div>
     </header>
   );

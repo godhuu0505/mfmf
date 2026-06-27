@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { withSignedUrls } from "@/lib/photos";
+import { listPets } from "@/lib/pets";
 import { getOwnerTags } from "@/lib/tags";
 import {
   SOURCE_LABEL,
@@ -13,6 +14,7 @@ import {
 } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
+import PhotoGallery from "@/components/PhotoGallery";
 import { updateRecord, deletePhoto, deleteRecord } from "@/app/records/actions";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +57,7 @@ export default async function RecordDetailPage({
     .returns<RecordPhoto[]>();
 
   const photos = await withSignedUrls(photoRows ?? []);
+  const pets = isEdit ? await listPets() : [];
 
   // この記録に付与されたタグ
   const { data: tagRows } = await supabase
@@ -92,6 +95,8 @@ export default async function RecordDetailPage({
               defaultSource={record.source}
               defaultAuthor={record.author}
               defaultWeightKg={record.weight_kg}
+              pets={pets.map((p) => ({ id: p.id, name: p.name }))}
+              defaultPetId={record.pet_id}
               defaultTags={tagNames}
               tagSuggestions={tagSuggestions}
               submitLabel="更新する"
@@ -197,24 +202,12 @@ export default async function RecordDetailPage({
             )}
 
             {photos.length > 0 && (
-              <section className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {photos.map((p) => (
-                  <div
-                    key={p.id}
-                    className="relative aspect-square overflow-hidden rounded-xl bg-slate-100"
-                  >
-                    {p.url && (
-                      <Image
-                        src={p.url}
-                        alt=""
-                        fill
-                        sizes="(max-width:640px) 50vw, 200px"
-                        className="object-cover"
-                        unoptimized
-                      />
-                    )}
-                  </div>
-                ))}
+              <section className="mt-6">
+                <PhotoGallery
+                  images={photos
+                    .filter((p) => p.url)
+                    .map((p) => ({ id: p.id, url: p.url as string }))}
+                />
               </section>
             )}
 
