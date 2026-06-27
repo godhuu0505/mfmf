@@ -74,6 +74,17 @@ export function tagsFromJoin(
 export const PHOTO_BUCKET = "daycare-photos";
 
 // ---------------------------------------------------------------
+// Google Drive 連携クレデンシャル (google_credentials)
+// refresh_token_enc はアプリ層で暗号化済みの文字列 (src/lib/google/crypto.ts)
+// ---------------------------------------------------------------
+export type GoogleCredential = {
+  owner_id: string;
+  refresh_token_enc: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// ---------------------------------------------------------------
 // 障害報告・機能要望フォーム (feedback)
 // ---------------------------------------------------------------
 

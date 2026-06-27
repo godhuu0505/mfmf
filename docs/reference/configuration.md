@@ -15,6 +15,21 @@
 > `NEXT_PUBLIC_*` はブラウザに公開される前提の値。RLS でデータを保護しているため公開しても問題ない。
 > `service_role` キーはサーバー専用の特権鍵で、本アプリでは**使わず**、リポジトリ・クライアントにも置かない。
 
+### Google Drive 連携（必須）
+
+Google ログインと写真の Drive 保存に使う。設定手順は
+[guides/google-drive-setup.md](../guides/google-drive-setup.md)。いずれも **サーバー専用**
+（`NEXT_PUBLIC_` を付けない）。Vercel の環境変数とローカル `.env.local` の両方に設定する。
+
+| 変数 | 取得元 | 用途 |
+| --- | --- | --- |
+| `GOOGLE_CLIENT_ID` | Google Cloud の OAuth クライアント | refresh token → access token 発行 |
+| `GOOGLE_CLIENT_SECRET` | 同上（Supabase の Google プロバイダにも設定） | 同上 |
+| `TOKEN_ENC_KEY` | 自分で生成した長い乱数文字列 | refresh token を DB 保存前に暗号化する鍵 |
+
+> `TOKEN_ENC_KEY` を失うと保存済みの Drive 連携を復号できなくなる（各自で再ログインが必要）。
+> `GOOGLE_CLIENT_SECRET` は Supabase ダッシュボードの Google プロバイダ設定にも同じ値を入れる。
+
 ### フィードバック Issue 化スクリプト（運用時のみ）
 
 `scripts/feedback-to-issues.mjs` を手元で実行するときだけ必要。詳細は

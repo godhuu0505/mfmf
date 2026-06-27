@@ -33,8 +33,10 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith("/login");
-  // 認証不要で表示するページ（オフライン用フォールバック等）
-  const isPublicRoute = pathname === "/offline";
+  // 認証不要で到達するルート:
+  // - /offline: オフライン用フォールバック
+  // - /auth/*: OAuth コールバック等（セッション確立前に到達する）
+  const isPublicRoute = pathname === "/offline" || pathname.startsWith("/auth");
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     // 未ログイン → /login へ
