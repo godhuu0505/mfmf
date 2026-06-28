@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { PHOTO_BUCKET } from "@/types/database";
+import { createPhotoSignedUrls } from "@/lib/photos";
 import AppHeader from "@/components/AppHeader";
 import PhotoGallery, { type GalleryImage } from "@/components/PhotoGallery";
 
@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "ギャラリー" };
 
 const MAX_PHOTOS = 300;
-const SIGNED_URL_TTL = 60 * 60; // 1時間
 
 type PhotoRow = {
   id: string;
@@ -46,29 +45,23 @@ export default async function GalleryPage() {
     return db.localeCompare(da);
   });
 
-  let images: GalleryImage[] = [];
-  if (rows.length > 0) {
-    const { data: signed } = await supabase.storage
-      .from(PHOTO_BUCKET)
-      .createSignedUrls(
-        rows.map((r) => r.storage_path),
-        SIGNED_URL_TTL,
-      );
-    images = rows
-      .map((r, i): GalleryImage | null => {
-        const url = signed?.[i]?.signedUrl;
-        if (!url) return null;
-        return {
-          id: r.id,
-          url,
-          recordId: r.record_id,
-          caption: r.daycare_records
-            ? formatDate(r.daycare_records.record_date)
-            : undefined,
-        };
-      })
-      .filter((x): x is GalleryImage => x !== null);
-  }
+  const urlByPath = await createPhotoSignedUrls(
+    rows.map((r) => r.storage_path),
+  );
+  const images: GalleryImage[] = rows
+    .map((r): GalleryImage | null => {
+      const url = urlByPath.get(r.storage_path);
+      if (!url) return null;
+      return {
+        id: r.id,
+        url,
+        recordId: r.record_id,
+        caption: r.daycare_records
+          ? formatDate(r.daycare_records.record_date)
+          : undefined,
+      };
+    })
+    .filter((x): x is GalleryImage => x !== null);
 
   return (
     <>
