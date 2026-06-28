@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/profile";
@@ -30,6 +31,24 @@ export default async function SettingsPage() {
           />
 
           <PasswordForm />
+
+          {/* フィードバックのトリアージ導線 */}
+          <section className="space-y-3 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+            <div>
+              <h2 className="text-base font-bold text-foreground">
+                送信したフィードバック
+              </h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                ご意見・不具合報告の状態を確認・整理できます。
+              </p>
+            </div>
+            <Link
+              href="/feedback"
+              className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
+            >
+              トリアージ画面を開く
+            </Link>
+          </section>
 
           {/* アカウント情報・サインアウト */}
           <section className="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
