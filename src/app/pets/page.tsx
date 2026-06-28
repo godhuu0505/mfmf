@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listPets } from "@/lib/pets";
 import AppHeader from "@/components/AppHeader";
+import SubmitButton from "@/components/SubmitButton";
 import { createPet, updatePet, deletePet } from "@/app/pets/actions";
 
 export const dynamic = "force-dynamic";
@@ -90,24 +91,24 @@ export default async function PetsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover"
+                    <SubmitButton
+                      pendingLabel="更新中…"
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
                     >
                       更新
-                    </button>
+                    </SubmitButton>
                   </div>
                 </form>
                 <form
                   action={deletePet.bind(null, pet.id)}
                   className="mt-2 border-t border-border pt-2"
                 >
-                  <button
-                    type="submit"
-                    className="text-xs text-red-500 transition hover:text-red-700"
+                  <SubmitButton
+                    pendingLabel="削除中…"
+                    className="text-xs text-red-500 transition hover:text-red-700 disabled:opacity-60"
                   >
                     このペットを削除する
-                  </button>
+                  </SubmitButton>
                 </form>
               </li>
             ))}
@@ -164,12 +165,12 @@ export default async function PetsPage() {
                 />
               </div>
             </div>
-            <button
-              type="submit"
-              className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover"
+            <SubmitButton
+              pendingLabel="追加中…"
+              className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
             >
               追加する
-            </button>
+            </SubmitButton>
           </form>
         </section>
 
