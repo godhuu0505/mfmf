@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { type ShareLink } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
+import SubmitButton from "@/components/SubmitButton";
 import CopyButton from "@/app/shares/CopyButton";
 import {
   createShareLink,
@@ -63,7 +64,7 @@ export default async function SharesPage() {
   return (
     <>
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← 一覧へ戻る
@@ -122,21 +123,21 @@ export default async function SharesPage() {
                   <div className="mt-2 flex items-center gap-3 border-t border-border pt-2">
                     {!link.revoked_at && (
                       <form action={revokeShareLink.bind(null, link.id)}>
-                        <button
-                          type="submit"
-                          className="text-xs font-medium text-amber-600 transition hover:text-amber-800"
+                        <SubmitButton
+                          pendingLabel="失効中…"
+                          className="text-xs font-medium text-amber-600 transition hover:text-amber-800 disabled:opacity-60"
                         >
                           失効させる
-                        </button>
+                        </SubmitButton>
                       </form>
                     )}
                     <form action={deleteShareLink.bind(null, link.id)}>
-                      <button
-                        type="submit"
-                        className="text-xs text-red-500 transition hover:text-red-700"
+                      <SubmitButton
+                        pendingLabel="削除中…"
+                        className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
                       >
                         削除
-                      </button>
+                      </SubmitButton>
                     </form>
                   </div>
                 </li>
@@ -190,12 +191,12 @@ export default async function SharesPage() {
                 />
               </div>
             </div>
-            <button
-              type="submit"
-              className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover"
+            <SubmitButton
+              pendingLabel="作成中…"
+              className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
             >
               リンクを作成する
-            </button>
+            </SubmitButton>
           </form>
         </section>
       </main>

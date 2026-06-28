@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { withSignedUrls } from "@/lib/photos";
@@ -15,7 +14,9 @@ import {
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
 import PhotoGallery from "@/components/PhotoGallery";
-import { updateRecord, deletePhoto, deleteRecord } from "@/app/records/actions";
+import SubmitButton from "@/components/SubmitButton";
+import PhotoEditTile from "./PhotoEditTile";
+import { updateRecord, deleteRecord } from "@/app/records/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export default async function RecordDetailPage({
   return (
     <>
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← 一覧へ戻る
@@ -110,33 +111,12 @@ export default async function RecordDetailPage({
                 </h2>
                 <div className="grid grid-cols-3 gap-2">
                   {photos.map((p) => (
-                    <div
+                    <PhotoEditTile
                       key={p.id}
-                      className="group relative aspect-square overflow-hidden rounded-xl bg-surface-muted"
-                    >
-                      {p.url && (
-                        <Image
-                          src={p.url}
-                          alt=""
-                          fill
-                          sizes="(max-width:640px) 33vw, 200px"
-                          className="object-cover"
-                          unoptimized
-                        />
-                      )}
-                      <form
-                        action={deletePhoto.bind(null, p.id, record.id)}
-                        className="absolute right-1 top-1"
-                      >
-                        <button
-                          type="submit"
-                          className="rounded-full bg-black/60 px-2 py-1 text-xs text-white transition hover:bg-black/80"
-                          aria-label="この写真を削除"
-                        >
-                          削除
-                        </button>
-                      </form>
-                    </div>
+                      id={p.id}
+                      recordId={record.id}
+                      url={p.url}
+                    />
                   ))}
                 </div>
               </section>
@@ -215,12 +195,12 @@ export default async function RecordDetailPage({
               action={deleteRecord.bind(null, record.id)}
               className="mt-10 border-t border-border pt-6"
             >
-              <button
-                type="submit"
-                className="text-sm text-red-500 transition hover:text-red-700"
+              <SubmitButton
+                pendingLabel="削除中…"
+                className="text-sm text-red-600 transition hover:text-red-800 disabled:opacity-60"
               >
                 この記録を削除する
-              </button>
+              </SubmitButton>
             </form>
           </>
         )}
