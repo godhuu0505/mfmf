@@ -8,11 +8,11 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "ヘルプ" };
 
 const sectionClass =
-  "space-y-2 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 scroll-mt-20";
-const h2Class = "text-lg font-bold text-slate-900";
-const pClass = "text-sm leading-relaxed text-slate-700";
-const ulClass = "list-disc space-y-1 pl-5 text-sm leading-relaxed text-slate-700";
-const inlineLink = "text-slate-900 underline underline-offset-2 hover:text-slate-700";
+  "space-y-2 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border scroll-mt-20";
+const h2Class = "text-lg font-bold text-foreground";
+const pClass = "text-sm leading-relaxed text-foreground";
+const ulClass = "list-disc space-y-1 pl-5 text-sm leading-relaxed text-foreground";
+const inlineLink = "text-foreground underline underline-offset-2 hover:text-foreground";
 
 export default async function HelpPage() {
   const supabase = await createClient();
@@ -26,21 +26,21 @@ export default async function HelpPage() {
       <AppHeader />
       <main className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
-          <Link href="/" className="text-sm text-slate-500 hover:text-slate-800">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← 一覧へ戻る
           </Link>
         </div>
-        <h1 className="mb-1 text-xl font-bold text-slate-900">ヘルプ</h1>
-        <p className="mb-6 text-sm text-slate-500">
+        <h1 className="mb-1 text-xl font-bold text-foreground">ヘルプ</h1>
+        <p className="mb-6 text-sm text-muted-foreground">
           mfmf の使い方をまとめています。困ったときに見にきてください。
         </p>
 
         <nav
           aria-label="目次"
-          className="mb-6 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"
+          className="mb-6 rounded-2xl bg-surface-muted p-4 ring-1 ring-border"
         >
-          <p className="mb-2 text-xs font-semibold text-slate-500">目次</p>
-          <ul className="space-y-1 text-sm text-slate-700">
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">目次</p>
+          <ul className="space-y-1 text-sm text-foreground">
             <li>
               <a href="#intro" className={inlineLink}>
                 はじめに

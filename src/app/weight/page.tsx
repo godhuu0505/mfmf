@@ -48,31 +48,31 @@ export default async function WeightPage() {
       <AppHeader />
       <main className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
-          <Link href="/" className="text-sm text-slate-500 hover:text-slate-800">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← 一覧へ戻る
           </Link>
         </div>
-        <h1 className="mb-4 text-xl font-bold text-slate-900">体重の推移</h1>
+        <h1 className="mb-4 text-xl font-bold text-foreground">体重の推移</h1>
 
         {rows.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
+          <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
             体重が記録された日がまだありません。
             <br />
             記録の追加・編集で体重(kg)を入力すると、ここに推移が表示されます。
           </div>
         ) : (
           <>
-            <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <section className="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
               <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   最新の体重
-                  <span className="ml-2 text-2xl font-bold text-slate-900">
+                  <span className="ml-2 text-2xl font-bold text-foreground">
                     {latest ? Number(latest.weight_kg).toFixed(2) : "-"}
                     <span className="ml-0.5 text-base font-medium">kg</span>
                   </span>
                 </p>
                 {rows.length > 1 && (
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     最初の記録から{" "}
                     <span
                       className={
@@ -81,7 +81,7 @@ export default async function WeightPage() {
                           ? "text-emerald-600"
                           : diff < 0
                             ? "text-rose-600"
-                            : "text-slate-600")
+                            : "text-muted-foreground")
                       }
                     >
                       {diff > 0 ? "+" : ""}
@@ -101,9 +101,9 @@ export default async function WeightPage() {
                 >
                   <Link
                     href={`/records/${r.id}`}
-                    className="flex flex-1 items-center justify-between gap-3 rounded-xl bg-white px-4 py-2.5 shadow-sm ring-1 ring-slate-200 transition hover:ring-slate-300"
+                    className="flex flex-1 items-center justify-between gap-3 rounded-xl bg-surface px-4 py-2.5 shadow-sm ring-1 ring-border transition hover:ring-border"
                   >
-                    <span className="flex items-center gap-2 text-sm text-slate-600">
+                    <span className="flex items-center gap-2 text-sm text-muted-foreground">
                       {formatDate(r.record_date)}
                       <span
                         className={
@@ -116,7 +116,7 @@ export default async function WeightPage() {
                         {SOURCE_LABEL[r.source]}
                       </span>
                     </span>
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-foreground">
                       {Number(r.weight_kg).toFixed(2)}kg
                     </span>
                   </Link>

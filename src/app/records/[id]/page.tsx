@@ -78,14 +78,14 @@ export default async function RecordDetailPage({
       <AppHeader />
       <main className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
-          <Link href="/" className="text-sm text-slate-500 hover:text-slate-800">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← 一覧へ戻る
           </Link>
         </div>
 
         {isEdit ? (
           <>
-            <h1 className="mb-6 text-xl font-bold text-slate-900">記録を編集</h1>
+            <h1 className="mb-6 text-xl font-bold text-foreground">記録を編集</h1>
             <RecordForm
               action={updateRecord.bind(null, record.id)}
               ownerId={record.owner_id}
@@ -105,14 +105,14 @@ export default async function RecordDetailPage({
 
             {photos.length > 0 && (
               <section className="mt-8">
-                <h2 className="mb-3 text-sm font-medium text-slate-700">
+                <h2 className="mb-3 text-sm font-medium text-foreground">
                   登録済みの写真
                 </h2>
                 <div className="grid grid-cols-3 gap-2">
                   {photos.map((p) => (
                     <div
                       key={p.id}
-                      className="group relative aspect-square overflow-hidden rounded-xl bg-slate-100"
+                      className="group relative aspect-square overflow-hidden rounded-xl bg-surface-muted"
                     >
                       {p.url && (
                         <Image
@@ -159,31 +159,31 @@ export default async function RecordDetailPage({
                     {SOURCE_LABEL[record.source]}
                   </span>
                   {record.weight_kg != null && (
-                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                    <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                       ⚖️ {record.weight_kg}kg
                     </span>
                   )}
                 </div>
-                <h1 className="text-xl font-bold text-slate-900">
+                <h1 className="text-xl font-bold text-foreground">
                   {formatDate(record.record_date)}
                 </h1>
                 {record.author && (
-                  <p className="mt-0.5 text-sm text-slate-500">
+                  <p className="mt-0.5 text-sm text-muted-foreground">
                     記入者: {record.author}
                   </p>
                 )}
               </div>
               <Link
                 href={`/records/${record.id}?edit=1`}
-                className="shrink-0 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                className="shrink-0 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
               >
                 編集
               </Link>
             </div>
 
-            <article className="whitespace-pre-wrap rounded-2xl bg-white p-5 text-slate-800 shadow-sm ring-1 ring-slate-200">
+            <article className="whitespace-pre-wrap rounded-2xl bg-surface p-5 text-foreground shadow-sm ring-1 ring-border">
               {record.body || (
-                <span className="text-slate-400">（本文なし）</span>
+                <span className="text-muted-foreground">（本文なし）</span>
               )}
             </article>
 
@@ -193,7 +193,7 @@ export default async function RecordDetailPage({
                   <Link
                     key={t.id}
                     href={`/?tag=${t.id}`}
-                    className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 transition hover:bg-slate-200"
+                    className="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground transition hover:bg-muted"
                   >
                     #{t.name}
                   </Link>
@@ -213,7 +213,7 @@ export default async function RecordDetailPage({
 
             <form
               action={deleteRecord.bind(null, record.id)}
-              className="mt-10 border-t border-slate-200 pt-6"
+              className="mt-10 border-t border-border pt-6"
             >
               <button
                 type="submit"

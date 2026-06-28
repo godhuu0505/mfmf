@@ -70,7 +70,7 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
             key={img.id}
             type="button"
             onClick={() => show(i)}
-            className="relative aspect-square overflow-hidden rounded-xl bg-slate-100 transition hover:opacity-90"
+            className="relative aspect-square overflow-hidden rounded-xl bg-surface-muted transition hover:opacity-90"
             aria-label="写真を拡大表示"
           >
             <Image
@@ -113,7 +113,7 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
             <button
               type="button"
               onClick={close}
-              className="rounded-full bg-white/10 px-3 py-1 text-sm transition hover:bg-white/20"
+              className="rounded-full bg-surface/10 px-3 py-1 text-sm transition hover:bg-surface/20"
               aria-label="閉じる"
             >
               ✕ 閉じる
@@ -128,7 +128,7 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
               <button
                 type="button"
                 onClick={prev}
-                className="absolute left-2 z-10 rounded-full bg-white/10 p-3 text-2xl text-white transition hover:bg-white/20"
+                className="absolute left-2 z-10 rounded-full bg-surface/10 p-3 text-2xl text-white transition hover:bg-surface/20"
                 aria-label="前の写真"
               >
                 ‹
@@ -148,7 +148,7 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
               <button
                 type="button"
                 onClick={next}
-                className="absolute right-2 z-10 rounded-full bg-white/10 p-3 text-2xl text-white transition hover:bg-white/20"
+                className="absolute right-2 z-10 rounded-full bg-surface/10 p-3 text-2xl text-white transition hover:bg-surface/20"
                 aria-label="次の写真"
               >
                 ›
@@ -164,7 +164,7 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
             {current.recordId && (
               <Link
                 href={`/records/${current.recordId}`}
-                className="rounded-lg bg-white/10 px-3 py-1 transition hover:bg-white/20"
+                className="rounded-lg bg-surface/10 px-3 py-1 transition hover:bg-surface/20"
               >
                 記録を見る →
               </Link>

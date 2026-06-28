@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "ペット" };
 
 const inputClass =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500";
-const labelClass = "mb-1 block text-sm font-medium text-slate-700";
+  "w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground";
+const labelClass = "mb-1 block text-sm font-medium text-foreground";
 
 export default async function PetsPage() {
   const supabase = await createClient();
@@ -27,12 +27,12 @@ export default async function PetsPage() {
       <AppHeader />
       <main className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
-          <Link href="/" className="text-sm text-slate-500 hover:text-slate-800">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← 一覧へ戻る
           </Link>
         </div>
-        <h1 className="mb-1 text-xl font-bold text-slate-900">ペット</h1>
-        <p className="mb-6 text-sm text-slate-500">
+        <h1 className="mb-1 text-xl font-bold text-foreground">ペット</h1>
+        <p className="mb-6 text-sm text-muted-foreground">
           記録を紐づけるペットを登録できます。多頭飼いにも対応しています。
         </p>
 
@@ -42,7 +42,7 @@ export default async function PetsPage() {
             {pets.map((pet) => (
               <li
                 key={pet.id}
-                className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200"
+                className="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border"
               >
                 <form
                   action={updatePet.bind(null, pet.id)}
@@ -62,7 +62,7 @@ export default async function PetsPage() {
                     <div className="w-32">
                       <label className={labelClass}>
                         種類
-                        <span className="ml-1 text-xs font-normal text-slate-400">
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
                           （任意）
                         </span>
                       </label>
@@ -77,7 +77,7 @@ export default async function PetsPage() {
                     <div className="w-40">
                       <label className={labelClass}>
                         誕生日
-                        <span className="ml-1 text-xs font-normal text-slate-400">
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
                           （任意）
                         </span>
                       </label>
@@ -92,7 +92,7 @@ export default async function PetsPage() {
                   <div className="flex items-center gap-3">
                     <button
                       type="submit"
-                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover"
                     >
                       更新
                     </button>
@@ -100,7 +100,7 @@ export default async function PetsPage() {
                 </form>
                 <form
                   action={deletePet.bind(null, pet.id)}
-                  className="mt-2 border-t border-slate-100 pt-2"
+                  className="mt-2 border-t border-border pt-2"
                 >
                   <button
                     type="submit"
@@ -115,8 +115,8 @@ export default async function PetsPage() {
         )}
 
         {/* 新規ペット追加 */}
-        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <h2 className="mb-4 text-base font-bold text-slate-900">
+        <section className="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+          <h2 className="mb-4 text-base font-bold text-foreground">
             ペットを追加
           </h2>
           <form action={createPet} className="space-y-4">
@@ -137,7 +137,7 @@ export default async function PetsPage() {
               <div className="w-32">
                 <label htmlFor="new-species" className={labelClass}>
                   種類
-                  <span className="ml-1 text-xs font-normal text-slate-400">
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
                     （任意）
                   </span>
                 </label>
@@ -152,7 +152,7 @@ export default async function PetsPage() {
               <div className="w-40">
                 <label htmlFor="new-birthday" className={labelClass}>
                   誕生日
-                  <span className="ml-1 text-xs font-normal text-slate-400">
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
                     （任意）
                   </span>
                 </label>
@@ -166,7 +166,7 @@ export default async function PetsPage() {
             </div>
             <button
               type="submit"
-              className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition hover:bg-slate-700"
+              className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover"
             >
               追加する
             </button>

@@ -158,11 +158,11 @@ export default function RecordForm({
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <span className="mb-1 block text-sm font-medium text-slate-700">
+        <span className="mb-1 block text-sm font-medium text-foreground">
           記録元
         </span>
         <input type="hidden" name="source" value={source} />
-        <div className="inline-flex rounded-lg border border-slate-300 p-0.5">
+        <div className="inline-flex rounded-lg border border-border p-0.5">
           {RECORD_SOURCES.map((s) => (
             <button
               key={s}
@@ -172,8 +172,8 @@ export default function RecordForm({
               className={
                 "rounded-md px-4 py-1.5 text-sm font-medium transition " +
                 (source === s
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:bg-slate-100")
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-surface-muted")
               }
             >
               {SOURCE_LABEL[s]}
@@ -184,14 +184,14 @@ export default function RecordForm({
 
       {pets.length > 0 && (
         <div>
-          <label htmlFor="pet_id" className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor="pet_id" className="mb-1 block text-sm font-medium text-foreground">
             ペット
           </label>
           <select
             id="pet_id"
             name="pet_id"
             defaultValue={defaultPetId ?? ""}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+            className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
           >
             {/* 未設定を明示。pet_id=null の既存記録を勝手に付け替えないため、
                 fallback で先頭ペットを選ばない。 */}
@@ -208,7 +208,7 @@ export default function RecordForm({
       <div>
         <label
           htmlFor="record_date"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="mb-1 block text-sm font-medium text-foreground"
         >
           記録の日付
         </label>
@@ -218,7 +218,7 @@ export default function RecordForm({
           type="date"
           required
           defaultValue={defaultDate}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+          className="rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
         />
       </div>
 
@@ -226,10 +226,10 @@ export default function RecordForm({
         <div className="flex-1 min-w-[10rem]">
           <label
             htmlFor="author"
-            className="mb-1 block text-sm font-medium text-slate-700"
+            className="mb-1 block text-sm font-medium text-foreground"
           >
             記入者
-            <span className="ml-1 text-xs font-normal text-slate-400">
+            <span className="ml-1 text-xs font-normal text-muted-foreground">
               （任意）
             </span>
           </label>
@@ -239,16 +239,16 @@ export default function RecordForm({
             type="text"
             defaultValue={defaultAuthor}
             placeholder={source === "home" ? "おかあさん など" : "担当スタッフ名"}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+            className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
           />
         </div>
         <div className="w-32">
           <label
             htmlFor="weight_kg"
-            className="mb-1 block text-sm font-medium text-slate-700"
+            className="mb-1 block text-sm font-medium text-foreground"
           >
             体重(kg)
-            <span className="ml-1 text-xs font-normal text-slate-400">
+            <span className="ml-1 text-xs font-normal text-muted-foreground">
               （任意）
             </span>
           </label>
@@ -261,7 +261,7 @@ export default function RecordForm({
             min="0"
             defaultValue={defaultWeightKg ?? ""}
             placeholder="2.25"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+            className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
           />
         </div>
       </div>
@@ -269,7 +269,7 @@ export default function RecordForm({
       <div>
         <label
           htmlFor="body"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="mb-1 block text-sm font-medium text-foreground"
         >
           {source === "home" ? "おうちでの記録" : "保育園からの記録"}
         </label>
@@ -279,7 +279,7 @@ export default function RecordForm({
           rows={8}
           defaultValue={defaultBody}
           placeholder="今日の様子などを記録します"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+          className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
         />
       </div>
 
@@ -288,7 +288,7 @@ export default function RecordForm({
       <div>
         <label
           htmlFor="photos"
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="mb-1 block text-sm font-medium text-foreground"
         >
           写真を追加（複数選択可）
         </label>
@@ -299,9 +299,9 @@ export default function RecordForm({
           accept="image/*"
           multiple
           onChange={handleFilesChange}
-          className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+          className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-surface-muted file:px-4 file:py-2 file:text-sm file:font-medium file:text-foreground hover:file:bg-muted"
         />
-        <p className="mt-1.5 text-xs text-slate-400" aria-live="polite">
+        <p className="mt-1.5 text-xs text-muted-foreground" aria-live="polite">
           {processing
             ? "画像を最適化しています…"
             : summary ?? "アップロード時に自動で縮小・圧縮します（長辺 1600px）。"}
@@ -318,13 +318,13 @@ export default function RecordForm({
         <button
           type="submit"
           disabled={busy}
-          className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition hover:bg-slate-700 disabled:opacity-60"
+          className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
         >
           {uploading ? "写真を保存中…" : isPending ? "保存中…" : submitLabel}
         </button>
         <a
           href={cancelHref}
-          className="text-sm text-slate-500 transition hover:text-slate-800"
+          className="text-sm text-muted-foreground transition hover:text-foreground"
         >
           キャンセル
         </a>

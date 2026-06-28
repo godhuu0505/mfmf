@@ -68,17 +68,17 @@ export default async function GalleryPage() {
       <AppHeader />
       <main className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
-          <Link href="/" className="text-sm text-slate-500 hover:text-slate-800">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← 一覧へ戻る
           </Link>
         </div>
-        <h1 className="mb-1 text-xl font-bold text-slate-900">ギャラリー</h1>
-        <p className="mb-6 text-sm text-slate-500">
+        <h1 className="mb-1 text-xl font-bold text-foreground">ギャラリー</h1>
+        <p className="mb-6 text-sm text-muted-foreground">
           すべての写真を新しい順に表示します。写真をタップすると拡大できます。
         </p>
 
         {images.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
+          <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
             まだ写真がありません。
             <br />
             記録に写真を追加すると、ここにまとまって表示されます。

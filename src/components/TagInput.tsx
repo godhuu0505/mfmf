@@ -71,9 +71,9 @@ export default function TagInput({ defaultTags = [], suggestions = [] }: Props) 
 
   return (
     <div>
-      <span className="mb-1 block text-sm font-medium text-slate-700">
+      <span className="mb-1 block text-sm font-medium text-foreground">
         タグ
-        <span className="ml-1 text-xs font-normal text-slate-400">（任意）</span>
+        <span className="ml-1 text-xs font-normal text-muted-foreground">（任意）</span>
       </span>
 
       {/* 送信用 hidden inputs（選択中のタグ名） */}
@@ -81,18 +81,18 @@ export default function TagInput({ defaultTags = [], suggestions = [] }: Props) 
         <input key={t} type="hidden" name="tag_names" value={t} />
       ))}
 
-      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-300 px-2 py-2 focus-within:border-slate-500 focus-within:ring-1 focus-within:ring-slate-500">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border px-2 py-2 focus-within:border-muted-foreground focus-within:ring-1 focus-within:ring-muted-foreground">
         {tags.map((t) => (
           <span
             key={t}
-            className="inline-flex items-center gap-1 rounded-full bg-slate-100 py-0.5 pl-2.5 pr-1 text-sm text-slate-700"
+            className="inline-flex items-center gap-1 rounded-full bg-surface-muted py-0.5 pl-2.5 pr-1 text-sm text-foreground"
           >
             #{t}
             <button
               type="button"
               onClick={() => removeTag(t)}
               aria-label={`タグ「${t}」を外す`}
-              className="flex h-4 w-4 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-300 hover:text-slate-700"
+              className="flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               ×
             </button>
@@ -108,7 +108,7 @@ export default function TagInput({ defaultTags = [], suggestions = [] }: Props) 
           list="tag-suggestions"
           maxLength={TAG_NAME_MAX_LENGTH}
           placeholder={tags.length === 0 ? "体調 / 食欲 / トリミング など" : ""}
-          className="min-w-[8rem] flex-1 border-0 bg-transparent px-1 py-0.5 text-sm text-slate-900 outline-none"
+          className="min-w-[8rem] flex-1 border-0 bg-transparent px-1 py-0.5 text-sm text-foreground outline-none"
         />
       </div>
 
@@ -125,7 +125,7 @@ export default function TagInput({ defaultTags = [], suggestions = [] }: Props) 
               key={s}
               type="button"
               onClick={() => addTag(s)}
-              className="rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+              className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground transition hover:border-border hover:bg-surface-muted hover:text-foreground"
             >
               ＋ {s}
             </button>
@@ -133,7 +133,7 @@ export default function TagInput({ defaultTags = [], suggestions = [] }: Props) 
         </div>
       )}
 
-      <p className="mt-1.5 text-xs text-slate-400">
+      <p className="mt-1.5 text-xs text-muted-foreground">
         Enter またはカンマで追加できます。
       </p>
     </div>

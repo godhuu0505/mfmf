@@ -19,7 +19,7 @@ export default function CopyButton({ value }: { value: string }) {
     <button
       type="button"
       onClick={copy}
-      className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
+      className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-surface-muted"
     >
       {copied ? "コピーしました" : "URLをコピー"}
     </button>

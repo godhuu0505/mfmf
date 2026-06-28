@@ -69,7 +69,7 @@ export default function RecordFilters({
   return (
     <form
       onSubmit={handleSubmit}
-      className="mb-4 space-y-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200"
+      className="mb-4 space-y-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border"
     >
       {/* キーワード検索 */}
       <div className="flex gap-2">
@@ -78,11 +78,11 @@ export default function RecordFilters({
           name="q"
           defaultValue={filters.q}
           placeholder="本文・記入者で検索"
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none"
+          className="min-w-0 flex-1 rounded-lg border border-border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-muted-foreground focus:outline-none"
         />
         <button
           type="submit"
-          className="shrink-0 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+          className="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover"
         >
           検索
         </button>
@@ -91,13 +91,13 @@ export default function RecordFilters({
       {/* 記録元 / 並び替え */}
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-500">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
             記録元
           </span>
           <select
             name="source"
             defaultValue={filters.source}
-            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-surface px-2 py-2 text-sm text-foreground focus:border-muted-foreground focus:outline-none"
           >
             {SOURCE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -107,13 +107,13 @@ export default function RecordFilters({
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-500">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
             並び替え
           </span>
           <select
             name="sort"
             defaultValue={filters.sort}
-            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-surface px-2 py-2 text-sm text-foreground focus:border-muted-foreground focus:outline-none"
           >
             {SORT_KEYS.map((k) => (
               <option key={k} value={k}>
@@ -127,7 +127,7 @@ export default function RecordFilters({
       {/* 期間 */}
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-500">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
             開始日
           </span>
           <input
@@ -135,11 +135,11 @@ export default function RecordFilters({
             name="from"
             defaultValue={filters.from}
             max={filters.to || undefined}
-            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-surface px-2 py-2 text-sm text-foreground focus:border-muted-foreground focus:outline-none"
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-500">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
             終了日
           </span>
           <input
@@ -147,7 +147,7 @@ export default function RecordFilters({
             name="to"
             defaultValue={filters.to}
             min={filters.from || undefined}
-            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-surface px-2 py-2 text-sm text-foreground focus:border-muted-foreground focus:outline-none"
           />
         </label>
       </div>
@@ -157,7 +157,7 @@ export default function RecordFilters({
           <button
             type="button"
             onClick={() => pushWithTag("")}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted hover:text-foreground"
           >
             条件をクリア
           </button>

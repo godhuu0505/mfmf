@@ -35,10 +35,10 @@ export default async function SharePage({
       <main className="flex min-h-screen items-center justify-center px-4">
         <div className="w-full max-w-sm text-center">
           <p className="mb-2 text-4xl">🔒</p>
-          <h1 className="mb-1 text-lg font-bold text-slate-900">
+          <h1 className="mb-1 text-lg font-bold text-foreground">
             この共有リンクは利用できません
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             リンクの期限が切れているか、無効化された可能性があります。
             <br />
             共有した人にもう一度確認してください。
@@ -54,14 +54,14 @@ export default async function SharePage({
     <main className="mx-auto max-w-2xl px-4 py-8">
       <header className="mb-6 text-center">
         <p className="text-2xl">🐾</p>
-        <h1 className="mt-1 text-xl font-bold text-slate-900">
+        <h1 className="mt-1 text-xl font-bold text-foreground">
           {view.label?.trim() ? view.label : "ペットの記録"}
         </h1>
-        <p className="mt-1 text-xs text-slate-400">閲覧専用で共有されています</p>
+        <p className="mt-1 text-xs text-muted-foreground">閲覧専用で共有されています</p>
       </header>
 
       {records.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
+        <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
           共有できる記録がまだありません。
         </div>
       ) : (
@@ -69,7 +69,7 @@ export default async function SharePage({
           {records.map((r, i) => (
             <li
               key={`${r.record_date}-${i}`}
-              className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200"
+              className="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border"
             >
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
                 <span
@@ -84,18 +84,18 @@ export default async function SharePage({
                   {SOURCE_LABEL[r.source]}
                 </span>
                 {r.weight_kg != null && (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                     ⚖️ {r.weight_kg}kg
                   </span>
                 )}
-                <span className="text-sm font-semibold text-slate-900">
+                <span className="text-sm font-semibold text-foreground">
                   {formatDate(r.record_date)}
                 </span>
               </div>
               {r.author && (
-                <p className="mb-1 text-xs text-slate-500">記入者: {r.author}</p>
+                <p className="mb-1 text-xs text-muted-foreground">記入者: {r.author}</p>
               )}
-              <p className="whitespace-pre-wrap text-sm text-slate-800">
+              <p className="whitespace-pre-wrap text-sm text-foreground">
                 {r.body || "（本文なし）"}
               </p>
             </li>
@@ -103,7 +103,7 @@ export default async function SharePage({
         </ul>
       )}
 
-      <p className="mt-8 text-center text-xs text-slate-400">
+      <p className="mt-8 text-center text-xs text-muted-foreground">
         mfmf — ペットの記録
       </p>
     </main>
