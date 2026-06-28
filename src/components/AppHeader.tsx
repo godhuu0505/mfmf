@@ -54,6 +54,14 @@ export default function AppHeader() {
             🔗
           </Link>
           <Link
+            href="/help"
+            className="text-sm text-slate-500 transition hover:text-slate-800"
+            aria-label="ヘルプ"
+            title="ヘルプ"
+          >
+            ❓
+          </Link>
+          <Link
             href="/settings"
             className="text-sm text-slate-500 transition hover:text-slate-800"
             aria-label="設定"
