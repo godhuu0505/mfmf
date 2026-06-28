@@ -45,3 +45,48 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
         run: npm run build
+
+  # PR で追加 / 変更された supabase/migrations/*.sql に破壊的 SQL が含まれていないかを検査する。
+  # Free プランには自動バックアップが無く、destructive 変更は事実上戻せないため、
+  # PR 段階で気づけるようにする。warning 止まりで強制ブロックはしない（やむを得ない場合がある）。
+  # workflow_call で deploy 系から呼ばれた時は PR コンテキストでないので skip される。
+  check-destructive-migration:
+    name: Check destructive migration SQL
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect destructive SQL in changed migrations
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eu
+          FILES=$(git diff --name-only --diff-filter=AM "$BASE_SHA" "$HEAD_SHA" -- 'supabase/migrations/*.sql' || true)
+          if [ -z "$FILES" ]; then
+            echo "No migration changes in this PR."
+            exit 0
+          fi
+          echo "Changed migrations:"
+          echo "$FILES"
+          # 検出対象:
+          #   - DROP TABLE / DROP COLUMN / DROP TYPE   … 構造とデータ消失
+          #   - ALTER ... TYPE                          … 型変換失敗 / 暗黙の切り捨て
+          #   - TRUNCATE / DELETE FROM                  … 行消失
+          #   - RENAME COLUMN / RENAME TO               … アプリ参照の不整合（データは残るが表示できなくなる）
+          #   - SET NOT NULL                            … 既存 NULL 行で migration が停止 or 既定値が必要
+          # 検出対象外（メタオブジェクトでデータに影響しない）:
+          #   - DROP POLICY / DROP TRIGGER / DROP CONSTRAINT
+          PATTERN='drop[[:space:]]+table|drop[[:space:]]+column|drop[[:space:]]+type|alter[[:space:]]+table[[:space:]]+[^ ]+[[:space:]]+drop[[:space:]]+column|alter[[:space:]]+column[[:space:]]+[^ ]+[[:space:]]+(set[[:space:]]+data[[:space:]]+)?type|alter[[:space:]]+table[[:space:]]+[^ ]+[[:space:]]+rename|rename[[:space:]]+column|rename[[:space:]]+to|set[[:space:]]+not[[:space:]]+null|truncate|delete[[:space:]]+from'
+          # 「ファイル名:行番号:<空白>--」で始まる行（SQL の行コメント）を除外する。
+          # 行末コメントは検出されるが、コード本体が引っかかっているので妥当。
+          MATCHES=$(echo "$FILES" | xargs grep -niE "$PATTERN" 2>/dev/null | grep -vE ':[[:space:]]*--' || true)
+          if [ -n "$MATCHES" ]; then
+            echo "::warning::Destructive SQL detected. Confirm: (1) ローカル supabase db reset で動作確認済み, (2) Artifact から復旧可能, (3) Storage / auth.users を触らない or 別途バックアップ済み. 詳細は docs/guides/deploy.md."
+            echo "$MATCHES"
+          else
+            echo "No destructive SQL detected."
+          fi

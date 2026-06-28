@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 このファイルは Claude Code が **mfmf**（ペット保育園記録アプリ）で作業するための指針です。
-全体像は `README.md`、DB/RLS は `supabase/migrations/0001_init.sql` を正とします。
+全体像は `README.md`、DB/RLS は `supabase/migrations/20260616130704_init.sql` を正とします。
 ツール非依存の要点版は `AGENTS.md`、各種手順・仕様は `docs/`（索引は `docs/README.md`）にあります。
 
 ## プロジェクト概要
@@ -76,5 +76,11 @@
 
 ## DB スキーマ変更
 
-`supabase/migrations/` に新しい連番 SQL を追加する（既存の `0001_init.sql` は編集しない）。
+`supabase/migrations/` に新しいタイムスタンプ付き SQL を追加する（`supabase migration new <name>` で
+生成、既存の `20260616130704_init.sql` は編集しない）。
 RLS・Storage ポリシー・`search_path` 固定の方針を踏襲する。
+
+main マージ時に `deploy-preview.yml` の `migrate` ジョブが `supabase db push` で**本番 Supabase
+に自動適用**する（preview / production は同一プロジェクト共有）。破壊的変更（DROP / カラム削除 /
+型変更）は main マージ時点で本番に作用するため、PR 段階でローカル `supabase db reset` の動作確認まで
+済ませること。詳細は [docs/guides/deploy.md](./docs/guides/deploy.md#supabasedbマイグレーション)。

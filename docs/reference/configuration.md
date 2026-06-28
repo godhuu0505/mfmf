@@ -43,13 +43,20 @@ Google ログインと写真の Drive 保存に使う。設定手順は
 
 ### デプロイ（GitHub Secrets）
 
-CI/CD で使用。詳細は [guides/deploy.md](../guides/deploy.md)。
+CI/CD で使用。詳細は [guides/deploy.md](../guides/deploy.md)。`preview` / `production` の両 Environment に
+登録する。Supabase 系 3 つは値が同じ（同一プロジェクト共有）。
 
-| Secret | 取得元 |
-| --- | --- |
-| `VERCEL_TOKEN` | Vercel Account Settings > Tokens |
-| `VERCEL_ORG_ID` | `.vercel/project.json` の `orgId` |
-| `VERCEL_PROJECT_ID` | `.vercel/project.json` の `projectId` |
+| Secret | 用途 | 取得元 |
+| --- | --- | --- |
+| `VERCEL_TOKEN` | Vercel デプロイ | Vercel Account Settings > Tokens |
+| `VERCEL_ORG_ID` | Vercel デプロイ | `.vercel/project.json` の `orgId` |
+| `VERCEL_PROJECT_ID` | Vercel デプロイ | `.vercel/project.json` の `projectId` |
+| `SUPABASE_ACCESS_TOKEN` | DB migrate / dump | Supabase Dashboard > Account > [Access Tokens](https://supabase.com/dashboard/account/tokens) |
+| `SUPABASE_DB_PASSWORD` | DB migrate / dump | Supabase Dashboard > Project Settings > Database |
+| `SUPABASE_PROJECT_ID` | DB migrate / dump | Project URL の subdomain（20 文字英小文字） |
+
+> Supabase 系が未設定なら `migrate` ジョブは自動 skip され、Vercel deploy のみ走る（DB に触らない
+> 動作確認用の抜け道）。Vercel 系が未設定なら deploy 全体 skip。
 
 ## npm スクリプト
 

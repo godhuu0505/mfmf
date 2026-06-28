@@ -25,10 +25,11 @@
 | スキーマ適用 | （実体で判断） | 上の実体が揃っていれば適用済み。未適用なら `supabase/migrations/` を SQL Editor で実行。 |
 | advisor | Advisors | RLS 未設定や危険な公開設定の警告が **0 件**。DDL 変更後は必ず確認。 |
 
-> ⚠️ **Database > Migrations の履歴には注意**。Supabase の履歴は CLI（`supabase db push` 等）や
-> MCP の `apply_migration` で適用したときだけ記録される。**SQL Editor で実行した場合は履歴に残らない**ため、
-> 履歴の有無ではなくテーブル / ポリシー / バケットの実体で判断する。CLI ベースで履歴を揃えたいときは
-> `supabase db push` や `supabase migration repair` を使う。
+> ⚠️ **Database > Migrations の履歴**。CI/CD の `migrate` ジョブが `supabase db push` で適用した
+> migration は **`supabase_migrations.schema_migrations`** に履歴が残るので、Actions の run と
+> 突き合わせて確認できる（[guides/deploy.md](./deploy.md)）。一方、過去に **SQL Editor で実行した分**
+> や初回 setup で手動適用した分は履歴に残らないため、移行期は実体（テーブル / ポリシー / バケット）と
+> 履歴の両面で判断する。ズレを直したいときは `supabase migration repair --status applied <version>` を使う。
 
 ## 3. 接続のスモークテスト
 
