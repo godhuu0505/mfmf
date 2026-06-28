@@ -78,9 +78,17 @@ just down    # 停止
 繋ぐ先の Supabase プロジェクトがまだ無い場合だけ実施します。
 
 1. [Supabase ダッシュボード](https://supabase.com/dashboard) で新規プロジェクトを作成。
-2. `supabase/migrations/` の SQL を**連番順に** SQL Editor で実行
-   （`0001_init.sql` 〜 `0009_share_links.sql` まで）。テーブル / RLS / Storage バケット
-   `daycare-photos` が作られます。
+2. `supabase/migrations/` の SQL を本番 DB に適用：
+   - **推奨**: CLI で一括適用
+     ```bash
+     supabase link --project-ref <PROJECT_REF>
+     supabase db push
+     ```
+   - **代替**: `supabase/migrations/` を**連番順に**（`0001_init.sql` 〜 `0010_grants.sql` まで）
+     SQL Editor で実行。
+   - テーブル / RLS / Storage バケット `daycare-photos` が作られます。
+   - 以降の追加 migration は CI/CD が自動適用するので、初回のみ手動で揃えれば OK
+     （仕組みは [guides/deploy.md](./guides/deploy.md#supabasedbマイグレーション)）。
 3. **Google プロバイダを有効化**してログインを設定。本アプリは Google OAuth 一本化のため、
    メール/パスワードでのログインは使えません。Google Cloud / Supabase の設定手順は
    **[guides/google-drive-setup.md](./guides/google-drive-setup.md)** を参照。

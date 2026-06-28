@@ -78,3 +78,8 @@
 
 `supabase/migrations/` に新しい連番 SQL を追加する（既存の `0001_init.sql` は編集しない）。
 RLS・Storage ポリシー・`search_path` 固定の方針を踏襲する。
+
+main マージ時に `deploy-preview.yml` の `migrate` ジョブが `supabase db push` で**本番 Supabase
+に自動適用**する（preview / production は同一プロジェクト共有）。破壊的変更（DROP / カラム削除 /
+型変更）は main マージ時点で本番に作用するため、PR 段階でローカル `supabase db reset` の動作確認まで
+済ませること。詳細は [docs/guides/deploy.md](./docs/guides/deploy.md#supabasedbマイグレーション)。
