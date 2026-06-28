@@ -13,6 +13,7 @@
     "feedback:issues": "node scripts/feedback-to-issues.mjs"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.62.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.58.0",
     "next": "^15.5.4",
