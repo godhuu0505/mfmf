@@ -16,14 +16,18 @@
 
 | 目的 | コマンド |
 | --- | --- |
-| 開発サーバー | `npm run dev` |
-| Lint | `npm run lint` |
-| 型チェック | `npm run typecheck` |
-| 本番ビルド | `npm run build` |
+| 開発サーバー | `just dev` |
+| CI ゲート一括（lint→typecheck→build） | `just check` |
+| Lint 単体 | `npm run lint` |
+| 型チェック単体 | `npm run typecheck` |
+| 本番ビルド単体 | `npm run build` |
 | PWA アイコン生成 | `npm run icons` |
+| Docker でアプリ起動（任意） | `just up` |
+| Docker を停止 | `just down` |
 
 **変更後は必ず `npm run lint` と `npm run typecheck` を通すこと。** UI/ルーティングや
-ビルド構成を触ったときは `npm run build` も確認する（CI と同じゲート）。
+ビルド構成を触ったときは `npm run build` も確認する（CI と同じゲート）。`just check`
+で 3 つを一括実行できる。
 依存は SessionStart フックが自動インストールするため、通常は手動 `npm install` 不要。
 
 ## アーキテクチャ / 規約

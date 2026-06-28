@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.github
+docs
+.env
+.env.*
+!.env.local.example
+*.md
+.DS_Store
+.claude
+.vscode
+.idea
+coverage

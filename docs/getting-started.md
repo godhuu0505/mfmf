@@ -38,10 +38,38 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon または publishable key>
 ## 3. 開発サーバーを起動
 
 ```bash
-npm run dev   # http://localhost:3000
+just dev   # http://localhost:3000
 ```
 
 ブラウザで http://localhost:3000 を開き、`/login` でログインできれば成功です。
+
+---
+
+## docker compose での起動（任意）
+
+ローカルマシンの Node.js バージョンを気にせず CI と同じ Node.js 22 で起動したい場合は、
+`docker compose` でアプリだけをコンテナ起動できます（Supabase は引き続きクラウド or
+`supabase start` を利用）。
+
+```bash
+just up      # Docker でアプリ起動
+just down    # 停止
+```
+
+### 接続先 Supabase の指定
+
+- **クラウド Supabase に繋ぐ**: そのまま `.env.local` の値で OK。
+- **ローカル Supabase（`supabase start`）に繋ぐ**: コンテナ内からホストの
+  `127.0.0.1:54321` に届かないため、`.env.local` を以下のように上書きする。
+
+  ```dotenv
+  NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321
+  ```
+
+  ただし `NEXT_PUBLIC_*` はブラウザにも露出する値です。ブラウザは `host.docker.internal`
+  を解決できないため、Mac で Docker 経由のアプリを使うときはローカル Supabase より
+  クラウド Supabase の方が素直です。本格的にコンテナ前提で開発するなら Supabase も
+  同じ compose ネットワークに置く構成を検討してください（現状はスコープ外）。
 
 ---
 

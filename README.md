@@ -12,17 +12,53 @@
 
 ## クイックスタート
 
+### A. リモート Supabase に繋ぐ（最短）
+
+クラウド上の Supabase プロジェクトを使う場合：
+
 ```bash
 git clone https://github.com/godhuu0505/mfmf.git
 cd mfmf
 npm install
 
 cp .env.local.example .env.local   # Supabase の URL / anon key を設定
-npm run dev                        # http://localhost:3000
+just dev                           # http://localhost:3000
 ```
 
-`.env.local` の値の取り方、Supabase プロジェクトとユーザーの用意を含む詳しい手順は
-**[docs/getting-started.md](./docs/getting-started.md)** を参照してください。
+詳しい手順（Supabase プロジェクトとユーザーの用意含む）は
+**[docs/getting-started.md](./docs/getting-started.md)**。
+
+### B. ローカル Supabase スタックを使う
+
+Docker（Docker Desktop / Rancher Desktop など）と `just` / Supabase CLI を入れて、初回だけ：
+
+```bash
+brew install just supabase/tap/supabase
+git clone https://github.com/godhuu0505/mfmf.git && cd mfmf
+npm install
+supabase init        # supabase/config.toml を生成
+just setup           # Supabase 起動 + .env.local 自動生成（初回専用）
+# Supabase Studio (http://127.0.0.1:54323) でログイン用ユーザーを 1 つ作成
+just up              # docker compose で Next.js 起動（CI と同じ Node 22）
+# または just dev でホスト Node 起動
+```
+
+詳細・トラブルシュートは **[docs/guides/local-supabase.md](./docs/guides/local-supabase.md)**。
+
+> **Google ログインや Drive 連携を使う場合**は、上記に加えて Google Cloud / Supabase 側の OAuth 設定が必要です。
+> 手順は **[docs/guides/google-drive-setup.md](./docs/guides/google-drive-setup.md)**。
+> `TOKEN_ENC_KEY` は `just setup` が自動投入します。
+
+### よく使う just コマンド
+
+```bash
+just            # 利用可能な recipe を一覧
+just dev        # ホスト Node で next dev
+just up         # docker compose で Next.js をコンテナ起動
+just down       # コンテナを停止
+just check      # lint → typecheck → build（CI と同じゲート）
+just setup      # 初回のみ：ローカル Supabase 起動 + .env.local 生成
+```
 
 ## 主な機能
 

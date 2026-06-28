@@ -73,14 +73,14 @@ mfmf は **Google ログイン**で認証し、写真を各自の **Google Drive
 
 ## 2. Supabase で Google プロバイダを有効化
 
-Supabase ダッシュボードで作業します。
+### 2A. リモート Supabase の場合（ダッシュボード）
 
-### 2-1. Google プロバイダ
+#### 2A-1. Google プロバイダ
 
 - 「Authentication」▶「Sign In / Providers」（旧 Providers）▶ **Google** を有効化。
 - 1-4 で取得した **Client ID** と **Client Secret** を入力して保存。
 
-### 2-2. リダイレクト URL の許可
+#### 2A-2. リダイレクト URL の許可
 
 - 「Authentication」▶「URL Configuration」。
 - **Site URL** に本番 URL（例: `https://mfmf.example.com`）を設定。
@@ -90,6 +90,44 @@ Supabase ダッシュボードで作業します。
   https://YOUR_APP_DOMAIN/auth/callback
   ```
   （ローカル開発と本番の両方。Vercel のプレビュー URL を使う場合はそれも追加）
+
+### 2B. ローカル Supabase（`supabase start`）の場合
+
+1-4 で Google Cloud に登録する **承認済みのリダイレクト URI** はローカル Supabase 用の値に：
+
+```
+http://127.0.0.1:54321/auth/v1/callback
+```
+
+`supabase init` が生成した `supabase/config.toml` を開き、`[auth.external.google]` セクションを
+編集して `enabled = true` と Client ID / Secret を設定（`env(...)` で `.env` 参照可）：
+
+```toml
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"
+```
+
+ローカル Supabase はプロジェクト直下の `.env` を参照するため、CLI 用に値を渡す軽量な
+方法として `supabase/.env` を作成（このファイルは git 無視対象）：
+
+```dotenv
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+```
+
+設定後、Supabase を再起動：
+
+```bash
+supabase stop
+supabase start
+```
+
+> アプリ側コールバック (`http://localhost:3000/auth/callback`) は `[auth]` セクションの
+> `site_url` / `additional_redirect_urls` に追加する設定もあります。`supabase init` の
+> デフォルトでは `http://localhost:3000` 系が含まれるので通常はそのまま使えます。
 
 ---
 
@@ -101,9 +139,10 @@ Supabase ダッシュボードで作業します。
 | --- | --- |
 | `GOOGLE_CLIENT_ID` | 1-4 のクライアント ID |
 | `GOOGLE_CLIENT_SECRET` | 1-4 のクライアントシークレット |
-| `TOKEN_ENC_KEY` | 下記コマンドで生成した乱数文字列 |
+| `TOKEN_ENC_KEY` | 乱数文字列（`just setup` 利用時は自動生成） |
 
-`TOKEN_ENC_KEY` の生成例:
+`just setup` を実行した場合は `TOKEN_ENC_KEY` が自動生成・投入されます。
+手動で発行する場合：
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
