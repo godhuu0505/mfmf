@@ -1,10 +1,13 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   toFeedbackFrequency,
   toFeedbackKind,
   toFeedbackSeverity,
+  toFeedbackStatus,
   type FeedbackContext,
 } from "@/types/database";
 import type { FeedbackState } from "./types";
@@ -92,4 +95,43 @@ export async function submitFeedback(
     message:
       "送信ありがとうございました！内容はしっかり届きました。いただいた声をもとに、よりよいアプリにしていきます。",
   };
+}
+
+// トリアージ画面から status を切り替える。RLS で本人の行のみ更新可能。
+export async function setFeedbackStatus(id: string, formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const newStatus = toFeedbackStatus(formData.get("status"));
+
+  const { error } = await supabase
+    .from("feedback")
+    .update({ status: newStatus, status_changed_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    throw new Error(`フィードバックの状態更新に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/feedback");
+}
+
+// トリアージ画面からフィードバックを削除する。
+export async function deleteFeedback(id: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { error } = await supabase.from("feedback").delete().eq("id", id);
+
+  if (error) {
+    throw new Error(`フィードバックの削除に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/feedback");
 }

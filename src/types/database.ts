@@ -215,6 +215,22 @@ export type FeedbackContext = {
   client_time?: string; // 端末側の送信時刻 (ISO)
 };
 
+export type FeedbackStatus = "open" | "triaged" | "closed";
+
+export const FEEDBACK_STATUSES: FeedbackStatus[] = ["open", "triaged", "closed"];
+
+export const FEEDBACK_STATUS_LABEL: Record<FeedbackStatus, string> = {
+  open: "未対応",
+  triaged: "整理済み",
+  closed: "対応完了",
+};
+
+export function toFeedbackStatus(value: unknown): FeedbackStatus {
+  return FEEDBACK_STATUSES.includes(value as FeedbackStatus)
+    ? (value as FeedbackStatus)
+    : "open";
+}
+
 export type Feedback = {
   id: string;
   owner_id: string;
@@ -230,5 +246,7 @@ export type Feedback = {
   context: FeedbackContext | null;
   github_issue_url: string | null;
   github_issue_number: number | null;
+  status: FeedbackStatus;
+  status_changed_at: string;
   created_at: string;
 };

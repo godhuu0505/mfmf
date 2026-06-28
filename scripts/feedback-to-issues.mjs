@@ -234,7 +234,12 @@ async function main() {
       const issue = await createIssue({ repo, token, title, body, labels });
       const { error: updateError } = await supabase
         .from("feedback")
-        .update({ github_issue_url: issue.url, github_issue_number: issue.number })
+        .update({
+          github_issue_url: issue.url,
+          github_issue_number: issue.number,
+          status: "triaged",
+          status_changed_at: new Date().toISOString(),
+        })
         .eq("id", row.id);
       if (updateError) {
         // Issue は作られたが控えの更新に失敗。二重登録を避けるため明示する。
