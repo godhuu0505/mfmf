@@ -7,15 +7,7 @@ import {
   toFeedbackSeverity,
   type FeedbackContext,
 } from "@/types/database";
-
-// useActionState で扱う送信結果。
-export type FeedbackState = {
-  ok: boolean;
-  // 画面に表示するメッセージ（丁寧な日本語）
-  message?: string;
-};
-
-export const initialFeedbackState: FeedbackState = { ok: false };
+import type { FeedbackState } from "./types";
 
 function trimOrNull(value: FormDataEntryValue | null): string | null {
   const s = String(value ?? "").trim();
