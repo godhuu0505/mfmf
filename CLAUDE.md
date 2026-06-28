@@ -16,14 +16,20 @@
 
 | 目的 | コマンド |
 | --- | --- |
-| 開発サーバー | `npm run dev` |
-| Lint | `npm run lint` |
-| 型チェック | `npm run typecheck` |
-| 本番ビルド | `npm run build` |
+| 開発サーバー | `just dev` |
+| CI ゲート一括（lint→typecheck→build） | `just check` |
+| Lint 単体 | `npm run lint` |
+| 型チェック単体 | `npm run typecheck` |
+| 本番ビルド単体 | `npm run build` |
 | PWA アイコン生成 | `npm run icons` |
+| Docker でアプリ起動（任意） | `just up` |
+| Docker を停止 | `just down` |
+| 初回構築（Supabase 起動 + .env.local 生成） | `just setup` |
+| Google OAuth 対話投入（初回） | `just setup-google` |
 
 **変更後は必ず `npm run lint` と `npm run typecheck` を通すこと。** UI/ルーティングや
-ビルド構成を触ったときは `npm run build` も確認する（CI と同じゲート）。
+ビルド構成を触ったときは `npm run build` も確認する（CI と同じゲート）。`just check`
+で 3 つを一括実行できる。
 依存は SessionStart フックが自動インストールするため、通常は手動 `npm install` 不要。
 
 ## アーキテクチャ / 規約
@@ -45,7 +51,9 @@
   （Vercel の Function ボディ上限 4.5MB を超えないため）。新規作成時は `record_id` をクライアントで
   生成し、パス規約と DB 行の id を一致させる。
 - Storage オブジェクトパス規約: `{owner_id}/{record_id}/{filename}`（生成/検証は `src/lib/storagePath.ts`）。
-- 画面: `/login`, `/`（一覧）, `/records/new`, `/records/[id]`（`?edit=1` で編集）。
+- 画面: `/login`（Google OAuth）, `/`（一覧）, `/records/new`, `/records/[id]`（`?edit=1` で編集）,
+  `/calendar`, `/gallery`, `/pets`, `/weight`, `/settings`, `/shares`, `/share/[token]`,
+  `/feedback`, `/offline`, `/auth/*`。
 
 ## セキュリティ（厳守）
 

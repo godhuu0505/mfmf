@@ -15,15 +15,19 @@ AI コーディングエージェント（Claude Code / Copilot / Cursor / Codex
 ## セットアップ・検証コマンド
 
 ```bash
-npm install        # 依存（web セッションでは SessionStart フックが自動実行）
-npm run dev        # 開発サーバー
-npm run lint       # ESLint
-npm run typecheck  # tsc --noEmit
-npm run build      # 本番ビルド
+npm install         # 依存（web セッションでは SessionStart フックが自動実行）
+just dev            # 開発サーバー
+just check          # lint → typecheck → build（CI と同じゲート）
+just up             # Docker でアプリ起動（任意）
+just down           # Docker を停止
+just setup          # 初回のみ：ローカル Supabase 起動 + .env.local 生成
+just setup-google   # 初回のみ：Google OAuth 認証情報を対話投入
 ```
 
-**変更後は必ず `npm run lint` と `npm run typecheck` を通す。** UI / ルーティング / ビルド構成を
-触ったときは `npm run build` も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
+個別に走らせたいときだけ `npm run lint` / `npm run typecheck` / `npm run build` を直接呼ぶ。
+
+**変更後は必ず lint と typecheck を通す。** UI / ルーティング / ビルド構成を触ったときは
+build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。`just check` で 3 つを一括実行できる。
 
 ## やってよいこと / 規約
 

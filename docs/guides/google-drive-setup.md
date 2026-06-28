@@ -73,14 +73,14 @@ mfmf は **Google ログイン**で認証し、写真を各自の **Google Drive
 
 ## 2. Supabase で Google プロバイダを有効化
 
-Supabase ダッシュボードで作業します。
+### 2A. リモート Supabase の場合（ダッシュボード）
 
-### 2-1. Google プロバイダ
+#### 2A-1. Google プロバイダ
 
 - 「Authentication」▶「Sign In / Providers」（旧 Providers）▶ **Google** を有効化。
 - 1-4 で取得した **Client ID** と **Client Secret** を入力して保存。
 
-### 2-2. リダイレクト URL の許可
+#### 2A-2. リダイレクト URL の許可
 
 - 「Authentication」▶「URL Configuration」。
 - **Site URL** に本番 URL（例: `https://mfmf.example.com`）を設定。
@@ -90,6 +90,68 @@ Supabase ダッシュボードで作業します。
   https://YOUR_APP_DOMAIN/auth/callback
   ```
   （ローカル開発と本番の両方。Vercel のプレビュー URL を使う場合はそれも追加）
+
+### 2B. ローカル Supabase（`supabase start`）の場合
+
+#### 2B-1. Google Cloud Console のリダイレクト URI
+
+1-4 で登録する **承認済みのリダイレクト URI** はローカル Supabase 用の値：
+
+```
+http://127.0.0.1:54321/auth/v1/callback
+```
+
+> `localhost` ではなく `127.0.0.1` で登録するのが慣行（Supabase ローカル CLI が `127.0.0.1`
+> で待ち受けるため）。`localhost` を登録するとコールバック先と一致せず認証に失敗します。
+
+#### 2B-2. `just setup-google` で対話投入（推奨）
+
+`just setup` 実行済みであれば、以下のコマンド 1 つで：
+
+- `supabase/.env` に Supabase Auth 用の認証情報を書き込み
+- `.env.local` の Drive 連携用 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を更新
+- `supabase/config.toml` の `[auth.external.google]` を `enabled = true` に切り替え
+- `supabase stop && supabase start` で反映
+
+```bash
+just setup-google
+```
+
+プロンプトで Client ID と Client Secret を入力（Secret は非表示入力）。完了後、ブラウザで
+`/login` の Google ログインを試せます。
+
+#### 2B-3. 手動で設定する場合（参考）
+
+`just setup-google` を使わない場合は以下の 3 ファイルを編集して `supabase stop && supabase start`：
+
+**`supabase/config.toml`**（既に雛形あり。`enabled = false` を `true` に変えるだけ）:
+
+```toml
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+skip_nonce_check = false
+```
+
+**`supabase/.env`**（git 無視対象）:
+
+```dotenv
+SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=...
+SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=...
+```
+
+**`.env.local`**（アプリの Drive 連携用に同じ値を）:
+
+```dotenv
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+```
+
+> アプリ側コールバック (`http://localhost:3000/auth/callback` /
+> `http://127.0.0.1:3000/auth/callback`) は本リポジトリの `config.toml` の
+> `additional_redirect_urls` に既に含めています。ブラウザでどちらの origin を使っても OK。
 
 ---
 
@@ -101,9 +163,10 @@ Supabase ダッシュボードで作業します。
 | --- | --- |
 | `GOOGLE_CLIENT_ID` | 1-4 のクライアント ID |
 | `GOOGLE_CLIENT_SECRET` | 1-4 のクライアントシークレット |
-| `TOKEN_ENC_KEY` | 下記コマンドで生成した乱数文字列 |
+| `TOKEN_ENC_KEY` | 乱数文字列（`just setup` 利用時は自動生成） |
 
-`TOKEN_ENC_KEY` の生成例:
+`just setup` を実行した場合は `TOKEN_ENC_KEY` が自動生成・投入されます。
+手動で発行する場合：
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
