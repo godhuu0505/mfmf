@@ -30,7 +30,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0f172a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b1220" },
+  ],
 };
 
 export default function RootLayout({
@@ -39,6 +42,9 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className="min-h-screen">
+        <a href="#main" className="skip-link">
+          メインコンテンツへスキップ
+        </a>
         {children}
         <FeedbackWidget />
         <ServiceWorkerRegister />

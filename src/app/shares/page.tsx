@@ -64,7 +64,7 @@ export default async function SharesPage() {
   return (
     <>
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← 一覧へ戻る
@@ -134,7 +134,7 @@ export default async function SharesPage() {
                     <form action={deleteShareLink.bind(null, link.id)}>
                       <SubmitButton
                         pendingLabel="削除中…"
-                        className="text-xs text-red-500 transition hover:text-red-700 disabled:opacity-60"
+                        className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
                       >
                         削除
                       </SubmitButton>

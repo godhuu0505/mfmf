@@ -5,7 +5,7 @@ export const dynamic = "force-static";
 
 export default function OfflinePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+    <main id="main" className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
       <div className="text-5xl">🐾</div>
       <h1 className="mt-4 text-xl font-bold text-foreground">
         オフラインです
