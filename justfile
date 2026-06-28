@@ -40,7 +40,7 @@ setup:
         echo "[setup] Failed to read ANON_KEY from supabase status"; exit 1; \
     fi; \
     echo "[setup] Generating TOKEN_ENC_KEY..."; \
-    TOKEN_ENC_KEY="$(node -e 'console.log(require(\"crypto\").randomBytes(32).toString(\"base64\"))')"; \
+    TOKEN_ENC_KEY="$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")"; \
     if [ -z "$TOKEN_ENC_KEY" ]; then \
         echo "[setup] Failed to generate TOKEN_ENC_KEY"; exit 1; \
     fi; \

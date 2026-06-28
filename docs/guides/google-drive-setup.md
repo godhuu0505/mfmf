@@ -93,41 +93,55 @@ mfmf は **Google ログイン**で認証し、写真を各自の **Google Drive
 
 ### 2B. ローカル Supabase（`supabase start`）の場合
 
-1-4 で Google Cloud に登録する **承認済みのリダイレクト URI** はローカル Supabase 用の値に：
+#### 2B-1. Google Cloud Console のリダイレクト URI
+
+1-4 で登録する **承認済みのリダイレクト URI** はローカル Supabase 用の値：
 
 ```
 http://127.0.0.1:54321/auth/v1/callback
 ```
 
-`supabase init` が生成した `supabase/config.toml` を開き、`[auth.external.google]` セクションを
-編集して `enabled = true` と Client ID / Secret を設定（`env(...)` で `.env` 参照可）：
+> `localhost` ではなく `127.0.0.1` で登録するのが慣行（Supabase ローカル CLI が `127.0.0.1`
+> で待ち受けるため）。`localhost` を登録するとコールバック先と一致せず認証に失敗します。
+
+#### 2B-2. `supabase/config.toml`
+
+本リポジトリの `supabase/config.toml` には `[auth.external.google]` セクションを
+あらかじめ用意してあります。`enabled = true` に変更するだけで OK：
 
 ```toml
 [auth.external.google]
-enabled = true
-client_id = "env(GOOGLE_CLIENT_ID)"
-secret = "env(GOOGLE_CLIENT_SECRET)"
-redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"
+enabled = true   # ← false から変更
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+skip_nonce_check = false
 ```
 
-ローカル Supabase はプロジェクト直下の `.env` を参照するため、CLI 用に値を渡す軽量な
-方法として `supabase/.env` を作成（このファイルは git 無視対象）：
+> `redirect_uri = ""` のままにすると Supabase 既定（`/auth/v1/callback`）を使うため、
+> 環境ごとに書き換える必要がありません。
+
+#### 2B-3. 認証情報を `supabase/.env` で渡す
+
+Supabase CLI は `supabase/.env` を `env(...)` の参照元として読みます（このファイルは
+`supabase/.gitignore` で除外済み）。1-4 で取得した値を：
 
 ```dotenv
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
+# supabase/.env
+SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=...
+SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=...
 ```
 
-設定後、Supabase を再起動：
+#### 2B-4. Supabase を再起動
 
 ```bash
 supabase stop
 supabase start
 ```
 
-> アプリ側コールバック (`http://localhost:3000/auth/callback`) は `[auth]` セクションの
-> `site_url` / `additional_redirect_urls` に追加する設定もあります。`supabase init` の
-> デフォルトでは `http://localhost:3000` 系が含まれるので通常はそのまま使えます。
+> アプリ側コールバック (`http://localhost:3000/auth/callback` /
+> `http://127.0.0.1:3000/auth/callback`) は本リポジトリの `config.toml` の
+> `additional_redirect_urls` に既に含めています。ブラウザでどちらの origin を使っても OK。
 
 ---
 
