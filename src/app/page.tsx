@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import {
-  PHOTO_BUCKET,
   SOURCE_LABEL,
   tagsFromJoin,
   type RecordSource,
@@ -16,6 +15,7 @@ import {
   parseFilters,
 } from "@/lib/recordQuery";
 import { getOwnerTags } from "@/lib/tags";
+import { createPhotoSignedUrls } from "@/lib/photos";
 import AppHeader from "@/components/AppHeader";
 import RecordFilters from "@/components/RecordFilters";
 
@@ -147,19 +147,7 @@ export default async function HomePage({
     .map((r) => r.record_photos?.[0]?.storage_path)
     .filter((p): p is string => Boolean(p));
 
-  const signed =
-    thumbPaths.length > 0
-      ? (
-          await supabase.storage
-            .from(PHOTO_BUCKET)
-            .createSignedUrls(thumbPaths, 60 * 60)
-        ).data
-      : [];
-
-  const urlByPath = new Map<string, string>();
-  signed?.forEach((s) => {
-    if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
-  });
+  const urlByPath = await createPhotoSignedUrls(thumbPaths);
 
   const prevHref = pageHref(filters.page - 1);
   const nextHref = pageHref(filters.page + 1);
