@@ -401,8 +401,13 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Logflare/Vector スタックを無効化する。
+# Rancher Desktop など Docker Desktop 以外のランタイムでは vector コンテナが
+# Docker ソケットに繋がらず unhealthy で `supabase start` ごと失敗するため。
+# ローカル開発で Studio の Logs タブを使わないなら無効で問題なし。
+# 関連: https://github.com/supabase/cli/issues/2505
 [analytics]
-enabled = true
+enabled = false
 port = 54327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"

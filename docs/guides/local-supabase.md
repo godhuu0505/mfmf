@@ -116,5 +116,6 @@ supabase stop   # Supabase スタックを停止（データは保持）
 | Service Worker のキャッシュが残る | SW は本番ビルドのみ登録。`just dev` / `just up` では無効。挙動確認は `npm run build && npm run start` |
 | `supabase start` が失敗する | Docker ランタイムが起動しているか確認。ポート競合時は既存スタックを `supabase stop` |
 | `docker: command not found` (Rancher Desktop) | Container Engine を `dockerd (moby)` に変更、`PATH` に `~/.rd/bin` を追加 |
+| `supabase_vector_mfmf container is not ready: unhealthy` で `supabase start` 失敗 | 本リポジトリの `config.toml` は `[analytics] enabled = false` にしてあり vector を起動しません。古い `config.toml` を引き継いだ場合は同じく無効化（または `supabase start -x vector` で除外）。原因は Rancher Desktop の Docker ソケットに vector コンテナから繋がらないため。 |
 
 関連: [reference/architecture.md](../reference/architecture.md) ・ [guides/verify-backend.md](./verify-backend.md)
