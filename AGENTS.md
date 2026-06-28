@@ -34,7 +34,7 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 - データ変更は **Server Action**（`src/app/records/actions.ts`）で行い、`redirect` / `revalidatePath` で反映する。
 - Supabase クライアントは用途別に使い分ける（Client: `src/lib/supabase/client.ts` / Server: `server.ts` / middleware: `middleware.ts`）。
 - Server Action 冒頭で `supabase.auth.getUser()` を確認し、未ログインは `redirect("/login")`。
-- DB スキーマ変更は `supabase/migrations/` に新しい連番 SQL を追加する（既存の `0001_init.sql` は編集しない）。main マージ時に `deploy-preview.yml` の `migrate` ジョブが `supabase db push` で本番 Supabase に自動適用する（preview / production は同一プロジェクト共有）。破壊的変更は PR 段階でローカル `supabase db reset` 確認まで済ませること。
+- DB スキーマ変更は `supabase/migrations/` に新しいタイムスタンプ付き SQL を追加する（`supabase migration new <name>` で生成、既存の `20260616130704_init.sql` は編集しない）。main マージ時に `deploy-preview.yml` の `migrate` ジョブが `supabase db push` で本番 Supabase に自動適用する（preview / production は同一プロジェクト共有）。破壊的変更は PR 段階でローカル `supabase db reset` 確認まで済ませること。
 - パスエイリアスは `@/*` → `src/*`。
 
 ## やってはいけないこと（境界）

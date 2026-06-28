@@ -84,7 +84,7 @@ just down    # 停止
      supabase link --project-ref <PROJECT_REF>
      supabase db push
      ```
-   - **代替**: `supabase/migrations/` を**連番順に**（`0001_init.sql` 〜 `0010_grants.sql` まで）
+   - **代替**: `supabase/migrations/` を**タイムスタンプ順に**（`20260616130704_init.sql` 〜 `20260616130713_grants.sql` まで）
      SQL Editor で実行。
    - テーブル / RLS / Storage バケット `daycare-photos` が作られます。
    - 以降の追加 migration は CI/CD が自動適用するので、初回のみ手動で揃えれば OK
