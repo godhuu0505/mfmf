@@ -155,7 +155,7 @@ export default async function HomePage({
   return (
     <>
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-foreground">記録一覧</h1>
           <div className="flex items-center gap-2">

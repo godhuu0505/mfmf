@@ -85,6 +85,26 @@ body {
   border: 0;
 }
 
+/* キーボードフォーカス時に現れる「メインへスキップ」リンク。
+   sr-only を踏襲して通常は不可視、:focus / :focus-visible 時のみ可視化する。 */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 60;
+}
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.18);
+}
+
 /* ローディングのスケルトン（シマー） */
 .skeleton {
   background-color: var(--skeleton-base);

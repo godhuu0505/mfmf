@@ -12,7 +12,7 @@ export default function Loading() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
           <div className="skeleton h-6 w-28 rounded-lg" />
           <div className="skeleton h-9 w-32 rounded-lg" />

@@ -32,7 +32,7 @@ export default async function SharePage({
 
   if (!view.valid) {
     return (
-      <main className="flex min-h-screen items-center justify-center px-4">
+      <main id="main" className="flex min-h-screen items-center justify-center px-4">
         <div className="w-full max-w-sm text-center">
           <p className="mb-2 text-4xl">🔒</p>
           <h1 className="mb-1 text-lg font-bold text-foreground">
@@ -51,7 +51,7 @@ export default async function SharePage({
   const records = view.records;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
+    <main id="main" className="mx-auto max-w-2xl px-4 py-8">
       <header className="mb-6 text-center">
         <p className="text-2xl">🐾</p>
         <h1 className="mt-1 text-xl font-bold text-foreground">

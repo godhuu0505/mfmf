@@ -20,7 +20,7 @@ export default async function SettingsPage() {
   return (
     <>
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <h1 className="mb-6 text-xl font-bold text-foreground">設定</h1>
 
         <div className="space-y-6">
