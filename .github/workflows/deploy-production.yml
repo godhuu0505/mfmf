@@ -71,7 +71,7 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v2
         with:
           version: latest
 
