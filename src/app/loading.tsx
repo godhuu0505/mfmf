@@ -5,14 +5,14 @@ export default function Loading() {
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">読み込み中</span>
       {/* ヘッダー風のバー */}
-      <div className="safe-pt sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur">
+      <div className="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
         <div className="safe-px mx-auto flex max-w-2xl items-center justify-between py-3">
           <div className="skeleton h-7 w-24 rounded-lg" />
           <div className="skeleton h-5 w-28 rounded-lg" />
         </div>
       </div>
 
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
           <div className="skeleton h-6 w-28 rounded-lg" />
           <div className="skeleton h-9 w-32 rounded-lg" />
@@ -22,7 +22,7 @@ export default function Loading() {
           {Array.from({ length: 5 }).map((_, i) => (
             <li
               key={i}
-              className="flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200"
+              className="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border"
             >
               <div className="skeleton h-20 w-20 shrink-0 rounded-xl" />
               <div className="min-w-0 flex-1 space-y-2 py-1">

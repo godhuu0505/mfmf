@@ -62,9 +62,9 @@ const BODY_GUIDE: Record<
 };
 
 const inputClass =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500";
-const labelClass = "mb-1 block text-sm font-medium text-slate-700";
-const hintClass = "mb-1.5 text-xs leading-relaxed text-slate-500";
+  "w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground";
+const labelClass = "mb-1 block text-sm font-medium text-foreground";
+const hintClass = "mb-1.5 text-xs leading-relaxed text-muted-foreground";
 
 export default function FeedbackWidget() {
   const [open, setOpen] = useState(false);
@@ -76,7 +76,7 @@ export default function FeedbackWidget() {
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg ring-1 ring-black/5 transition hover:bg-slate-700 active:scale-95"
+        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg ring-1 ring-black/5 transition hover:bg-primary-hover active:scale-95"
       >
         <svg
           aria-hidden="true"
@@ -141,20 +141,20 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
         type="button"
         aria-label="閉じる"
         onClick={onClose}
-        className="absolute inset-0 bg-slate-900/40"
+        className="absolute inset-0 bg-black/40"
       />
 
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl">
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl">
         {/* ヘッダー */}
-        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h2
               id="feedback-title"
-              className="text-base font-semibold text-slate-900"
+              className="text-base font-semibold text-foreground"
             >
               ご意見・不具合のお知らせ
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               気づいたことを、なんでも教えてください。
             </p>
           </div>
@@ -162,7 +162,7 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="閉じる"
-            className="-mr-1 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="-mr-1 rounded-lg p-1.5 text-muted-foreground transition hover:bg-surface-muted hover:text-foreground"
           >
             <svg
               aria-hidden="true"
@@ -196,13 +196,13 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
                 <path d="M20 6 9 17l-5-5" />
               </svg>
             </div>
-            <p className="text-sm leading-relaxed text-slate-700">
+            <p className="text-sm leading-relaxed text-foreground">
               {state.message}
             </p>
             <button
               type="button"
               onClick={onClose}
-              className="mt-2 rounded-lg bg-slate-900 px-6 py-2.5 font-medium text-white transition hover:bg-slate-700"
+              className="mt-2 rounded-lg bg-primary px-6 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover"
             >
               閉じる
             </button>
@@ -210,7 +210,7 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
         ) : (
           <form action={formAction} className="overflow-y-auto px-5 py-4">
             {/* イントロ */}
-            <p className="mb-4 rounded-lg bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
+            <p className="mb-4 rounded-lg bg-surface-muted px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
               入力が必要なのは「内容」だけです。むずかしく考えず、思ったことを
               そのまま書いてください。書ける範囲で大丈夫です。今このアプリで
               起きている状況（開いている画面など）も、自動でいっしょにお送りします。
@@ -230,8 +230,8 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
                     className={
                       "rounded-lg border px-3 py-2 text-sm font-medium transition " +
                       (kind === k
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 text-slate-600 hover:bg-slate-100")
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border text-muted-foreground hover:bg-surface-muted")
                     }
                   >
                     {FEEDBACK_KIND_LABEL[k]}
@@ -265,11 +265,11 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
               type="button"
               onClick={() => setShowDetails((v) => !v)}
               aria-expanded={showDetails}
-              className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="flex w-full items-center justify-between rounded-lg border border-border px-3 py-2.5 text-left text-sm font-medium text-foreground transition hover:bg-surface-muted"
             >
               <span>
                 もっと詳しく教えていただけますか？
-                <span className="ml-1 text-xs font-normal text-slate-400">
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
                   （任意・書ける範囲でOK）
                 </span>
               </span>
@@ -277,7 +277,7 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
                 aria-hidden="true"
                 viewBox="0 0 24 24"
                 className={
-                  "h-4 w-4 shrink-0 text-slate-400 transition " +
+                  "h-4 w-4 shrink-0 text-muted-foreground transition " +
                   (showDetails ? "rotate-180" : "")
                 }
                 fill="none"
@@ -291,8 +291,8 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
             </button>
 
             {showDetails && (
-              <div className="mt-3 space-y-4 rounded-lg bg-slate-50 px-3 py-4">
-                <p className="text-xs leading-relaxed text-slate-500">
+              <div className="mt-3 space-y-4 rounded-lg bg-surface-muted px-3 py-4">
+                <p className="text-xs leading-relaxed text-muted-foreground">
                   分かるところだけで大丈夫です。空欄のままでも送信できます。
                 </p>
 
@@ -411,18 +411,18 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
             )}
 
             {/* 送信 */}
-            <div className="mt-5 flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+            <div className="mt-5 flex items-center justify-end gap-3 border-t border-border pt-4">
               <button
                 type="button"
                 onClick={onClose}
-                className="text-sm text-slate-500 transition hover:text-slate-800"
+                className="text-sm text-muted-foreground transition hover:text-foreground"
               >
                 やめる
               </button>
               <button
                 type="submit"
                 disabled={isPending}
-                className="rounded-lg bg-slate-900 px-6 py-2.5 font-medium text-white transition hover:bg-slate-700 disabled:opacity-60"
+                className="rounded-lg bg-primary px-6 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
               >
                 {isPending ? "送信中…" : "送信する"}
               </button>

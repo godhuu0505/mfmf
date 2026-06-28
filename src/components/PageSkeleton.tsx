@@ -4,7 +4,7 @@ export default function PageSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">読み込み中</span>
-      <div className="safe-pt sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur">
+      <div className="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
         <div className="safe-px mx-auto flex max-w-2xl items-center justify-between py-3">
           <div className="skeleton h-7 w-24 rounded-lg" />
           <div className="skeleton h-5 w-28 rounded-lg" />

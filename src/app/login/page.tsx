@@ -48,16 +48,16 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main id="main" className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="mb-1 text-center text-2xl font-bold text-slate-900">
+        <h1 className="mb-1 text-center text-2xl font-bold text-foreground">
           mfmf
         </h1>
-        <p className="mb-8 text-center text-sm text-slate-500">
+        <p className="mb-8 text-center text-sm text-muted-foreground">
           ペット保育園記録
         </p>
 
-        <div className="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <div className="space-y-4 rounded-2xl bg-surface p-6 shadow-sm ring-1 ring-border">
           {error && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
               {error}
@@ -68,13 +68,13 @@ export default function LoginPage() {
             type="button"
             onClick={signInWithGoogle}
             disabled={loading}
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface px-4 py-2.5 font-medium text-foreground transition hover:bg-surface-muted disabled:opacity-60"
           >
             <GoogleIcon />
             {loading ? "ログイン中…" : "Google でログイン"}
           </button>
 
-          <p className="text-center text-xs text-slate-400">
+          <p className="text-center text-xs text-muted-foreground">
             写真は Google Drive に保存されます。
           </p>
         </div>

@@ -82,9 +82,9 @@ export default async function CalendarPage({
   return (
     <>
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
-          <Link href="/" className="text-sm text-slate-500 hover:text-slate-800">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← 一覧へ戻る
           </Link>
         </div>
@@ -92,17 +92,17 @@ export default async function CalendarPage({
         <div className="mb-4 flex items-center justify-between">
           <Link
             href={`/calendar?ym=${ymString(prev.year, prev.month)}`}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100"
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
             aria-label="前の月"
           >
             ‹ 前月
           </Link>
-          <h1 className="text-lg font-bold text-slate-900">
+          <h1 className="text-lg font-bold text-foreground">
             {year}年{month}月
           </h1>
           <Link
             href={`/calendar?ym=${ymString(next.year, next.month)}`}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100"
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
             aria-label="次の月"
           >
             翌月 ›
@@ -120,7 +120,7 @@ export default async function CalendarPage({
                   ? "text-rose-500"
                   : i === 6
                     ? "text-sky-500"
-                    : "text-slate-500")
+                    : "text-muted-foreground")
               }
             >
               {w}
@@ -138,12 +138,12 @@ export default async function CalendarPage({
                 className={
                   "flex h-14 flex-col items-center justify-start rounded-lg p-1 text-sm " +
                   (has
-                    ? "bg-white shadow-sm ring-1 ring-slate-200"
-                    : "text-slate-400") +
-                  (isToday ? " ring-2 ring-slate-900" : "")
+                    ? "bg-surface shadow-sm ring-1 ring-border"
+                    : "text-muted-foreground") +
+                  (isToday ? " ring-2 ring-foreground" : "")
                 }
               >
-                <span className={has ? "font-semibold text-slate-900" : ""}>
+                <span className={has ? "font-semibold text-foreground" : ""}>
                   {d}
                 </span>
                 {has && (
@@ -168,7 +168,7 @@ export default async function CalendarPage({
           })}
         </div>
 
-        <p className="mt-3 flex items-center gap-3 text-xs text-slate-500">
+        <p className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <span className="h-1.5 w-1.5 rounded-full bg-sky-500" /> 保育園
           </span>
@@ -179,18 +179,18 @@ export default async function CalendarPage({
 
         {/* この月の記録（日付ごと） */}
         <section className="mt-8">
-          <h2 className="mb-3 text-sm font-medium text-slate-700">
+          <h2 className="mb-3 text-sm font-medium text-foreground">
             この月の記録（{records.length}件）
           </h2>
           {records.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
               この月の記録はありません。
             </div>
           ) : (
             <ul className="space-y-4">
               {[...byDate.entries()].map(([date, dayRecords]) => (
                 <li key={date} id={`day-${date}`} className="scroll-mt-4">
-                  <p className="mb-1.5 text-sm font-semibold text-slate-900">
+                  <p className="mb-1.5 text-sm font-semibold text-foreground">
                     {new Intl.DateTimeFormat("ja-JP", {
                       month: "long",
                       day: "numeric",
@@ -202,7 +202,7 @@ export default async function CalendarPage({
                       <li key={r.id}>
                         <Link
                           href={`/records/${r.id}`}
-                          className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm shadow-sm ring-1 ring-slate-200 transition hover:ring-slate-300"
+                          className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm shadow-sm ring-1 ring-border transition hover:ring-border"
                         >
                           <span
                             className={
@@ -215,11 +215,11 @@ export default async function CalendarPage({
                             {r.source === "home" ? "🏠 " : "🏫 "}
                             {SOURCE_LABEL[r.source]}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-slate-700">
+                          <span className="min-w-0 flex-1 truncate text-foreground">
                             {r.body.replace(/\s+/g, " ").trim() || "（本文なし）"}
                           </span>
                           {(r.record_photos?.length ?? 0) > 0 && (
-                            <span className="shrink-0 text-xs text-slate-400">
+                            <span className="shrink-0 text-xs text-muted-foreground">
                               📷 {r.record_photos.length}
                             </span>
                           )}

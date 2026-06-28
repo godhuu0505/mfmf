@@ -28,13 +28,13 @@ export default async function NewRecordPage() {
   return (
     <>
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
-          <Link href="/" className="text-sm text-slate-500 hover:text-slate-800">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← 一覧へ戻る
           </Link>
         </div>
-        <h1 className="mb-6 text-xl font-bold text-slate-900">記録を追加</h1>
+        <h1 className="mb-6 text-xl font-bold text-foreground">記録を追加</h1>
 
         <RecordForm
           action={createRecord}

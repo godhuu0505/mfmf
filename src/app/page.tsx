@@ -155,19 +155,19 @@ export default async function HomePage({
   return (
     <>
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-900">記録一覧</h1>
+          <h1 className="text-xl font-bold text-foreground">記録一覧</h1>
           <div className="flex items-center gap-2">
             <Link
               href="/weight"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
             >
               ⚖️ 体重
             </Link>
             <Link
               href="/records/new"
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover"
             >
               ＋ 新規
             </Link>
@@ -182,7 +182,7 @@ export default async function HomePage({
         />
 
         {total > 0 && (
-          <p className="mb-3 text-sm text-slate-500">
+          <p className="mb-3 text-sm text-muted-foreground">
             全 {total} 件
             {totalPages > 1 && (
               <span>
@@ -198,12 +198,12 @@ export default async function HomePage({
             {activeTag ? (
               <Link
                 href={tagHref(null)}
-                className="rounded-full border border-slate-300 px-3 py-0.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+                className="rounded-full border border-border px-3 py-0.5 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
               >
                 ✕ タグ解除
               </Link>
             ) : (
-              <span className="text-xs font-medium text-slate-400">
+              <span className="text-xs font-medium text-muted-foreground">
                 タグで絞り込み:
               </span>
             )}
@@ -217,8 +217,8 @@ export default async function HomePage({
                   className={
                     "rounded-full px-2.5 py-0.5 text-xs font-medium transition " +
                     (isActive
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200")
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-surface-muted text-muted-foreground hover:bg-muted")
                   }
                 >
                   #{t.name}
@@ -229,7 +229,7 @@ export default async function HomePage({
         )}
 
         {list.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
+          <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
             {active ? (
               <>条件に該当する記録はありません。</>
             ) : (
@@ -251,9 +251,9 @@ export default async function HomePage({
                 <li key={r.id}>
                   <Link
                     href={`/records/${r.id}`}
-                    className="flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200 transition hover:ring-slate-300"
+                    className="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition hover:ring-border"
                   >
-                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-muted">
                       {thumbUrl ? (
                         <Image
                           src={thumbUrl}
@@ -273,15 +273,15 @@ export default async function HomePage({
                       <div className="flex flex-wrap items-center gap-1.5">
                         <SourceBadge source={r.source} />
                         {r.weight_kg != null && (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                             ⚖️ {r.weight_kg}kg
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                      <p className="mt-1 text-sm font-semibold text-foreground">
                         {formatDate(r.record_date)}
                       </p>
-                      <p className="mt-0.5 text-sm text-slate-600">
+                      <p className="mt-0.5 text-sm text-muted-foreground">
                         {excerpt(r.body) || "（本文なし）"}
                       </p>
                       {(() => {
@@ -291,7 +291,7 @@ export default async function HomePage({
                             {recordTags.map((t) => (
                               <span
                                 key={t.id}
-                                className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
+                                className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted-foreground"
                               >
                                 #{t.name}
                               </span>
@@ -300,7 +300,7 @@ export default async function HomePage({
                         ) : null;
                       })()}
                       {photoCount > 0 && (
-                        <p className="mt-1 text-xs text-slate-400">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           📷 写真 {photoCount} 枚
                         </p>
                       )}
@@ -318,28 +318,28 @@ export default async function HomePage({
               <Link
                 href={prevHref}
                 rel="prev"
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
               >
                 ← 前へ
               </Link>
             ) : (
-              <span className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-300">
+              <span className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted">
                 ← 前へ
               </span>
             )}
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-muted-foreground">
               {filters.page} / {totalPages}
             </span>
             {filters.page < totalPages ? (
               <Link
                 href={nextHref}
                 rel="next"
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
               >
                 次へ →
               </Link>
             ) : (
-              <span className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-300">
+              <span className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted">
                 次へ →
               </span>
             )}
