@@ -51,8 +51,38 @@ setup:
     sed -i.bak -E "s#^TOKEN_ENC_KEY=.*#TOKEN_ENC_KEY=$TOKEN_ENC_KEY#" .env.local; \
     rm -f .env.local.bak; \
     echo "[setup] Done."; \
-    echo "[setup] Next steps:"; \
-    echo "  1. Create a user in Supabase Studio (http://127.0.0.1:54323)"; \
-    echo "  2. (Optional) For Google login: set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env.local"; \
-    echo "     and configure supabase/config.toml [auth.external.google] — see docs/guides/google-drive-setup.md"; \
-    echo "  3. Run 'just up' (or 'just dev')"
+    echo "[setup] Next: 'just setup-google' で Google OAuth を設定 → 'just up' (or 'just dev')"
+
+# Configure Google OAuth interactively. Run after Google Cloud OAuth client is created.
+# Writes secrets to supabase/.env and .env.local, enables [auth.external.google], restarts Supabase.
+setup-google:
+    @set -e; \
+    if [ ! -f .env.local ]; then \
+        echo "[setup-google] .env.local が無い。先に 'just setup' を実行してください。"; exit 1; \
+    fi; \
+    if [ ! -f supabase/config.toml ]; then \
+        echo "[setup-google] supabase/config.toml が無い。"; exit 1; \
+    fi; \
+    echo "[setup-google] Google Cloud Console で発行した OAuth クライアント情報を入力します。"; \
+    echo "[setup-google] リダイレクト URI は http://127.0.0.1:54321/auth/v1/callback を登録済みであること。"; \
+    read -r -p "GOOGLE_CLIENT_ID: " GOOGLE_CLIENT_ID; \
+    read -rs -p "GOOGLE_CLIENT_SECRET: " GOOGLE_CLIENT_SECRET; echo; \
+    if [ -z "$GOOGLE_CLIENT_ID" ] || [ -z "$GOOGLE_CLIENT_SECRET" ]; then \
+        echo "[setup-google] 値が空。中止。"; exit 1; \
+    fi; \
+    echo "[setup-google] supabase/.env に書き込み..."; \
+    { \
+        echo "SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"; \
+        echo "SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=$GOOGLE_CLIENT_SECRET"; \
+    } > supabase/.env; \
+    echo "[setup-google] .env.local の Drive 連携用キーを更新..."; \
+    sed -i.bak -E "s#^GOOGLE_CLIENT_ID=.*#GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID#" .env.local; \
+    sed -i.bak -E "s#^GOOGLE_CLIENT_SECRET=.*#GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET#" .env.local; \
+    rm -f .env.local.bak; \
+    echo "[setup-google] supabase/config.toml の [auth.external.google] を有効化..."; \
+    sed -i.bak '/^\[auth\.external\.google\]/,/^\[/ s/^enabled = false/enabled = true/' supabase/config.toml; \
+    rm -f supabase/config.toml.bak; \
+    echo "[setup-google] Supabase を再起動して設定を反映..."; \
+    supabase stop >/dev/null 2>&1 || true; \
+    supabase start; \
+    echo "[setup-google] Done. ブラウザで /login の Google ログインを試してください。"

@@ -63,13 +63,29 @@ just setup
 ## 4. Google ログインを設定
 
 本アプリは **Google OAuth 一本化**で、メール/パスワードログインの UI はありません。
-ローカル Supabase でログインするには Google Cloud の OAuth クライアントを発行し、
-`supabase/config.toml` の `[auth.external.google]` を有効化する必要があります。
+Google Cloud Console での OAuth クライアント発行（手動・約 5 分）→ 認証情報を投入する
+流れになります。
 
-手順は **[google-drive-setup.md](./google-drive-setup.md)** を参照（ローカル向け
-redirect URI と `config.toml` 例は「2B. ローカル Supabase の場合」セクション）。
-`.env.local` 側では `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を設定します。
-`TOKEN_ENC_KEY` は `just setup` が自動で乱数を投入します。
+### 4-1. Google Cloud Console で OAuth クライアントを発行
+
+詳細は [google-drive-setup.md](./google-drive-setup.md) の **1 章**。**承認済みの
+リダイレクト URI** は `http://127.0.0.1:54321/auth/v1/callback`（`localhost` ではなく `127.0.0.1`）。
+
+### 4-2. `just setup-google` で対話的に投入（推奨）
+
+```bash
+just setup-google
+```
+
+実行内容：
+
+1. `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` をプロンプトで受け取る
+2. `supabase/.env` に Supabase Auth 用の `SUPABASE_AUTH_EXTERNAL_GOOGLE_*` として書き込み
+3. `.env.local` の Drive 連携用 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を更新
+4. `supabase/config.toml` の `[auth.external.google]` を `enabled = true` に切り替え
+5. `supabase stop && supabase start` で設定を反映
+
+手動でやる場合は [google-drive-setup.md 2B](./google-drive-setup.md#2b-ローカル-supabasesupabase-start-の場合) を参照。
 
 > ⚠️ 夫婦共用方針：RLS が `owner_id = auth.uid()` のため、別の Google アカウントで
 > ログインすると記録が共有されません。**1 つの Google アカウント**で 2 人とも使ってください。

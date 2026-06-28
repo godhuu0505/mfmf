@@ -104,39 +104,49 @@ http://127.0.0.1:54321/auth/v1/callback
 > `localhost` ではなく `127.0.0.1` で登録するのが慣行（Supabase ローカル CLI が `127.0.0.1`
 > で待ち受けるため）。`localhost` を登録するとコールバック先と一致せず認証に失敗します。
 
-#### 2B-2. `supabase/config.toml`
+#### 2B-2. `just setup-google` で対話投入（推奨）
 
-本リポジトリの `supabase/config.toml` には `[auth.external.google]` セクションを
-あらかじめ用意してあります。`enabled = true` に変更するだけで OK：
+`just setup` 実行済みであれば、以下のコマンド 1 つで：
+
+- `supabase/.env` に Supabase Auth 用の認証情報を書き込み
+- `.env.local` の Drive 連携用 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を更新
+- `supabase/config.toml` の `[auth.external.google]` を `enabled = true` に切り替え
+- `supabase stop && supabase start` で反映
+
+```bash
+just setup-google
+```
+
+プロンプトで Client ID と Client Secret を入力（Secret は非表示入力）。完了後、ブラウザで
+`/login` の Google ログインを試せます。
+
+#### 2B-3. 手動で設定する場合（参考）
+
+`just setup-google` を使わない場合は以下の 3 ファイルを編集して `supabase stop && supabase start`：
+
+**`supabase/config.toml`**（既に雛形あり。`enabled = false` を `true` に変えるだけ）:
 
 ```toml
 [auth.external.google]
-enabled = true   # ← false から変更
+enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 redirect_uri = ""
 skip_nonce_check = false
 ```
 
-> `redirect_uri = ""` のままにすると Supabase 既定（`/auth/v1/callback`）を使うため、
-> 環境ごとに書き換える必要がありません。
-
-#### 2B-3. 認証情報を `supabase/.env` で渡す
-
-Supabase CLI は `supabase/.env` を `env(...)` の参照元として読みます（このファイルは
-`supabase/.gitignore` で除外済み）。1-4 で取得した値を：
+**`supabase/.env`**（git 無視対象）:
 
 ```dotenv
-# supabase/.env
 SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=...
 SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=...
 ```
 
-#### 2B-4. Supabase を再起動
+**`.env.local`**（アプリの Drive 連携用に同じ値を）:
 
-```bash
-supabase stop
-supabase start
+```dotenv
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
 ```
 
 > アプリ側コールバック (`http://localhost:3000/auth/callback` /

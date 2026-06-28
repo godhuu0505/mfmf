@@ -24,6 +24,8 @@
 | PWA アイコン生成 | `npm run icons` |
 | Docker でアプリ起動（任意） | `just up` |
 | Docker を停止 | `just down` |
+| 初回構築（Supabase 起動 + .env.local 生成） | `just setup` |
+| Google OAuth 対話投入（初回） | `just setup-google` |
 
 **変更後は必ず `npm run lint` と `npm run typecheck` を通すこと。** UI/ルーティングや
 ビルド構成を触ったときは `npm run build` も確認する（CI と同じゲート）。`just check`

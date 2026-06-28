@@ -12,6 +12,9 @@
 
 ## クイックスタート
 
+本アプリは **Google OAuth 一本化**（メール/パスワードログインは使えません）。
+どのルートを選んでも、Google Cloud Console での OAuth クライアント発行が必須です。
+
 ### A. リモート Supabase に繋ぐ（最短）
 
 クラウド上の Supabase プロジェクトを使う場合：
@@ -25,41 +28,44 @@ cp .env.local.example .env.local   # Supabase の URL / anon key を設定
 just dev                           # http://localhost:3000
 ```
 
-詳しい手順（Supabase プロジェクトとユーザーの用意含む）は
+詳しい手順（Supabase プロジェクト発行と Google プロバイダ設定含む）は
 **[docs/getting-started.md](./docs/getting-started.md)**。
 
-### B. ローカル Supabase スタックを使う
+### B. ローカル Supabase スタックを使う（推奨）
 
-Docker（Docker Desktop / Rancher Desktop など）と `just` / Supabase CLI を入れて、初回だけ：
+Docker（Docker Desktop / Rancher Desktop など）と `just` / Supabase CLI を導入：
 
 ```bash
 brew install just supabase/tap/supabase
 git clone https://github.com/godhuu0505/mfmf.git && cd mfmf
 npm install
-supabase init        # supabase/config.toml を生成
-just setup           # Supabase 起動 + .env.local 自動生成（初回専用）
-# Google OAuth クライアントを発行し supabase/config.toml と .env.local に設定
-# 詳細: docs/guides/google-drive-setup.md
+```
+
+**初回 1 回だけ** Google Cloud Console で **OAuth クライアント**を発行します（約 5 分）。
+リダイレクト URI に `http://127.0.0.1:54321/auth/v1/callback` を登録（`localhost` ではなく
+`127.0.0.1`）。発行手順は [docs/guides/google-drive-setup.md](./docs/guides/google-drive-setup.md) 1 章。
+
+その後、コマンド 3 つで起動できます：
+
+```bash
+just setup           # Supabase 起動 + .env.local 自動生成（URL/anon key/TOKEN_ENC_KEY）
+just setup-google    # CLIENT_ID/SECRET を対話入力 → 全箇所に投入 + Supabase 再起動
 just up              # docker compose で Next.js 起動（CI と同じ Node 22）
 # または just dev でホスト Node 起動
 ```
 
 詳細・トラブルシュートは **[docs/guides/local-supabase.md](./docs/guides/local-supabase.md)**。
 
-> 本アプリは **Google OAuth 一本化** で、メール/パスワードログインは使えません。
-> いずれのルートでも Google Cloud / Supabase の OAuth 設定が必須です
-> （手順: **[docs/guides/google-drive-setup.md](./docs/guides/google-drive-setup.md)**）。
-> `TOKEN_ENC_KEY` は `just setup` が自動投入します。
-
 ### よく使う just コマンド
 
 ```bash
-just            # 利用可能な recipe を一覧
-just dev        # ホスト Node で next dev
-just up         # docker compose で Next.js をコンテナ起動
-just down       # コンテナを停止
-just check      # lint → typecheck → build（CI と同じゲート）
-just setup      # 初回のみ：ローカル Supabase 起動 + .env.local 生成
+just                # 利用可能な recipe を一覧
+just dev            # ホスト Node で next dev
+just up             # docker compose で Next.js をコンテナ起動
+just down           # コンテナを停止
+just check          # lint → typecheck → build（CI と同じゲート）
+just setup          # 初回のみ：ローカル Supabase 起動 + .env.local 生成
+just setup-google   # 初回のみ：Google OAuth 認証情報を対話投入
 ```
 
 ## 主な機能
