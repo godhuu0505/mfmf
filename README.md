@@ -38,15 +38,17 @@ git clone https://github.com/godhuu0505/mfmf.git && cd mfmf
 npm install
 supabase init        # supabase/config.toml を生成
 just setup           # Supabase 起動 + .env.local 自動生成（初回専用）
-# Supabase Studio (http://127.0.0.1:54323) でログイン用ユーザーを 1 つ作成
+# Google OAuth クライアントを発行し supabase/config.toml と .env.local に設定
+# 詳細: docs/guides/google-drive-setup.md
 just up              # docker compose で Next.js 起動（CI と同じ Node 22）
 # または just dev でホスト Node 起動
 ```
 
 詳細・トラブルシュートは **[docs/guides/local-supabase.md](./docs/guides/local-supabase.md)**。
 
-> **Google ログインや Drive 連携を使う場合**は、上記に加えて Google Cloud / Supabase 側の OAuth 設定が必要です。
-> 手順は **[docs/guides/google-drive-setup.md](./docs/guides/google-drive-setup.md)**。
+> 本アプリは **Google OAuth 一本化** で、メール/パスワードログインは使えません。
+> いずれのルートでも Google Cloud / Supabase の OAuth 設定が必須です
+> （手順: **[docs/guides/google-drive-setup.md](./docs/guides/google-drive-setup.md)**）。
 > `TOKEN_ENC_KEY` は `just setup` が自動投入します。
 
 ### よく使う just コマンド

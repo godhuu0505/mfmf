@@ -60,18 +60,19 @@ just setup
 > NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase status の anon key>
 > ```
 
-## 4. ログイン用ユーザーを発行
+## 4. Google ログインを設定
 
-ローカル Studio（`supabase status` の `Studio URL`、通常 http://127.0.0.1:54323）の
-**Authentication > Users** で 1 アカウントだけ発行します（夫婦共用方針：RLS が
-`owner_id = auth.uid()` のため、ユーザーを分けると記録が共有されません）。
+本アプリは **Google OAuth 一本化**で、メール/パスワードログインの UI はありません。
+ローカル Supabase でログインするには Google Cloud の OAuth クライアントを発行し、
+`supabase/config.toml` の `[auth.external.google]` を有効化する必要があります。
 
-> **Google ログインを使う場合**は別途、Google Cloud の OAuth クライアント発行と
-> `supabase/config.toml` の `[auth.external.google]` 設定が必要です。ローカル Supabase
-> 向けの redirect URI と `config.toml` 例は
-> [google-drive-setup.md#2b-ローカル-supabase-supabase-start-の場合](./google-drive-setup.md#2b-ローカル-supabasesupabase-start-の場合) を参照。
-> 写真機能まで使うなら `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` の `.env.local` 設定も。
-> `TOKEN_ENC_KEY` は `just setup` が自動で乱数を投入します。
+手順は **[google-drive-setup.md](./google-drive-setup.md)** を参照（ローカル向け
+redirect URI と `config.toml` 例は「2B. ローカル Supabase の場合」セクション）。
+`.env.local` 側では `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を設定します。
+`TOKEN_ENC_KEY` は `just setup` が自動で乱数を投入します。
+
+> ⚠️ 夫婦共用方針：RLS が `owner_id = auth.uid()` のため、別の Google アカウントで
+> ログインすると記録が共有されません。**1 つの Google アカウント**で 2 人とも使ってください。
 
 ## 5. アプリ起動
 
@@ -108,7 +109,7 @@ supabase stop   # Supabase スタックを停止（データは保持）
 | `just setup` が `.env.local already exists` | 初回専用。再構築したいなら `rm .env.local` してから（既存値は事前にメモ） |
 | `just setup` が `Failed to read ANON_KEY` | `supabase start` 完了前。`supabase status` で起動を確認してから再実行 |
 | 起動時に `NEXT_PUBLIC_SUPABASE_URL` 関連でエラー | `.env.local` 未設定 / 値が空。`just setup` 実行か、`.env.local.example` を元に設定し再起動 |
-| ログインできない | ユーザー未発行、または email/password 間違い。Studio の Authentication > Users を確認 |
+| Google ログインができない | `supabase/config.toml` の `[auth.external.google]` 設定漏れ、`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` 未設定、または Google Cloud 側のリダイレクト URI に `http://127.0.0.1:54321/auth/v1/callback` が登録されていない可能性 |
 | 一覧は出るが他人のデータが見える / 見えない | RLS が `owner_id = auth.uid()` 前提。マイグレーション未適用の可能性 |
 | 写真が表示されない | Storage バケット `daycare-photos`（private）未作成、または署名付き URL の期限切れ |
 | `just up` で SSR が Supabase に届かない | `docker-compose.yml` の `environment.SUPABASE_INTERNAL_URL` と `extra_hosts` を確認 |

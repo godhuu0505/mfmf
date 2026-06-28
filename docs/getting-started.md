@@ -79,13 +79,15 @@ just down    # 停止
 
 1. [Supabase ダッシュボード](https://supabase.com/dashboard) で新規プロジェクトを作成。
 2. `supabase/migrations/` の SQL を**連番順に** SQL Editor で実行
-   （`0001_init.sql` → `0002_record_metadata.sql` → `0003_feedback.sql`）。
-   テーブル / RLS / Storage バケット `daycare-photos` が作られます。
-3. **Authentication > Users > Add user** でログイン用ユーザーを発行
-   （サインアップ UI はありません）。
+   （`0001_init.sql` 〜 `0009_share_links.sql` まで）。テーブル / RLS / Storage バケット
+   `daycare-photos` が作られます。
+3. **Google プロバイダを有効化**してログインを設定。本アプリは Google OAuth 一本化のため、
+   メール/パスワードでのログインは使えません。Google Cloud / Supabase の設定手順は
+   **[guides/google-drive-setup.md](./guides/google-drive-setup.md)** を参照。
 
 > ⚠️ 本アプリは **1 アカウント共用**の方針です。RLS が `owner_id = auth.uid()` ベースのため、
-> ユーザーを分けると記録が共有されません。**夫婦で共有する 1 つのログイン**を発行して 2 人で使ってください
+> 別の Google アカウントでログインすると記録が共有されません。**夫婦で共有する 1 つの Google
+> アカウント**で 2 人とも使ってください
 > （理由は [design-decisions.md](./explanation/design-decisions.md#共有方針-a-1-アカウント共用)）。
 
 ---
