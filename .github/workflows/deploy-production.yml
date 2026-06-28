@@ -22,9 +22,13 @@ jobs:
   # Vercel / Supabase のシークレットが設定されているかを確認する。
   # 未設定の環境ではジョブを skip させ、ワークフロー全体が赤くならないようにする。
   # secrets コンテキストは job-level の if では参照できないので、専用ジョブで output 化する。
+  # environment 指定が必須: Environment scoped secrets を読むため
+  # （これがないと Repository scope の secret しか見えず、Environment 登録分が「未設定」と誤判定される）。
   check-secrets:
     name: Check deploy secrets
     runs-on: ubuntu-latest
+    environment:
+      name: production
     outputs:
       has_vercel: ${{ steps.check.outputs.has_vercel }}
       has_supabase: ${{ steps.check.outputs.has_supabase }}
