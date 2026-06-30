@@ -95,7 +95,9 @@ auth token は Sentry の Settings → Auth Tokens から、`project:releases`
 
 - `metric` — 元の名前（`LCP` など）
 - `rating` — `good` / `needs-improvement` / `poor` / `unknown`
-- `path` — 計測時の `window.location.pathname`（画面の識別に使う）
+- `path` — 計測時の画面パス。動的ルートは `/records/[id]` / `/share/[token]` の
+  ようにパターンへ正規化して送る（UUID/token ごとに p75 が分裂せず、画面単位で
+  集計できる）。未知のパスは `other` に丸める
 - `navigation_type` — `navigate` / `reload` / `back-forward` など
 
 ### Sentry 上で見る

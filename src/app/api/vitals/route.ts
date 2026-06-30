@@ -19,6 +19,19 @@ export async function POST(req: Request) {
     return new Response("bad shape", { status: 400 });
   }
 
+  // 値は有限の数値のみ。未認証エンドポイントなので、不正な JSON で
+  // distribution に NaN / Infinity / undefined が入らないよう弾く。
+  if (typeof metric.value !== "number" || !Number.isFinite(metric.value)) {
+    return new Response("bad value", { status: 400 });
+  }
+
+  // 受け付ける名前は next/web-vitals が出す既知のものに限定する。未認証なので
+  // 任意名で Sentry のメトリクス名（カーディナリティ）が無制限に増えるのを防ぐ。
+  // 未知の名前は黙って捨てて 204（telemetry なのでエラーにはしない）。
+  if (!ALLOWED_METRICS.has(metric.name)) {
+    return new Response(null, { status: 204 });
+  }
+
   // CLS は単位なしのスコア、それ以外（LCP/INP/FCP/TTFB）はミリ秒。
   const unit = metric.name === "CLS" ? "none" : "millisecond";
 
@@ -31,7 +44,7 @@ export async function POST(req: Request) {
       attributes: {
         metric: metric.name,
         rating: metric.rating ?? "unknown",
-        path: metric.path ?? "unknown",
+        path: normalizePath(metric.path),
         navigation_type: metric.navigationType ?? "unknown",
       },
     },
@@ -57,3 +70,44 @@ type WebVital = {
   navigationType?: string;
   path?: string;
 };
+
+// next/web-vitals が報告し得る既知のメトリクス名。Core Web Vitals に加え、
+// Next.js のカスタム計測（hydration / render など）も含む。これ以外は受け取らない
+// （未認証エンドポイントでの任意名によるメトリクス・カーディナリティ肥大を防ぐ）。
+const ALLOWED_METRICS = new Set([
+  "CLS",
+  "FCP",
+  "INP",
+  "LCP",
+  "TTFB",
+  "Next.js-hydration",
+  "Next.js-route-change-to-render",
+  "Next.js-render",
+]);
+
+// p75 は path 属性で group by する。静的ルートはそのまま、動的ルートは
+// パターンに畳んで送る（UUID/token ごとに系列が分裂し、かつ未認証経由で
+// path のカーディナリティが無制限に増えるのを防ぐ）。未知のパスは "other"。
+const KNOWN_PATHS = new Set([
+  "/",
+  "/login",
+  "/records/new",
+  "/calendar",
+  "/gallery",
+  "/pets",
+  "/weight",
+  "/settings",
+  "/shares",
+  "/feedback",
+  "/offline",
+  "/help",
+]);
+
+function normalizePath(raw: string | undefined): string {
+  if (typeof raw !== "string" || !raw.startsWith("/")) return "other";
+  if (KNOWN_PATHS.has(raw)) return raw;
+  if (/^\/records\/[^/]+$/.test(raw)) return "/records/[id]";
+  if (/^\/share\/[^/]+$/.test(raw)) return "/share/[token]";
+  if (raw === "/auth" || raw.startsWith("/auth/")) return "/auth/*";
+  return "other";
+}
