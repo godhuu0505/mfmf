@@ -2,6 +2,8 @@ import * as Sentry from "@sentry/nextjs";
 
 // Next.js が Node / Edge ランタイムの両方で起動時に呼ぶフック。
 // SENTRY_DSN が未設定なら Sentry.init は no-op になる。
+// Trace Metrics（Sentry.metrics.*）は SDK 既定で有効なので明示の opt-in は不要。
+// Web Vitals の p75 集計（/api/vitals → distribution）はこれを利用する。
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     Sentry.init({
