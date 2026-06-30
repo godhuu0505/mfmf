@@ -18,6 +18,7 @@ export function toSource(value: unknown): RecordSource {
 export type DaycareRecord = {
   id: string;
   owner_id: string;
+  household_id: string | null; // 所属世帯。移行期は null（NOT NULL 化は後続 PR）
   record_date: string; // YYYY-MM-DD
   source: RecordSource;
   author: string;
@@ -54,10 +55,29 @@ export type SharedView =
   | { valid: false }
   | { valid: true; label: string | null; records: SharedRecord[] };
 
+// ---------------------------------------------------------------
+// 世帯（テナント）/ メンバーシップ (households / household_members)
+// Phase 3.5 S1: owner_id から household メンバーシップ判定への段階移行。
+// 本スライスではスキーマ追加とバックフィルのみ（RLS 本切替・アプリ改修は後続 PR）。
+// ---------------------------------------------------------------
+export type Household = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
+export type HouseholdMember = {
+  household_id: string;
+  user_id: string;
+  role: string; // 既定 'owner'
+  created_at: string;
+};
+
 // 飼っているペット（多頭飼いに備える素地）。owner_id ベースの RLS で保護。
 export type Pet = {
   id: string;
   owner_id: string;
+  household_id: string | null; // 所属世帯。移行期は null
   name: string;
   species: string | null;
   birthday: string | null; // YYYY-MM-DD
@@ -68,6 +88,7 @@ export type Pet = {
 export type RecordPhoto = {
   id: string;
   record_id: string;
+  household_id: string | null; // 所属世帯。親 daycare_records から継承。移行期は null
   storage_path: string;
   created_at: string;
 };
@@ -234,6 +255,7 @@ export function toFeedbackStatus(value: unknown): FeedbackStatus {
 export type Feedback = {
   id: string;
   owner_id: string;
+  household_id: string | null; // 所属世帯。移行期は null
   kind: FeedbackKind;
   severity: FeedbackSeverity | null;
   frequency: FeedbackFrequency | null;
