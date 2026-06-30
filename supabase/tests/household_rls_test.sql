@@ -22,7 +22,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(28);
+select plan(32);
 
 -- ---------------------------------------------------------------
 -- 固定 UUID（fixture）
@@ -269,6 +269,53 @@ select lives_ok(
   $$insert into public.daycare_records (owner_id, household_id, body)
     values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'inserted by C')$$,
   'メンバー追加後: C は HA に daycare_record を insert 可（household ポリシー単独で許可）'
+);
+
+-- ===============================================================
+-- シナリオ④: owner_id ⇄ household_id 整合の強制（越境防止）
+--   household_id / owner_id は移行期どちらもクライアント書込み可能。メンバー判定が
+--   household_id 単独を信用すると、owner_id 付け替え / household_id 偽装で越境が起きる。
+--   メンバーポリシーは is_household_member(household_id, owner_id) も要求して整合を強制する。
+-- ===============================================================
+-- C（HA メンバー）は HA レコードの owner_id を非メンバー B へ付け替えられない
+--   （member with check の is_household_member(HA, B) が偽、owner with check も C≠B → 42501）。
+select throws_ok(
+  $$update public.daycare_records set owner_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    where id = 'aaaa0000-0000-0000-0000-000000000001'$$,
+  '42501',
+  null,
+  'C は HA レコードの owner_id を非メンバー(B)へ付け替えられない'
+);
+
+-- owner 自身(A)でも owner_id を他者(B)へ付け替えられない
+--   （owner with check は A≠B、member with check は is_household_member(HA,B) が偽 → 42501）。
+--   旧 owner_id ポリシー単独では owner_id は自分に固定で不変だったため、本 PR で弱めていないことの証明。
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+select throws_ok(
+  $$update public.daycare_records set owner_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    where id = 'aaaa0000-0000-0000-0000-000000000001'$$,
+  '42501',
+  null,
+  'A は自分のレコードの owner_id を他者(B)へ付け替えられない（owner_id 不変性を維持）'
+);
+
+-- A は owner 経路で「自分の行に他 household(HB) の household_id」を書ける（owner ポリシーは
+-- household_id を制約しない＝移行期の既知の未強制）。だが owner(A) は HB のメンバーでないため、
+-- is_household_member(HB, A) が偽となり、その行は HB メンバーのメンバー可視クエリに現れない。
+select lives_ok(
+  $$insert into public.daycare_records (id, owner_id, household_id, body)
+    values ('aaaa9999-0000-0000-0000-000000000009',
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            '22222222-2222-2222-2222-222222222222', 'injected')$$,
+  'A は owner 経路で他 household の UUID を持つ自分の行を作成できる（owner_id 経路は不変・未強制）'
+);
+select set_config('request.jwt.claims',
+  '{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+select results_eq(
+  $$select count(*)::int from public.daycare_records where id = 'aaaa9999-0000-0000-0000-000000000009'$$,
+  $$values (0)$$,
+  'B は owner が HB 非メンバーの注入行を見られない（owner_id ⇄ household_id 整合の強制）'
 );
 
 reset role;

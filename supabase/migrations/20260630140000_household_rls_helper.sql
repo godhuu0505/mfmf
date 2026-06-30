@@ -22,8 +22,19 @@
 --   - 非空配列 → そのロールのいずれかを持つメンバーであるか（将来の RBAC #45 で
 --     'owner' / 'member' 等を絞り込む用途に使えるよう、シグネチャを今から用意する）。
 --
+-- is_household_member(target_household, target_user):
+--   「*任意の* ユーザー target_user が target_household のメンバーか」を返す姉妹関数。
+--   has_household_role が呼び出しユーザー(auth.uid())専用なのに対し、こちらは行の
+--   owner_id を渡して「その行の所有者は本当にその household のメンバーか」を検証する用途。
+--   household_id と owner_id はどちらも移行期はクライアント書込み可能なため、メンバー
+--   判定ポリシーが household_id 単独を信用すると、owner_id を別 household のユーザーへ
+--   付け替える / 自分の行の household_id を他 household の UUID にする経路で越境が起こる。
+--   本関数で「owner_id ∈ household_id」を併せて要求し、両者の整合を強制する。
+--   同じく SECURITY DEFINER + search_path 固定で household_members の RLS を迂回する。
+--
 -- ロールバック手順（本 migration を取り消す場合）:
 --   後続のポリシー migration を先に戻してから:
+--   drop function if exists public.is_household_member(uuid, uuid);
 --   drop function if exists public.has_household_role(uuid, text[]);
 -- =============================================================
 
@@ -57,3 +68,30 @@ comment on function public.has_household_role(uuid, text[]) is
 -- authenticated / service_role にのみ明示付与する（anon はテーブルに触れないため不要）。
 revoke all on function public.has_household_role(uuid, text[]) from public;
 grant execute on function public.has_household_role(uuid, text[]) to authenticated, service_role;
+
+-- target_user が target_household のメンバーかを返す（呼び出しユーザー非依存）。
+-- 行の owner_id と household_id の整合（owner が当該 household に属するか）を RLS で
+-- 強制するために用いる。SECURITY DEFINER + search_path 固定で再帰を防ぐ。
+create or replace function public.is_household_member(
+  target_household uuid,
+  target_user      uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.household_members m
+    where m.household_id = target_household
+      and m.user_id = target_user
+  );
+$$;
+
+comment on function public.is_household_member(uuid, uuid) is
+  '任意のユーザー target_user が target_household のメンバーかを返す。行の owner_id ∈ household_id 整合を RLS ポリシーで強制する用途。SECURITY DEFINER + search_path 固定で household_members の RLS を迂回し再帰を防ぐ。';
+
+revoke all on function public.is_household_member(uuid, uuid) from public;
+grant execute on function public.is_household_member(uuid, uuid) to authenticated, service_role;
