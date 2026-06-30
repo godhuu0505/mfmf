@@ -1,10 +1,11 @@
 name: Deploy Production
 
-# main に入っている commit にタグを付け、その Release を公開（=Release Note 作成）したら
-# Vercel の Production 環境へデプロイする。
+# main にマージ（push）されたら、CI 緑を確認したうえで
+# Supabase migration を本番に適用し、Vercel の Production 環境へデプロイする。
+# 「merge = 本番リリース」。Release 公開ゲートは設けない。
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
 
 # 本番デプロイは取りこぼしたくないので途中キャンセルしない。
 concurrency:
@@ -52,9 +53,8 @@ jobs:
           fi
 
   # supabase/migrations/ の未適用分を本番 Supabase に push する。
-  # Release タグ時点の migrations を適用する（checkout に ref を指定）。
-  # 通常は main マージ時の deploy-preview.yml で適用済みのため no-op になるが、
-  # 「Release で出すスキーマ ≡ Release で出すコード」のセットを保証するための保険。
+  # main マージ時点でスキーマを進めてから、続く Vercel Production deploy が新スキーマ前提で動作できるようにする。
+  # `supabase db push` は schema_migrations を見て冪等に動作する。
   migrate:
     name: Supabase migrate
     needs: [verify, check-secrets]
@@ -68,8 +68,6 @@ jobs:
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.tag_name }}
 
       - uses: supabase/setup-cli@v2
         with:
@@ -89,9 +87,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          # preview / production で Artifact 名を分けて衝突を防ぐ。
-          # Release タグ名を入れることで「どの Release 直前の DB か」を Artifact 一覧から判別できる。
-          name: supabase-backup-production-${{ github.event.release.tag_name }}
+          # commit SHA を入れて「どの main マージ直前の DB か」を Artifact 一覧から判別できるようにする。
+          name: supabase-backup-production-${{ github.sha }}
           path: |
             pre-migrate-schema.sql
             pre-migrate-data.sql
@@ -119,10 +116,7 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
-      # Release のタグを明示的にチェックアウトする（タグ時点のコードを本番に出す）。
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.tag_name }}
 
       - uses: actions/setup-node@v4
         with:

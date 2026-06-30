@@ -80,7 +80,7 @@
 生成、既存の `20260616130704_init.sql` は編集しない）。
 RLS・Storage ポリシー・`search_path` 固定の方針を踏襲する。
 
-main マージ時に `deploy-preview.yml` の `migrate` ジョブが `supabase db push` で**本番 Supabase
-に自動適用**する（preview / production は同一プロジェクト共有）。破壊的変更（DROP / カラム削除 /
-型変更）は main マージ時点で本番に作用するため、PR 段階でローカル `supabase db reset` の動作確認まで
-済ませること。詳細は [docs/guides/deploy.md](./docs/guides/deploy.md#supabasedbマイグレーション)。
+main マージ時に `deploy-production.yml` の `migrate` ジョブが `supabase db push` で**本番 Supabase
+に自動適用**し、続けて Vercel Production にデプロイされる（merge = 本番リリース）。破壊的変更（DROP /
+カラム削除 / 型変更）は main マージ時点で本番に作用するため、PR 段階でローカル `supabase db reset` の
+動作確認まで済ませること。詳細は [docs/guides/deploy.md](./docs/guides/deploy.md#supabasedbマイグレーション)。
