@@ -1,0 +1,7 @@
+-- mfmf / ローカル開発のシードデータ（意図的に空）
+--
+-- supabase/config.toml の [db.seed] sql_paths が本ファイルを参照する。シードデータは
+-- 持たない方針だが、CI の `supabase start`（db-rls-tests ジョブ）が参照する実ファイルを
+-- 用意しておくことで、CLI バージョン差によるシードパス解決の失敗を確実に避ける。
+-- pgTAP テスト（supabase/tests/）は各自トランザクション内で fixture を自前投入するため、
+-- ここにテスト用データは置かない。
