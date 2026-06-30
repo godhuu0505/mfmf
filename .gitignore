@@ -37,3 +37,4 @@ yarn-error.log*
 
 # claude code (個人ローカルの上書き設定はコミットしない)
 .claude/settings.local.json
+.env*
