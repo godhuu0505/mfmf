@@ -46,6 +46,32 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
         run: npm run build
 
+  # Supabase ローカルスタックを起動し、migration 適用後に pgTAP で RLS のテナント分離を検証する。
+  # RLS（一次防衛線）を弱める変更が入るとここで赤くなり PR が落ちる（Issue #38 / #92 手順5）。
+  # workflow_call（deploy 系から再利用）でも走らせ、main マージ前にも分離を担保する。
+  db-rls-tests:
+    name: RLS tenant isolation (pgTAP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # deploy-production.yml と同じ supabase/setup-cli@v2 を使う。
+      - uses: supabase/setup-cli@v2
+        with:
+          version: latest
+
+      # supabase start でローカルスタックを起動し、supabase/migrations/*.sql を順に適用する。
+      - name: Start Supabase (apply migrations)
+        run: supabase start
+
+      # supabase/tests/**/*.sql を pg_prove で実行。1 つでも失敗すれば exit≠0 でジョブが落ちる。
+      - name: Run pgTAP tests
+        run: supabase test db
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup
+
   # PR で追加 / 変更された supabase/migrations/*.sql に破壊的 SQL が含まれていないかを検査する。
   # Free プランには自動バックアップが無く、destructive 変更は事実上戻せないため、
   # PR 段階で気づけるようにする。warning 止まりで強制ブロックはしない（やむを得ない場合がある）。
