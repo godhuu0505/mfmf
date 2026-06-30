@@ -138,4 +138,4 @@ mfmf で現在使える機能を、ユーザー視点でまとめた参照用ド
 | CI ゲート | lint → typecheck → build（`.github/workflows/ci.yml`） |
 | ローカル一括チェック | `just check`（CI と同じ） |
 | Docker でアプリ起動 | `just up` / `just down`（Node.js 22 で CI と同条件） |
-| Vercel デプロイ | main→Preview, Release タグ→Production（[guides/deploy.md](../guides/deploy.md)） |
+| Vercel デプロイ | main マージ→migration + Production（[guides/deploy.md](../guides/deploy.md)） |
