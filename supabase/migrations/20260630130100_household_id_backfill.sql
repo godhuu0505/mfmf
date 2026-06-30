@@ -66,7 +66,18 @@ create index if not exists pets_household_idx            on public.pets         
 --          on conflict では防げない競合）を防ぐ。
 --      (b) 既存メンバーシップがあれば household を再利用（role は owner を優先）。
 --          並び順に決定的なタイブレークを入れ、再実行時の選択を安定させる。
+--
+--    updated_at の保全:
+--      本バックフィルは household_id を埋めるだけのメタデータ更新であり、ユーザーの
+--      編集ではない。daycare_records / pets には set_updated_at トリガがあり、素の
+--      UPDATE では updated_at が migration 時刻へ書き換わって「最終編集日時」を汚す。
+--      これを防ぐため、対象トリガを当バックフィルの間だけ無効化する（同一トランザクション
+--      内なので失敗時はロールバックで元に戻る）。feedback / record_photos に updated_at は
+--      無く対象外。
 -- ---------------------------------------------------------------
+alter table public.daycare_records disable trigger daycare_records_set_updated_at;
+alter table public.pets            disable trigger pets_set_updated_at;
+
 do $$
 declare
   r  record;
@@ -123,8 +134,18 @@ begin
       and p.household_id is null;
 end $$;
 
--- 注: 本 PR ではアプリの書き込みを変更しないため、本 migration 適用後〜
--- household_id を埋めるアプリ改修（#44）までの間に作成される行は household_id が
--- NULL のまま残る（移行期は nullable なので許容）。後続の NOT NULL 化 PR は
--- 「同等のバックフィル（record_photos の親継承を含む）を再実行してから NOT NULL を
--- 課す」こと。本 PR 単体では既存データのみを対象とする（後方互換・無停止）。
+-- updated_at トリガを元に戻す。
+alter table public.daycare_records enable trigger daycare_records_set_updated_at;
+alter table public.pets            enable trigger pets_set_updated_at;
+
+-- 注: 本 PR ではアプリの書き込みも owner_id ベースの insert/update ポリシーも変更
+-- しないため、移行期は household_id がクライアントから書き込み可能な「未強制」の列
+-- である（移行期は nullable・アクセス制御には未使用なので無害）。後続のメンバーシップ
+-- RLS 切替 PR（#44）は以下を必ず満たすこと:
+--   1) household_id の書き込みをメンバーシップ整合（自分が属する household のみ）に
+--      制約する／サーバ専用にする。
+--   2) NOT NULL 化の前バックフィルでは「NULL の補填」だけでなく、移行期に紛れ込んだ
+--      不整合な非 NULL household_id（他 household の UUID 等）を owner の正規 household へ
+--      再整合（reconcile）する。NULL のみ修復すると不正値が切替後に残るため。
+--   3) record_photos は親 daycare_records の household_id を継承し続ける（親と乖離させない）。
+-- 本 PR 単体では既存データのみを対象とする（後方互換・無停止）。
