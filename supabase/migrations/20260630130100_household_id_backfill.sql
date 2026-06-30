@@ -55,13 +55,26 @@ create index if not exists pets_household_idx            on public.pets         
 -- ---------------------------------------------------------------
 -- 2. バックフィル
 --    既存ユーザーごとに既定 household を 1 つ用意し、role='owner' で登録、
---    当該ユーザー所有の業務行へ household_id を埋める。冪等。
+--    当該ユーザー所有の業務行へ household_id を埋める。
+--
+--    冪等性について:
+--    - 通常運用では Supabase の migration ランナーが本ファイルを「一度だけ」適用
+--      する（schema_migrations で追跡）。`supabase db reset` は空 DB に対して走る。
+--    - それでも安全側に倒し、再実行されても重複 household を作らないよう以下を担保:
+--      (a) トランザクション内アドバイザリロックでバックフィル全体を直列化し、
+--          同一オーナーへの households 二重作成（PK が (household_id,user_id) のため
+--          on conflict では防げない競合）を防ぐ。
+--      (b) 既存メンバーシップがあれば household を再利用（role は owner を優先）。
+--          並び順に決定的なタイブレークを入れ、再実行時の選択を安定させる。
 -- ---------------------------------------------------------------
 do $$
 declare
   r  record;
   hh uuid;
 begin
+  -- バックフィル全体を直列化（並行/再試行実行での household 二重作成を防ぐ）。
+  perform pg_advisory_xact_lock(20260630130100);
+
   -- owner_id を持つ全業務テーブルから distinct なオーナーを集める。
   for r in
     select distinct owner_id
@@ -74,12 +87,13 @@ begin
     ) s
     where owner_id is not null
   loop
-    -- 冪等: 既に owner メンバーシップがあればその household を再利用、無ければ新規作成。
+    -- 冪等: 既にメンバーである household があれば再利用（owner を優先）、無ければ新規作成。
+    -- role を WHERE で固定せず ORDER BY で優先することで、将来 role が変化した
+    -- ユーザーを再実行しても新たな重複 household を作らない。タイブレークは決定的。
     select m.household_id into hh
     from public.household_members m
     where m.user_id = r.owner_id
-      and m.role = 'owner'
-    order by m.created_at
+    order by (m.role = 'owner') desc, m.created_at, m.household_id
     limit 1;
 
     if hh is null then
@@ -108,3 +122,9 @@ begin
     where p.record_id = dr.id
       and p.household_id is null;
 end $$;
+
+-- 注: 本 PR ではアプリの書き込みを変更しないため、本 migration 適用後〜
+-- household_id を埋めるアプリ改修（#44）までの間に作成される行は household_id が
+-- NULL のまま残る（移行期は nullable なので許容）。後続の NOT NULL 化 PR は
+-- 「同等のバックフィル（record_photos の親継承を含む）を再実行してから NOT NULL を
+-- 課す」こと。本 PR 単体では既存データのみを対象とする（後方互換・無停止）。
