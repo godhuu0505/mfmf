@@ -211,8 +211,11 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 ## このあとの実装（参考）
 
-- **Phase 2**: クライアントから Drive へ直接アップロード、`record_photos` を Drive ファイル ID 化。
-- **Phase 3**: 画像プロキシ `/api/photo/[fileId]` + CDN キャッシュで表示。
-- **Phase 4**: 共有フォルダの設定 UI。
+> 以下は Drive 連携内のローカルな実装ステップ。全体ロードマップの Phase 番号
+> （`docs/explanation/vision-and-roadmap.md` §6）とは無関係。
+
+- **ステップ 2**: クライアントから Drive へ直接アップロード、`record_photos` を Drive ファイル ID 化。
+- **ステップ 3**: 画像プロキシ `/api/photo/[fileId]` + CDN キャッシュで表示。
+- **ステップ 4**: 共有フォルダの設定 UI。
 
 トークン発行のサーバー実装は `src/lib/google/token.ts`、暗号化は `src/lib/google/crypto.ts`。
