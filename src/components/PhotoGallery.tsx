@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 export type GalleryImage = {
   id: string;
@@ -113,10 +114,11 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
             <button
               type="button"
               onClick={close}
-              className="rounded-full bg-surface/10 px-3 py-1 text-sm transition hover:bg-surface/20"
+              className="flex items-center gap-1 rounded-full bg-surface/10 px-3 py-1 text-sm transition hover:bg-surface/20"
               aria-label="閉じる"
             >
-              ✕ 閉じる
+              <X className="h-4 w-4" aria-hidden="true" />
+              閉じる
             </button>
           </div>
 
@@ -128,10 +130,10 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
               <button
                 type="button"
                 onClick={prev}
-                className="absolute left-2 z-10 rounded-full bg-surface/10 p-3 text-2xl text-white transition hover:bg-surface/20"
+                className="absolute left-2 z-10 rounded-full bg-surface/10 p-3 text-white transition hover:bg-surface/20"
                 aria-label="前の写真"
               >
-                ‹
+                <ChevronLeft className="h-6 w-6" aria-hidden="true" />
               </button>
             )}
             <div className="relative h-full max-h-[80vh] w-full max-w-3xl">
@@ -148,10 +150,10 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
               <button
                 type="button"
                 onClick={next}
-                className="absolute right-2 z-10 rounded-full bg-surface/10 p-3 text-2xl text-white transition hover:bg-surface/20"
+                className="absolute right-2 z-10 rounded-full bg-surface/10 p-3 text-white transition hover:bg-surface/20"
                 aria-label="次の写真"
               >
-                ›
+                <ChevronRight className="h-6 w-6" aria-hidden="true" />
               </button>
             )}
           </div>

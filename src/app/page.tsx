@@ -18,6 +18,8 @@ import { getOwnerTags } from "@/lib/tags";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import AppHeader from "@/components/AppHeader";
 import RecordFilters from "@/components/RecordFilters";
+import SourceIcon from "@/components/SourceIcon";
+import { Camera, PawPrint, Scale, X } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +43,11 @@ function SourceBadge({ source }: { source: RecordSource }) {
   return (
     <span
       className={
-        "rounded-full px-2 py-0.5 text-xs font-medium " +
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
         (isHome ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700")
       }
     >
-      {isHome ? "🏠 " : "🏫 "}
+      <SourceIcon source={source} className="h-3.5 w-3.5" />
       {SOURCE_LABEL[source]}
     </span>
   );
@@ -161,9 +163,10 @@ export default async function HomePage({
           <div className="flex items-center gap-2">
             <Link
               href="/weight"
-              className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
             >
-              ⚖️ 体重
+              <Scale className="h-4 w-4" aria-hidden="true" />
+              体重
             </Link>
             <Link
               href="/records/new"
@@ -198,9 +201,10 @@ export default async function HomePage({
             {activeTag ? (
               <Link
                 href={tagHref(null)}
-                className="rounded-full border border-border px-3 py-0.5 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
+                className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-0.5 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
               >
-                ✕ タグ解除
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+                タグ解除
               </Link>
             ) : (
               <span className="text-xs font-medium text-muted-foreground">
@@ -264,8 +268,8 @@ export default async function HomePage({
                           unoptimized
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-2xl">
-                          🐾
+                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                          <PawPrint className="h-8 w-8" aria-hidden="true" />
                         </div>
                       )}
                     </div>
@@ -273,8 +277,9 @@ export default async function HomePage({
                       <div className="flex flex-wrap items-center gap-1.5">
                         <SourceBadge source={r.source} />
                         {r.weight_kg != null && (
-                          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                            ⚖️ {r.weight_kg}kg
+                          <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            <Scale className="h-3.5 w-3.5" aria-hidden="true" />
+                            {r.weight_kg}kg
                           </span>
                         )}
                       </div>
@@ -300,8 +305,9 @@ export default async function HomePage({
                         ) : null;
                       })()}
                       {photoCount > 0 && (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          📷 写真 {photoCount} 枚
+                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+                          写真 {photoCount} 枚
                         </p>
                       )}
                     </div>

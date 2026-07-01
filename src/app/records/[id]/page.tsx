@@ -15,8 +15,10 @@ import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
 import PhotoGallery from "@/components/PhotoGallery";
 import SubmitButton from "@/components/SubmitButton";
+import SourceIcon from "@/components/SourceIcon";
 import PhotoEditTile from "./PhotoEditTile";
 import { updateRecord, deleteRecord } from "@/app/records/actions";
+import { Scale } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -129,18 +131,19 @@ export default async function RecordDetailPage({
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <span
                     className={
-                      "rounded-full px-2.5 py-0.5 text-xs font-medium " +
+                      "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium " +
                       (record.source === "home"
                         ? "bg-amber-100 text-amber-700"
                         : "bg-sky-100 text-sky-700")
                     }
                   >
-                    {record.source === "home" ? "🏠 " : "🏫 "}
+                    <SourceIcon source={record.source} className="h-3.5 w-3.5" />
                     {SOURCE_LABEL[record.source]}
                   </span>
                   {record.weight_kg != null && (
-                    <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                      ⚖️ {record.weight_kg}kg
+                    <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      <Scale className="h-3.5 w-3.5" aria-hidden="true" />
+                      {record.weight_kg}kg
                     </span>
                   )}
                 </div>
