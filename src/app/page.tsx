@@ -15,7 +15,7 @@ import {
   parseFilters,
 } from "@/lib/recordQuery";
 import { getOwnerTags } from "@/lib/tags";
-import { getCurrentHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import AppHeader from "@/components/AppHeader";
 import RecordFilters from "@/components/RecordFilters";
@@ -81,7 +81,7 @@ export default async function HomePage({
       count: "exact",
     });
 
-  if (householdId) query = query.eq("household_id", householdId);
+  if (householdId) query = query.or(householdScopeFilter(householdId));
   if (filters.source !== "all") query = query.eq("source", filters.source);
   if (filters.from) query = query.gte("record_date", filters.from);
   if (filters.to) query = query.lte("record_date", filters.to);

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getHouseholdIdForUser } from "@/lib/household";
+import { getHouseholdIdForUser, householdScopeFilter } from "@/lib/household";
 import {
   FEEDBACK_STATUS_LABEL,
   FEEDBACK_STATUSES,
@@ -64,14 +64,14 @@ export default async function FeedbackTriagePage({
     .from("feedback")
     .select("*")
     .order("created_at", { ascending: false });
-  if (householdId) query = query.eq("household_id", householdId);
+  if (householdId) query = query.or(householdScopeFilter(householdId));
   if (activeStatus) query = query.eq("status", activeStatus);
   const { data } = await query.returns<Feedback[]>();
   const items = data ?? [];
 
   // 各 status の件数（フィルタ無しで取得して集計）
   let countsQuery = supabase.from("feedback").select("status");
-  if (householdId) countsQuery = countsQuery.eq("household_id", householdId);
+  if (householdId) countsQuery = countsQuery.or(householdScopeFilter(householdId));
   const { data: countsData } = await countsQuery.returns<
     Pick<Feedback, "status">[]
   >();

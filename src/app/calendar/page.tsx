@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { SOURCE_LABEL, type RecordWithPhotos } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
 
@@ -59,7 +59,7 @@ export default async function CalendarPage({
     .lte("record_date", lastDay)
     .order("record_date", { ascending: true })
     .order("created_at", { ascending: true });
-  if (householdId) query = query.eq("household_id", householdId);
+  if (householdId) query = query.or(householdScopeFilter(householdId));
   const { data } = await query.returns<RecordWithPhotos[]>();
 
   const records = data ?? [];

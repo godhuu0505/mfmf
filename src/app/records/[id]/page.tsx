@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { withSignedUrls } from "@/lib/photos";
 import { listPets } from "@/lib/pets";
 import { getOwnerTags } from "@/lib/tags";
@@ -48,7 +48,7 @@ export default async function RecordDetailPage({
   const householdId = await getCurrentHouseholdId(supabase);
 
   let recordQuery = supabase.from("daycare_records").select("*").eq("id", id);
-  if (householdId) recordQuery = recordQuery.eq("household_id", householdId);
+  if (householdId) recordQuery = recordQuery.or(householdScopeFilter(householdId));
   const { data: record } = await recordQuery.single<DaycareRecord>();
 
   if (!record) notFound();

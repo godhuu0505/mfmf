@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { SOURCE_LABEL, type DaycareRecord } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
 import WeightChart, { type WeightPoint } from "@/components/WeightChart";
@@ -31,7 +31,7 @@ export default async function WeightPage() {
     .select("id, record_date, weight_kg, source")
     .not("weight_kg", "is", null)
     .order("record_date", { ascending: true });
-  if (householdId) query = query.eq("household_id", householdId);
+  if (householdId) query = query.or(householdScopeFilter(householdId));
   const { data } = await query.returns<WeightRow[]>();
 
   const rows = data ?? [];

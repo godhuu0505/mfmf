@@ -24,22 +24,24 @@ function parseRecordFields(formData: FormData) {
   return { record_date, body, source, author, weight_kg };
 }
 
-// pet_id を取り出し、本人所有のペットのみ受理する（横取り防止の防御）。
-// 未指定・不正・他人のペットは null。
+// pet_id を取り出し、正当に紐付けられるペットのみ受理する（横取り防止の防御）。
+// 受理範囲: 本人所有のペット、または household を解決できた場合は同じ household のペット
+// （共有記録が参照する同居メンバーのペットを取りこぼさないため）。RLS で見えるペットに限る。
+// household 未解決時は従来どおり owner_id のみ。未指定・不正・対象外は null。
 async function resolvePetId(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ownerId: string,
+  householdId: string | null,
   formData: FormData,
 ): Promise<string | null> {
   const petId = String(formData.get("pet_id") || "").trim();
   if (!UUID_RE.test(petId)) return null;
 
-  const { data } = await supabase
-    .from("pets")
-    .select("id")
-    .eq("id", petId)
-    .eq("owner_id", ownerId)
-    .maybeSingle();
+  let query = supabase.from("pets").select("id").eq("id", petId);
+  query = householdId
+    ? query.or(`owner_id.eq.${ownerId},household_id.eq.${householdId}`)
+    : query.eq("owner_id", ownerId);
+  const { data } = await query.maybeSingle();
 
   return data ? petId : null;
 }
@@ -182,9 +184,9 @@ export async function createRecord(formData: FormData) {
     throw new Error("不正なリクエストです");
   }
   const fields = parseRecordFields(formData);
-  const pet_id = await resolvePetId(supabase, user.id, formData);
   // 所属世帯を解決し、書き込みに household_id をセットする（owner_id は従来どおり残す）。
   const householdId = await getHouseholdIdForUser(supabase, user.id);
+  const pet_id = await resolvePetId(supabase, user.id, householdId, formData);
 
   const { error } = await supabase
     .from("daycare_records")
@@ -221,10 +223,10 @@ export async function updateRecord(recordId: string, formData: FormData) {
   if (!user) redirect("/login");
 
   const fields = parseRecordFields(formData);
-  const pet_id = await resolvePetId(supabase, user.id, formData);
   // 所属世帯を解決。null（未所属）のときは既存 household_id を上書きしない。
   const householdId = await getHouseholdIdForUser(supabase, user.id);
   const householdPatch = householdId ? { household_id: householdId } : {};
+  const pet_id = await resolvePetId(supabase, user.id, householdId, formData);
 
   const { error } = await supabase
     .from("daycare_records")

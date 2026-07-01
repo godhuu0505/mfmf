@@ -43,3 +43,18 @@ export async function getCurrentHouseholdId(
   if (!user) return null;
   return getHouseholdIdForUser(supabase, user.id);
 }
+
+// 読み取りを household 基準へ寄せるときの PostgREST `or` フィルタ式。
+// 「当該 household の行」＋「household_id が null の行」を対象にする。
+//
+// null を含める理由（無停止移行の要）: バックフィル migration の本番適用後・本コードの
+// 配信前の期間に、旧コード（household_id 未設定）が作成した行は household_id=null のまま
+// 残る。所有者は既に household_members 行を持つため、`household_id = hh` の等値だけで絞ると
+// これらの自分の行が一覧から突然消える。null 行を併せて拾うことでこの取りこぼしを防ぐ。
+//
+// 越境しない理由: household_id=null の行は has_household_role(null)=false のため、RLS 上は
+// owner_id ポリシー（owner_id = auth.uid()）経由でしか返らない。つまり返る null 行は常に
+// 呼び出しユーザー自身の行に限られ、他 household の null 行は混入しない。
+export function householdScopeFilter(householdId: string): string {
+  return `household_id.eq.${householdId},household_id.is.null`;
+}

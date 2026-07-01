@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import AppHeader from "@/components/AppHeader";
 import PhotoGallery, { type GalleryImage } from "@/components/PhotoGallery";
@@ -37,7 +37,7 @@ export default async function GalleryPage() {
     .select("id, storage_path, record_id, daycare_records!inner(record_date)")
     .order("created_at", { ascending: false })
     .limit(MAX_PHOTOS);
-  if (householdId) query = query.eq("household_id", householdId);
+  if (householdId) query = query.or(householdScopeFilter(householdId));
   const { data } = await query.returns<PhotoRow[]>();
 
   const rows = data ?? [];

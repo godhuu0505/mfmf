@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getHouseholdIdForUser } from "@/lib/household";
+import { getHouseholdIdForUser, householdScopeFilter } from "@/lib/household";
 import type { Pet } from "@/types/database";
 
 // 現在ログイン中ユーザーのペット一覧を取得する（作成日昇順）。
@@ -18,7 +18,7 @@ export async function listPets(): Promise<Pet[]> {
     .from("pets")
     .select("*")
     .order("created_at", { ascending: true });
-  if (householdId) query = query.eq("household_id", householdId);
+  if (householdId) query = query.or(householdScopeFilter(householdId));
   const { data } = await query.returns<Pet[]>();
 
   return data ?? [];
