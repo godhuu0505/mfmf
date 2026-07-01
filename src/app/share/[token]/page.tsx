@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { SOURCE_LABEL, type SharedView } from "@/types/database";
+import SourceIcon from "@/components/SourceIcon";
+import { Lock, PawPrint, Scale } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +36,9 @@ export default async function SharePage({
     return (
       <main id="main" className="flex min-h-screen items-center justify-center px-4">
         <div className="w-full max-w-sm text-center">
-          <p className="mb-2 text-4xl">🔒</p>
+          <p className="mb-2 flex justify-center text-muted-foreground">
+            <Lock className="h-10 w-10" aria-hidden="true" />
+          </p>
           <h1 className="mb-1 text-lg font-bold text-foreground">
             この共有リンクは利用できません
           </h1>
@@ -53,7 +57,9 @@ export default async function SharePage({
   return (
     <main id="main" className="mx-auto max-w-2xl px-4 py-8">
       <header className="mb-6 text-center">
-        <p className="text-2xl">🐾</p>
+        <p className="flex justify-center text-foreground">
+          <PawPrint className="h-7 w-7" aria-hidden="true" />
+        </p>
         <h1 className="mt-1 text-xl font-bold text-foreground">
           {view.label?.trim() ? view.label : "ペットの記録"}
         </h1>
@@ -74,18 +80,19 @@ export default async function SharePage({
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
                 <span
                   className={
-                    "rounded-full px-2 py-0.5 text-xs font-medium " +
+                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
                     (r.source === "home"
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-sky-100 text-sky-700")
+                      ? "bg-amber-100 text-amber-900"
+                      : "bg-sky-100 text-sky-900")
                   }
                 >
-                  {r.source === "home" ? "🏠 " : "🏫 "}
+                  <SourceIcon source={r.source} className="h-3.5 w-3.5" />
                   {SOURCE_LABEL[r.source]}
                 </span>
                 {r.weight_kg != null && (
-                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                    ⚖️ {r.weight_kg}kg
+                  <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                    <Scale className="h-3.5 w-3.5" aria-hidden="true" />
+                    {r.weight_kg}kg
                   </span>
                 )}
                 <span className="text-sm font-semibold text-foreground">

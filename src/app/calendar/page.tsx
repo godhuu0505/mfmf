@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { SOURCE_LABEL, type RecordWithPhotos } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
+import SourceIcon from "@/components/SourceIcon";
+import { Camera } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -210,21 +212,23 @@ export default async function CalendarPage({
                         >
                           <span
                             className={
-                              "rounded-full px-2 py-0.5 text-xs font-medium " +
+                              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
                               (r.source === "home"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-sky-100 text-sky-700")
+                                ? "bg-amber-100 text-amber-900"
+                                : "bg-sky-100 text-sky-900")
                             }
                           >
-                            {r.source === "home" ? "🏠 " : "🏫 "}
+                            <SourceIcon source={r.source} className="h-3.5 w-3.5" />
                             {SOURCE_LABEL[r.source]}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-foreground">
                             {r.body.replace(/\s+/g, " ").trim() || "（本文なし）"}
                           </span>
                           {(r.record_photos?.length ?? 0) > 0 && (
-                            <span className="shrink-0 text-xs text-muted-foreground">
-                              📷 {r.record_photos.length}
+                            <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                              <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+                              <span className="sr-only">写真</span>
+                              {r.record_photos.length}
                             </span>
                           )}
                         </Link>

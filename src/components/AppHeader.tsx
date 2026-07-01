@@ -1,7 +1,17 @@
 import Link from "next/link";
 import Image from "next/image";
+import {
+  CalendarDays,
+  CircleHelp,
+  Images,
+  LogOut,
+  PawPrint,
+  Settings,
+  Share2,
+} from "lucide-react";
 
 // 共通ヘッダー。右側にログアウトボタン。
+// アイコンは lucide-react（線画・currentColor 継承）。色はテーマトークンに追従する。
 export default function AppHeader() {
   return (
     <header className="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
@@ -20,61 +30,64 @@ export default function AppHeader() {
           />
           mfmf
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Link
             href="/gallery"
-            className="text-sm text-muted-foreground transition hover:text-foreground"
+            className="text-muted-foreground transition hover:text-foreground"
             aria-label="ギャラリー"
             title="ギャラリー"
           >
-            🖼️
+            <Images className="h-5 w-5" aria-hidden="true" />
           </Link>
           <Link
             href="/calendar"
-            className="text-sm text-muted-foreground transition hover:text-foreground"
+            className="text-muted-foreground transition hover:text-foreground"
             aria-label="カレンダー"
             title="カレンダー"
           >
-            📅
+            <CalendarDays className="h-5 w-5" aria-hidden="true" />
           </Link>
           <Link
             href="/pets"
-            className="text-sm text-muted-foreground transition hover:text-foreground"
+            className="text-muted-foreground transition hover:text-foreground"
             aria-label="ペット"
             title="ペット"
           >
-            🐾
+            <PawPrint className="h-5 w-5" aria-hidden="true" />
           </Link>
           <Link
             href="/shares"
-            className="text-sm text-muted-foreground transition hover:text-foreground"
+            className="text-muted-foreground transition hover:text-foreground"
             aria-label="共有リンク"
             title="共有リンク"
           >
-            🔗
+            <Share2 className="h-5 w-5" aria-hidden="true" />
           </Link>
           <Link
             href="/help"
-            className="text-sm text-muted-foreground transition hover:text-foreground"
+            className="text-muted-foreground transition hover:text-foreground"
             aria-label="ヘルプ"
             title="ヘルプ"
           >
-            ❓
+            <CircleHelp className="h-5 w-5" aria-hidden="true" />
           </Link>
           <Link
             href="/settings"
-            className="text-sm text-muted-foreground transition hover:text-foreground"
+            className="text-muted-foreground transition hover:text-foreground"
             aria-label="設定"
             title="設定"
           >
-            ⚙️
+            <Settings className="h-5 w-5" aria-hidden="true" />
           </Link>
           <form action="/auth/signout" method="post">
             <button
               type="submit"
-              className="text-sm text-muted-foreground transition hover:text-foreground"
+              aria-label="ログアウト"
+              className="flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
             >
-              ログアウト
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              {/* 狭い画面ではアイコンのみ表示してヘッダーのはみ出しを防ぐ */}
+              <span className="hidden sm:inline">ログアウト</span>
             </button>
           </form>
         </div>

@@ -13,6 +13,7 @@ import {
   type FeedbackContext,
   type FeedbackKind,
 } from "@/types/database";
+import { Check, ChevronDown, MessageCircle, X } from "lucide-react";
 
 // 送信時に、ユーザーが入力しなくてもアプリの状況を自動で集める。
 function collectContext(): FeedbackContext {
@@ -78,18 +79,7 @@ export default function FeedbackWidget() {
         aria-haspopup="dialog"
         className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg ring-1 ring-black/5 transition hover:bg-primary-hover active:scale-95"
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          className="h-5 w-5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
+        <MessageCircle className="h-5 w-5" aria-hidden="true" />
         ご意見・不具合
       </button>
 
@@ -164,18 +154,7 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
             aria-label="閉じる"
             className="-mr-1 rounded-lg p-1.5 text-muted-foreground transition hover:bg-surface-muted hover:text-foreground"
           >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -183,18 +162,7 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
           // 送信完了画面
           <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="h-7 w-7"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
+              <Check className="h-7 w-7" strokeWidth={2.5} aria-hidden="true" />
             </div>
             <p className="text-sm leading-relaxed text-foreground">
               {state.message}
@@ -273,21 +241,13 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
                   （任意・書ける範囲でOK）
                 </span>
               </span>
-              <svg
+              <ChevronDown
                 aria-hidden="true"
-                viewBox="0 0 24 24"
                 className={
                   "h-4 w-4 shrink-0 text-muted-foreground transition " +
                   (showDetails ? "rotate-180" : "")
                 }
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
+              />
             </button>
 
             {showDetails && (

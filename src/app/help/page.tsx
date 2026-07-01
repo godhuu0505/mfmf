@@ -2,6 +2,20 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AppHeader from "@/components/AppHeader";
+import {
+  CalendarDays,
+  CircleHelp,
+  House,
+  Images,
+  MessageCircle,
+  PawPrint,
+  School,
+  Settings,
+  Share2,
+} from "lucide-react";
+
+// 文中に差し込む小さなアイコン（テキストのベースラインに揃える）。
+const inlineIcon = "inline-block h-4 w-4 align-text-bottom";
 
 export const dynamic = "force-dynamic";
 
@@ -83,8 +97,13 @@ export default async function HelpPage() {
               作られています。
             </p>
             <p className={pClass}>
-              画面上部のヘッダーから、ギャラリー🖼️ / カレンダー📅 / ペット🐾 /
-              共有リンク🔗 / ヘルプ❓ / 設定⚙️ に移動できます。
+              画面上部のヘッダーから、ギャラリー
+              <Images className={inlineIcon} aria-hidden="true" /> / カレンダー
+              <CalendarDays className={inlineIcon} aria-hidden="true" /> / ペット
+              <PawPrint className={inlineIcon} aria-hidden="true" /> / 共有リンク
+              <Share2 className={inlineIcon} aria-hidden="true" /> / ヘルプ
+              <CircleHelp className={inlineIcon} aria-hidden="true" /> / 設定
+              <Settings className={inlineIcon} aria-hidden="true" /> に移動できます。
             </p>
           </section>
 
@@ -102,7 +121,9 @@ export default async function HelpPage() {
                 <strong>日付</strong>：いつの記録か。既定では今日が入ります。
               </li>
               <li>
-                <strong>記録元</strong>：🏫 保育園 / 🏠 おうち のどちらか。
+                <strong>記録元</strong>：
+                <School className={inlineIcon} aria-hidden="true" /> 保育園 /{" "}
+                <House className={inlineIcon} aria-hidden="true" /> おうち のどちらか。
               </li>
               <li>
                 <strong>記入者</strong>：誰が書いたか。設定画面で既定値を決められます。
@@ -136,7 +157,8 @@ export default async function HelpPage() {
               <li>
                 すべての写真は{" "}
                 <Link href="/gallery" className={inlineLink}>
-                  ギャラリー🖼️
+                  ギャラリー
+                  <Images className={inlineIcon} aria-hidden="true" />
                 </Link>{" "}
                 から新しい順にまとめて見ることができます。
               </li>
@@ -160,7 +182,8 @@ export default async function HelpPage() {
             <p className={pClass}>
               祖父母など、アプリにログインしない人にも記録を見せたい場合は、
               <Link href="/shares" className={inlineLink}>
-                共有リンク🔗
+                共有リンク
+                <Share2 className={inlineIcon} aria-hidden="true" />
               </Link>
               から閲覧専用のリンクを発行できます。
             </p>
@@ -177,7 +200,9 @@ export default async function HelpPage() {
             <h2 className={h2Class}>困ったとき</h2>
             <ul className={ulClass}>
               <li>
-                画面の右下にある「💬」ボタンから、不具合や要望を送れます。
+                画面の右下にある「
+                <MessageCircle className={inlineIcon} aria-hidden="true" />{" "}
+                ご意見・不具合」ボタンから、不具合や要望を送れます。
                 内容はアプリの管理者にだけ届きます。
               </li>
               <li>

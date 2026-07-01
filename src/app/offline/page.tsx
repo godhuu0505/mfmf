@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PawPrint } from "lucide-react";
 
 // オフライン時に Service Worker が表示するフォールバックページ。
 export const dynamic = "force-static";
@@ -6,7 +7,7 @@ export const dynamic = "force-static";
 export default function OfflinePage() {
   return (
     <main id="main" className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-      <div className="text-5xl">🐾</div>
+      <PawPrint className="h-12 w-12 text-muted-foreground" aria-hidden="true" />
       <h1 className="mt-4 text-xl font-bold text-foreground">
         オフラインです
       </h1>
