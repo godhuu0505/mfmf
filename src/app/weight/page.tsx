@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SOURCE_LABEL, type DaycareRecord } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
+import SourceIcon from "@/components/SourceIcon";
 import WeightChart, { type WeightPoint } from "@/components/WeightChart";
 
 export const dynamic = "force-dynamic";
@@ -107,12 +108,13 @@ export default async function WeightPage() {
                       {formatDate(r.record_date)}
                       <span
                         className={
-                          "rounded-full px-2 py-0.5 text-xs font-medium " +
+                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
                           (r.source === "home"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-sky-100 text-sky-700")
+                            ? "bg-amber-100 text-amber-900"
+                            : "bg-sky-100 text-sky-900")
                         }
                       >
+                        <SourceIcon source={r.source} className="h-3 w-3" />
                         {SOURCE_LABEL[r.source]}
                       </span>
                     </span>

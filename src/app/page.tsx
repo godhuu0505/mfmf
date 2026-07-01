@@ -44,7 +44,7 @@ function SourceBadge({ source }: { source: RecordSource }) {
     <span
       className={
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
-        (isHome ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700")
+        (isHome ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-900")
       }
     >
       <SourceIcon source={source} className="h-3.5 w-3.5" />

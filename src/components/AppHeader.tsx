@@ -30,7 +30,7 @@ export default function AppHeader() {
           />
           mfmf
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Link
             href="/gallery"
             className="text-muted-foreground transition hover:text-foreground"
@@ -82,10 +82,12 @@ export default function AppHeader() {
           <form action="/auth/signout" method="post">
             <button
               type="submit"
+              aria-label="ログアウト"
               className="flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />
-              ログアウト
+              {/* 狭い画面ではアイコンのみ表示してヘッダーのはみ出しを防ぐ */}
+              <span className="hidden sm:inline">ログアウト</span>
             </button>
           </form>
         </div>

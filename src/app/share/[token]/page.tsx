@@ -82,8 +82,8 @@ export default async function SharePage({
                   className={
                     "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
                     (r.source === "home"
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-sky-100 text-sky-700")
+                      ? "bg-amber-100 text-amber-900"
+                      : "bg-sky-100 text-sky-900")
                   }
                 >
                   <SourceIcon source={r.source} className="h-3.5 w-3.5" />
