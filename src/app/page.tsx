@@ -15,6 +15,7 @@ import {
   parseFilters,
 } from "@/lib/recordQuery";
 import { getOwnerTags } from "@/lib/tags";
+import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import AppHeader from "@/components/AppHeader";
 import RecordFilters from "@/components/RecordFilters";
@@ -68,7 +69,11 @@ export default async function HomePage({
     ? ownerTags.find((t) => t.id === tagParam) ?? null
     : null;
 
-  // RLS（owner_id = auth.uid()）の範囲内で検索・絞り込み・並び替え・ページングする。
+  // 読み取りは household 基準へ寄せる（Phase 3.5 S1 手順7）。所属世帯を解決できれば
+  // household_id で絞り込み、未所属なら従来どおり owner_id RLS にフォールバックする。
+  // いずれも RLS（owner_id = auth.uid() / household メンバー）が一次防衛線。
+  const householdId = await getCurrentHouseholdId(supabase);
+
   // 一覧 + 先頭写真 + 付与タグをまとめて取得。
   let query = supabase
     .from("daycare_records")
@@ -76,6 +81,7 @@ export default async function HomePage({
       count: "exact",
     });
 
+  if (householdId) query = query.or(householdScopeFilter(householdId));
   if (filters.source !== "all") query = query.eq("source", filters.source);
   if (filters.from) query = query.gte("record_date", filters.from);
   if (filters.to) query = query.lte("record_date", filters.to);

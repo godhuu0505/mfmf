@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getHouseholdIdForUser } from "@/lib/household";
 import {
   toFeedbackFrequency,
   toFeedbackKind,
@@ -68,9 +69,12 @@ export async function submitFeedback(
   const actual = trimOrNull(formData.get("actual"));
   const reporter = trimOrNull(formData.get("reporter"));
   const context = parseContext(formData.get("context"));
+  // 所属世帯を解決し、書き込みに household_id をセットする（owner_id は従来どおり残す）。
+  const householdId = await getHouseholdIdForUser(supabase, user.id);
 
   const { error: insertError } = await supabase.from("feedback").insert({
     owner_id: user.id,
+    household_id: householdId,
     kind,
     severity,
     frequency,

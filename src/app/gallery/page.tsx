@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import AppHeader from "@/components/AppHeader";
 import PhotoGallery, { type GalleryImage } from "@/components/PhotoGallery";
@@ -27,14 +28,17 @@ function formatDate(d: string) {
 
 export default async function GalleryPage() {
   const supabase = await createClient();
+  // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
+  // record_photos の household_id は親 daycare_records から継承済み。
+  const householdId = await getCurrentHouseholdId(supabase);
 
-  // record_photos の RLS は親記録の owner で制限される（owner スコープ）。
-  const { data } = await supabase
+  let query = supabase
     .from("record_photos")
     .select("id, storage_path, record_id, daycare_records!inner(record_date)")
     .order("created_at", { ascending: false })
-    .limit(MAX_PHOTOS)
-    .returns<PhotoRow[]>();
+    .limit(MAX_PHOTOS);
+  if (householdId) query = query.or(householdScopeFilter(householdId));
+  const { data } = await query.returns<PhotoRow[]>();
 
   const rows = data ?? [];
 

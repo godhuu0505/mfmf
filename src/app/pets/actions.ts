@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getHouseholdIdForUser } from "@/lib/household";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -31,9 +32,12 @@ export async function createPet(formData: FormData) {
     throw new Error("ペットの名前を入力してください");
   }
 
+  // 所属世帯を解決し、書き込みに household_id をセットする（owner_id は従来どおり残す）。
+  const householdId = await getHouseholdIdForUser(supabase, user.id);
+
   const { error } = await supabase
     .from("pets")
-    .insert({ owner_id: user.id, ...fields });
+    .insert({ owner_id: user.id, household_id: householdId, ...fields });
   if (error) {
     throw new Error(`ペットの追加に失敗しました: ${error.message}`);
   }
