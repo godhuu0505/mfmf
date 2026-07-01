@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET, normalizeTagName, toSource } from "@/types/database";
 import { isPathForRecord } from "@/lib/storagePath";
+import { getHouseholdIdForUser } from "@/lib/household";
 
 // フォームから記録メタデータ（記録元・記入者・体重）を取り出す。
 function parseRecordFields(formData: FormData) {
@@ -58,14 +59,22 @@ async function attachPhotoPaths(
   ownerId: string,
   recordId: string,
   paths: string[],
+  householdId: string | null,
 ) {
   // {owner_id}/{record_id}/... 配下のパスのみ受理（防御的サニタイズ）。
   const valid = paths.filter((p) => isPathForRecord(p, ownerId, recordId));
   if (valid.length === 0) return;
 
+  // household_id は親 daycare_records から継承する（バックフィルの「親に追随」と同方針）。
   const { error } = await supabase
     .from("record_photos")
-    .insert(valid.map((storage_path) => ({ record_id: recordId, storage_path })));
+    .insert(
+      valid.map((storage_path) => ({
+        record_id: recordId,
+        storage_path,
+        household_id: householdId,
+      })),
+    );
   if (error) {
     throw new Error(`写真情報の保存に失敗しました: ${error.message}`);
   }
@@ -174,16 +183,30 @@ export async function createRecord(formData: FormData) {
   }
   const fields = parseRecordFields(formData);
   const pet_id = await resolvePetId(supabase, user.id, formData);
+  // 所属世帯を解決し、書き込みに household_id をセットする（owner_id は従来どおり残す）。
+  const householdId = await getHouseholdIdForUser(supabase, user.id);
 
   const { error } = await supabase
     .from("daycare_records")
-    .insert({ id: recordId, owner_id: user.id, ...fields, pet_id });
+    .insert({
+      id: recordId,
+      owner_id: user.id,
+      household_id: householdId,
+      ...fields,
+      pet_id,
+    });
 
   if (error) {
     throw new Error(`記録の作成に失敗しました: ${error.message}`);
   }
 
-  await attachPhotoPaths(supabase, user.id, recordId, readPhotoPaths(formData));
+  await attachPhotoPaths(
+    supabase,
+    user.id,
+    recordId,
+    readPhotoPaths(formData),
+    householdId,
+  );
   await syncRecordTags(supabase, user.id, recordId, readTagNames(formData));
 
   revalidatePath("/");
@@ -199,17 +222,26 @@ export async function updateRecord(recordId: string, formData: FormData) {
 
   const fields = parseRecordFields(formData);
   const pet_id = await resolvePetId(supabase, user.id, formData);
+  // 所属世帯を解決。null（未所属）のときは既存 household_id を上書きしない。
+  const householdId = await getHouseholdIdForUser(supabase, user.id);
+  const householdPatch = householdId ? { household_id: householdId } : {};
 
   const { error } = await supabase
     .from("daycare_records")
-    .update({ ...fields, pet_id })
+    .update({ ...fields, ...householdPatch, pet_id })
     .eq("id", recordId);
 
   if (error) {
     throw new Error(`記録の更新に失敗しました: ${error.message}`);
   }
 
-  await attachPhotoPaths(supabase, user.id, recordId, readPhotoPaths(formData));
+  await attachPhotoPaths(
+    supabase,
+    user.id,
+    recordId,
+    readPhotoPaths(formData),
+    householdId,
+  );
   await syncRecordTags(supabase, user.id, recordId, readTagNames(formData));
 
   revalidatePath("/");

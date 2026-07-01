@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getHouseholdIdForUser } from "@/lib/household";
 import {
   FEEDBACK_STATUS_LABEL,
   FEEDBACK_STATUSES,
@@ -56,19 +57,24 @@ export default async function FeedbackTriagePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
+  const householdId = await getHouseholdIdForUser(supabase, user.id);
+
   let query = supabase
     .from("feedback")
     .select("*")
     .order("created_at", { ascending: false });
+  if (householdId) query = query.eq("household_id", householdId);
   if (activeStatus) query = query.eq("status", activeStatus);
   const { data } = await query.returns<Feedback[]>();
   const items = data ?? [];
 
   // 各 status の件数（フィルタ無しで取得して集計）
-  const { data: countsData } = await supabase
-    .from("feedback")
-    .select("status")
-    .returns<Pick<Feedback, "status">[]>();
+  let countsQuery = supabase.from("feedback").select("status");
+  if (householdId) countsQuery = countsQuery.eq("household_id", householdId);
+  const { data: countsData } = await countsQuery.returns<
+    Pick<Feedback, "status">[]
+  >();
   const counts: Record<FeedbackStatus, number> = {
     open: 0,
     triaged: 0,

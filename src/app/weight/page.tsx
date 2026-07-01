@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentHouseholdId } from "@/lib/household";
 import { SOURCE_LABEL, type DaycareRecord } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
 import WeightChart, { type WeightPoint } from "@/components/WeightChart";
@@ -22,13 +23,16 @@ type WeightRow = Pick<
 
 export default async function WeightPage() {
   const supabase = await createClient();
+  // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
+  const householdId = await getCurrentHouseholdId(supabase);
 
-  const { data } = await supabase
+  let query = supabase
     .from("daycare_records")
     .select("id, record_date, weight_kg, source")
     .not("weight_kg", "is", null)
-    .order("record_date", { ascending: true })
-    .returns<WeightRow[]>();
+    .order("record_date", { ascending: true });
+  if (householdId) query = query.eq("household_id", householdId);
+  const { data } = await query.returns<WeightRow[]>();
 
   const rows = data ?? [];
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentHouseholdId } from "@/lib/household";
 import { withSignedUrls } from "@/lib/photos";
 import { listPets } from "@/lib/pets";
 import { getOwnerTags } from "@/lib/tags";
@@ -42,11 +43,13 @@ export default async function RecordDetailPage({
 
   const supabase = await createClient();
 
-  const { data: record } = await supabase
-    .from("daycare_records")
-    .select("*")
-    .eq("id", id)
-    .single<DaycareRecord>();
+  // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
+  // いずれの経路でも RLS が一次防衛線。写真・タグは親記録経由でスコープされる。
+  const householdId = await getCurrentHouseholdId(supabase);
+
+  let recordQuery = supabase.from("daycare_records").select("*").eq("id", id);
+  if (householdId) recordQuery = recordQuery.eq("household_id", householdId);
+  const { data: record } = await recordQuery.single<DaycareRecord>();
 
   if (!record) notFound();
 

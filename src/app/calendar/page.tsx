@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentHouseholdId } from "@/lib/household";
 import { SOURCE_LABEL, type RecordWithPhotos } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
 
@@ -49,14 +50,17 @@ export default async function CalendarPage({
   const lastDay = `${year}-${pad(month)}-${pad(lastDate)}`;
 
   const supabase = await createClient();
-  const { data } = await supabase
+  // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
+  const householdId = await getCurrentHouseholdId(supabase);
+  let query = supabase
     .from("daycare_records")
     .select("*, record_photos(*)")
     .gte("record_date", firstDay)
     .lte("record_date", lastDay)
     .order("record_date", { ascending: true })
-    .order("created_at", { ascending: true })
-    .returns<RecordWithPhotos[]>();
+    .order("created_at", { ascending: true });
+  if (householdId) query = query.eq("household_id", householdId);
+  const { data } = await query.returns<RecordWithPhotos[]>();
 
   const records = data ?? [];
 
