@@ -18,7 +18,7 @@ export function toSource(value: unknown): RecordSource {
 export type DaycareRecord = {
   id: string;
   owner_id: string;
-  household_id: string | null; // 所属世帯。移行期は null（NOT NULL 化は後続 PR）
+  household_id: string; // 所属世帯（NOT NULL・S1 手順6で確定）
   record_date: string; // YYYY-MM-DD
   source: RecordSource;
   author: string;
@@ -77,7 +77,7 @@ export type HouseholdMember = {
 export type Pet = {
   id: string;
   owner_id: string;
-  household_id: string | null; // 所属世帯。移行期は null
+  household_id: string; // 所属世帯（NOT NULL・S1 手順6で確定）
   name: string;
   species: string | null;
   birthday: string | null; // YYYY-MM-DD
@@ -88,7 +88,7 @@ export type Pet = {
 export type RecordPhoto = {
   id: string;
   record_id: string;
-  household_id: string | null; // 所属世帯。親 daycare_records から継承。移行期は null
+  household_id: string; // 所属世帯（NOT NULL・親 daycare_records から継承）
   storage_path: string;
   created_at: string;
 };
@@ -255,7 +255,7 @@ export function toFeedbackStatus(value: unknown): FeedbackStatus {
 export type Feedback = {
   id: string;
   owner_id: string;
-  household_id: string | null; // 所属世帯。移行期は null
+  household_id: string; // 所属世帯（NOT NULL・S1 手順6で確定）
   kind: FeedbackKind;
   severity: FeedbackSeverity | null;
   frequency: FeedbackFrequency | null;
