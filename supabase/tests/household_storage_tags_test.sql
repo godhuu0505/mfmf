@@ -14,23 +14,28 @@
 --      両方・共有タグ辞書にアクセスできるようになる
 --   ④ owner 経路で注入された「owner ⇄ household 不整合」タグは誰にも可視化されず、
 --      record_tags にも持ち込めない（整合強制）
+--   ⑤ 複数世帯モデル: 旧規約オブジェクトの開放は「その記録が属する世帯」単位。
+--      A が HB にも所属して HB に記録を持つとき、HB のメンバー(B)はその写真を見られるが、
+--      A と HA を共有するだけの C は見られない（owner 単位の開放ではないことの証明）
 -- =============================================================
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(40);
+select plan(43);
 
 -- ---------------------------------------------------------------
 -- 固定 UUID（fixture）
 --   users:      A=aaaa.., B=bbbb.., C=cccc..
---   households: HA=1111.., HB=2222..
---   records:    RA=aaaa0000..1（A/HA）, RB=bbbb0000..2（B/HB）
+--   households: HA=1111.., HB=2222..（A は HA owner かつ HB member＝複数世帯所属 D1）
+--   records:    RA=aaaa0000..1（A/HA）, RB=bbbb0000..2（B/HB）,
+--               RX=aaaa0000..3（A が HB に持つ記録＝シナリオ⑤用）
 --   tags:       TA=aaaa7777..1（A/HA 共有）, TB=bbbb7777..2（B/HB）,
 --               TN=aaaa7777..3（A/household 未所属＝移行期）, TC=cccc7777..4（C が作成）,
 --               TSQ=bbbb7777..5（B が owner 経路で HA に注入する不整合タグ）
---   storage:    legacy_a = {A}/{RA}/a.jpg（旧規約）, hh_a = {HA}/{RA}/h.jpg（新規約）
+--   storage:    legacy_a = {A}/{RA}/a.jpg（旧規約）, hh_a = {HA}/{RA}/h.jpg（新規約）,
+--               cross_a = {A}/{RX}/x.jpg（旧規約・HB の記録＝シナリオ⑤用）
 -- ---------------------------------------------------------------
 insert into auth.users (id, email) values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a@test.local'),
@@ -43,16 +48,19 @@ insert into public.households (id, name) values
 
 insert into public.household_members (household_id, user_id, role) values
   ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'owner'),
-  ('22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'owner');
+  ('22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'owner'),
+  ('22222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'member');
 
 insert into public.daycare_records (id, owner_id, household_id, body) values
   ('aaaa0000-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'A record'),
-  ('bbbb0000-0000-0000-0000-000000000002', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'B record');
+  ('bbbb0000-0000-0000-0000-000000000002', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'B record'),
+  ('aaaa0000-0000-0000-0000-000000000003', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'A record in HB');
 
 -- Storage オブジェクト（bucket は init.sql が作成済みの daycare-photos）
 insert into storage.objects (bucket_id, name) values
   ('daycare-photos', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/aaaa0000-0000-0000-0000-000000000001/a.jpg'),
   ('daycare-photos', '11111111-1111-1111-1111-111111111111/aaaa0000-0000-0000-0000-000000000001/h.jpg'),
+  ('daycare-photos', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/aaaa0000-0000-0000-0000-000000000003/x.jpg'),
   ('daycare-photos', 'not-a-uuid/whatever.jpg');
 
 -- タグ辞書（TA=世帯共有 / TN=移行期の未所属 / TB=他世帯）と RA への付与
@@ -75,9 +83,11 @@ select set_config('storage.allow_delete_query', 'true', true);
 -- ===============================================================
 -- 不変条件ガード
 -- ===============================================================
-select is_definer(
-  'shares_household_with',
-  'shares_household_with は SECURITY DEFINER（household_members の RLS 迂回・boolean のみ返す）'
+select ok(
+  exists (select 1 from pg_policies
+          where schemaname = 'storage' and tablename = 'objects'
+            and policyname = 'daycare_photos_select_shared_owner'),
+  '旧規約 {owner_id}/... を世帯メンバーへ開放するポリシーが存在する'
 );
 
 select ok(
@@ -157,6 +167,15 @@ select results_eq(
       and name = '11111111-1111-1111-1111-111111111111/aaaa0000-0000-0000-0000-000000000001/h.jpg'$$,
   $$values (0)$$,
   'B は他 household(HA) の新規約オブジェクトを select 不可'
+);
+-- シナリオ⑤（正例）: 旧規約の開放は「記録の世帯」単位。A が HB に持つ記録 RX の
+-- 写真は、HB メンバーの B から見える（owner A が HB のメンバーで整合も成立）。
+select results_eq(
+  $$select count(*)::int from storage.objects
+    where bucket_id = 'daycare-photos'
+      and name = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/aaaa0000-0000-0000-0000-000000000003/x.jpg'$$,
+  $$values (1)$$,
+  'B は自世帯(HB)の記録に紐づく A の旧規約オブジェクトを select 可（記録の世帯単位で開放）'
 );
 select throws_ok(
   $$insert into storage.objects (bucket_id, name)
@@ -262,7 +281,16 @@ select results_eq(
     where bucket_id = 'daycare-photos'
       and name = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/aaaa0000-0000-0000-0000-000000000001/a.jpg'$$,
   $$values (1)$$,
-  'メンバー追加後: C は同世帯オーナー(A)の旧規約オブジェクトを select 可（shares_household_with）'
+  'メンバー追加後: C は同世帯(HA)の記録に紐づく A の旧規約オブジェクトを select 可'
+);
+-- シナリオ⑤（負例・P1 回帰）: C は A と HA を共有するが、A が HB に持つ記録 RX の
+-- 写真は見えない。「owner とどこかの世帯を共有しているか」で開くと漏れる境界。
+select results_eq(
+  $$select count(*)::int from storage.objects
+    where bucket_id = 'daycare-photos'
+      and name = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/aaaa0000-0000-0000-0000-000000000003/x.jpg'$$,
+  $$values (0)$$,
+  'C は owner(A) と世帯を共有していても、別世帯(HB)の記録に紐づく旧規約オブジェクトは select 不可'
 );
 select results_eq(
   $$select count(*)::int from storage.objects
@@ -305,6 +333,16 @@ select lives_ok(
             'cccccccc-cccc-cccc-cccc-cccccccccccc',
             '11111111-1111-1111-1111-111111111111', 'by-c')$$,
   'C は HA の共有辞書へタグを追加できる'
+);
+-- tags_insert_member は owner_id = auth.uid() を要求する（他メンバー名義での作成
+-- ＝名前空間の占有・他アカウントの cascade への紐付けをさせない。record_tags と同型）。
+select throws_ok(
+  $$insert into public.tags (owner_id, household_id, name)
+    values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            '11111111-1111-1111-1111-111111111111', 'spoofed-owner')$$,
+  '42501',
+  null,
+  'C は同世帯メンバー(A)名義のタグを作成できない（owner_id = auth.uid() の強制）'
 );
 select isnt_empty(
   $$update public.tags set name = 'shared-a-renamed'

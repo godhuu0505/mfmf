@@ -117,6 +117,10 @@ async function syncRecordTags(
   tagNames: string[],
 ) {
   // 望ましいタグ名の集合に対応する既存タグを引く（世帯辞書を優先）。
+  // householdId があるときは、移行期に残った自分の未所属（household_id=null）タグを
+  // 世帯辞書へ「昇格」させてから返す。null のままだと他メンバーはそのタグを解決できず、
+  // 他メンバーの記録への付与も RLS（t.household_id = r.household_id）で弾かれるため。
+  // 昇格対象は常に自分のタグに限られる（null タグは owner RLS 経由でしか見えない）。
   const selectTagsByName = async () => {
     let query = supabase.from("tags").select("id, name, household_id").in("name", tagNames);
     query = householdId
@@ -126,7 +130,25 @@ async function syncRecordTags(
     if (error) {
       throw new Error(`タグの取得に失敗しました: ${error.message}`);
     }
-    return data ?? [];
+    let rows = data ?? [];
+
+    const legacyIds = householdId
+      ? rows.filter((t) => t.household_id === null).map((t) => t.id)
+      : [];
+    if (householdId && legacyIds.length > 0) {
+      const { error: promoteError } = await supabase
+        .from("tags")
+        .update({ household_id: householdId })
+        .in("id", legacyIds)
+        .is("household_id", null);
+      if (promoteError) {
+        throw new Error(`タグの更新に失敗しました: ${promoteError.message}`);
+      }
+      rows = rows.map((t) =>
+        t.household_id === null ? { ...t, household_id: householdId } : t,
+      );
+    }
+    return rows;
   };
 
   // 1. 望ましいタグ名に対応する tag id を用意する（無ければ作成）。

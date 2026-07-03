@@ -95,7 +95,13 @@ end $$;
 --    に加え、行の owner がその household のメンバーであること
 --    （is_household_member(household_id, owner_id)）も要求し、owner_id ⇄ household_id の
 --    整合しない行（越境注入）をメンバー経路で一切可視・改変させない。
---    update / delete も全メンバーに開く（世帯の共有辞書。role 別の絞り込みは S2 #46）。
+--    insert はさらに owner_id = auth.uid() を要求する（record_tags_insert_member と同型）。
+--    owner_id は tags_owner_name_unique と auth.users への on delete cascade に効くため、
+--    他メンバー名義でのタグ作成（名前空間の占有・他アカウントのライフサイクルへの
+--    紐付け）をさせない。update は「共有辞書を他メンバーも編集できる」意味論
+--    （daycare_records の *_member と同じ）を保つため owner 固定は課さないが、
+--    with check の is_household_member により owner の付け替え先は同一世帯のメンバーに
+--    限られる。delete も全メンバーに開く（role 別の絞り込みは S2 #46）。
 -- ---------------------------------------------------------------
 drop policy if exists "tags_select_member" on public.tags;
 create policy "tags_select_member"
@@ -109,7 +115,8 @@ drop policy if exists "tags_insert_member" on public.tags;
 create policy "tags_insert_member"
   on public.tags for insert
   with check (
-    public.has_household_role(household_id)
+    owner_id = auth.uid()
+    and public.has_household_role(household_id)
     and public.is_household_member(household_id, owner_id)
   );
 

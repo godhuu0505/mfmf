@@ -17,13 +17,16 @@
 --   ① household パス（新規約）: 先頭セグメント = 自分がメンバーの household_id
 --        select / insert / delete を許可（テーブル側の *_member ポリシーと同粒度。
 --        role 別の絞り込みは S2 RBAC #46 で has_household_role(allowed_roles) に絞る）。
---   ② owner パス（旧規約）: 先頭セグメント = 「自分と同一 household に属するユーザー」の id
---        select / delete のみ許可（世帯メンバーが旧写真を閲覧・記録削除時に片付けられる
---        ように）。insert は許可しない（他人の owner プレフィックス配下への新規作成は
---        させない。本人の旧規約 insert は既存 daycare_photos_insert_own が引き続き許可）。
+--   ② owner パス（旧規約）: パス規約 {owner_id}/{record_id}/{filename} の第2セグメント
+--        （record_id）を daycare_records に突き合わせ、「その記録が属する household の
+--        メンバー」にのみ select / delete を許可（record_photos の *_member ポリシーと
+--        同型）。オブジェクト単位ではなく「記録の世帯」単位で判定することで、複数世帯
+--        モデル（D1）でも owner が別世帯に持つ記録の写真へは越境できない。
+--        insert は許可しない（他人の owner プレフィックス配下への新規作成はさせない。
+--        本人の旧規約 insert は既存 daycare_photos_insert_own が引き続き許可）。
 --
--- パス先頭セグメントは信頼できない入力なので、uuid へ安全にキャストする
--- try_cast_uuid() を用意する（不正値は null → 各判定関数は false を返す）。
+-- パスのセグメントは信頼できない入力なので、uuid へ安全にキャストする
+-- try_cast_uuid() を用意する（不正値は null → 各判定は単に不成立になる）。
 -- AND / OR の評価順序に依存した ::uuid キャストはエラーで全体を落とすため使わない。
 --
 -- 不変条件:
@@ -37,7 +40,6 @@
 --   drop policy if exists "daycare_photos_delete_household" on storage.objects;
 --   drop policy if exists "daycare_photos_insert_household" on storage.objects;
 --   drop policy if exists "daycare_photos_select_household" on storage.objects;
---   drop function if exists public.shares_household_with(uuid);
 --   drop function if exists public.try_cast_uuid(text);
 --   （アプリ側も {owner_id}/... 生成へ戻すこと。household パスで作成済みのオブジェクトは
 --     旧 own ポリシーでは不可視になるため、戻す前に有無を確認する。）
@@ -71,39 +73,7 @@ revoke all on function public.try_cast_uuid(text) from public;
 grant execute on function public.try_cast_uuid(text) to authenticated, service_role;
 
 -- ---------------------------------------------------------------
--- 2. ヘルパー: 呼び出しユーザーが target_user と同一 household を共有しているか
---    旧規約 {owner_id}/... のオブジェクトを「その owner と同じ世帯のメンバー」に開放する
---    判定。has_household_role / is_household_member と同じく SECURITY DEFINER +
---    search_path 固定で household_members の RLS を迂回する（boolean のみ返し、
---    他ユーザーのメンバーシップ情報は漏らさない）。
---    target_user = auth.uid() 自身の場合も「共に属する世帯が 1 つでもあれば」true に
---    なるが、本人アクセスは既存 own ポリシーが常に許可するため差は生じない。
--- ---------------------------------------------------------------
-create or replace function public.shares_household_with(target_user uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select exists (
-    select 1
-    from public.household_members me
-    join public.household_members them
-      on them.household_id = me.household_id
-    where me.user_id = auth.uid()
-      and them.user_id = target_user
-  );
-$$;
-
-comment on function public.shares_household_with(uuid) is
-  '呼び出しユーザー(auth.uid())が target_user と同一 household に属しているかを返す。旧規約 {owner_id}/... の Storage オブジェクトを世帯メンバーへ開放する判定に使う。SECURITY DEFINER + search_path 固定。';
-
-revoke all on function public.shares_household_with(uuid) from public;
-grant execute on function public.shares_household_with(uuid) to authenticated, service_role;
-
--- ---------------------------------------------------------------
--- 3. 新規約 {household_id}/{record_id}/{filename} のポリシー（併存追加）
+-- 2. 新規約 {household_id}/{record_id}/{filename} のポリシー（併存追加）
 --    先頭セグメントが「自分がメンバーの household」なら select / insert / delete 可。
 --    先頭セグメントが uuid でない・存在しない household の場合、try_cast_uuid /
 --    has_household_role が null / false を返すため単に不成立になる（エラーにしない）。
@@ -133,10 +103,15 @@ create policy "daycare_photos_delete_household"
   );
 
 -- ---------------------------------------------------------------
--- 4. 旧規約 {owner_id}/{record_id}/{filename} の世帯メンバー開放（併存追加）
---    先頭セグメント（= オブジェクト owner の user id）と同一 household に属していれば
---    select / delete 可。既存オブジェクトを移動せずに、世帯メンバーの閲覧
---    （署名付き URL の発行）と記録削除時のオブジェクト片付けを成立させる。
+-- 3. 旧規約 {owner_id}/{record_id}/{filename} の世帯メンバー開放（併存追加）
+--    第2セグメント（record_id）が指す daycare_records の household のメンバーであり、
+--    かつ第1セグメント（owner_id）がその記録の owner と一致する場合に select / delete 可
+--    （record_photos の *_member ポリシーと同型。親レコードの owner ∈ household 整合も
+--    要求する）。既存オブジェクトを移動せずに、世帯メンバーの閲覧（署名付き URL の発行）
+--    と記録削除時のオブジェクト片付けを成立させる。
+--    「owner とどこかの世帯を共有しているか」ではなく「その記録の世帯のメンバーか」で
+--    判定するのが要点: 複数世帯モデル（D1）で owner が別世帯に持つ記録の写真や、
+--    記録が消えた孤児オブジェクトへは開かない（本人の own ポリシーのみ残る）。
 --    insert は追加しない（他人の owner プレフィックスへの新規作成を開けない）。
 -- ---------------------------------------------------------------
 drop policy if exists "daycare_photos_select_shared_owner" on storage.objects;
@@ -144,7 +119,13 @@ create policy "daycare_photos_select_shared_owner"
   on storage.objects for select
   using (
     bucket_id = 'daycare-photos'
-    and public.shares_household_with(public.try_cast_uuid((storage.foldername(name))[1]))
+    and exists (
+      select 1 from public.daycare_records r
+      where r.id = public.try_cast_uuid((storage.foldername(name))[2])
+        and r.owner_id = public.try_cast_uuid((storage.foldername(name))[1])
+        and public.has_household_role(r.household_id)
+        and public.is_household_member(r.household_id, r.owner_id)
+    )
   );
 
 drop policy if exists "daycare_photos_delete_shared_owner" on storage.objects;
@@ -152,5 +133,11 @@ create policy "daycare_photos_delete_shared_owner"
   on storage.objects for delete
   using (
     bucket_id = 'daycare-photos'
-    and public.shares_household_with(public.try_cast_uuid((storage.foldername(name))[1]))
+    and exists (
+      select 1 from public.daycare_records r
+      where r.id = public.try_cast_uuid((storage.foldername(name))[2])
+        and r.owner_id = public.try_cast_uuid((storage.foldername(name))[1])
+        and public.has_household_role(r.household_id)
+        and public.is_household_member(r.household_id, r.owner_id)
+    )
   );
