@@ -28,11 +28,11 @@ S1（[#92](https://github.com/godhuu0505/mfmf/issues/92)）の無停止移行8�
 | 3 | 既存ユーザーを既定 household に owner でバックフィル | ✅ | 同上 |
 | 4 | メンバーシップ RLS を `owner_id` と**併存**追加 | ✅ | `20260630140000/140100`（PR #98）。`has_household_role` / `is_household_member` |
 | 5 | pgTAP でテナント分離を証明 | ✅ | `supabase/tests/household_rls_test.sql`（28 assert）+ CI |
-| 6 | `household_id` を **NOT NULL** 化 | 🟡 後回し | 型も `string \| null` のまま（D9） |
+| 6 | `household_id` を **NOT NULL** 化 | ✅ | `20260703160000_household_id_not_null.sql`（PR #102/#105）。型も `string` へ更新済み |
 | 7 | アプリ読み書きを household 基準へ切替 | ✅ | `src/lib/household.ts`（PR #99） |
 | 8 | **Storage パスの household 化** | ✅ | `20260703120000_storage_household_paths.sql`。新規アップロードは `{household_id}/...`、既存 `{owner_id}/...` は移動せず世帯メンバー読取ポリシーを併存 |
 
-- **S2 RBAC（[#46](https://github.com/godhuu0505/mfmf/issues/46)）**: `household_members.role` 列はあるが値は `'owner'` 固定・**強制ロジックなし**。
+- **S2 RBAC（[#46](https://github.com/godhuu0505/mfmf/issues/46)）**: 着手中。role は CHECK 制約（owner/editor/viewer, `20260703170000`）で固定し、member 経路の write は editor 以上に限定済み。**残**: 旧 owner_id write ポリシーの切替（drop）・ロール管理（D6）・Server Action 検査と UI 出し分け。
 - **S3 内部招待（[#45](https://github.com/godhuu0505/mfmf/issues/45)）**: `household_invites` テーブルなし・**未着手**。
 - **S4 外部ゲスト（[#93](https://github.com/godhuu0505/mfmf/issues/93)）**: `guest_grants` テーブルなし・**未着手**。
 - **S5 公開サインアップ（[#47](https://github.com/godhuu0505/mfmf/issues/47)）**: ログインは **Google OAuth 一択**（`drive.file` スコープ要求）。email/password なし・セルフ登録 UI なし。
@@ -154,7 +154,7 @@ G(外部ゲスト) / S(共有) / M(移行・非機能)。
 | UC-M01 | Storage パスを household 化する | 全書き込み | S1 手順8 / #44（D9） | ✅ | `{owner_id}/...`→`{household_id}/...`（新規分）。既存オブジェクトは移動せず世帯メンバー読取/削除ポリシーを併存。SW が private/期限付き URL をキャッシュしない不変条件を維持 |
 | UC-M02 | `tags` / `record_tags` を household 共有にする | 世帯メンバー | S1 手順7 後半 / #44（D9） | ✅ | 定型タグを世帯で共有（`20260703120100`）。RLS をメンバーシップ判定へ（owner 併存）。他世帯には漏れない（pgTAP 担保）。世帯単位の name 一意制約は household_id 書込のメンバーシップ整合強制（S2 以降）とセットで導入 |
 | UC-M03 | `profiles` / `google_credentials` は個人スコープのまま維持 | 個人 | #44（D9） | 🟢 | アカウント設定/認証情報は世帯共有しない。owner_id/auth.users 直結を維持 |
-| UC-M04 | `household_id` を NOT NULL 化する | 全業務表 | S1 手順6 / #44（D9） | 🟡 後回し | 混在期を閉じる。本番適用はワンショット。3.5 の受け入れには**含めない** |
+| UC-M04 | `household_id` を NOT NULL 化する | 全業務表 | S1 手順6 / #44（D9） | ✅ | `20260703160000_household_id_not_null.sql`（PR #102/#105）で本番適用済み。セーフティネット・バックフィル → NULL 行ゼロ assert → SET NOT NULL の段階適用 |
 | UC-M05 | クロステナント不可侵を回帰検出する | CI | S1 手順5 / #38 | ✅→拡張 | pgTAP を S2/S3/S4 のロール・ゲストにも拡張 |
 | UC-M06 | owner_id ⇄ household_id の整合を強制し越境を防ぐ | 攻撃者 | S1 / #44 | ✅ | `is_household_member(household_id, owner_id)` で整合要求（実装済） |
 | UC-M07 | 操作の監査ログ（誰が何を変更したか） | owner | Phase 4 / #14 | 💡 | D5 で他人の記録を編集可にしたため監査ニーズ増。Phase 4 ガバナンスへ |
@@ -164,7 +164,7 @@ G(外部ゲスト) / S(共有) / M(移行・非機能)。
 ## 5. スライス別の並び（依存順）
 
 ```
-S1 テナント基盤（✅ 手順1-5,7,8 / 🟡 手順6 後回し）
+S1 テナント基盤（✅ 手順1-8 完了）
   └→ S2 RBAC（owner/editor/viewer 強制, D5）
         └→ S3 内部招待 + 世帯切替UI（D2）
               ├→ S4 外部ゲスト + 共有一本化（guest_grants, D4/D8）
