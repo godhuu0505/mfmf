@@ -15,7 +15,7 @@ import {
   parseFilters,
 } from "@/lib/recordQuery";
 import { getTagDictionary } from "@/lib/tags";
-import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
+import { canEdit, getCurrentMembership, householdScopeFilter } from "@/lib/household";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import AppHeader from "@/components/AppHeader";
 import RecordFilters from "@/components/RecordFilters";
@@ -74,7 +74,10 @@ export default async function HomePage({
   // 読み取りは household 基準へ寄せる（Phase 3.5 S1 手順7）。所属世帯を解決できれば
   // household_id で絞り込み、未所属なら従来どおり owner_id RLS にフォールバックする。
   // いずれも RLS（owner_id = auth.uid() / household メンバー）が一次防衛線。
-  const householdId = await getCurrentHouseholdId(supabase);
+  const membership = await getCurrentMembership(supabase);
+  const householdId = membership?.householdId ?? null;
+  // viewer には編集系 UI を出さない（UC-A06。サーバー強制は RLS / Server Action）。
+  const readOnly = membership !== null && !canEdit(membership.role);
 
   // 一覧 + 先頭写真 + 付与タグをまとめて取得。
   let query = supabase
@@ -174,12 +177,14 @@ export default async function HomePage({
               <Scale className="h-4 w-4" aria-hidden="true" />
               体重
             </Link>
-            <Link
-              href="/records/new"
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover"
-            >
-              ＋ 新規
-            </Link>
+            {!readOnly && (
+              <Link
+                href="/records/new"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover"
+              >
+                ＋ 新規
+              </Link>
+            )}
           </div>
         </div>
 

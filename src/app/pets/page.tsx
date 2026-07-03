@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listPets } from "@/lib/pets";
+import { canEdit, getCurrentMembership } from "@/lib/household";
 import AppHeader from "@/components/AppHeader";
 import SubmitButton from "@/components/SubmitButton";
 import { createPet, updatePet, deletePet } from "@/app/pets/actions";
@@ -22,6 +23,9 @@ export default async function PetsPage() {
   if (!user) redirect("/login");
 
   const pets = await listPets();
+  // viewer には編集フォームを出さず、閲覧用の一覧のみ表示する（UC-A06）。
+  const membership = await getCurrentMembership(supabase);
+  const readOnly = membership !== null && !canEdit(membership.role);
 
   return (
     <>
@@ -45,6 +49,16 @@ export default async function PetsPage() {
                 key={pet.id}
                 className="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border"
               >
+                {readOnly ? (
+                  <div>
+                    <p className="font-medium text-foreground">{pet.name}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {pet.species ?? "種類未設定"}
+                      {pet.birthday ? ` ・ 誕生日 ${pet.birthday}` : ""}
+                    </p>
+                  </div>
+                ) : (
+                <>
                 <form
                   action={updatePet.bind(null, pet.id)}
                   className="space-y-3"
@@ -110,12 +124,15 @@ export default async function PetsPage() {
                     このペットを削除する
                   </SubmitButton>
                 </form>
+                </>
+                )}
               </li>
             ))}
           </ul>
         )}
 
-        {/* 新規ペット追加 */}
+        {/* 新規ペット追加（viewer には出さない） */}
+        {!readOnly && (
         <section className="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
           <h2 className="mb-4 text-base font-bold text-foreground">
             ペットを追加
@@ -173,6 +190,7 @@ export default async function PetsPage() {
             </SubmitButton>
           </form>
         </section>
+        )}
 
         {/* ペット画像（アバター）アップロードは将来対応 */}
       </main>

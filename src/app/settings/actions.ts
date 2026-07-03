@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMembership } from "@/lib/household";
 
 export type SettingsResult = {
   ok: boolean;
@@ -77,4 +78,69 @@ export async function changePassword(
   }
 
   return { ok: true, message: "パスワードを変更しました。" };
+}
+
+// ---------------------------------------------------------------
+// 世帯（household）管理 — Phase 3.5 S2 (#46)
+// 一次防衛線は RLS（households_update_owner / household_members_update_owner）と
+// D6 トリガ（最後の owner の降格不可）。ここでは getUser + owner 検査で
+// 分かりやすいエラーを返す（クライアント回避不可の強制は DB 側）。
+// ---------------------------------------------------------------
+
+// 世帯名を変更する（owner のみ / UC-H02）。
+export async function renameHousehold(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const membership = await getCurrentMembership(supabase);
+  if (!membership) throw new Error("世帯に所属していません");
+  if (membership.role !== "owner") {
+    throw new Error("世帯名の変更は owner のみ行えます");
+  }
+
+  const name = String(formData.get("household_name") || "").trim().slice(0, 100);
+  const { error } = await supabase
+    .from("households")
+    .update({ name })
+    .eq("id", membership.householdId);
+  if (error) {
+    throw new Error(`世帯名の変更に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/settings");
+}
+
+// メンバーのロールを変更する（owner のみ / UC-H04。最後の owner の降格は D6 が拒否）。
+export async function updateMemberRole(memberUserId: string, formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const membership = await getCurrentMembership(supabase);
+  if (!membership) throw new Error("世帯に所属していません");
+  if (membership.role !== "owner") {
+    throw new Error("ロールの変更は owner のみ行えます");
+  }
+
+  const role = String(formData.get("role") || "");
+  if (!["owner", "editor", "viewer"].includes(role)) {
+    throw new Error("不正なロールです");
+  }
+
+  const { error } = await supabase
+    .from("household_members")
+    .update({ role })
+    .eq("household_id", membership.householdId)
+    .eq("user_id", memberUserId);
+  if (error) {
+    // D6 トリガ（最後の owner の降格不可）のメッセージをそのまま届ける。
+    throw new Error(`ロールの変更に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/settings");
 }
