@@ -49,7 +49,7 @@ insert into public.households (id, name) values
 insert into public.household_members (household_id, user_id, role) values
   ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'owner'),
   ('22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'owner'),
-  ('22222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'member');
+  ('22222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'editor');
 
 insert into public.daycare_records (id, owner_id, household_id, body) values
   ('aaaa0000-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'A record'),
@@ -270,7 +270,7 @@ select results_eq(
 -- C を HA のメンバーに追加（postgres へ戻して RLS 迂回で投入）
 reset role;
 insert into public.household_members (household_id, user_id, role)
-values ('11111111-1111-1111-1111-111111111111', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'member');
+values ('11111111-1111-1111-1111-111111111111', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'editor');
 
 set local role authenticated;
 select set_config('request.jwt.claims',
