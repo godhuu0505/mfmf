@@ -1,23 +1,21 @@
 -- =============================================================
 -- mfmf / Phase 3.5 S2 (Issue #46 / #38) — RBAC（owner / editor / viewer）の pgTAP 証明
 --
--- 20260703170000_rbac_roles.sql の検証:
+-- 20260703170000_rbac_roles.sql / 20260704000000_rbac_switch_and_management.sql の検証:
 --   - role は 'owner' / 'editor' / 'viewer' のみ（CHECK 制約）
---   - viewer は閲覧のみ（UC-A01）: member 経路の write が一切通らない
+--   - viewer は閲覧のみ（UC-A01）: member 経路の write も owner 経路（S2 切替で drop 済み）
+--     も一切通らない
 --   - editor は他人の記録も編集・削除できる（UC-A02 / UC-A03, D5 / D11）
 --   - viewer 自身のフィードバック送信は owner 経路で引き続き可（設計どおり）
---
--- 既知の移行期挙動（S2-PR2 の切替で閉じる・本テストの対象外）:
---   旧 owner_id ベースの write ポリシーが併存しているため、viewer も「自分名義の行」
---   だけは owner 経路で作成できる。viewer ロールの実利用は S3 招待の導入後であり、
---   その前に owner 経路 write の切替（drop）を行う。
+--   - メンバー一覧は世帯内で共有（UC-H03）、role 変更・メンバー削除は owner のみ
+--     （UC-H04/H05）、本人退出は可（UC-H06）、最後の owner は降格・削除・退出不可（D6）
 -- =============================================================
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(19);
+select plan(31);
 
 -- fixture: HA に A(owner) / E(editor) / V(viewer)。record RA・tag TA・photo PH は A 作成。
 insert into auth.users (id, email) values
@@ -126,6 +124,34 @@ select is_empty(
     where id = 'aaaaffff-0000-0000-0000-000000000001' returning 1$$,
   'viewer は写真行を delete できない（no-op）'
 );
+-- S2 切替（owner 経路 write の drop）により、viewer は「自分名義の行」も作成できない
+select throws_ok(
+  $$insert into public.daycare_records (owner_id, household_id, body)
+    values ('dddddddd-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', 'own by viewer')$$,
+  '42501',
+  null,
+  'viewer は自分名義の記録も insert できない（S2 切替で owner 経路が閉鎖）'
+);
+select throws_ok(
+  $$insert into public.tags (owner_id, household_id, name)
+    values ('dddddddd-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', 'by-viewer')$$,
+  '42501',
+  null,
+  'viewer は自分名義のタグも insert できない（同上）'
+);
+select throws_ok(
+  $$insert into storage.objects (bucket_id, name)
+    values ('daycare-photos', 'dddddddd-dddd-dddd-dddd-dddddddddddd/aaaa0000-0000-0000-0000-000000000001/own.jpg')$$,
+  '42501',
+  null,
+  'viewer は旧規約 {自分の owner_id}/... へもアップロードできない（同上）'
+);
+select results_eq(
+  $$select count(*)::int from public.household_members
+    where household_id = '11111111-1111-1111-1111-111111111111'$$,
+  $$values (3)$$,
+  'viewer も世帯のメンバー一覧（role 含む）を参照できる（UC-H03）'
+);
 select lives_ok(
   $$insert into public.feedback (owner_id, household_id, body)
     values ('dddddddd-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', 'viewer feedback')$$,
@@ -174,6 +200,73 @@ select isnt_empty(
   $$delete from public.daycare_records
     where id = 'aaaa0000-0000-0000-0000-000000000001' returning 1$$,
   'editor は他人の記録を delete 可（D11）'
+);
+
+-- ---------------------------------------------------------------
+-- 世帯管理: role 変更/メンバー削除は owner のみ・D6（最後の owner 保護）
+-- ---------------------------------------------------------------
+-- editor E は他メンバーの role を変更できない（update は owner のみ → no-op）
+select is_empty(
+  $$update public.household_members set role = 'editor'
+    where household_id = '11111111-1111-1111-1111-111111111111'
+      and user_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd' returning 1$$,
+  'editor はメンバーの role を変更できない（owner のみ・no-op）'
+);
+-- editor E は世帯名を変更できない（update は owner のみ → no-op）
+select is_empty(
+  $$update public.households set name = 'renamed by editor'
+    where id = '11111111-1111-1111-1111-111111111111' returning 1$$,
+  'editor は世帯名を変更できない（owner のみ・no-op）'
+);
+
+-- owner A で検証
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+
+select isnt_empty(
+  $$update public.household_members set role = 'editor'
+    where household_id = '11111111-1111-1111-1111-111111111111'
+      and user_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd' returning 1$$,
+  'owner はメンバー(V)の role を変更できる（UC-H04: viewer → editor）'
+);
+select throws_ok(
+  $$update public.household_members set role = 'editor'
+    where household_id = '11111111-1111-1111-1111-111111111111'
+      and user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'$$,
+  'P0001',
+  null,
+  '最後の owner は自分を降格できない（D6）'
+);
+select throws_ok(
+  $$delete from public.household_members
+    where household_id = '11111111-1111-1111-1111-111111111111'
+      and user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'$$,
+  'P0001',
+  null,
+  '最後の owner は退出・削除できない（D6）'
+);
+select throws_ok(
+  $$update public.household_members set user_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd'
+    where household_id = '11111111-1111-1111-1111-111111111111'
+      and user_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'$$,
+  'P0001',
+  null,
+  'membership の user_id / household_id は付け替え不可（owner 数の抜け道防止）'
+);
+select isnt_empty(
+  $$update public.households set name = 'renamed by owner'
+    where id = '11111111-1111-1111-1111-111111111111' returning 1$$,
+  'owner は世帯名を変更できる（UC-H02）'
+);
+
+-- 本人退出（UC-H06）: editor E は自分の membership を削除できる
+select set_config('request.jwt.claims',
+  '{"sub":"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee","role":"authenticated"}', true);
+select isnt_empty(
+  $$delete from public.household_members
+    where household_id = '11111111-1111-1111-1111-111111111111'
+      and user_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' returning 1$$,
+  'メンバー本人は世帯から退出できる（UC-H06。最後の owner ではないので D6 に触れない）'
 );
 
 reset role;

@@ -300,22 +300,24 @@ select throws_ok(
   'A は自分のレコードの owner_id を他者(B)へ付け替えられない（owner_id 不変性を維持）'
 );
 
--- A は owner 経路で「自分の行に他 household(HB) の household_id」を書ける（owner ポリシーは
--- household_id を制約しない＝移行期の既知の未強制）。だが owner(A) は HB のメンバーでないため、
--- is_household_member(HB, A) が偽となり、その行は HB メンバーのメンバー可視クエリに現れない。
-select lives_ok(
+-- かつて owner 経路は「自分の行に他 household(HB) の household_id」を書けた（移行期の
+-- 既知の未強制）。S2 の切替（20260704000000）で owner 経路の write が drop されたため、
+-- この注入経路自体が閉じている（member 経路は has_household_role(HB) が偽で不成立）。
+select throws_ok(
   $$insert into public.daycare_records (id, owner_id, household_id, body)
     values ('aaaa9999-0000-0000-0000-000000000009',
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
             '22222222-2222-2222-2222-222222222222', 'injected')$$,
-  'A は owner 経路で他 household の UUID を持つ自分の行を作成できる（owner_id 経路は不変・未強制）'
+  '42501',
+  null,
+  'A は他 household の UUID を持つ行を作成できない（S2 切替で owner 経路の注入が閉鎖）'
 );
 select set_config('request.jwt.claims',
   '{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","role":"authenticated"}', true);
 select results_eq(
   $$select count(*)::int from public.daycare_records where id = 'aaaa9999-0000-0000-0000-000000000009'$$,
   $$values (0)$$,
-  'B は owner が HB 非メンバーの注入行を見られない（owner_id ⇄ household_id 整合の強制）'
+  'B から注入行は見えない（行が作成されないことの確認）'
 );
 
 reset role;

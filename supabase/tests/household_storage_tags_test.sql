@@ -67,7 +67,10 @@ insert into storage.objects (bucket_id, name) values
 insert into public.tags (id, owner_id, household_id, name) values
   ('aaaa7777-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'shared-a'),
   ('bbbb7777-0000-0000-0000-000000000002', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'shared-b'),
-  ('aaaa7777-0000-0000-0000-000000000003', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', null, 'legacy-a');
+  ('aaaa7777-0000-0000-0000-000000000003', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', null, 'legacy-a'),
+  -- TSQ: owner ⇄ household 不整合の注入タグ（owner B ∉ HA）。作成経路は S2 切替で閉鎖済みの
+  -- ため postgres で直接投入し、「存在しても誰にも見えず使えない」ことをシナリオ④で証明する。
+  ('bbbb7777-0000-0000-0000-000000000005', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'squat');
 
 insert into public.record_tags (record_id, tag_id, owner_id) values
   ('aaaa0000-0000-0000-0000-000000000001', 'aaaa7777-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
@@ -198,10 +201,12 @@ select is_empty(
     returning 1$$,
   'B は他 household(HA) の新規約オブジェクトを delete できない（no-op）'
 );
-select lives_ok(
+select throws_ok(
   $$insert into storage.objects (bucket_id, name)
     values ('daycare-photos', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/bbbb0000-0000-0000-0000-000000000002/b2.jpg')$$,
-  'B は旧規約 {自分の owner_id}/... へ従来どおり insert 可（own insert ポリシー不変・弱めない）'
+  '42501',
+  null,
+  '旧規約 {owner_id}/... への新規アップロードは本人でも不可（S2 切替で閉鎖。新規は {household_id}/... のみ）'
 );
 
 select results_eq(
@@ -230,15 +235,18 @@ select throws_ok(
   'B は他 household(HA) の記録へタグ付けできない'
 );
 
--- 既知の未強制（シナリオ④前段）: B は owner 経路で「owner=B, household=HA」の不整合
--- タグを作成できてしまう（household_id は移行期クライアント書込み可能・20260630130100 注記）。
--- 後続テストでこの注入タグが誰にも可視化されず、record_tags にも持ち込めないことを証明する。
-select lives_ok(
+-- シナリオ④前段: かつて owner 経路で作成できた「owner=B, household=HA」の不整合タグは、
+-- S2 の切替（tags_insert_own の drop）で作成経路自体が閉じた。万一 DB に残っていた場合に
+-- 備え、後続テスト（fixture の TSQ 行を使用）で不整合タグが誰にも可視化されず
+-- record_tags にも持ち込めないことは引き続き証明する。
+select throws_ok(
   $$insert into public.tags (id, owner_id, household_id, name)
-    values ('bbbb7777-0000-0000-0000-000000000005',
+    values ('bbbb7777-0000-0000-0000-000000000006',
             'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-            '11111111-1111-1111-1111-111111111111', 'squat')$$,
-  'B は owner 経路で他 household の UUID を持つ自分のタグを作成できる（owner_id 経路は不変・未強制）'
+            '11111111-1111-1111-1111-111111111111', 'squat2')$$,
+  '42501',
+  null,
+  'B は他 household の UUID を持つタグを作成できない（S2 切替で注入経路が閉鎖）'
 );
 
 -- ===============================================================
