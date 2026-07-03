@@ -64,6 +64,14 @@ insert into public.tags (id, owner_id, household_id, name) values
 insert into public.record_tags (record_id, tag_id, owner_id) values
   ('aaaa0000-0000-0000-0000-000000000001', 'aaaa7777-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
 
+-- storage の protect_objects_delete トリガ（storage migration 0055-prevent-direct-deletes、
+-- 文レベル・0 行でも発火）は SQL 直接 DELETE を一律拒否する。これは「Storage API を
+-- 経由しない削除でオブジェクト実体が孤児化する」のを防ぐ運用ガードであり、RLS とは
+-- 無関係。本テストの検証対象は RLS の delete ポリシーなので、トランザクション限定
+--（第3引数 is_local=true、rollback で消える）でガードを解除する。実体を持たない
+-- テスト行のみが対象のため孤児化の懸念もない。
+select set_config('storage.allow_delete_query', 'true', true);
+
 -- ===============================================================
 -- 不変条件ガード
 -- ===============================================================
