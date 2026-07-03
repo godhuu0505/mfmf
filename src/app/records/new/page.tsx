@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentHouseholdId } from "@/lib/household";
+import { canEdit, getCurrentMembership } from "@/lib/household";
 import { getCurrentProfile } from "@/lib/profile";
 import { listPets } from "@/lib/pets";
 import AppHeader from "@/components/AppHeader";
@@ -20,12 +20,15 @@ export default async function NewRecordPage() {
 
   const today = new Date().toISOString().slice(0, 10);
   // householdId は Storage パス {household_id}/{record_id}/... の先頭セグメント（手順8）。
-  const [profile, pets, dictionaryTags, householdId] = await Promise.all([
+  const [profile, pets, dictionaryTags, membership] = await Promise.all([
     getCurrentProfile(),
     listPets(),
     getTagDictionary(),
-    getCurrentHouseholdId(supabase),
+    getCurrentMembership(supabase),
   ]);
+  // viewer は記録を追加できない（UC-A01/A06。サーバー強制は RLS / Server Action）。
+  if (membership && !canEdit(membership.role)) redirect("/");
+  const householdId = membership?.householdId ?? null;
   const tagSuggestions = dictionaryTags.map((t) => t.name);
 
   return (

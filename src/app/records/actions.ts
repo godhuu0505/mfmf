@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET, normalizeTagName, toSource } from "@/types/database";
 import { isPathForRecord } from "@/lib/storagePath";
-import { getHouseholdIdForUser, householdScopeFilter } from "@/lib/household";
+import { requireEditableHousehold, householdScopeFilter } from "@/lib/household";
 
 // フォームから記録メタデータ（記録元・記入者・体重）を取り出す。
 function parseRecordFields(formData: FormData) {
@@ -242,8 +242,8 @@ export async function createRecord(formData: FormData) {
     throw new Error("不正なリクエストです");
   }
   const fields = parseRecordFields(formData);
-  // 所属世帯を解決し、書き込みに household_id をセットする（owner_id は従来どおり残す）。
-  const householdId = await getHouseholdIdForUser(supabase, user.id);
+  // ロール検査（viewer は書き込み不可）+ 所属世帯の解決（一次防衛線は RLS）。
+  const householdId = await requireEditableHousehold(supabase, user.id);
   const pet_id = await resolvePetId(supabase, user.id, householdId, formData);
 
   const { error } = await supabase
@@ -287,8 +287,9 @@ export async function updateRecord(recordId: string, formData: FormData) {
   if (!user) redirect("/login");
 
   const fields = parseRecordFields(formData);
-  // 所属世帯を解決。null（未所属）のときは既存 household_id を上書きしない。
-  const householdId = await getHouseholdIdForUser(supabase, user.id);
+  // ロール検査（viewer は書き込み不可）+ 所属世帯の解決。null（未所属）のときは
+  // 既存 household_id を上書きしない。
+  const householdId = await requireEditableHousehold(supabase, user.id);
   const householdPatch = householdId ? { household_id: householdId } : {};
   const pet_id = await resolvePetId(supabase, user.id, householdId, formData);
 
@@ -323,6 +324,11 @@ export async function updateRecord(recordId: string, formData: FormData) {
 
 export async function deletePhoto(photoId: string, recordId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  await requireEditableHousehold(supabase, user.id);
 
   const { data: photo, error: fetchError } = await supabase
     .from("record_photos")
@@ -355,6 +361,7 @@ export async function deleteRecord(recordId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  await requireEditableHousehold(supabase, user.id);
 
   // 紐づく Storage オブジェクトを先に削除 (DB 行は ON DELETE CASCADE)
   const { data: photos } = await supabase

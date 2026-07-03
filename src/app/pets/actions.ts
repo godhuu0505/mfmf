@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getHouseholdIdForUser } from "@/lib/household";
+import { requireEditableHousehold } from "@/lib/household";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -32,8 +32,8 @@ export async function createPet(formData: FormData) {
     throw new Error("ペットの名前を入力してください");
   }
 
-  // 所属世帯を解決し、書き込みに household_id をセットする（owner_id は従来どおり残す）。
-  const householdId = await getHouseholdIdForUser(supabase, user.id);
+  // ロール検査（viewer は書き込み不可）+ 所属世帯の解決（一次防衛線は RLS）。
+  const householdId = await requireEditableHousehold(supabase, user.id);
 
   const { error } = await supabase
     .from("pets")
@@ -47,7 +47,8 @@ export async function createPet(formData: FormData) {
 }
 
 export async function updatePet(petId: string, formData: FormData) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  await requireEditableHousehold(supabase, user.id);
   const fields = parsePetFields(formData);
   if (fields.name === "") {
     throw new Error("ペットの名前を入力してください");
@@ -64,7 +65,8 @@ export async function updatePet(petId: string, formData: FormData) {
 }
 
 export async function deletePet(petId: string) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  await requireEditableHousehold(supabase, user.id);
   // 記録の pet_id は ON DELETE SET NULL のため、削除しても記録自体は残る。
   const { error } = await supabase.from("pets").delete().eq("id", petId);
   if (error) {

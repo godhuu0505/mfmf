@@ -20,10 +20,22 @@ type ServerClient = Awaited<ReturnType<typeof createClient>>;
 // （作成が古い順 → household_id 昇順）で決定的にする。
 const ROLE_PRIORITY: Record<string, number> = { owner: 0, editor: 1, viewer: 2 };
 
-export async function getHouseholdIdForUser(
+export type HouseholdRole = "owner" | "editor" | "viewer";
+
+export type Membership = {
+  householdId: string;
+  role: HouseholdRole;
+};
+
+// role が記録・写真・ペット等を書き込めるか（S2 RBAC: viewer は閲覧のみ）。
+export function canEdit(role: HouseholdRole): boolean {
+  return role === "owner" || role === "editor";
+}
+
+async function getMembershipForUser(
   supabase: ServerClient,
   userId: string,
-): Promise<string | null> {
+): Promise<Membership | null> {
   const { data } = await supabase
     .from("household_members")
     .select("household_id, role, created_at")
@@ -36,7 +48,43 @@ export async function getHouseholdIdForUser(
       a.created_at.localeCompare(b.created_at) ||
       a.household_id.localeCompare(b.household_id),
   );
-  return best.household_id;
+  return {
+    householdId: best.household_id,
+    role: (best.role in ROLE_PRIORITY ? best.role : "viewer") as HouseholdRole,
+  };
+}
+
+export async function getHouseholdIdForUser(
+  supabase: ServerClient,
+  userId: string,
+): Promise<string | null> {
+  return (await getMembershipForUser(supabase, userId))?.householdId ?? null;
+}
+
+// 現在ログイン中ユーザーの「現在の世帯」とロールを返す（未ログイン/未所属は null）。
+// UI のロール別出し分け（UC-A06）と Server Action のロール検査に使う。
+export async function getCurrentMembership(
+  supabase: ServerClient,
+): Promise<Membership | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  return getMembershipForUser(supabase, user.id);
+}
+
+// Server Action 冒頭のロール検査: viewer からの書き込みを分かりやすいエラーで拒否し、
+// 通れば書き込みに使う household_id（未所属は null = RLS が最終防衛線）を返す。
+// 一次防衛線はあくまで RLS（クライアント回避不可）。ここは UX のための早期検査。
+export async function requireEditableHousehold(
+  supabase: ServerClient,
+  userId: string,
+): Promise<string | null> {
+  const membership = await getMembershipForUser(supabase, userId);
+  if (membership && !canEdit(membership.role)) {
+    throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
+  }
+  return membership?.householdId ?? null;
 }
 
 // 現在ログイン中ユーザーが所属する世帯 ID を解決する（読み取り経路の便宜ラッパー）。

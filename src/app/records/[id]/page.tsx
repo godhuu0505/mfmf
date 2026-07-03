@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
+import { canEdit, getCurrentMembership, householdScopeFilter } from "@/lib/household";
 import { withSignedUrls } from "@/lib/photos";
 import { listPets } from "@/lib/pets";
 import { getTagDictionary } from "@/lib/tags";
@@ -47,7 +47,11 @@ export default async function RecordDetailPage({
 
   // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
   // いずれの経路でも RLS が一次防衛線。写真・タグは親記録経由でスコープされる。
-  const householdId = await getCurrentHouseholdId(supabase);
+  const membership = await getCurrentMembership(supabase);
+  const householdId = membership?.householdId ?? null;
+  // viewer には編集系 UI を出さない（UC-A06）。編集モードの URL 直叩きも閲覧へ倒す。
+  const readOnly = membership !== null && !canEdit(membership.role);
+  const isEditable = isEdit && !readOnly;
 
   let recordQuery = supabase.from("daycare_records").select("*").eq("id", id);
   if (householdId) recordQuery = recordQuery.or(householdScopeFilter(householdId));
@@ -63,7 +67,7 @@ export default async function RecordDetailPage({
     .returns<RecordPhoto[]>();
 
   const photos = await withSignedUrls(photoRows ?? []);
-  const pets = isEdit ? await listPets() : [];
+  const pets = isEditable ? await listPets() : [];
 
   // この記録に付与されたタグ
   const { data: tagRows } = await supabase
@@ -75,7 +79,7 @@ export default async function RecordDetailPage({
   const tagNames = tags.map((t) => t.name);
 
   // 編集フォームのサジェスト用に世帯のタグ辞書を取得
-  const tagSuggestions = isEdit
+  const tagSuggestions = isEditable
     ? (await getTagDictionary()).map((t) => t.name)
     : [];
 
@@ -89,7 +93,7 @@ export default async function RecordDetailPage({
           </Link>
         </div>
 
-        {isEdit ? (
+        {isEditable ? (
           <>
             <h1 className="mb-6 text-xl font-bold text-foreground">記録を編集</h1>
             <RecordForm
@@ -160,12 +164,14 @@ export default async function RecordDetailPage({
                   </p>
                 )}
               </div>
-              <Link
-                href={`/records/${record.id}?edit=1`}
-                className="shrink-0 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
-              >
-                編集
-              </Link>
+              {!readOnly && (
+                <Link
+                  href={`/records/${record.id}?edit=1`}
+                  className="shrink-0 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
+                >
+                  編集
+                </Link>
+              )}
             </div>
 
             <article className="whitespace-pre-wrap rounded-2xl bg-surface p-5 text-foreground shadow-sm ring-1 ring-border">
@@ -198,17 +204,19 @@ export default async function RecordDetailPage({
               </section>
             )}
 
-            <form
-              action={deleteRecord.bind(null, record.id)}
-              className="mt-10 border-t border-border pt-6"
-            >
-              <SubmitButton
-                pendingLabel="削除中…"
-                className="text-sm text-red-600 transition hover:text-red-800 disabled:opacity-60"
+            {!readOnly && (
+              <form
+                action={deleteRecord.bind(null, record.id)}
+                className="mt-10 border-t border-border pt-6"
               >
-                この記録を削除する
-              </SubmitButton>
-            </form>
+                <SubmitButton
+                  pendingLabel="削除中…"
+                  className="text-sm text-red-600 transition hover:text-red-800 disabled:opacity-60"
+                >
+                  この記録を削除する
+                </SubmitButton>
+              </form>
+            )}
           </>
         )}
       </main>
