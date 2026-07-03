@@ -28,10 +28,11 @@
 --   tags:            insert / update / delete
 --   record_tags:     insert / delete（親レコード継承）
 --   storage.objects: 新規約 insert / delete、旧規約 delete（select は全メンバーのまま）
+--   share_links:     insert（新規発行のみ editor 以上。§9 参照）
 --
 -- ロールバック手順（本 migration を取り消す場合）:
---   各 create policy を 20260630140100 / 20260703120000 / 20260703120100 の定義
---   （allowed_roles なし）で再作成し、
+--   各 create policy を 20260630140100 / 20260703120000 / 20260703120100 /
+--   20260616130712（share_links）の定義（allowed_roles なし）で再作成し、
 --   alter table public.household_members drop constraint if exists household_members_role_check;
 -- =============================================================
 
@@ -289,5 +290,28 @@ create policy "daycare_photos_delete_shared_owner"
         and r.owner_id = public.try_cast_uuid((storage.foldername(name))[1])
         and public.has_household_role(r.household_id, array['owner','editor'])
         and public.is_household_member(r.household_id, r.owner_id)
+    )
+  );
+
+-- ---------------------------------------------------------------
+-- 9. share_links — 新規発行を editor 以上に限定
+--    share_links は owner_id ベースの匿名共有リンク（S4 #93 / D4 で guest_grants へ
+--    一本化・廃止予定）。viewer に降格されたユーザーが自分名義の記録を匿名リンクで
+--    露出し続けられると「viewer は閲覧のみ」（UC-A01）が破れるため、*作成* を
+--    「いずれかの世帯で owner / editor である」ユーザーに限定する。
+--    revoke（update）・delete・select は従来どおり本人可のまま残す — 露出を*減らす*
+--    操作まで塞ぐと、降格されたユーザーが自分の発行済みリンクを失効できなくなるため。
+--    household_members への直接サブクエリは select_self ポリシー（user_id = auth.uid()・
+--    他テーブル非参照）配下で自分の行しか見えず、再帰も情報漏えいもない。
+-- ---------------------------------------------------------------
+drop policy if exists "share_links_insert_own" on public.share_links;
+create policy "share_links_insert_own"
+  on public.share_links for insert
+  with check (
+    auth.uid() = owner_id
+    and exists (
+      select 1 from public.household_members m
+      where m.user_id = auth.uid()
+        and m.role in ('owner', 'editor')
     )
   );

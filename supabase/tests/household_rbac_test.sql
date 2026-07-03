@@ -17,7 +17,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(17);
+select plan(19);
 
 -- fixture: HA に A(owner) / E(editor) / V(viewer)。record RA・tag TA・photo PH は A 作成。
 insert into auth.users (id, email) values
@@ -131,6 +131,13 @@ select lives_ok(
     values ('dddddddd-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', 'viewer feedback')$$,
   'viewer も自分名義のフィードバックは送信できる（owner 経路・設計どおり）'
 );
+select throws_ok(
+  $$insert into public.share_links (owner_id, token)
+    values ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'token-by-viewer')$$,
+  '42501',
+  null,
+  'viewer は匿名共有リンクを新規発行できない（share_links_insert_own の editor+ 限定）'
+);
 
 -- ---------------------------------------------------------------
 -- editor E: 他人の記録も編集・削除できる（D5 / D11）
@@ -142,6 +149,11 @@ select lives_ok(
   $$insert into public.daycare_records (owner_id, household_id, body)
     values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'by editor')$$,
   'editor は世帯へ記録を insert 可'
+);
+select lives_ok(
+  $$insert into public.share_links (owner_id, token)
+    values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'token-by-editor')$$,
+  'editor は匿名共有リンクを発行できる'
 );
 select isnt_empty(
   $$update public.daycare_records set body = 'edited by editor'

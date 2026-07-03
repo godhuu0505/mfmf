@@ -13,23 +13,30 @@ type ServerClient = Awaited<ReturnType<typeof createClient>>;
 // nullable であり、owner_id ベースの RLS がそのまま一次防衛線として機能するため、
 // null の場合は household スコープを適用せず従来どおり owner_id RLS にフォールバックする。
 //
-// 複数メンバーシップがある場合の選択は 20260630130100 のバックフィルと同じタイブレーク
-// （owner ロール優先 → 作成が古い順 → household_id 昇順）で決定的にする。
+// 複数メンバーシップがある場合は、書き込み権限の強いロールの世帯を優先する
+// （owner → editor → viewer。S2 #46 で role が 3 値になったため、文字列の辞書順では
+// 'viewer' が最上位になってしまう。辞書順ソートは使わず明示的な優先度で選ぶ）。
+// 同ロール内のタイブレークは 20260630130100 のバックフィルと同じ
+// （作成が古い順 → household_id 昇順）で決定的にする。
+const ROLE_PRIORITY: Record<string, number> = { owner: 0, editor: 1, viewer: 2 };
+
 export async function getHouseholdIdForUser(
   supabase: ServerClient,
   userId: string,
 ): Promise<string | null> {
   const { data } = await supabase
     .from("household_members")
-    .select("household_id")
-    .eq("user_id", userId)
-    .order("role", { ascending: false }) // 'owner' を 'member' より優先
-    .order("created_at", { ascending: true })
-    .order("household_id", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .select("household_id, role, created_at")
+    .eq("user_id", userId);
+  if (!data || data.length === 0) return null;
 
-  return data?.household_id ?? null;
+  const [best] = data.slice().sort(
+    (a, b) =>
+      (ROLE_PRIORITY[a.role] ?? 9) - (ROLE_PRIORITY[b.role] ?? 9) ||
+      a.created_at.localeCompare(b.created_at) ||
+      a.household_id.localeCompare(b.household_id),
+  );
+  return best.household_id;
 }
 
 // 現在ログイン中ユーザーが所属する世帯 ID を解決する（読み取り経路の便宜ラッパー）。
