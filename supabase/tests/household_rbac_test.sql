@@ -237,13 +237,11 @@ select throws_ok(
   null,
   '最後の owner は自分を降格できない（D6）'
 );
-select throws_ok(
+select is_empty(
   $$delete from public.household_members
     where household_id = '11111111-1111-1111-1111-111111111111'
-      and user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'$$,
-  'P0001',
-  null,
-  '最後の owner は退出・削除できない（D6）'
+      and user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' returning 1$$,
+  'membership の delete ポリシーは未導入（退出/削除は UC-H10 の読取緩和と一体で S3 #45 にて解禁・deny by default）'
 );
 select throws_ok(
   $$update public.household_members set user_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd'
@@ -259,14 +257,14 @@ select isnt_empty(
   'owner は世帯名を変更できる（UC-H02）'
 );
 
--- 本人退出（UC-H06）: editor E は自分の membership を削除できる
+-- 本人退出（UC-H06）はまだ解禁しない（S3 #45。UC-H10 の読取緩和と一体で導入）
 select set_config('request.jwt.claims',
   '{"sub":"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee","role":"authenticated"}', true);
-select isnt_empty(
+select is_empty(
   $$delete from public.household_members
     where household_id = '11111111-1111-1111-1111-111111111111'
       and user_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' returning 1$$,
-  'メンバー本人は世帯から退出できる（UC-H06。最後の owner ではないので D6 に触れない）'
+  '本人退出も現状は deny by default（UC-H06 は S3 #45 で解禁）'
 );
 
 reset role;
