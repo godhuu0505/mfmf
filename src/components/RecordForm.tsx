@@ -23,8 +23,10 @@ type PetOption = { id: string; name: string };
 
 type Props = {
   action: (formData: FormData) => void | Promise<void>;
-  /** ログイン中ユーザーの id（Storage パスと RLS の前提） */
+  /** ログイン中ユーザーの id（household 未所属時の Storage パスと RLS のフォールバック） */
   ownerId: string;
+  /** 記録が属する世帯 id。あれば Storage パスは {household_id}/{record_id}/... で生成する。 */
+  householdId?: string | null;
   /** 編集時は既存 record id。新規時は内部生成して record_id として送る。 */
   recordId?: string;
   defaultDate: string; // YYYY-MM-DD
@@ -46,6 +48,7 @@ type Props = {
 export default function RecordForm({
   action,
   ownerId,
+  householdId = null,
   recordId: existingRecordId,
   defaultDate,
   defaultBody = "",
@@ -59,11 +62,14 @@ export default function RecordForm({
   submitLabel,
   cancelHref,
 }: Props) {
-  // 新規作成時も先に id を確定し、Storage パス {owner_id}/{record_id}/... と一致させる。
+  // 新規作成時も先に id を確定し、Storage パス {scope_id}/{record_id}/... と一致させる。
   const recordId = useMemo(
     () => existingRecordId ?? crypto.randomUUID(),
     [existingRecordId],
   );
+  // Storage パスの先頭セグメント。世帯があれば {household_id}/...（Phase 3.5 手順8 の
+  // 新規約）、未所属時は従来どおり {owner_id}/...（RLS も両規約を併存で許可する）。
+  const storageScopeId = householdId ?? ownerId;
   const [source, setSource] = useState<RecordSource>(defaultSource);
 
   const formRef = useRef<HTMLFormElement>(null);
@@ -121,7 +127,7 @@ export default function RecordForm({
       setUploading(true);
       for (const file of files) {
         if (!file || file.size === 0) continue;
-        const path = buildStoragePath(ownerId, recordId, file.name);
+        const path = buildStoragePath(storageScopeId, recordId, file.name);
         const { error: uploadError } = await supabase.storage
           .from(PHOTO_BUCKET)
           .upload(path, file, { contentType: file.type, upsert: false });

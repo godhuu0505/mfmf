@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET, normalizeTagName, toSource } from "@/types/database";
 import { isPathForRecord } from "@/lib/storagePath";
-import { getHouseholdIdForUser } from "@/lib/household";
+import { getHouseholdIdForUser, householdScopeFilter } from "@/lib/household";
 
 // フォームから記録メタデータ（記録元・記入者・体重）を取り出す。
 function parseRecordFields(formData: FormData) {
@@ -63,8 +63,14 @@ async function attachPhotoPaths(
   paths: string[],
   householdId: string | null,
 ) {
-  // {owner_id}/{record_id}/... 配下のパスのみ受理（防御的サニタイズ）。
-  const valid = paths.filter((p) => isPathForRecord(p, ownerId, recordId));
+  // {household_id}/{record_id}/...（手順8 の新規約）または {owner_id}/{record_id}/...
+  // （未所属時のフォールバック）配下のパスのみ受理（防御的サニタイズ）。
+  // Storage 側もメンバーシップ RLS が同じ規約で強制する。
+  const valid = paths.filter(
+    (p) =>
+      (householdId !== null && isPathForRecord(p, householdId, recordId)) ||
+      isPathForRecord(p, ownerId, recordId),
+  );
   if (valid.length === 0) return;
 
   // household_id は親 daycare_records から継承する（バックフィルの「親に追随」と同方針）。
@@ -100,37 +106,67 @@ function readTagNames(formData: FormData): string[] {
 
 // 記録に付与するタグを、与えられたタグ名の集合に一致するよう同期する。
 // 既存タグは再利用し、未登録のタグ名は tags に作成してから record_tags を貼り直す。
+// Phase 3.5 UC-M02: タグ辞書は世帯で共有する。household を解決できた場合は
+// 「世帯の辞書（+ 移行期の自分の未所属タグ）」から名前を引き、同名タグの重複作成を
+// 避けて世帯メンバーのタグを再利用する。作成時は household_id を付与する。
 async function syncRecordTags(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ownerId: string,
+  householdId: string | null,
   recordId: string,
   tagNames: string[],
 ) {
+  // 望ましいタグ名の集合に対応する既存タグを引く（世帯辞書を優先）。
+  const selectTagsByName = async () => {
+    let query = supabase.from("tags").select("id, name, household_id").in("name", tagNames);
+    query = householdId
+      ? query.or(householdScopeFilter(householdId))
+      : query.eq("owner_id", ownerId);
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`タグの取得に失敗しました: ${error.message}`);
+    }
+    return data ?? [];
+  };
+
   // 1. 望ましいタグ名に対応する tag id を用意する（無ければ作成）。
   const tagIds: string[] = [];
   if (tagNames.length > 0) {
-    const { data: existing, error: selectError } = await supabase
-      .from("tags")
-      .select("id, name")
-      .eq("owner_id", ownerId)
-      .in("name", tagNames);
-    if (selectError) {
-      throw new Error(`タグの取得に失敗しました: ${selectError.message}`);
-    }
-
     const idByName = new Map<string, string>();
-    (existing ?? []).forEach((t) => idByName.set(t.name, t.id));
+    // 同名が「世帯の共有タグ」と「移行期の未所属タグ」の両方にある場合は世帯側を優先。
+    const fill = (rows: { id: string; name: string; household_id: string | null }[]) => {
+      rows.forEach((t) => {
+        if (!idByName.has(t.name) || t.household_id !== null) {
+          idByName.set(t.name, t.id);
+        }
+      });
+    };
+    fill(await selectTagsByName());
 
     const missing = tagNames.filter((n) => !idByName.has(n));
     if (missing.length > 0) {
       const { data: inserted, error: insertError } = await supabase
         .from("tags")
-        .insert(missing.map((name) => ({ owner_id: ownerId, name })))
-        .select("id, name");
+        .insert(
+          missing.map((name) => ({
+            owner_id: ownerId,
+            household_id: householdId,
+            name,
+          })),
+        )
+        .select("id, name, household_id");
       if (insertError) {
-        throw new Error(`タグの作成に失敗しました: ${insertError.message}`);
+        // 一意制約違反（23505）は同名タグの同時作成との競合。作成済みを引き直して続行する。
+        if (insertError.code === "23505") {
+          fill(await selectTagsByName());
+          if (tagNames.some((n) => !idByName.has(n))) {
+            throw new Error(`タグの作成に失敗しました: ${insertError.message}`);
+          }
+        } else {
+          throw new Error(`タグの作成に失敗しました: ${insertError.message}`);
+        }
       }
-      (inserted ?? []).forEach((t) => idByName.set(t.name, t.id));
+      fill(inserted ?? []);
     }
 
     tagNames.forEach((n) => {
@@ -178,7 +214,7 @@ export async function createRecord(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // record_id はクライアント生成（Storage パス {owner_id}/{record_id}/... と一致させる）。
+  // record_id はクライアント生成（Storage パス {scope_id}/{record_id}/... と一致させる）。
   const recordId = String(formData.get("record_id") || "");
   if (!UUID_RE.test(recordId)) {
     throw new Error("不正なリクエストです");
@@ -209,7 +245,13 @@ export async function createRecord(formData: FormData) {
     readPhotoPaths(formData),
     householdId,
   );
-  await syncRecordTags(supabase, user.id, recordId, readTagNames(formData));
+  await syncRecordTags(
+    supabase,
+    user.id,
+    householdId,
+    recordId,
+    readTagNames(formData),
+  );
 
   revalidatePath("/");
   redirect(`/records/${recordId}`);
@@ -244,7 +286,13 @@ export async function updateRecord(recordId: string, formData: FormData) {
     readPhotoPaths(formData),
     householdId,
   );
-  await syncRecordTags(supabase, user.id, recordId, readTagNames(formData));
+  await syncRecordTags(
+    supabase,
+    user.id,
+    householdId,
+    recordId,
+    readTagNames(formData),
+  );
 
   revalidatePath("/");
   revalidatePath(`/records/${recordId}`);
@@ -264,7 +312,7 @@ export async function deletePhoto(photoId: string, recordId: string) {
     throw new Error(`写真が見つかりません: ${fetchError?.message}`);
   }
 
-  // Storage オブジェクトを削除 (RLS でオーナーのみ削除可能)
+  // Storage オブジェクトを削除 (RLS でオーナー / 世帯メンバーのみ削除可能)
   await supabase.storage.from(PHOTO_BUCKET).remove([photo.storage_path]);
 
   const { error } = await supabase

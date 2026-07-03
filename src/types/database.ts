@@ -93,10 +93,11 @@ export type RecordPhoto = {
   created_at: string;
 };
 
-// 記録に付与する自由タグ（オーナーごとの辞書）
+// 記録に付与する自由タグ（世帯で共有する辞書。owner_id は作成者）
 export type Tag = {
   id: string;
   owner_id: string;
+  household_id: string | null; // 所属世帯。移行期は null
   name: string;
   created_at: string;
 };

@@ -14,7 +14,7 @@ import {
   PAGE_SIZE,
   parseFilters,
 } from "@/lib/recordQuery";
-import { getOwnerTags } from "@/lib/tags";
+import { getTagDictionary } from "@/lib/tags";
 import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import AppHeader from "@/components/AppHeader";
@@ -65,10 +65,10 @@ export default async function HomePage({
 
   const supabase = await createClient();
 
-  // 絞り込み UI 用にオーナーのタグ辞書を取得し、選択中タグを特定する。
-  const ownerTags = await getOwnerTags();
+  // 絞り込み UI 用に世帯のタグ辞書を取得し、選択中タグを特定する。
+  const dictionaryTags = await getTagDictionary();
   const activeTag = tagParam
-    ? ownerTags.find((t) => t.id === tagParam) ?? null
+    ? dictionaryTags.find((t) => t.id === tagParam) ?? null
     : null;
 
   // 読み取りは household 基準へ寄せる（Phase 3.5 S1 手順7）。所属世帯を解決できれば
@@ -202,7 +202,7 @@ export default async function HomePage({
           </p>
         )}
 
-        {ownerTags.length > 0 && (
+        {dictionaryTags.length > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-1.5">
             {activeTag ? (
               <Link
@@ -217,7 +217,7 @@ export default async function HomePage({
                 タグで絞り込み:
               </span>
             )}
-            {ownerTags.map((t) => {
+            {dictionaryTags.map((t) => {
               const isActive = activeTag?.id === t.id;
               return (
                 <Link

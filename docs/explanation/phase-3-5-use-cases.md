@@ -30,7 +30,7 @@ S1（[#92](https://github.com/godhuu0505/mfmf/issues/92)）の無停止移行8�
 | 5 | pgTAP でテナント分離を証明 | ✅ | `supabase/tests/household_rls_test.sql`（28 assert）+ CI |
 | 6 | `household_id` を **NOT NULL** 化 | 🟡 後回し | 型も `string \| null` のまま（D9） |
 | 7 | アプリ読み書きを household 基準へ切替 | ✅ | `src/lib/household.ts`（PR #99） |
-| 8 | **Storage パスの household 化** | 🟢 3.5 で実施 | 現状 `{owner_id}/{record_id}/{filename}` のまま（D9） |
+| 8 | **Storage パスの household 化** | ✅ | `20260703120000_storage_household_paths.sql`。新規アップロードは `{household_id}/...`、既存 `{owner_id}/...` は移動せず世帯メンバー読取ポリシーを併存 |
 
 - **S2 RBAC（[#46](https://github.com/godhuu0505/mfmf/issues/46)）**: `household_members.role` 列はあるが値は `'owner'` 固定・**強制ロジックなし**。
 - **S3 内部招待（[#45](https://github.com/godhuu0505/mfmf/issues/45)）**: `household_invites` テーブルなし・**未着手**。
@@ -151,8 +151,8 @@ G(外部ゲスト) / S(共有) / M(移行・非機能)。
 
 | ID | ユースケース | アクター | スライス/Issue | 状態 | 受け入れ条件 |
 | --- | --- | --- | --- | --- | --- |
-| UC-M01 | Storage パスを household 化する | 全書き込み | S1 手順8 / #44（D9） | 🟢 | `{owner_id}/...`→`{household_id}/...`。SW が private/期限付き URL をキャッシュしない不変条件を維持 |
-| UC-M02 | `tags` / `record_tags` を household 共有にする | 世帯メンバー | S1 手順7 後半 / #44（D9） | 🟢 | 定型タグを世帯で共有。RLS をメンバーシップ判定へ。他世帯には漏れない |
+| UC-M01 | Storage パスを household 化する | 全書き込み | S1 手順8 / #44（D9） | ✅ | `{owner_id}/...`→`{household_id}/...`（新規分）。既存オブジェクトは移動せず世帯メンバー読取/削除ポリシーを併存。SW が private/期限付き URL をキャッシュしない不変条件を維持 |
+| UC-M02 | `tags` / `record_tags` を household 共有にする | 世帯メンバー | S1 手順7 後半 / #44（D9） | ✅ | 定型タグを世帯で共有（`20260703120100`）。RLS をメンバーシップ判定へ（owner 併存）。他世帯には漏れない（pgTAP 担保）。世帯単位の name 一意制約は household_id 書込のメンバーシップ整合強制（S2 以降）とセットで導入 |
 | UC-M03 | `profiles` / `google_credentials` は個人スコープのまま維持 | 個人 | #44（D9） | 🟢 | アカウント設定/認証情報は世帯共有しない。owner_id/auth.users 直結を維持 |
 | UC-M04 | `household_id` を NOT NULL 化する | 全業務表 | S1 手順6 / #44（D9） | 🟡 後回し | 混在期を閉じる。本番適用はワンショット。3.5 の受け入れには**含めない** |
 | UC-M05 | クロステナント不可侵を回帰検出する | CI | S1 手順5 / #38 | ✅→拡張 | pgTAP を S2/S3/S4 のロール・ゲストにも拡張 |
@@ -164,7 +164,7 @@ G(外部ゲスト) / S(共有) / M(移行・非機能)。
 ## 5. スライス別の並び（依存順）
 
 ```
-S1 テナント基盤（✅ 手順1-5,7 / 🟢 手順8 / 🟡 手順6 後回し）
+S1 テナント基盤（✅ 手順1-5,7,8 / 🟡 手順6 後回し）
   └→ S2 RBAC（owner/editor/viewer 強制, D5）
         └→ S3 内部招待 + 世帯切替UI（D2）
               ├→ S4 外部ゲスト + 共有一本化（guest_grants, D4/D8）

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentHouseholdId } from "@/lib/household";
 import { getCurrentProfile } from "@/lib/profile";
 import { listPets } from "@/lib/pets";
 import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
 import { createRecord } from "@/app/records/actions";
-import { getOwnerTags } from "@/lib/tags";
+import { getTagDictionary } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +19,14 @@ export default async function NewRecordPage() {
   if (!user) redirect("/login");
 
   const today = new Date().toISOString().slice(0, 10);
-  const [profile, pets, ownerTags] = await Promise.all([
+  // householdId は Storage パス {household_id}/{record_id}/... の先頭セグメント（手順8）。
+  const [profile, pets, dictionaryTags, householdId] = await Promise.all([
     getCurrentProfile(),
     listPets(),
-    getOwnerTags(),
+    getTagDictionary(),
+    getCurrentHouseholdId(supabase),
   ]);
-  const tagSuggestions = ownerTags.map((t) => t.name);
+  const tagSuggestions = dictionaryTags.map((t) => t.name);
 
   return (
     <>
@@ -39,6 +42,7 @@ export default async function NewRecordPage() {
         <RecordForm
           action={createRecord}
           ownerId={user.id}
+          householdId={householdId}
           defaultDate={today}
           defaultAuthor={profile?.default_author ?? ""}
           pets={pets.map((p) => ({ id: p.id, name: p.name }))}

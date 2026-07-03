@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { withSignedUrls } from "@/lib/photos";
 import { listPets } from "@/lib/pets";
-import { getOwnerTags } from "@/lib/tags";
+import { getTagDictionary } from "@/lib/tags";
 import {
   SOURCE_LABEL,
   tagsFromJoin,
@@ -74,9 +74,9 @@ export default async function RecordDetailPage({
   const tags = tagsFromJoin(tagRows);
   const tagNames = tags.map((t) => t.name);
 
-  // 編集フォームのサジェスト用にオーナーのタグ辞書を取得
+  // 編集フォームのサジェスト用に世帯のタグ辞書を取得
   const tagSuggestions = isEdit
-    ? (await getOwnerTags()).map((t) => t.name)
+    ? (await getTagDictionary()).map((t) => t.name)
     : [];
 
   return (
@@ -95,6 +95,7 @@ export default async function RecordDetailPage({
             <RecordForm
               action={updateRecord.bind(null, record.id)}
               ownerId={record.owner_id}
+              householdId={record.household_id ?? householdId}
               recordId={record.id}
               defaultDate={record.record_date}
               defaultBody={record.body}

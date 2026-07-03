@@ -54,7 +54,7 @@ DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/) です�
 | --- | --- | --- |
 | `daycare_records` | 日々の記録 | `owner_id`, `record_date`, `source`(daycare/home), `author`, `weight_kg`, `pet_id`, `body`, タイムスタンプ |
 | `record_photos` | 記録に紐づく写真 | `record_id`, `storage_path` |
-| `tags` | 自由タグ（オーナーごとの辞書） | `owner_id`, `name`（オーナー内で一意） |
+| `tags` | 自由タグ（世帯で共有する辞書） | `owner_id`(作成者), `household_id`, `name`（オーナー内で一意） |
 | `record_tags` | 記録 ↔ タグ の多対多 | `record_id`, `tag_id`, `owner_id` |
 | `feedback` | ご意見・不具合フォームの送信内容 | `owner_id`, `kind`, `body`, 任意項目, `context`(自動収集), `github_issue_url` ほか |
 | `profiles` | ユーザーのプロフィール / 設定 | `owner_id`(unique), `display_name`, `default_author`, タイムスタンプ |
@@ -63,9 +63,13 @@ DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/) です�
 
 ## 認可・RLS・Storage
 
-- RLS はすべて `owner_id = auth.uid()` ベース（**セキュリティの一次防衛線**）。
+- RLS が**セキュリティの一次防衛線**。`owner_id = auth.uid()` ポリシーに加え、Phase 3.5 で
+  household メンバーシップ判定（`has_household_role` / `is_household_member`）を**併存**追加
+  （業務テーブル・`tags` / `record_tags`・Storage。移行期は両経路が有効）。
 - Storage バケット `daycare-photos` は **private**。配信は署名付き URL（期限 1 時間）。
-- オブジェクトパス規約: `{owner_id}/{record_id}/{filename}`（生成 / 検証は `src/lib/storagePath.ts`）。
+- オブジェクトパス規約: `{household_id}/{record_id}/{filename}`（生成 / 検証は
+  `src/lib/storagePath.ts`）。household 未所属時と既存オブジェクトは旧規約
+  `{owner_id}/{record_id}/{filename}` のまま（世帯メンバー読取/削除ポリシーを併存）。
 - 写真はクライアントから Storage へ直接アップロードし、Server Action にはパスだけを渡す
   （Vercel Function ボディ上限 4.5MB を超えないため）。
 
