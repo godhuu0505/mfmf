@@ -221,7 +221,7 @@ select results_eq(
 -- C を HA のメンバーに追加（postgres へ戻して RLS 迂回で投入）
 reset role;
 insert into public.household_members (household_id, user_id, role)
-values ('11111111-1111-1111-1111-111111111111', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'member');
+values ('11111111-1111-1111-1111-111111111111', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'editor');
 
 -- 再び C として検証
 set local role authenticated;
