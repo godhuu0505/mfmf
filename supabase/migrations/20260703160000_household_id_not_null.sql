@@ -1,6 +1,11 @@
 -- =============================================================
 -- mfmf / Phase 3.5 S1 (Issue #92 手順6 / #43) — household_id を NOT NULL 化（S1 仕上げ）
 --
+-- ※ 旧ファイル名 20260630150000_household_id_not_null.sql からの改名（SQL 内容は不変更・
+--    本番未適用のまま改名）。PR #104 の migration（20260703120000/120100）が先に本番へ
+--    適用されたため、旧タイムスタンプのままでは `supabase db push` が out-of-order
+--    エラーで停止する（deploy-production run #12 の失敗）。適用順を最後尾へ揃える改名。
+--
 -- 手順 6：業務テーブル（daycare_records / record_photos / feedback / pets）の
 --   household_id を NOT NULL 化し、S1 のテナント分離を確定する。これで移行期の
 --   「household_id が NULL 可（＝どの世帯にも属さない業務行があり得る）」状態が閉じる。
