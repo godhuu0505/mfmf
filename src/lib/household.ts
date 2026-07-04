@@ -1,7 +1,13 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 // Server 用 Supabase クライアントの型（Server Component / Server Action / Route Handler 共通）。
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
+
+// 「現在の世帯」を保持する Cookie（UC-H08）。値は household_id。
+// 実際のメンバーシップと突き合わせてから使うため、偽装されても越境は起きない
+// （一次防衛線は RLS）。
+export const HOUSEHOLD_COOKIE = "mfmf-household";
 
 // 指定ユーザーが所属する世帯 ID を解決する。
 //
@@ -41,6 +47,20 @@ async function getMembershipForUser(
     .select("household_id, role, created_at")
     .eq("user_id", userId);
   if (!data || data.length === 0) return null;
+
+  // UC-H08: Cookie の「現在の世帯」が自分のメンバーシップに実在すればそれを優先する。
+  // 無効値（退出済み・偽装・他人の世帯）は単に無視して既定の優先度選択へ倒す。
+  const cookieStore = await cookies();
+  const selected = cookieStore.get(HOUSEHOLD_COOKIE)?.value;
+  if (selected) {
+    const match = data.find((m) => m.household_id === selected);
+    if (match) {
+      return {
+        householdId: match.household_id,
+        role: (match.role in ROLE_PRIORITY ? match.role : "viewer") as HouseholdRole,
+      };
+    }
+  }
 
   const [best] = data.slice().sort(
     (a, b) =>
@@ -112,4 +132,31 @@ export async function getCurrentHouseholdId(
 // 呼び出しユーザー自身の行に限られ、他 household の null 行は混入しない。
 export function householdScopeFilter(householdId: string): string {
   return `household_id.eq.${householdId},household_id.is.null`;
+}
+
+// 切替 UI 用: 現在ログイン中ユーザーの全メンバーシップ（世帯名つき・加入順）。
+export type MembershipWithName = Membership & { householdName: string };
+
+export async function listCurrentMemberships(
+  supabase: ServerClient,
+): Promise<MembershipWithName[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("household_members")
+    .select("household_id, role, households(name)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+    .returns<
+      { household_id: string; role: string; households: { name: string } | null }[]
+    >();
+
+  return (data ?? []).map((m) => ({
+    householdId: m.household_id,
+    role: (m.role in ROLE_PRIORITY ? m.role : "viewer") as HouseholdRole,
+    householdName: m.households?.name ?? "",
+  }));
 }

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMembership } from "@/lib/household";
+import { cookies } from "next/headers";
+import { getCurrentMembership, HOUSEHOLD_COOKIE } from "@/lib/household";
 
 export type SettingsResult = {
   ok: boolean;
@@ -261,4 +262,34 @@ export async function leaveHousehold() {
 
   revalidatePath("/", "layout");
   redirect("/");
+}
+
+// 「現在の世帯」を切り替える（UC-H08）。Cookie に保持し、全画面が追従する。
+// 実在する自分のメンバーシップのみ受理（Cookie 偽装は household.ts 側でも無視される）。
+export async function switchHousehold(householdId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data } = await supabase
+    .from("household_members")
+    .select("household_id")
+    .eq("user_id", user.id)
+    .eq("household_id", householdId)
+    .maybeSingle();
+  if (!data) {
+    throw new Error("その世帯のメンバーではありません");
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(HOUSEHOLD_COOKIE, householdId, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/settings");
 }
