@@ -153,6 +153,10 @@ export default function RecordForm({
     const fd = new FormData(form);
     fd.delete("photos"); // 画像本体は送らない
     fd.set("record_id", recordId);
+    // フォームを描画（= 写真をアップロード）した世帯を明示して送る。Server Action は
+    // Cookie の「現在の世帯」ではなくこの値を検証して使う（別タブで世帯を切り替えた
+    // 後に送信しても、記録と写真パスの世帯が食い違わない）。
+    if (householdId) fd.set("household_id", householdId);
     paths.forEach((p) => fd.append("photo_paths", p));
 
     // action を await して、リダイレクト完了まで isPending=true を維持し二重送信を防ぐ。

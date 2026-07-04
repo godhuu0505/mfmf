@@ -209,3 +209,34 @@ begin
   );
 end;
 $$;
+
+-- share_links の書き込みポリシーを世帯整合で強化する。
+-- insert: household_id を必須にし、「その世帯で editor+」であることを要求
+--   （null で作ると get_shared_view の移行期分岐（owner のみで絞る）に乗り、
+--   直接 API 経由で全世帯の自筆記録を公開できてしまうため。20260703170000 の
+--   「どこかの世帯で editor+」より厳密化）。
+-- update: revoke（失効）以外の変更も同じ整合を要求（リンクの household_id を
+--   自分が editor+ でない世帯へ付け替える・null へ戻す経路を閉じる）。
+drop policy if exists "share_links_insert_own" on public.share_links;
+create policy "share_links_insert_own"
+  on public.share_links for insert
+  with check (
+    auth.uid() = owner_id
+    and household_id is not null
+    and public.has_household_role(household_id, array['owner','editor'])
+  );
+
+drop policy if exists "share_links_update_own" on public.share_links;
+create policy "share_links_update_own"
+  on public.share_links for update
+  using (auth.uid() = owner_id)
+  with check (
+    auth.uid() = owner_id
+    and (
+      revoked_at is not null
+      or (
+        household_id is not null
+        and public.has_household_role(household_id, array['owner','editor'])
+      )
+    )
+  );

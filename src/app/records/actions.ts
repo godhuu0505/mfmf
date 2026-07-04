@@ -272,8 +272,24 @@ export async function createRecord(formData: FormData) {
     throw new Error("不正なリクエストです");
   }
   const fields = parseRecordFields(formData);
-  // ロール検査（viewer は書き込み不可）+ 所属世帯の解決（一次防衛線は RLS）。
-  const householdId = await requireEditableHousehold(supabase, user.id);
+  // 書き込み先の世帯は「フォームを描画した世帯」（hidden で送信・写真のアップロード
+  // 先と同一）を優先し、その世帯での editor+ を検証する。Cookie の現在世帯に依存する
+  // と、別タブで切り替えた後の送信で記録と写真パスの世帯が食い違う。
+  // hidden が無い場合（未所属フォールバック）のみ従来どおり現在世帯を解決する。
+  const formHousehold = String(formData.get("household_id") || "").trim();
+  let householdId: string | null;
+  if (UUID_RE.test(formHousehold)) {
+    const role = await getRoleInHousehold(supabase, user.id, formHousehold);
+    if (!role) {
+      throw new Error("この世帯のメンバーではありません");
+    }
+    if (!canEdit(role)) {
+      throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
+    }
+    householdId = formHousehold;
+  } else {
+    householdId = await requireEditableHousehold(supabase, user.id);
+  }
   const pet_id = await resolvePetId(supabase, user.id, householdId, formData);
 
   const { error } = await supabase
