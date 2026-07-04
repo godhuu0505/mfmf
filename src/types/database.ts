@@ -25,8 +25,26 @@ export type DaycareRecord = {
   weight_kg: number | null;
   pet_id: string | null; // 対象ペット。未設定は null（段階導入）
   body: string;
+  guest_visible: boolean; // 対象ペットのゲストに見せるか（D8: 既定 false）
   created_at: string;
   updated_at: string;
+};
+
+// 外部ゲスト（保育園/シッター）への対象ペット・期間限定アクセス付与（S4 / UC-G01）。
+export const GUEST_ROLES = ["guest:daycare", "guest:sitter"] as const;
+export type GuestRole = (typeof GUEST_ROLES)[number];
+
+export type GuestGrant = {
+  id: string;
+  household_id: string;
+  user_id: string;
+  scope_pet_id: string;
+  role: GuestRole;
+  valid_from: string; // YYYY-MM-DD
+  valid_to: string | null; // null = 取り消しまで有効
+  revoked_at: string | null;
+  created_by: string;
+  created_at: string;
 };
 
 // 読み取り専用の共有リンク。owner_id ベースの RLS で保護。
