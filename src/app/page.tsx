@@ -17,6 +17,7 @@ import {
 } from "@/lib/recordQuery";
 import { getTagDictionary } from "@/lib/tags";
 import { canEdit, getCurrentMembership, householdScopeFilter } from "@/lib/household";
+import { hasActiveGuestGrant } from "@/lib/guest";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import AppHeader from "@/components/AppHeader";
 import RecordFilters from "@/components/RecordFilters";
@@ -65,6 +66,10 @@ export default async function HomePage({
   const tagParam = Array.isArray(sp.tag) ? sp.tag[0] : sp.tag;
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
   // 絞り込み UI 用に世帯のタグ辞書を取得し、選択中タグを特定する。
   const dictionaryTags = await getTagDictionary();
@@ -76,9 +81,13 @@ export default async function HomePage({
   // household_id で絞り込み、未所属なら従来どおり owner_id RLS にフォールバックする。
   // いずれも RLS（owner_id = auth.uid() / household メンバー）が一次防衛線。
   const membership = await getCurrentMembership(supabase);
-  // 世帯を持たないユーザー（新規登録直後など）はオンボーディングへ（UC-O03）。
-  // household_id NOT NULL 化以降、未所属では記録・ペットを作成できないため。
-  if (!membership) redirect("/onboarding");
+  // 世帯を持たないユーザー: 有効なゲスト付与があればゲスト画面へ（UC-G02）。
+  // それ以外（新規登録直後など）はオンボーディングへ（UC-O03。household_id NOT NULL
+  // 化以降、未所属では記録・ペットを作成できないため）。
+  if (!membership) {
+    if (await hasActiveGuestGrant(supabase, user.id)) redirect("/guest");
+    redirect("/onboarding");
+  }
   const householdId = membership.householdId;
   // viewer には編集系 UI を出さない（UC-A06。サーバー強制は RLS / Server Action）。
   const readOnly = !canEdit(membership.role);
