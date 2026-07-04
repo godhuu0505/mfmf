@@ -211,3 +211,54 @@ export async function revokeInvite(inviteId: string) {
 
   revalidatePath("/settings");
 }
+
+// メンバーを世帯から削除する（owner のみ / UC-H05。最後の owner は D6 が拒否）。
+export async function removeMember(memberUserId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const membership = await getCurrentMembership(supabase);
+  if (!membership || membership.role !== "owner") {
+    throw new Error("メンバーの削除は owner のみ行えます");
+  }
+
+  const { error } = await supabase
+    .from("household_members")
+    .delete()
+    .eq("household_id", membership.householdId)
+    .eq("user_id", memberUserId);
+  if (error) {
+    throw new Error(`メンバーの削除に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/settings");
+}
+
+// 自分が世帯から退出する（UC-H06。最後の owner は D6 が拒否）。
+// 退出後は当該世帯のデータが一切見えなくなる（記録は世帯に残る = UC-H10）。
+export async function leaveHousehold() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const membership = await getCurrentMembership(supabase);
+  if (!membership) throw new Error("世帯に所属していません");
+
+  const { error } = await supabase
+    .from("household_members")
+    .delete()
+    .eq("household_id", membership.householdId)
+    .eq("user_id", user.id);
+  if (error) {
+    // 最後の owner の場合は D6 トリガのメッセージをそのまま届ける。
+    throw new Error(`世帯からの退出に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/");
+}

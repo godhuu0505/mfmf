@@ -74,29 +74,31 @@ select is_definer(
   'has_household_role は SECURITY DEFINER（members 自己参照の RLS 再帰回避）'
 );
 
+-- S3（20260704020000）で業務データの読取は世帯メンバーシップへ一本化された
+-- （own select は退出者のアクセス遮断のため撤去。feedback のみ準個人データとして残置）。
 select ok(
-  exists (select 1 from pg_policies
+  not exists (select 1 from pg_policies
           where schemaname = 'public' and tablename = 'daycare_records'
             and policyname = 'records_select_own'),
-  '既存 owner_id ポリシー records_select_own が併存追加後も残存している'
+  'records_select_own は S3 で撤去済み（読取は世帯メンバーシップのみ）'
 );
 select ok(
-  exists (select 1 from pg_policies
+  not exists (select 1 from pg_policies
           where schemaname = 'public' and tablename = 'pets'
             and policyname = 'pets_select_own'),
-  '既存 owner_id ポリシー pets_select_own が残存している'
+  'pets_select_own は S3 で撤去済み'
 );
 select ok(
   exists (select 1 from pg_policies
           where schemaname = 'public' and tablename = 'feedback'
             and policyname = 'feedback_select_own'),
-  '既存 owner_id ポリシー feedback_select_own が残存している'
+  'feedback_select_own は残存（自分のご意見は準個人データとして本人可視のまま）'
 );
 select ok(
-  exists (select 1 from pg_policies
+  not exists (select 1 from pg_policies
           where schemaname = 'public' and tablename = 'record_photos'
             and policyname = 'photos_select_own'),
-  '既存 owner_id ポリシー photos_select_own が残存している'
+  'photos_select_own は S3 で撤去済み'
 );
 
 -- ===============================================================
