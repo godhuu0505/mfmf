@@ -26,9 +26,11 @@ export default async function NewRecordPage() {
     getTagDictionary(),
     getCurrentMembership(supabase),
   ]);
+  // 世帯を持たないユーザーはまずオンボーディングへ（UC-O03。未所属では作成不可）。
+  if (!membership) redirect("/onboarding");
   // viewer は記録を追加できない（UC-A01/A06。サーバー強制は RLS / Server Action）。
-  if (membership && !canEdit(membership.role)) redirect("/");
-  const householdId = membership?.householdId ?? null;
+  if (!canEdit(membership.role)) redirect("/");
+  const householdId = membership.householdId;
   const tagSuggestions = dictionaryTags.map((t) => t.name);
 
   return (
