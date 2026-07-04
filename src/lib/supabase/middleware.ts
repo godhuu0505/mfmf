@@ -34,15 +34,21 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isAuthRoute = pathname.startsWith("/login");
+  // ログイン済みユーザーには不要な認証系ページ（/login・/signup）
+  const isAuthRoute =
+    pathname.startsWith("/login") || pathname.startsWith("/signup");
   // 認証不要で到達するルート:
   // - /offline: オフライン用フォールバック
   // - /auth/*: OAuth コールバック等（セッション確立前に到達する）
   // - /share/*: 読み取り専用の共有ビュー（共有「管理」画面 /shares は保護対象）
+  // - /signup, /forgot-password: セルフ登録（UC-O02）・パスワード再設定の入口
+  //   （/reset-password は回復セッション確立後に到達するため保護対象のまま）
   const isPublicRoute =
     pathname === "/offline" ||
     pathname.startsWith("/auth") ||
-    pathname.startsWith("/share/");
+    pathname.startsWith("/share/") ||
+    pathname.startsWith("/signup") ||
+    pathname.startsWith("/forgot-password");
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     // 未ログイン → /login へ

@@ -8,7 +8,11 @@ import { saveGoogleRefreshToken } from "@/lib/google/token";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  // オープンリダイレクト防止: next はサイト内パスのみ許可する
+  //（"//evil.example" のようなプロトコル相対 URL を弾く）。
+  const rawNext = searchParams.get("next") ?? "/";
+  const next =
+    rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=oauth`);
