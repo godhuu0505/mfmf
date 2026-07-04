@@ -29,9 +29,10 @@ export default async function InvitePage({
   // 自分のメール宛てなら RLS 越しに見える（他人宛て・存在しない token は null）。
   const { data: invite } = await supabase
     .from("household_invites")
-    .select("email, role, expires_at, accepted_at, revoked_at")
+    .select("email, role, expires_at, accepted_at, revoked_at, valid_from, valid_to")
     .eq("token", token)
     .maybeSingle();
+  const isGuestInvite = invite?.role.startsWith("guest:") ?? false;
 
   const invalid =
     !invite ||
@@ -63,18 +64,31 @@ export default async function InvitePage({
           </section>
         ) : (
           <section className="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
-            <p className="text-sm text-foreground">
-              あなた（{invite.email}）は、ロール{" "}
-              <span className="font-medium">{invite.role}</span>{" "}
-              として世帯に招待されています。参加すると世帯の記録・写真・ペットを
-              {invite.role === "viewer" ? "閲覧できます。" : "閲覧・編集できます。"}
-            </p>
+            {isGuestInvite ? (
+              <p className="text-sm text-foreground">
+                あなた（{invite.email}）は、
+                <span className="font-medium">
+                  {invite.role === "guest:daycare" ? "保育園" : "シッター"}のゲスト
+                </span>
+                として招待されています。参加すると、対象のペット 1 匹について、
+                期間内（{invite.valid_from ?? "参加日"} 〜{" "}
+                {invite.valid_to ?? "失効まで"}）に共有された記録の閲覧と、
+                お世話の記録の追加ができます（写真や世帯のその他の情報は見えません）。
+              </p>
+            ) : (
+              <p className="text-sm text-foreground">
+                あなた（{invite.email}）は、ロール{" "}
+                <span className="font-medium">{invite.role}</span>{" "}
+                として世帯に招待されています。参加すると世帯の記録・写真・ペットを
+                {invite.role === "viewer" ? "閲覧できます。" : "閲覧・編集できます。"}
+              </p>
+            )}
             <form action={acceptInvite.bind(null, token)}>
               <SubmitButton
                 pendingLabel="参加中…"
                 className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
               >
-                この世帯に参加する
+                {isGuestInvite ? "ゲストとして参加する" : "この世帯に参加する"}
               </SubmitButton>
             </form>
           </section>

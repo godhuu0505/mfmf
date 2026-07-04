@@ -7,10 +7,12 @@ import AppHeader from "@/components/AppHeader";
 import SubmitButton from "@/components/SubmitButton";
 import { ProfileForm, PasswordForm } from "@/app/settings/SettingsForms";
 import {
+  createGuestInvite,
   createInvite,
   leaveHousehold,
   removeMember,
   renameHousehold,
+  revokeGuestGrant,
   revokeInvite,
   switchHousehold,
   updateMemberRole,
@@ -22,6 +24,15 @@ const ROLE_LABEL: Record<string, string> = {
   owner: "owner（全権・メンバー管理）",
   editor: "editor（記録の追加・編集）",
   viewer: "viewer（閲覧のみ）",
+};
+
+// 招待一覧・ゲスト一覧で使う短い role 表示（内部 role + ゲスト種別）。
+const SHORT_ROLE_LABEL: Record<string, string> = {
+  owner: "owner",
+  editor: "editor",
+  viewer: "viewer",
+  "guest:daycare": "ゲスト（保育園）",
+  "guest:sitter": "ゲスト（シッター）",
 };
 
 export const metadata = { title: "設定" };
@@ -63,15 +74,51 @@ export default async function SettingsPage() {
   }[];
 
   // 招待一覧（owner のみ。RLS invites_select_owner が強制）。
-  const { data: invites } =
+  // ゲスト管理（S4 / UC-G01）用にペット一覧とゲスト付与一覧も owner のみ取得する。
+  const [{ data: invites }, { data: householdPets }, { data: guests }] =
     membership && isOwner
-      ? await supabase
-          .from("household_invites")
-          .select("id, email, role, token, expires_at, accepted_at, revoked_at")
-          .eq("household_id", membership.householdId)
-          .order("created_at", { ascending: false })
-          .limit(20)
-      : { data: null };
+      ? await Promise.all([
+          supabase
+            .from("household_invites")
+            .select("id, email, role, token, expires_at, accepted_at, revoked_at")
+            .eq("household_id", membership.householdId)
+            .order("created_at", { ascending: false })
+            .limit(20),
+          supabase
+            .from("pets")
+            .select("id, name")
+            .eq("household_id", membership.householdId)
+            .order("created_at", { ascending: true }),
+          // ゲストのメール解決は owner 限定の SECURITY DEFINER 関数で行う。
+          supabase.rpc("get_household_guests", {
+            p_household: membership.householdId,
+          }),
+        ])
+      : [{ data: null }, { data: null }, { data: null }];
+  const guestRows = ((guests as unknown) ?? []) as {
+    id: string;
+    user_id: string;
+    email: string | null;
+    scope_pet_id: string;
+    role: string;
+    valid_from: string;
+    valid_to: string | null;
+    revoked_at: string | null;
+    created_at: string;
+  }[];
+  const petNameById = new Map((householdPets ?? []).map((p) => [p.id, p.name]));
+
+  const guestStatus = (g: {
+    valid_from: string;
+    valid_to: string | null;
+    revoked_at: string | null;
+  }): string => {
+    if (g.revoked_at) return "失効済み";
+    const today = new Date().toISOString().slice(0, 10);
+    if (g.valid_from > today) return "開始前";
+    if (g.valid_to && g.valid_to < today) return "期間終了";
+    return "有効";
+  };
 
   const inviteStatus = (inv: {
     expires_at: string;
@@ -303,7 +350,8 @@ export default async function SettingsPage() {
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="text-foreground">
-                              {inv.email}（{inv.role}） ・ {inviteStatus(inv)}
+                              {inv.email}（{SHORT_ROLE_LABEL[inv.role] ?? inv.role}） ・{" "}
+                              {inviteStatus(inv)}
                             </span>
                             {inviteStatus(inv) === "有効" && (
                               <form
@@ -327,6 +375,154 @@ export default async function SettingsPage() {
                               招待リンク: /invite/{inv.token}
                               （このリンクを本人に共有してください）
                             </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* 外部ゲスト（保育園/シッター・S4 / UC-G01〜G04）: owner のみ */}
+              {isOwner && (
+                <div className="border-t border-border pt-4">
+                  <h3 className="mb-1 text-sm font-medium text-foreground">
+                    外部ゲスト（保育園・シッター）
+                  </h3>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    対象のペット 1 匹と期間を限定して招待します。ゲストに見えるのは
+                    担当ペットのプロフィールと、期間内の「ゲストに共有」した記録・
+                    ゲスト自身の記入だけです（写真・他のペット・世帯情報は見えません）。
+                  </p>
+
+                  {(householdPets ?? []).length === 0 ? (
+                    <p className="rounded-lg bg-surface-muted px-3 py-2 text-sm text-muted-foreground">
+                      ゲストを招待するには、先にペットを登録してください。
+                    </p>
+                  ) : (
+                    <form
+                      action={createGuestInvite.bind(null, membership.householdId)}
+                      className="flex flex-wrap items-end gap-2"
+                    >
+                      <div className="flex-1 min-w-[12rem]">
+                        <label
+                          htmlFor="guest_email"
+                          className="mb-1 block text-xs text-muted-foreground"
+                        >
+                          宛先メールアドレス
+                        </label>
+                        <input
+                          id="guest_email"
+                          name="guest_email"
+                          type="email"
+                          required
+                          placeholder="daycare@example.com"
+                          className="w-full rounded-lg border border-border px-3 py-2 text-sm text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="guest_pet_id"
+                          className="mb-1 block text-xs text-muted-foreground"
+                        >
+                          対象ペット
+                        </label>
+                        <select
+                          id="guest_pet_id"
+                          name="guest_pet_id"
+                          required
+                          className="rounded-lg border border-border px-2 py-2 text-sm text-foreground"
+                        >
+                          {(householdPets ?? []).map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="guest_role"
+                          className="mb-1 block text-xs text-muted-foreground"
+                        >
+                          種別
+                        </label>
+                        <select
+                          id="guest_role"
+                          name="guest_role"
+                          defaultValue="guest:daycare"
+                          className="rounded-lg border border-border px-2 py-2 text-sm text-foreground"
+                        >
+                          <option value="guest:daycare">保育園</option>
+                          <option value="guest:sitter">シッター</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="guest_valid_from"
+                          className="mb-1 block text-xs text-muted-foreground"
+                        >
+                          開始日（省略時は受諾日）
+                        </label>
+                        <input
+                          id="guest_valid_from"
+                          name="guest_valid_from"
+                          type="date"
+                          className="rounded-lg border border-border px-2 py-1.5 text-sm text-foreground"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="guest_valid_to"
+                          className="mb-1 block text-xs text-muted-foreground"
+                        >
+                          終了日（省略時は失効まで）
+                        </label>
+                        <input
+                          id="guest_valid_to"
+                          name="guest_valid_to"
+                          type="date"
+                          className="rounded-lg border border-border px-2 py-1.5 text-sm text-foreground"
+                        />
+                      </div>
+                      <SubmitButton
+                        pendingLabel="発行中…"
+                        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
+                      >
+                        ゲスト招待を発行
+                      </SubmitButton>
+                    </form>
+                  )}
+
+                  {guestRows.length > 0 && (
+                    <ul className="mt-3 space-y-2">
+                      {guestRows.map((g) => (
+                        <li
+                          key={g.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-muted px-3 py-2 text-sm"
+                        >
+                          <span className="text-foreground">
+                            {g.email ?? `ゲスト ${g.user_id.slice(0, 8)}…`}（
+                            {SHORT_ROLE_LABEL[g.role] ?? g.role} /{" "}
+                            {petNameById.get(g.scope_pet_id) ?? "不明なペット"}） ・{" "}
+                            {g.valid_from} 〜 {g.valid_to ?? "失効まで"} ・{" "}
+                            {guestStatus(g)}
+                          </span>
+                          {!g.revoked_at && (
+                            <form
+                              action={revokeGuestGrant.bind(
+                                null,
+                                membership.householdId,
+                                g.id,
+                              )}
+                            >
+                              <SubmitButton
+                                pendingLabel="失効中…"
+                                className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
+                              >
+                                失効させる
+                              </SubmitButton>
+                            </form>
                           )}
                         </li>
                       ))}
