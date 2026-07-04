@@ -35,7 +35,7 @@ S1（[#92](https://github.com/godhuu0505/mfmf/issues/92)）の無停止移行8�
 - **S2 RBAC（[#46](https://github.com/godhuu0505/mfmf/issues/46)）**: **DB/RLS は完了**。role は CHECK 制約（owner/editor/viewer, `20260703170000`）、write は editor 以上に限定、旧 owner_id write ポリシーは切替済み（drop, `20260704000000`。feedback 送信・タグ昇格用 update 等の意図した例外は migration ヘッダー参照）。ロール変更（UC-H04）/世帯名変更（UC-H02）の RLS と D6（最後の owner 保護）トリガも導入済み。メンバー削除/退出（UC-H05/H06）は UC-H10 の読取述語緩和と一体で S3 #45 にて解禁。アプリ層も完了: Server Action のロール検査（`requireEditableHousehold`）、viewer への UI 出し分け（一覧/詳細/新規/ペット, UC-A06）、/settings の世帯セクション（世帯名変更 UC-H02・メンバー一覧 UC-H03・ロール変更 UC-H04）。**S2 はこれで完了**（招待・削除・退出の UI は S3）。
 - **S3 内部招待（[#45](https://github.com/godhuu0505/mfmf/issues/45)）**: **完了**。招待（`household_invites` + 宛先メール固定の受諾 D12/D13、UC-O09〜O11）、退出/削除（UC-H05/H06 + D6、UC-H10 読取緩和）、世帯切替（Cookie ベースの現在世帯 UC-H08・複数世帯参加 UC-H07 の解禁 = D2 解除）、メンバー表示のメール/名前解決（`get_household_members`）。
 - **S4 外部ゲスト（[#93](https://github.com/godhuu0505/mfmf/issues/93)）**: `guest_grants` テーブルなし・**未着手**。
-- **S5 公開サインアップ（[#47](https://github.com/godhuu0505/mfmf/issues/47)）**: ログインは **Google OAuth 一択**（`drive.file` スコープ要求）。email/password なし・セルフ登録 UI なし。
+- **S5 公開サインアップ（[#47](https://github.com/godhuu0505/mfmf/issues/47)）**: **着手中（S4 より先行。D3/D7 の認証基盤を先に整える）**。世帯プロビジョニング（UC-O03: `create_own_household` SECURITY DEFINER = 未所属ユーザーのみ新世帯作成 + owner 化、`/onboarding` → 最初のペット登録導線 UC-O05）は導入済み。ログインは現状 **Google OAuth のみ**（`drive.file` スコープ要求）。email/password（UC-O02）・セルフ登録 UI・feature flag（UC-O08）は次 PR。
 - **既存の共有**: Phase 2 の `share_links`（`/shares`・`/share/[token]`、read-only トークン、**写真なし**、`get_shared_view` SECURITY DEFINER 経由、`owner_id` ベース）。S4 と思想が重複 → **統合対象**（D4）。
 
 ---
@@ -115,9 +115,9 @@ G(外部ゲスト) / S(共有) / M(移行・非機能)。
 | --- | --- | --- | --- | --- | --- |
 | UC-O01 | Google でサインアップ/ログインする | 全員 | 既存 / S5 | ✅ | 実装済（`drive.file` スコープ、offline+consent でリフレッシュトークン取得） |
 | UC-O02 | email/password（or magic link）で登録/ログインする | 外部/一般 | S5 / #47（D3） | 🟢 | Google 非依存で登録可。メール確認を伴う |
-| UC-O03 | 新規登録者が新世帯を作成し owner になる | 新規 | S5 / #47（D7） | 🟢 | 登録＝auth ユーザー作成→**新 household 作成→owner 化**→オンボ。world が 0 個にならない |
+| UC-O03 | 新規登録者が新世帯を作成し owner になる | 新規 | S5 / #47（D7） | ✅ | `create_own_household`（SECURITY DEFINER・未所属のみ）+ `/onboarding`。登録＝auth ユーザー作成→**新 household 作成→owner 化**→オンボ。world が 0 個にならない |
 | UC-O04 | 招待リンク経由で登録し、既存世帯に参加する | 被招待者 | S3+S5 / #45,#47（D7） | 🟢 | 招待受諾でのみ member 化。role は招待時指定。**自己昇格不可** |
-| UC-O05 | 初回オンボ（ペット登録・サンプル記録） | 新規 owner | S5 / #47 | 🟢 | household 前提。最初のペット登録まで導線 |
+| UC-O05 | 初回オンボ（ペット登録・サンプル記録） | 新規 owner | S5 / #47 | ✅ | `/onboarding`（世帯作成）→ `/pets`（最初のペット登録）へ導線。サンプル記録は見送り |
 | UC-O06 | 利用規約・プライバシーへ同意する | 新規 | S5 / #47・#50 | 🟢 | 法務（#50）と連携。同意記録を保持 |
 | UC-O07 | 不正登録・bot を抑止する | 攻撃者 | S5 / #37 | 🟡 | サインアップにレート制限。公開＝課金と揃えるまで feature flag で閉じる |
 | UC-O08 | 公開前は feature flag でサインアップを閉じておく | 運用 | S5 / #47 | 🟢 | 招待のみ運用から安全に切替。法務/濫用対策が未了なら閉じる |

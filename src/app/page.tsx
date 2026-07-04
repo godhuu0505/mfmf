@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   SOURCE_LABEL,
@@ -75,9 +76,12 @@ export default async function HomePage({
   // household_id で絞り込み、未所属なら従来どおり owner_id RLS にフォールバックする。
   // いずれも RLS（owner_id = auth.uid() / household メンバー）が一次防衛線。
   const membership = await getCurrentMembership(supabase);
-  const householdId = membership?.householdId ?? null;
+  // 世帯を持たないユーザー（新規登録直後など）はオンボーディングへ（UC-O03）。
+  // household_id NOT NULL 化以降、未所属では記録・ペットを作成できないため。
+  if (!membership) redirect("/onboarding");
+  const householdId = membership.householdId;
   // viewer には編集系 UI を出さない（UC-A06。サーバー強制は RLS / Server Action）。
-  const readOnly = membership !== null && !canEdit(membership.role);
+  const readOnly = !canEdit(membership.role);
 
   // 一覧 + 先頭写真 + 付与タグをまとめて取得。
   let query = supabase

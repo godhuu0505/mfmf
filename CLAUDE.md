@@ -54,7 +54,7 @@
   既存オブジェクトは `{owner_id}/{record_id}/{filename}` を併存。生成/検証は `src/lib/storagePath.ts`）。
 - 画面: `/login`（Google OAuth）, `/`（一覧）, `/records/new`, `/records/[id]`（`?edit=1` で編集）,
   `/calendar`, `/gallery`, `/pets`, `/weight`, `/settings`, `/shares`, `/share/[token]`,
-  `/feedback`, `/offline`, `/auth/*`。
+  `/onboarding`（未所属ユーザーの世帯作成）, `/invite/[token]`, `/feedback`, `/offline`, `/auth/*`。
 
 ## セキュリティ（厳守）
 
