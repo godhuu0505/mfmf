@@ -144,3 +144,70 @@ export async function updateMemberRole(memberUserId: string, formData: FormData)
 
   revalidatePath("/settings");
 }
+
+// 招待を発行する（owner のみ / UC-O09。宛先メール固定 D12・期限 7 日）。
+// 強制は RLS（invites_insert_owner）。リンクは /invite/{token} を owner が本人へ共有する。
+export async function createInvite(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const membership = await getCurrentMembership(supabase);
+  if (!membership || membership.role !== "owner") {
+    throw new Error("招待の発行は owner のみ行えます");
+  }
+
+  const email = String(formData.get("invite_email") || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("宛先メールアドレスを正しく入力してください");
+  }
+  const role = String(formData.get("invite_role") || "");
+  if (!["editor", "viewer"].includes(role)) {
+    throw new Error("不正なロールです（招待できるのは editor / viewer のみ）");
+  }
+
+  // 推測不能なトークン（URL セーフ）。一意制約が衝突を最終防衛する。
+  const token = `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll("-", "");
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error } = await supabase.from("household_invites").insert({
+    household_id: membership.householdId,
+    email,
+    role,
+    token,
+    invited_by: user.id,
+    expires_at: expiresAt,
+  });
+  if (error) {
+    throw new Error(`招待の発行に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/settings");
+}
+
+// 招待を取り消す（owner のみ / UC-O11）。
+export async function revokeInvite(inviteId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const membership = await getCurrentMembership(supabase);
+  if (!membership || membership.role !== "owner") {
+    throw new Error("招待の取消は owner のみ行えます");
+  }
+
+  const { error } = await supabase
+    .from("household_invites")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", inviteId)
+    .eq("household_id", membership.householdId);
+  if (error) {
+    throw new Error(`招待の取消に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/settings");
+}
