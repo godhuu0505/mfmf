@@ -35,7 +35,7 @@ S1（[#92](https://github.com/godhuu0505/mfmf/issues/92)）の無停止移行8�
 - **S2 RBAC（[#46](https://github.com/godhuu0505/mfmf/issues/46)）**: **DB/RLS は完了**。role は CHECK 制約（owner/editor/viewer, `20260703170000`）、write は editor 以上に限定、旧 owner_id write ポリシーは切替済み（drop, `20260704000000`。feedback 送信・タグ昇格用 update 等の意図した例外は migration ヘッダー参照）。ロール変更（UC-H04）/世帯名変更（UC-H02）の RLS と D6（最後の owner 保護）トリガも導入済み。メンバー削除/退出（UC-H05/H06）は UC-H10 の読取述語緩和と一体で S3 #45 にて解禁。アプリ層も完了: Server Action のロール検査（`requireEditableHousehold`）、viewer への UI 出し分け（一覧/詳細/新規/ペット, UC-A06）、/settings の世帯セクション（世帯名変更 UC-H02・メンバー一覧 UC-H03・ロール変更 UC-H04）。**S2 はこれで完了**（招待・削除・退出の UI は S3）。
 - **S3 内部招待（[#45](https://github.com/godhuu0505/mfmf/issues/45)）**: **完了**。招待（`household_invites` + 宛先メール固定の受諾 D12/D13、UC-O09〜O11）、退出/削除（UC-H05/H06 + D6、UC-H10 読取緩和）、世帯切替（Cookie ベースの現在世帯 UC-H08・複数世帯参加 UC-H07 の解禁 = D2 解除）、メンバー表示のメール/名前解決（`get_household_members`）。
 - **S4 外部ゲスト（[#93](https://github.com/godhuu0505/mfmf/issues/93)）**: `guest_grants` テーブルなし・**未着手**。
-- **S5 公開サインアップ（[#47](https://github.com/godhuu0505/mfmf/issues/47)）**: **着手中（S4 より先行。D3/D7 の認証基盤を先に整える）**。世帯プロビジョニング（UC-O03: `create_own_household` SECURITY DEFINER = 未所属ユーザーのみ新世帯作成 + owner 化、`/onboarding` → 最初のペット登録導線 UC-O05）は導入済み。ログインは現状 **Google OAuth のみ**（`drive.file` スコープ要求）。email/password（UC-O02）・セルフ登録 UI・feature flag（UC-O08）は次 PR。
+- **S5 公開サインアップ（[#47](https://github.com/godhuu0505/mfmf/issues/47)）**: **実装完了（S4 より先行。D3/D7 の認証基盤を先に整えた）**。世帯プロビジョニング（UC-O03: `create_own_household` SECURITY DEFINER = 未所属ユーザーのみ新世帯作成 + owner 化、`/onboarding` → 最初のペット登録導線 UC-O05）、email/password 認証（UC-O02: `/signup` メール確認つき登録・`/login` ログイン・`/forgot-password`→`/reset-password` 再設定）、同意チェック（UC-O06 暫定）、feature flag（UC-O08: `SIGNUP_ENABLED` 既定閉）。**公開（flag 開放）は課金 #49・法務 #50・濫用対策 #37 と揃えてから**。Google ログインは従来どおり（`drive.file` スコープ要求）。
 - **既存の共有**: Phase 2 の `share_links`（`/shares`・`/share/[token]`、read-only トークン、**写真なし**、`get_shared_view` SECURITY DEFINER 経由、`owner_id` ベース）。S4 と思想が重複 → **統合対象**（D4）。
 
 ---
@@ -114,16 +114,16 @@ G(外部ゲスト) / S(共有) / M(移行・非機能)。
 | ID | ユースケース | アクター | スライス/Issue | 状態 | 受け入れ条件 |
 | --- | --- | --- | --- | --- | --- |
 | UC-O01 | Google でサインアップ/ログインする | 全員 | 既存 / S5 | ✅ | 実装済（`drive.file` スコープ、offline+consent でリフレッシュトークン取得） |
-| UC-O02 | email/password（or magic link）で登録/ログインする | 外部/一般 | S5 / #47（D3） | 🟢 | Google 非依存で登録可。メール確認を伴う |
+| UC-O02 | email/password（or magic link）で登録/ログインする | 外部/一般 | S5 / #47（D3） | ✅ | `/signup`（メール確認つき登録）・`/login`（email/password ログイン）・`/forgot-password`→`/reset-password`（再設定）。登録 UI は flag 閉塞中は非表示（UC-O08） |
 | UC-O03 | 新規登録者が新世帯を作成し owner になる | 新規 | S5 / #47（D7） | ✅ | `create_own_household`（SECURITY DEFINER・未所属のみ）+ `/onboarding`。登録＝auth ユーザー作成→**新 household 作成→owner 化**→オンボ。world が 0 個にならない |
-| UC-O04 | 招待リンク経由で登録し、既存世帯に参加する | 被招待者 | S3+S5 / #45,#47（D7） | 🟢 | 招待受諾でのみ member 化。role は招待時指定。**自己昇格不可** |
+| UC-O04 | 招待リンク経由で登録し、既存世帯に参加する | 被招待者 | S3+S5 / #45,#47（D7） | ✅ | 招待受諾でのみ member 化（S3）。アカウントは Google（常時）/ email/password（flag 開放時）で作成可。role は招待時指定。**自己昇格不可** |
 | UC-O05 | 初回オンボ（ペット登録・サンプル記録） | 新規 owner | S5 / #47 | ✅ | `/onboarding`（世帯作成）→ `/pets`（最初のペット登録）へ導線。サンプル記録は見送り |
-| UC-O06 | 利用規約・プライバシーへ同意する | 新規 | S5 / #47・#50 | 🟢 | 法務（#50）と連携。同意記録を保持 |
-| UC-O07 | 不正登録・bot を抑止する | 攻撃者 | S5 / #37 | 🟡 | サインアップにレート制限。公開＝課金と揃えるまで feature flag で閉じる |
-| UC-O08 | 公開前は feature flag でサインアップを閉じておく | 運用 | S5 / #47 | 🟢 | 招待のみ運用から安全に切替。法務/濫用対策が未了なら閉じる |
-| UC-O09 | メールアドレス固定で招待する（指定アドレスだけ受諾可） | owner | S3 / #45（D12） | 🟢 | オープンリンクは採らない。受諾時に**宛先メール一致を要求**。期限・失効・取消・再送を owner が管理 |
-| UC-O10 | 既登録者はログイン中アカウントのメール一致でワンクリック参加 | 被招待者 | S3 / #45（D13） | 🟢 | ログイン中アカウントのメールが宛先と一致→即参加。**不一致は拒否**（別アカウントでの誤受諾防止） |
-| UC-O11 | 招待は期限切れ/失効/取消で無効化される | owner | S3 / #45 | 🟢 | 受諾でのみメンバー化（自己昇格不可 UC-A05）。owner のみ招待・取消 |
+| UC-O06 | 利用規約・プライバシーへ同意する | 新規 | S5 / #47・#50 | ✅（暫定） | `/signup` で同意チェック必須・同意時刻を user_metadata（`tos_accepted_at`）へ記録。正式な文書と監査可能な同意台帳は #50 で整備 |
+| UC-O07 | 不正登録・bot を抑止する | 攻撃者 | S5 / #37 | 🟡 | Supabase 側のサインアップ/メール送信レート制限 + flag 閉塞（UC-O08）で当面カバー。CAPTCHA 等は #37 |
+| UC-O08 | 公開前は feature flag でサインアップを閉じておく | 運用 | S5 / #47 | ✅ | 環境変数 `SIGNUP_ENABLED`（既定: 閉）で `/signup` と導線を閉塞。API 自体の閉塞は Supabase 側 signup 許可も無効にする（`src/lib/signup.ts` 参照） |
+| UC-O09 | メールアドレス固定で招待する（指定アドレスだけ受諾可） | owner | S3 / #45（D12） | ✅ | オープンリンクは採らない。受諾時に**宛先メール一致を要求**。期限・失効・取消・再送を owner が管理 |
+| UC-O10 | 既登録者はログイン中アカウントのメール一致でワンクリック参加 | 被招待者 | S3 / #45（D13） | ✅ | ログイン中アカウントのメールが宛先と一致→即参加。**不一致は拒否**（別アカウントでの誤受諾防止） |
+| UC-O11 | 招待は期限切れ/失効/取消で無効化される | owner | S3 / #45 | ✅ | 受諾でのみメンバー化（自己昇格不可 UC-A05）。owner のみ招待・取消 |
 | UC-O12 | アカウント退会は自分の membership 退出のみ（3.5 最小） | 本人 | S3 / #45（D14） | 🟢 | 各世帯から退出（**最後の owner は不可** D6）。完全なアカウント削除・データエクスポートは Phase 5 法務（#50）へ |
 
 ### D. 外部アカウント・ゲスト — S4
@@ -190,10 +190,10 @@ S1 テナント基盤（✅ 手順1-8 完了）
 
 ## 7. 未決事項（次にブラッシュアップする論点）
 
-- **アイデンティティ連携**: 同一人物が Google と email/password の両方でログインしたとき、1 アカウントに統合するか別扱いか（Supabase の identity linking）。認証方式追加（D3）に伴う新論点。
+- **アイデンティティ連携**: 同一人物が Google と email/password の両方でログインしたとき、1 アカウントに統合するか別扱いか。現状は Supabase の既定（手動リンク無効・同一メールの検証済みアカウントへの自動リンクは provider 依存）のまま。公開（flag 開放）前に実挙動を検証して方針を確定する。
 - **UC-H09 世帯削除の UX**: 参照データがある世帯をどう畳むか（現状 FK NO ACTION で削除不可）。エクスポート後削除など。
-- **UC-H11 ペット削除の連鎖設計**: `daycare_records` / `record_photos` / `guest_grants` の on delete をどう畳むか。
-- **通知**: 招待が届いた・ゲスト期間の開始/終了などの通知を 3.5 に含めるか（メール / PWA プッシュ）。
+- **UC-H11 ペット削除の連鎖設計**: **決定（2026-07-04 ヒアリング）**: 記録は残す（現状どおり `records.pet_id` は ON DELETE SET NULL。過去の記録は世帯の資産として保持）。S4 の `guest_grants` のペット参照のみ CASCADE にする。
+- **通知**: **決定（2026-07-04 ヒアリング）**: 招待の通知メールは実装しない（`/invite/{token}` リンクを LINE 等で手動共有する現方式を維持 = ¥0 運用）。ゲスト期間等の通知も 3.5 では見送り。
 - **D10 Drive 原本の所有者**: 共有世帯で editor がアップした写真の原本を owner の Drive に集約するか各自か（Drive 連携＝3.5 後）。
 - **UC-S02 既存共有リンクの移行告知**: 匿名廃止に伴い、現利用者（祖父母等）への案内と旧トークン失効の運用。
 - **UC-M04 NOT NULL 化のタイミング**: 混在期をいつ閉じるか（本番適用はワンショットで要ローカル検証）。
