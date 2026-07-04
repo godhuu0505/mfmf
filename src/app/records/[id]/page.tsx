@@ -18,7 +18,11 @@ import PhotoGallery from "@/components/PhotoGallery";
 import SubmitButton from "@/components/SubmitButton";
 import SourceIcon from "@/components/SourceIcon";
 import PhotoEditTile from "./PhotoEditTile";
-import { updateRecord, deleteRecord } from "@/app/records/actions";
+import {
+  updateRecord,
+  deleteRecord,
+  setRecordGuestVisible,
+} from "@/app/records/actions";
 import { Scale } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -204,6 +208,41 @@ export default async function RecordDetailPage({
                     .map((p) => ({ id: p.id, url: p.url as string }))}
                 />
               </section>
+            )}
+
+            {/* ゲスト共有（S4 / D8）: ペット紐付きの記録のみ。共有すると対象ペットの
+                有効なゲスト（保育園/シッター）が期間内に本文を閲覧できる（写真は共有されない）。 */}
+            {!readOnly && record.pet_id && (
+              <form
+                action={setRecordGuestVisible.bind(
+                  null,
+                  record.id,
+                  !record.guest_visible,
+                )}
+                className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    ゲスト（保育園・シッター）への共有
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {record.guest_visible
+                      ? "共有中: 対象ペットの有効なゲストが期間内にこの記録の本文を閲覧できます（写真は共有されません）。"
+                      : "未共有: ゲストにはこの記録は見えません（ゲスト自身が書いた記録は本人に常に見えます）。"}
+                  </p>
+                </div>
+                <SubmitButton
+                  pendingLabel="変更中…"
+                  className={
+                    "rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-60 " +
+                    (record.guest_visible
+                      ? "border border-border text-foreground hover:bg-surface-muted"
+                      : "bg-primary text-primary-foreground hover:bg-primary-hover")
+                  }
+                >
+                  {record.guest_visible ? "共有を解除" : "ゲストに共有"}
+                </SubmitButton>
+              </form>
             )}
 
             {!readOnly && (

@@ -4,11 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
-import {
-  getCurrentMembership,
-  getRoleInHousehold,
-  HOUSEHOLD_COOKIE,
-} from "@/lib/household";
+import { getRoleInHousehold, HOUSEHOLD_COOKIE } from "@/lib/household";
+import { GUEST_ROLES, type GuestRole } from "@/types/database";
 
 export type SettingsResult = {
   ok: boolean;
@@ -178,6 +175,67 @@ export async function createInvite(householdId: string, formData: FormData) {
   });
   if (error) {
     throw new Error(`招待の発行に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/settings");
+}
+
+// ゲスト招待を発行する（owner のみ / UC-G01。対象ペット・期間つき、宛先メール固定 D12）。
+// 受諾でメンバーではなく guest_grants が作られる（accept_household_invite が分岐）。
+export async function createGuestInvite(householdId: string, formData: FormData) {
+  const { supabase, user } = await requireOwnerOf(householdId);
+
+  const email = String(formData.get("guest_email") || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("宛先メールアドレスを正しく入力してください");
+  }
+  const role = String(formData.get("guest_role") || "");
+  if (!GUEST_ROLES.includes(role as GuestRole)) {
+    throw new Error("不正なゲスト種別です");
+  }
+  const petId = String(formData.get("guest_pet_id") || "").trim();
+  if (petId === "") {
+    throw new Error("対象のペットを選択してください");
+  }
+  const validFrom = String(formData.get("guest_valid_from") || "").trim();
+  const validTo = String(formData.get("guest_valid_to") || "").trim();
+  if (validFrom !== "" && validTo !== "" && validTo < validFrom) {
+    throw new Error("終了日は開始日以降にしてください");
+  }
+
+  const token = `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll("-", "");
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  // 対象ペットが自世帯のものであることは RLS（invites_insert_owner）が強制する。
+  const { error } = await supabase.from("household_invites").insert({
+    household_id: householdId,
+    email,
+    role,
+    token,
+    invited_by: user.id,
+    expires_at: expiresAt,
+    scope_pet_id: petId,
+    valid_from: validFrom === "" ? null : validFrom,
+    valid_to: validTo === "" ? null : validTo,
+  });
+  if (error) {
+    throw new Error(`ゲスト招待の発行に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/settings");
+}
+
+// ゲスト付与を失効する（owner のみ / UC-G04。失効した時点でゲストは読み書き不可）。
+export async function revokeGuestGrant(householdId: string, grantId: string) {
+  const { supabase } = await requireOwnerOf(householdId);
+
+  const { error } = await supabase
+    .from("guest_grants")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", grantId)
+    .eq("household_id", householdId);
+  if (error) {
+    throw new Error(`ゲスト付与の失効に失敗しました: ${error.message}`);
   }
 
   revalidatePath("/settings");

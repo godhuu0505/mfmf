@@ -436,3 +436,25 @@ export async function deleteRecord(recordId: string) {
   revalidatePath("/");
   redirect("/");
 }
+
+// 記録のゲスト共有フラグを切り替える（S4 / D8: 既定 deny、世帯側が記録単位で明示共有）。
+// 対象記録が属する世帯での editor+ を要求（Cookie の現在世帯には依存しない）。
+export async function setRecordGuestVisible(recordId: string, visible: boolean) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  await requireEditableRecordHousehold(supabase, user.id, recordId);
+
+  const { error } = await supabase
+    .from("daycare_records")
+    .update({ guest_visible: visible })
+    .eq("id", recordId);
+  if (error) {
+    throw new Error(`ゲスト共有の変更に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath(`/records/${recordId}`);
+  revalidatePath("/");
+}
