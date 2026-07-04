@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireEditableHousehold } from "@/lib/household";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -32,11 +33,18 @@ export async function createShareLink(formData: FormData) {
     expires_at = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
   }
 
+  // 共有対象は「現在の世帯」に固定する（複数世帯の作成者でも他世帯の記録は漏れない）。
+  const householdId = await requireEditableHousehold(supabase, user.id);
+  if (!householdId) {
+    throw new Error("世帯に所属していないため共有リンクを作成できません");
+  }
+
   // 推測不能なトークン（256bit 相当）。
   const token = randomBytes(24).toString("base64url");
 
   const { error } = await supabase.from("share_links").insert({
     owner_id: user.id,
+    household_id: householdId,
     token,
     label,
     from_date,

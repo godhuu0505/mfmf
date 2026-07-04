@@ -134,6 +134,23 @@ export function householdScopeFilter(householdId: string): string {
   return `household_id.eq.${householdId},household_id.is.null`;
 }
 
+// 指定世帯における自分のロールを返す（非メンバーは null）。
+// 「記録が属する世帯」での権限を検査する用途（Cookie の現在世帯とは独立）。
+export async function getRoleInHousehold(
+  supabase: ServerClient,
+  userId: string,
+  householdId: string,
+): Promise<HouseholdRole | null> {
+  const { data } = await supabase
+    .from("household_members")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("household_id", householdId)
+    .maybeSingle();
+  if (!data) return null;
+  return (data.role in ROLE_PRIORITY ? data.role : "viewer") as HouseholdRole;
+}
+
 // 切替 UI 用: 現在ログイン中ユーザーの全メンバーシップ（世帯名つき・加入順）。
 export type MembershipWithName = Membership & { householdName: string };
 

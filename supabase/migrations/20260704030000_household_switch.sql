@@ -124,3 +124,88 @@ comment on function public.get_household_members(uuid) is
 
 revoke all on function public.get_household_members(uuid) from public;
 grant execute on function public.get_household_members(uuid) to authenticated;
+
+-- ---------------------------------------------------------------
+-- share_links の世帯スコープ化（複数世帯解禁の前提）
+--   get_shared_view は従来 owner_id だけで記録を集めていたため、複数世帯に所属する
+--   作成者が発行したリンクは「その人が全世帯で書いた記録」を匿名公開してしまう。
+--   リンクに household_id を持たせ、リンクの世帯の記録に限定する。
+--   既存リンクは owner の既定世帯（バックフィルと同じタイブレーク）へ紐づける。
+--   （share_links 自体は S4 #93 / D4 で guest_grants へ一本化・廃止予定）
+-- ---------------------------------------------------------------
+alter table public.share_links
+  add column if not exists household_id uuid references public.households (id);
+
+comment on column public.share_links.household_id is
+  '共有対象の世帯。リンクはこの世帯の記録のみ返す（null は移行期の旧リンク = owner のみで絞る）';
+
+do $$
+declare
+  r  record;
+  hh uuid;
+begin
+  perform pg_advisory_xact_lock(20260704030000);
+  for r in
+    select distinct owner_id from public.share_links where household_id is null
+  loop
+    select m.household_id into hh
+    from public.household_members m
+    where m.user_id = r.owner_id
+    order by (m.role = 'owner') desc, m.created_at, m.household_id
+    limit 1;
+    if hh is not null then
+      update public.share_links
+        set household_id = hh
+        where owner_id = r.owner_id and household_id is null;
+    end if;
+  end loop;
+end $$;
+
+create or replace function public.get_shared_view(p_token text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  link  public.share_links;
+  recs  jsonb;
+begin
+  select * into link
+  from public.share_links
+  where token = p_token
+    and revoked_at is null
+    and (expires_at is null or expires_at > now());
+
+  if not found then
+    return jsonb_build_object('valid', false);
+  end if;
+
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'record_date', record_date,
+        'source',      source,
+        'author',      author,
+        'weight_kg',   weight_kg,
+        'body',        body
+      )
+      order by record_date desc, created_at desc
+    ),
+    '[]'::jsonb
+  )
+  into recs
+  from public.daycare_records
+  where owner_id = link.owner_id
+    -- リンクの世帯の記録のみ（null は移行期の旧リンク = 従来どおり owner のみで絞る）
+    and (link.household_id is null or household_id = link.household_id)
+    and (link.from_date is null or record_date >= link.from_date)
+    and (link.to_date   is null or record_date <= link.to_date);
+
+  return jsonb_build_object(
+    'valid',   true,
+    'label',   link.label,
+    'records', recs
+  );
+end;
+$$;

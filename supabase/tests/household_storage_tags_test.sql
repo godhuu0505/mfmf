@@ -23,7 +23,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(43);
+select plan(44);
 
 -- ---------------------------------------------------------------
 -- 固定 UUID（fixture）
@@ -74,6 +74,10 @@ insert into public.tags (id, owner_id, household_id, name) values
 
 insert into public.record_tags (record_id, tag_id, owner_id) values
   ('aaaa0000-0000-0000-0000-000000000001', 'aaaa7777-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+
+-- 共有リンク（owner A・世帯 HA）。複数世帯の作成者でもリンクの世帯の記録しか返さないことを検証する。
+insert into public.share_links (owner_id, household_id, token) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'share-ha-token');
 
 -- storage の protect_objects_delete トリガ（storage migration 0055-prevent-direct-deletes、
 -- 文レベル・0 行でも発火）は SQL 直接 DELETE を一律拒否する。これは「Storage API を
@@ -421,5 +425,14 @@ select results_eq(
 );
 
 reset role;
+
+-- get_shared_view は「リンクの世帯」の記録だけを返す（複数世帯の作成者 A が
+-- HB に持つ記録は HA のリンクから漏れない = UC-H07 解禁の前提）。
+select ok(
+  (public.get_shared_view('share-ha-token') -> 'records')::text like '%A record%'
+    and (public.get_shared_view('share-ha-token') -> 'records')::text not like '%A record in HB%',
+  '共有リンクはリンクの世帯（HA）の記録のみ返し、作成者が他世帯（HB）に持つ記録は漏れない'
+);
+
 select * from finish();
 rollback;
