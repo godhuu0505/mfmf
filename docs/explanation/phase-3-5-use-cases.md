@@ -34,9 +34,10 @@ S1（[#92](https://github.com/godhuu0505/mfmf/issues/92)）の無停止移行8�
 
 - **S2 RBAC（[#46](https://github.com/godhuu0505/mfmf/issues/46)）**: **DB/RLS は完了**。role は CHECK 制約（owner/editor/viewer, `20260703170000`）、write は editor 以上に限定、旧 owner_id write ポリシーは切替済み（drop, `20260704000000`。feedback 送信・タグ昇格用 update 等の意図した例外は migration ヘッダー参照）。ロール変更（UC-H04）/世帯名変更（UC-H02）の RLS と D6（最後の owner 保護）トリガも導入済み。メンバー削除/退出（UC-H05/H06）は UC-H10 の読取述語緩和と一体で S3 #45 にて解禁。アプリ層も完了: Server Action のロール検査（`requireEditableHousehold`）、viewer への UI 出し分け（一覧/詳細/新規/ペット, UC-A06）、/settings の世帯セクション（世帯名変更 UC-H02・メンバー一覧 UC-H03・ロール変更 UC-H04）。**S2 はこれで完了**（招待・削除・退出の UI は S3）。
 - **S3 内部招待（[#45](https://github.com/godhuu0505/mfmf/issues/45)）**: **完了**。招待（`household_invites` + 宛先メール固定の受諾 D12/D13、UC-O09〜O11）、退出/削除（UC-H05/H06 + D6、UC-H10 読取緩和）、世帯切替（Cookie ベースの現在世帯 UC-H08・複数世帯参加 UC-H07 の解禁 = D2 解除）、メンバー表示のメール/名前解決（`get_household_members`）。
-- **S4 外部ゲスト（[#93](https://github.com/godhuu0505/mfmf/issues/93)）**: **着手中（DB 基盤 + 招待導線・管理 UI まで導入済み）**。`guest_grants`（対象ペット・期間限定、`20260705000000`）+ ゲスト RLS ヘルパー + 記録の明示共有フラグ `daycare_records.guest_visible`（D8 既定 deny、pgTAP 28 assert）。ゲスト招待は S3 招待基盤を流用（`20260705010000`: `household_invites` に `guest:daycare`/`guest:sitter` + `scope_pet_id` + 期間、受諾で `guest_grants` を作成・メンバー化しない。pgTAP 10 assert）。/settings にゲスト招待・付与管理（owner）、記録詳細に「ゲストに共有」トグル。**残り**: ゲスト向け閲覧/記入 UI・`share_links` 廃止（D4: S4 完了時に即廃止）= S4-PR3。
+- **S4 外部ゲスト（[#93](https://github.com/godhuu0505/mfmf/issues/93)）**: **完了**。`guest_grants`（対象ペット・期間限定、`20260705000000`）+ ゲスト RLS ヘルパー + 記録の明示共有フラグ `daycare_records.guest_visible`（D8 既定 deny）。ゲスト招待は S3 招待基盤を流用（`20260705010000`: `household_invites` に guest role + `scope_pet_id` + 期間、受諾で `guest_grants` を作成・メンバー化しない）。/settings にゲスト招待・付与管理（owner）、記録詳細に「ゲストに共有」トグル、`/guest`・`/guest/records/new` にゲスト向け閲覧/記入 UI。**`share_links` 廃止**（D4/UC-S01, `20260705020000`）: `get_shared_view` を常時無効化・既存リンク一括失効、`/shares` は終了案内・ナビから撤去（物理 DROP は後続クリーンアップ）。pgTAP: guest_grants 28 + guest_invites 10 assert。
+- **Phase 3.5（[#91](https://github.com/godhuu0505/mfmf/issues/91)）全体**: **S1〜S5 完了**。世帯テナント分離（S1）・RBAC（S2）・内部招待/退出/切替（S3）・外部ゲスト（S4）・公開サインアップ基盤（S5、flag で閉塞中）。残る論点は §7（世帯削除 UC-H09・写真つきゲスト共有 UC-S04・アイデンティティ連携・監査ログ）で、いずれも Phase 4/5 送り。
 - **S5 公開サインアップ（[#47](https://github.com/godhuu0505/mfmf/issues/47)）**: **実装完了（S4 より先行。D3/D7 の認証基盤を先に整えた）**。世帯プロビジョニング（UC-O03: `create_own_household` SECURITY DEFINER = 未所属ユーザーのみ新世帯作成 + owner 化、`/onboarding` → 最初のペット登録導線 UC-O05）、email/password 認証（UC-O02: `/signup` メール確認つき登録・`/login` ログイン・`/forgot-password`→`/reset-password` 再設定）、同意チェック（UC-O06 暫定）、feature flag（UC-O08: `SIGNUP_ENABLED` 既定閉）。**公開（flag 開放）は課金 #49・法務 #50・濫用対策 #37 と揃えてから**。Google ログインは従来どおり（`drive.file` スコープ要求）。
-- **既存の共有**: Phase 2 の `share_links`（`/shares`・`/share/[token]`、read-only トークン、**写真なし**、`get_shared_view` SECURITY DEFINER 経由、`owner_id` ベース）。S4 と思想が重複 → **統合対象**（D4）。
+- **既存の共有**: Phase 2 の `share_links`（匿名 read-only トークン）は **S4 で廃止**（D4/UC-S01, `20260705020000`）。`get_shared_view` は常時無効・既存リンクは一括失効済み。閲覧共有は viewer 招待（S3）or 期間限定ゲスト招待（S4）へ一本化。テーブルの物理 DROP は後続クリーンアップ PR。
 
 ---
 
@@ -95,7 +96,7 @@ G(外部ゲスト) / S(共有) / M(移行・非機能)。
 | UC-H08 | 「現在の世帯」を切り替える | 複数所属者 | S3 / #45（D2） | 🟢 | 切替を Cookie/セッションに保持。全画面が現在世帯に追従。切替UI 未導入の間は招待受諾を 1 世帯に制限（D2） |
 | UC-H09 | 世帯を削除する | owner | 🟡 検討 | 🟡 | 参照データがある世帯の扱い（現状 FK は NO ACTION で削除不可＝孤児化防止）。要 UX 判断 → §7 |
 | UC-H10 | 退出/削除されたメンバーが作った記録は世帯に残る | 世帯 | S2/S3 | 🟢 | `owner_id` は残置（記録は消えない）。閲覧は世帯メンバーシップ RLS で世帯側に残る。作成者本人は退出後アクセス不可 |
-| UC-H11 | ペット削除時に紐づく記録・写真・ゲスト付与を畳む | owner | S4 / #44,#93 | 🟡 | FK 連鎖 or 明示クリーンアップ（`daycare_records` / `record_photos` / `guest_grants`）。migration で on delete を設計。要確定 |
+| UC-H11 | ペット削除時に紐づく記録・写真・ゲスト付与を畳む | owner | S4 / #44,#93 | ✅ | 決定（2026-07-04）: 記録は残す（`records.pet_id` は SET NULL 維持）、`guest_grants.scope_pet_id` は CASCADE。pgTAP 済 |
 
 ### B. 認証・認可（RBAC） — S2
 
@@ -130,21 +131,21 @@ G(外部ゲスト) / S(共有) / M(移行・非機能)。
 
 | ID | ユースケース | アクター | スライス/Issue | 状態 | 受け入れ条件 |
 | --- | --- | --- | --- | --- | --- |
-| UC-G01 | 保育園/シッターを対象ペット・期間限定で招く | owner | S4 / #93 | 🟢 | `guest_grants(household_id,user_id,scope_pet_id,role,valid_from,valid_to)` + RLS。招待導線は S3 流用 |
-| UC-G02 | ゲストは担当ペットのプロフィール＋期間内の共有記録のみ閲覧 | guest | S4 / #93（D8） | 🟢 | 既定 deny。owner が明示共有した記録＋ゲスト自身の記入のみ可視。家族の他情報・他ペットは不可視 |
-| UC-G03 | ゲストは期間内に担当ペットの記録を追加できる | guest | S4 / #93 | 🟢 | 追加は自身の記入のみ。対象ペット・期間外は不可 |
-| UC-G04 | 期間外/失効でゲストのアクセスが自動無効化される | guest | S4 / #93 | 🟢 | `valid_from/valid_to` を RLS ヘルパー（SECURITY DEFINER・search_path 固定）で判定。pgTAP で担保 |
-| UC-G05 | ゲストは Google 非依存で参加できる | guest | S4+S5（D3） | 🟢 | email/password で口座レス回避。UC-O02 前提 |
-| UC-G06 | ゲストのスコープ外参照・自己昇格が不可能 | 攻撃者 | S4 / #38,#93 | 🟢 | pgTAP でクロステナント/スコープ外を証明 |
-| UC-G07 | 期間終了後、ゲストの記入は世帯に残りゲストはアクセスを失う | guest/世帯 | S4 / #93（D8） | 🟢 | ゲストが書いた記録は世帯に残置（`household_id`=世帯・`owner_id`=ゲスト）。`valid_to` 経過でゲスト本人は不可視・不可書 |
+| UC-G01 | 保育園/シッターを対象ペット・期間限定で招く | owner | S4 / #93 | ✅ | `guest_grants` + RLS。招待は S3 基盤を流用（`household_invites` に guest role + `scope_pet_id` + 期間）。/settings で発行・失効 |
+| UC-G02 | ゲストは担当ペットのプロフィール＋期間内の共有記録のみ閲覧 | guest | S4 / #93（D8） | ✅ | 既定 deny（`guest_visible`）。`/guest` に担当ペットと期間内の共有記録＋自分の記入のみ表示。写真・他情報・他ペットは不可視。RLS が一次防衛線 |
+| UC-G03 | ゲストは期間内に担当ペットの記録を追加できる | guest | S4 / #93 | ✅ | `/guest/records/new`（テキスト・日付・体重。写真/タグはゲスト対象外）。追加は自身の記入のみ・対象ペット・期間内。RLS `records_insert_guest` が強制 |
+| UC-G04 | 期間外/失効でゲストのアクセスが自動無効化される | guest | S4 / #93 | ✅ | `valid_from/valid_to` を `has_guest_access` / `has_guest_record_access`（SECURITY DEFINER）で判定。pgTAP 済 |
+| UC-G05 | ゲストは Google 非依存で参加できる | guest | S4+S5（D3） | ✅ | S5 の email/password 認証（UC-O02）で参加可。ゲスト画面は Google 非依存 |
+| UC-G06 | ゲストのスコープ外参照・自己昇格が不可能 | 攻撃者 | S4 / #38,#93 | ✅ | pgTAP でクロステナント/スコープ外/自己付与/共有フラグ偽装の遮断を証明（guest_grants_test 28・guest_invites_test 10） |
+| UC-G07 | 期間終了後、ゲストの記入は世帯に残りゲストはアクセスを失う | guest/世帯 | S4 / #93（D8） | ✅ | ゲストの記入は世帯に残置（`owner_id`=ゲスト）。失効/期間外でゲスト本人は不可視・不可書。pgTAP 済 |
 
 ### E. 共有 — S4 に統合
 
 | ID | ユースケース | アクター | スライス/Issue | 状態 | 受け入れ条件 |
 | --- | --- | --- | --- | --- | --- |
-| UC-S01 | 既存 `share_links`（匿名 read-only）を廃止し `guest_grants` へ一本化 | owner | S4 / #93（D4） | 🟢 | 匿名閲覧を廃止。全員アカウント必須。発行済みトークンの失効/移行を伴う |
-| UC-S02 | 発行済み共有リンクの移行/告知 | owner/運用 | S4（D4） | 🟡 | 既存利用者（祖父母等）へアカウント作成を案内。旧トークンは期限内失効 |
-| UC-S03 | 一時的な引き継ぎ共有（read-only）をアカウントベースで表現 | owner→viewer/guest | S3/S4 | 🟢 | 「祖父母に一時閲覧」は viewer 招待 or 期間限定 guest で代替 |
+| UC-S01 | 既存 `share_links`（匿名 read-only）を廃止し `guest_grants` へ一本化 | owner | S4 / #93（D4） | ✅ | `get_shared_view` を常に無効化・既存リンクを一括失効（`20260705020000`）。/shares は終了案内・ナビから撤去。物理 DROP は後続クリーンアップ |
+| UC-S02 | 発行済み共有リンクの移行/告知 | owner/運用 | S4（D4） | ✅（暫定） | /shares と /share/[token] に終了案内を表示し viewer/ゲスト招待へ誘導。旧トークンは即時失効（期限を待たない） |
+| UC-S03 | 一時的な引き継ぎ共有（read-only）をアカウントベースで表現 | owner→viewer/guest | S3/S4 | ✅ | viewer 招待（S3）or 期間限定ゲスト招待（S4）で代替。匿名リンクは廃止 |
 | UC-S04 | 写真を含む共有（旧 share_links は写真非対応だった） | 閲覧者 | S4 / #93 | 🟡 | アカウント前提になったことで署名付き URL をログイン済み配信で扱える。SW 不変条件（private/期限付きをキャッシュしない）と両立 |
 
 ### F. マルチテナント移行の残債・非機能 — S1 残 + 横断

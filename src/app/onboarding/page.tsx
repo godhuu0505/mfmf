@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/household";
+import { hasActiveGuestGrant } from "@/lib/guest";
 import SubmitButton from "@/components/SubmitButton";
 import { createOwnHousehold } from "@/app/onboarding/actions";
 
@@ -21,14 +22,8 @@ export default async function OnboardingPage() {
   const membership = await getCurrentMembership(supabase);
   if (membership) redirect("/");
 
-  // ゲスト（保育園/シッター）は世帯を持たないのが正常状態（UC-G02）。
-  // ゲスト向け画面（S4-PR3）までの間、誤って自分の世帯を作らないよう案内を出す。
-  const { data: grants } = await supabase
-    .from("guest_grants")
-    .select("id")
-    .is("revoked_at", null)
-    .limit(1);
-  const isGuest = (grants ?? []).length > 0;
+  // 有効なゲスト付与を持つユーザーはゲスト画面へ（UC-G02。世帯を持たないのが正常）。
+  if (await hasActiveGuestGrant(supabase, user.id)) redirect("/guest");
 
   return (
     <main id="main" className="flex min-h-screen items-center justify-center px-4">
@@ -41,13 +36,6 @@ export default async function OnboardingPage() {
         </p>
 
         <div className="rounded-2xl bg-surface p-6 shadow-sm ring-1 ring-border">
-          {isGuest && (
-            <p className="mb-4 rounded-lg bg-surface-muted px-3 py-2 text-xs text-muted-foreground">
-              あなたはゲスト（保育園/シッター）として招待されています。ゲスト向けの
-              閲覧・記入画面は近日公開予定です。ご自身のペットの記録を別に始める場合
-              のみ、以下から世帯を作成してください。
-            </p>
-          )}
           <form action={createOwnHousehold} className="space-y-4">
             <div>
               <label

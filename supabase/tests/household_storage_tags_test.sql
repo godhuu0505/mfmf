@@ -426,12 +426,11 @@ select results_eq(
 
 reset role;
 
--- get_shared_view は「リンクの世帯」の記録だけを返す（複数世帯の作成者 A が
--- HB に持つ記録は HA のリンクから漏れない = UC-H07 解禁の前提）。
+-- 匿名共有リンク（share_links）は D4/UC-S01 で廃止済み。get_shared_view は
+-- トークンの有効・無効・世帯に関わらず常に無効を返す（匿名閲覧の完全停止）。
 select ok(
-  (public.get_shared_view('share-ha-token') -> 'records')::text like '%A record%'
-    and (public.get_shared_view('share-ha-token') -> 'records')::text not like '%A record in HB%',
-  '共有リンクはリンクの世帯（HA）の記録のみ返し、作成者が他世帯（HB）に持つ記録は漏れない'
+  (public.get_shared_view('share-ha-token') ->> 'valid') = 'false',
+  '匿名共有は廃止され、既存トークンでも get_shared_view は記録を返さない（D4/UC-S01）'
 );
 
 select * from finish();

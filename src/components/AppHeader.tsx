@@ -7,7 +7,6 @@ import {
   LogOut,
   PawPrint,
   Settings,
-  Share2,
 } from "lucide-react";
 
 // 共通ヘッダー。右側にログアウトボタン。
@@ -54,14 +53,6 @@ export default function AppHeader() {
             title="ペット"
           >
             <PawPrint className="h-5 w-5" aria-hidden="true" />
-          </Link>
-          <Link
-            href="/shares"
-            className="text-muted-foreground transition hover:text-foreground"
-            aria-label="共有リンク"
-            title="共有リンク"
-          >
-            <Share2 className="h-5 w-5" aria-hidden="true" />
           </Link>
           <Link
             href="/help"

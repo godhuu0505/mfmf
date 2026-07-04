@@ -54,8 +54,10 @@
   既存オブジェクトは `{owner_id}/{record_id}/{filename}` を併存。生成/検証は `src/lib/storagePath.ts`）。
 - 画面: `/login`（Google OAuth + email/password）, `/signup`（`SIGNUP_ENABLED=true` で開放）,
   `/forgot-password`, `/reset-password`, `/`（一覧）, `/records/new`, `/records/[id]`（`?edit=1` で編集）,
-  `/calendar`, `/gallery`, `/pets`, `/weight`, `/settings`, `/shares`, `/share/[token]`,
-  `/onboarding`（未所属ユーザーの世帯作成）, `/invite/[token]`, `/feedback`, `/offline`, `/auth/*`。
+  `/calendar`, `/gallery`, `/pets`, `/weight`, `/settings`, `/share/[token]`,
+  `/onboarding`（未所属ユーザーの世帯作成）, `/invite/[token]`（内部/ゲスト招待の受諾）,
+  `/guest`・`/guest/records/new`（外部ゲストの閲覧/記入 UC-G02/G03）,
+  `/feedback`, `/offline`, `/auth/*`。`/shares`・`/share/[token]` は匿名共有廃止（D4）の終了案内。
 
 ## セキュリティ（厳守）
 
