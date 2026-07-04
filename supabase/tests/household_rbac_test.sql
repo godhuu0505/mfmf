@@ -15,7 +15,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(34);
+select plan(35);
 
 -- fixture: HA に A(owner) / E(editor) / V(viewer)。record RA・tag TA・photo PH は A 作成。
 insert into auth.users (id, email) values
@@ -293,5 +293,13 @@ select results_eq(
 );
 
 reset role;
+
+-- 退出した発行者（E）の共有リンクは自動的に無効になる（get_shared_view が
+-- 「発行者がリンクの世帯のメンバーであること」を要求するため）。
+select ok(
+  (public.get_shared_view('token-by-editor') ->> 'valid') = 'false',
+  '発行者が世帯を退出すると、その共有リンクは無効になる（UC-H05/H06 のリンク残置防止）'
+);
+
 select * from finish();
 rollback;

@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireEditableHousehold } from "@/lib/household";
+import { canEdit, getRoleInHousehold } from "@/lib/household";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -15,8 +15,15 @@ async function requireUser() {
   return { supabase, user };
 }
 
-export async function createShareLink(formData: FormData) {
+// householdId は /shares を描画した世帯（Cookie の現在世帯ではない = 別タブで
+// 切り替えた後の古いフォーム送信でも、公開対象の世帯がすり替わらない）。
+export async function createShareLink(householdId: string, formData: FormData) {
   const { supabase, user } = await requireUser();
+
+  const role = await getRoleInHousehold(supabase, user.id, householdId);
+  if (!role || !canEdit(role)) {
+    throw new Error("共有リンクの発行は対象の世帯の owner / editor のみ行えます");
+  }
 
   const label = String(formData.get("label") || "").trim() || null;
   const fromRaw = String(formData.get("from_date") || "").trim();
@@ -31,12 +38,6 @@ export async function createShareLink(formData: FormData) {
   const days = Number(expiresDaysRaw);
   if (Number.isFinite(days) && days > 0) {
     expires_at = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-  }
-
-  // 共有対象は「現在の世帯」に固定する（複数世帯の作成者でも他世帯の記録は漏れない）。
-  const householdId = await requireEditableHousehold(supabase, user.id);
-  if (!householdId) {
-    throw new Error("世帯に所属していないため共有リンクを作成できません");
   }
 
   // 推測不能なトークン（256bit 相当）。

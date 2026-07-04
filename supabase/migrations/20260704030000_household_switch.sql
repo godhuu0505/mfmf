@@ -175,7 +175,12 @@ begin
   from public.share_links
   where token = p_token
     and revoked_at is null
-    and (expires_at is null or expires_at > now());
+    and (expires_at is null or expires_at > now())
+    -- 発行者がリンクの世帯を退出/削除されたら、そのリンクも自動的に無効化する
+    -- （退出者は世帯データへのアクセスを失う = UC-H05/H06。リンク経由の残置も許さない。
+    --   null は移行期の旧リンク = S4 の share_links 廃止 D4 で一掃する）
+    and (household_id is null
+         or public.is_household_member(household_id, owner_id));
 
   if not found then
     return jsonb_build_object('valid', false);

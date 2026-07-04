@@ -143,7 +143,10 @@ export default async function SettingsPage() {
               )}
 
               {isOwner ? (
-                <form action={renameHousehold} className="flex items-end gap-2">
+                <form
+                  action={renameHousehold.bind(null, membership.householdId)}
+                  className="flex items-end gap-2"
+                >
                   <div className="flex-1">
                     <label
                       htmlFor="household_name"
@@ -188,7 +191,11 @@ export default async function SettingsPage() {
                       {isOwner && m.user_id !== user.id ? (
                         <div className="flex items-center gap-2">
                           <form
-                            action={updateMemberRole.bind(null, m.user_id)}
+                            action={updateMemberRole.bind(
+                              null,
+                              membership.householdId,
+                              m.user_id,
+                            )}
                             className="flex items-center gap-2"
                           >
                             <select
@@ -207,7 +214,13 @@ export default async function SettingsPage() {
                               変更
                             </SubmitButton>
                           </form>
-                          <form action={removeMember.bind(null, m.user_id)}>
+                          <form
+                            action={removeMember.bind(
+                              null,
+                              membership.householdId,
+                              m.user_id,
+                            )}
+                          >
                             <SubmitButton
                               pendingLabel="削除中…"
                               className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
@@ -226,7 +239,10 @@ export default async function SettingsPage() {
                   削除・退出しても、その人が書いた記録は世帯に残ります。
                   世帯には最低 1 人の owner が必要です（最後の owner は降格・退出できません）。
                 </p>
-                <form action={leaveHousehold} className="mt-3">
+                <form
+                  action={leaveHousehold.bind(null, membership.householdId)}
+                  className="mt-3"
+                >
                   <SubmitButton
                     pendingLabel="退出中…"
                     className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
@@ -242,7 +258,10 @@ export default async function SettingsPage() {
                   <h3 className="mb-2 text-sm font-medium text-foreground">
                     メンバーを招待
                   </h3>
-                  <form action={createInvite} className="flex flex-wrap items-end gap-2">
+                  <form
+                    action={createInvite.bind(null, membership.householdId)}
+                    className="flex flex-wrap items-end gap-2"
+                  >
                     <div className="flex-1 min-w-[12rem]">
                       <label
                         htmlFor="invite_email"
@@ -287,7 +306,13 @@ export default async function SettingsPage() {
                               {inv.email}（{inv.role}） ・ {inviteStatus(inv)}
                             </span>
                             {inviteStatus(inv) === "有効" && (
-                              <form action={revokeInvite.bind(null, inv.id)}>
+                              <form
+                                action={revokeInvite.bind(
+                                  null,
+                                  membership.householdId,
+                                  inv.id,
+                                )}
+                              >
                                 <SubmitButton
                                   pendingLabel="取消中…"
                                   className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"

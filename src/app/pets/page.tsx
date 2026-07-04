@@ -138,6 +138,10 @@ export default async function PetsPage() {
             ペットを追加
           </h2>
           <form action={createPet} className="space-y-4">
+            {/* 追加先の世帯を明示（Cookie 切替後の古いフォーム送信対策） */}
+            {membership && (
+              <input type="hidden" name="household_id" value={membership.householdId} />
+            )}
             <div className="flex flex-wrap gap-3">
               <div className="flex-1 min-w-[10rem]">
                 <label htmlFor="new-name" className={labelClass}>
