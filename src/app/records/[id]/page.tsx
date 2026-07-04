@@ -80,7 +80,9 @@ export default async function RecordDetailPage({
 
   // 編集フォームのサジェスト用に世帯のタグ辞書を取得
   const tagSuggestions = isEditable
-    ? (await getTagDictionary()).map((t) => t.name)
+    ? (await getTagDictionary(record.household_id ?? householdId)).map(
+        (t) => t.name,
+      )
     : [];
 
   return (

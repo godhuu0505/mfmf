@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMembership } from "@/lib/household";
 import { type ShareLink } from "@/types/database";
 import AppHeader from "@/components/AppHeader";
 import SubmitButton from "@/components/SubmitButton";
@@ -43,6 +44,9 @@ export default async function SharesPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // 共有の対象世帯 = この画面を描画した世帯（作成フォームにバインドする）。
+  const membership = await getCurrentMembership(supabase);
 
   const { data } = await supabase
     .from("share_links")
@@ -151,7 +155,11 @@ export default async function SharesPage() {
           <h2 className="mb-4 text-base font-bold text-foreground">
             共有リンクを作成
           </h2>
-          <form action={createShareLink} className="space-y-4">
+          {membership ? (
+          <form
+            action={createShareLink.bind(null, membership.householdId)}
+            className="space-y-4"
+          >
             <div>
               <label htmlFor="label" className={labelClass}>
                 メモ（共有相手など・任意）
@@ -198,6 +206,11 @@ export default async function SharesPage() {
               リンクを作成する
             </SubmitButton>
           </form>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              世帯に所属していないため共有リンクを作成できません。
+            </p>
+          )}
         </section>
       </main>
     </>

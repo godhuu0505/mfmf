@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMembership } from "@/lib/household";
+import { getCurrentMembership, listCurrentMemberships } from "@/lib/household";
 import { getCurrentProfile } from "@/lib/profile";
 import AppHeader from "@/components/AppHeader";
 import SubmitButton from "@/components/SubmitButton";
@@ -12,6 +12,7 @@ import {
   removeMember,
   renameHousehold,
   revokeInvite,
+  switchHousehold,
   updateMemberRole,
 } from "@/app/settings/actions";
 
@@ -38,20 +39,28 @@ export default async function SettingsPage() {
   // メンバー一覧は RLS（household_members_select_member）で自世帯分のみ返る。
   const membership = await getCurrentMembership(supabase);
   const isOwner = membership?.role === "owner";
-  const [{ data: household }, { data: members }] = membership
+  const [{ data: household }, { data: members }, memberships] = membership
     ? await Promise.all([
         supabase
           .from("households")
           .select("id, name")
           .eq("id", membership.householdId)
           .maybeSingle(),
-        supabase
-          .from("household_members")
-          .select("user_id, role, created_at")
-          .eq("household_id", membership.householdId)
-          .order("created_at", { ascending: true }),
+        // メール・表示名は個人スコープ（UC-M03）のため、世帯メンバーに限って返す
+        // SECURITY DEFINER 関数で解決する。
+        supabase.rpc("get_household_members", {
+          p_household: membership.householdId,
+        }),
+        listCurrentMemberships(supabase),
       ])
-    : [{ data: null }, { data: null }];
+    : [{ data: null }, { data: null }, []];
+  const memberRows = ((members as unknown) ?? []) as {
+    user_id: string;
+    role: string;
+    created_at: string;
+    email: string | null;
+    display_name: string | null;
+  }[];
 
   // 招待一覧（owner のみ。RLS invites_select_owner が強制）。
   const { data: invites } =
@@ -100,8 +109,44 @@ export default async function SettingsPage() {
                 </p>
               </div>
 
+              {memberships.length > 1 && (
+                <div>
+                  <h3 className="mb-2 text-sm font-medium text-foreground">
+                    世帯を切り替え（UC-H08）
+                  </h3>
+                  <ul className="space-y-2">
+                    {memberships.map((m) => (
+                      <li
+                        key={m.householdId}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-muted px-3 py-2 text-sm"
+                      >
+                        <span className="text-foreground">
+                          {m.householdName || "（名前未設定の世帯）"} ・ {m.role}
+                          {m.householdId === membership.householdId
+                            ? "（表示中）"
+                            : ""}
+                        </span>
+                        {m.householdId !== membership.householdId && (
+                          <form action={switchHousehold.bind(null, m.householdId)}>
+                            <SubmitButton
+                              pendingLabel="切替中…"
+                              className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+                            >
+                              この世帯を表示
+                            </SubmitButton>
+                          </form>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {isOwner ? (
-                <form action={renameHousehold} className="flex items-end gap-2">
+                <form
+                  action={renameHousehold.bind(null, membership.householdId)}
+                  className="flex items-end gap-2"
+                >
                   <div className="flex-1">
                     <label
                       htmlFor="household_name"
@@ -134,20 +179,23 @@ export default async function SettingsPage() {
               <div>
                 <h3 className="mb-2 text-sm font-medium text-foreground">メンバー</h3>
                 <ul className="space-y-2">
-                  {(members ?? []).map((m) => (
+                  {memberRows.map((m) => (
                     <li
                       key={m.user_id}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-muted px-3 py-2 text-sm"
                     >
                       <span className="text-foreground">
-                        {m.user_id === user.id
-                          ? `${profile?.display_name || user.email || "自分"}（自分）`
-                          : `メンバー ${m.user_id.slice(0, 8)}…`}
+                        {m.display_name || m.email || `メンバー ${m.user_id.slice(0, 8)}…`}
+                        {m.user_id === user.id ? "（自分）" : ""}
                       </span>
                       {isOwner && m.user_id !== user.id ? (
                         <div className="flex items-center gap-2">
                           <form
-                            action={updateMemberRole.bind(null, m.user_id)}
+                            action={updateMemberRole.bind(
+                              null,
+                              membership.householdId,
+                              m.user_id,
+                            )}
                             className="flex items-center gap-2"
                           >
                             <select
@@ -166,7 +214,13 @@ export default async function SettingsPage() {
                               変更
                             </SubmitButton>
                           </form>
-                          <form action={removeMember.bind(null, m.user_id)}>
+                          <form
+                            action={removeMember.bind(
+                              null,
+                              membership.householdId,
+                              m.user_id,
+                            )}
+                          >
                             <SubmitButton
                               pendingLabel="削除中…"
                               className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
@@ -185,7 +239,10 @@ export default async function SettingsPage() {
                   削除・退出しても、その人が書いた記録は世帯に残ります。
                   世帯には最低 1 人の owner が必要です（最後の owner は降格・退出できません）。
                 </p>
-                <form action={leaveHousehold} className="mt-3">
+                <form
+                  action={leaveHousehold.bind(null, membership.householdId)}
+                  className="mt-3"
+                >
                   <SubmitButton
                     pendingLabel="退出中…"
                     className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
@@ -201,7 +258,10 @@ export default async function SettingsPage() {
                   <h3 className="mb-2 text-sm font-medium text-foreground">
                     メンバーを招待
                   </h3>
-                  <form action={createInvite} className="flex flex-wrap items-end gap-2">
+                  <form
+                    action={createInvite.bind(null, membership.householdId)}
+                    className="flex flex-wrap items-end gap-2"
+                  >
                     <div className="flex-1 min-w-[12rem]">
                       <label
                         htmlFor="invite_email"
@@ -246,7 +306,13 @@ export default async function SettingsPage() {
                               {inv.email}（{inv.role}） ・ {inviteStatus(inv)}
                             </span>
                             {inviteStatus(inv) === "有効" && (
-                              <form action={revokeInvite.bind(null, inv.id)}>
+                              <form
+                                action={revokeInvite.bind(
+                                  null,
+                                  membership.householdId,
+                                  inv.id,
+                                )}
+                              >
                                 <SubmitButton
                                   pendingLabel="取消中…"
                                   className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"

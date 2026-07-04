@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMembership } from "@/lib/household";
+import { cookies } from "next/headers";
+import {
+  getCurrentMembership,
+  getRoleInHousehold,
+  HOUSEHOLD_COOKIE,
+} from "@/lib/household";
 
 export type SettingsResult = {
   ok: boolean;
@@ -87,25 +92,31 @@ export async function changePassword(
 // 分かりやすいエラーを返す（クライアント回避不可の強制は DB 側）。
 // ---------------------------------------------------------------
 
-// 世帯名を変更する（owner のみ / UC-H02）。
-export async function renameHousehold(formData: FormData) {
+// 対象世帯（= 画面を描画した世帯。Cookie の現在世帯ではない）での owner を要求する
+// 共通検査。別タブで世帯を切り替えた後に古いフォームを送信しても、操作は必ず
+// フォームの世帯に対して検証・適用される。一次防衛線は RLS。
+async function requireOwnerOf(householdId: string) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership) throw new Error("世帯に所属していません");
-  if (membership.role !== "owner") {
-    throw new Error("世帯名の変更は owner のみ行えます");
+  const role = await getRoleInHousehold(supabase, user.id, householdId);
+  if (role !== "owner") {
+    throw new Error("この操作は対象の世帯の owner のみ行えます");
   }
+  return { supabase, user };
+}
+
+// 世帯名を変更する（owner のみ / UC-H02）。householdId は画面を描画した世帯。
+export async function renameHousehold(householdId: string, formData: FormData) {
+  const { supabase } = await requireOwnerOf(householdId);
 
   const name = String(formData.get("household_name") || "").trim().slice(0, 100);
   const { error } = await supabase
     .from("households")
     .update({ name })
-    .eq("id", membership.householdId);
+    .eq("id", householdId);
   if (error) {
     throw new Error(`世帯名の変更に失敗しました: ${error.message}`);
   }
@@ -114,18 +125,12 @@ export async function renameHousehold(formData: FormData) {
 }
 
 // メンバーのロールを変更する（owner のみ / UC-H04。最後の owner の降格は D6 が拒否）。
-export async function updateMemberRole(memberUserId: string, formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership) throw new Error("世帯に所属していません");
-  if (membership.role !== "owner") {
-    throw new Error("ロールの変更は owner のみ行えます");
-  }
+export async function updateMemberRole(
+  householdId: string,
+  memberUserId: string,
+  formData: FormData,
+) {
+  const { supabase } = await requireOwnerOf(householdId);
 
   const role = String(formData.get("role") || "");
   if (!["owner", "editor", "viewer"].includes(role)) {
@@ -135,7 +140,7 @@ export async function updateMemberRole(memberUserId: string, formData: FormData)
   const { error } = await supabase
     .from("household_members")
     .update({ role })
-    .eq("household_id", membership.householdId)
+    .eq("household_id", householdId)
     .eq("user_id", memberUserId);
   if (error) {
     // D6 トリガ（最後の owner の降格不可）のメッセージをそのまま届ける。
@@ -147,17 +152,8 @@ export async function updateMemberRole(memberUserId: string, formData: FormData)
 
 // 招待を発行する（owner のみ / UC-O09。宛先メール固定 D12・期限 7 日）。
 // 強制は RLS（invites_insert_owner）。リンクは /invite/{token} を owner が本人へ共有する。
-export async function createInvite(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership || membership.role !== "owner") {
-    throw new Error("招待の発行は owner のみ行えます");
-  }
+export async function createInvite(householdId: string, formData: FormData) {
+  const { supabase, user } = await requireOwnerOf(householdId);
 
   const email = String(formData.get("invite_email") || "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -173,7 +169,7 @@ export async function createInvite(formData: FormData) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const { error } = await supabase.from("household_invites").insert({
-    household_id: membership.householdId,
+    household_id: householdId,
     email,
     role,
     token,
@@ -188,23 +184,14 @@ export async function createInvite(formData: FormData) {
 }
 
 // 招待を取り消す（owner のみ / UC-O11）。
-export async function revokeInvite(inviteId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership || membership.role !== "owner") {
-    throw new Error("招待の取消は owner のみ行えます");
-  }
+export async function revokeInvite(householdId: string, inviteId: string) {
+  const { supabase } = await requireOwnerOf(householdId);
 
   const { error } = await supabase
     .from("household_invites")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", inviteId)
-    .eq("household_id", membership.householdId);
+    .eq("household_id", householdId);
   if (error) {
     throw new Error(`招待の取消に失敗しました: ${error.message}`);
   }
@@ -213,22 +200,13 @@ export async function revokeInvite(inviteId: string) {
 }
 
 // メンバーを世帯から削除する（owner のみ / UC-H05。最後の owner は D6 が拒否）。
-export async function removeMember(memberUserId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership || membership.role !== "owner") {
-    throw new Error("メンバーの削除は owner のみ行えます");
-  }
+export async function removeMember(householdId: string, memberUserId: string) {
+  const { supabase } = await requireOwnerOf(householdId);
 
   const { error } = await supabase
     .from("household_members")
     .delete()
-    .eq("household_id", membership.householdId)
+    .eq("household_id", householdId)
     .eq("user_id", memberUserId);
   if (error) {
     throw new Error(`メンバーの削除に失敗しました: ${error.message}`);
@@ -238,21 +216,19 @@ export async function removeMember(memberUserId: string) {
 }
 
 // 自分が世帯から退出する（UC-H06。最後の owner は D6 が拒否）。
+// householdId は画面を描画した世帯（= 退出対象を明示。Cookie には依存しない）。
 // 退出後は当該世帯のデータが一切見えなくなる（記録は世帯に残る = UC-H10）。
-export async function leaveHousehold() {
+export async function leaveHousehold(householdId: string) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const membership = await getCurrentMembership(supabase);
-  if (!membership) throw new Error("世帯に所属していません");
-
   const { error } = await supabase
     .from("household_members")
     .delete()
-    .eq("household_id", membership.householdId)
+    .eq("household_id", householdId)
     .eq("user_id", user.id);
   if (error) {
     // 最後の owner の場合は D6 トリガのメッセージをそのまま届ける。
@@ -261,4 +237,34 @@ export async function leaveHousehold() {
 
   revalidatePath("/", "layout");
   redirect("/");
+}
+
+// 「現在の世帯」を切り替える（UC-H08）。Cookie に保持し、全画面が追従する。
+// 実在する自分のメンバーシップのみ受理（Cookie 偽装は household.ts 側でも無視される）。
+export async function switchHousehold(householdId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data } = await supabase
+    .from("household_members")
+    .select("household_id")
+    .eq("user_id", user.id)
+    .eq("household_id", householdId)
+    .maybeSingle();
+  if (!data) {
+    throw new Error("その世帯のメンバーではありません");
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(HOUSEHOLD_COOKIE, householdId, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/settings");
 }

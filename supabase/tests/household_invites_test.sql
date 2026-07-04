@@ -7,14 +7,15 @@
 --   - 受諾 accept_household_invite は token 実在・未失効・未使用・期限内・
 --     宛先メール一致（D12/D13）をすべて満たす場合のみメンバー化する
 --   - household_members への直接 insert は引き続き deny by default（UC-A05）
---   - 世帯切替 UI 導入までは複数世帯への参加を制限（D2）
+--   - 複数世帯への参加可（UC-H07。D2 は切替 UI とセットで解除 = 20260704030000）
+--   - get_household_members はメンバー限定でメール・表示名を返す（非メンバーは拒否）
 -- =============================================================
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(15);
+select plan(18);
 
 -- fixture:
 --   A = HA の owner / E = HA の editor / B = 未所属（被招待者）/ C = HB の owner（D2 用）
@@ -143,13 +144,32 @@ select isnt_empty(
 );
 
 -- ---------------------------------------------------------------
--- D2: 既に他世帯（HB）に所属する C は、切替 UI 導入まで HA へ参加できない
+-- 複数世帯への参加（UC-H07・D1。D2 は切替 UI とセットで解除済み = 20260704030000）
+-- と get_household_members（メンバー限定のメール解決）
 -- ---------------------------------------------------------------
 select set_config('request.jwt.claims',
   '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","email":"c@test.local","role":"authenticated"}', true);
-select throws_ok(
+select lives_ok(
   $$select public.accept_household_invite('tok-for-c')$$,
-  'P0001', null, '既に他世帯へ所属するユーザーの受諾は世帯切替 UI 導入まで制限（D2）'
+  '既に他世帯（HB）へ所属するユーザーも受諾できる（複数世帯参加 UC-H07。D2 は切替 UI とセットで解除）'
+);
+select results_eq(
+  $$select count(*)::int from public.household_members
+    where user_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'$$,
+  $$values (2)$$,
+  'C は HB と HA の 2 世帯に所属する'
+);
+select results_eq(
+  $$select count(*)::int from public.get_household_members('11111111-1111-1111-1111-111111111111')
+    where email = 'a@test.local'$$,
+  $$values (1)$$,
+  'メンバーは get_household_members で世帯メンバーのメールを解決できる'
+);
+select set_config('request.jwt.claims',
+  '{"sub":"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee","email":"e@test.local","role":"authenticated"}', true);
+select throws_ok(
+  $$select * from public.get_household_members('22222222-2222-2222-2222-222222222222')$$,
+  '42501', null, '非メンバーは get_household_members を呼べない（メンバー構成・メールを漏らさない）'
 );
 
 reset role;

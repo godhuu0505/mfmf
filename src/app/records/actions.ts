@@ -5,7 +5,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET, normalizeTagName, toSource } from "@/types/database";
 import { isPathForRecord } from "@/lib/storagePath";
-import { requireEditableHousehold, householdScopeFilter } from "@/lib/household";
+import {
+  canEdit,
+  getRoleInHousehold,
+  householdScopeFilter,
+  requireEditableHousehold,
+} from "@/lib/household";
 
 // フォームから記録メタデータ（記録元・記入者・体重）を取り出す。
 function parseRecordFields(formData: FormData) {
@@ -48,6 +53,31 @@ async function resolvePetId(
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// 既存の記録に対する操作の権限検査: 記録が「属する世帯」でのロールを確認する
+// （Cookie の「現在の世帯」とは独立。別タブで世帯を切り替えた後に古いフォームを
+// 送信しても、対象の記録が別世帯へ移動したり誤った世帯で検証されたりしない）。
+// 記録が見えている時点で呼び出しユーザーはその世帯のメンバー（読取は membership
+// のみ）だが、role が viewer なら分かりやすいエラーで拒否する。一次防衛線は RLS。
+async function requireEditableRecordHousehold(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  recordId: string,
+): Promise<string> {
+  const { data } = await supabase
+    .from("daycare_records")
+    .select("household_id")
+    .eq("id", recordId)
+    .maybeSingle();
+  if (!data) {
+    throw new Error("記録が見つかりません（または権限がありません）");
+  }
+  const role = await getRoleInHousehold(supabase, userId, data.household_id);
+  if (role && !canEdit(role)) {
+    throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
+  }
+  return data.household_id;
+}
 
 // 写真はクライアントから Storage へ直接アップロード済み。
 // ここではそのオブジェクトパスを record_photos に登録するだけ。
@@ -242,8 +272,24 @@ export async function createRecord(formData: FormData) {
     throw new Error("不正なリクエストです");
   }
   const fields = parseRecordFields(formData);
-  // ロール検査（viewer は書き込み不可）+ 所属世帯の解決（一次防衛線は RLS）。
-  const householdId = await requireEditableHousehold(supabase, user.id);
+  // 書き込み先の世帯は「フォームを描画した世帯」（hidden で送信・写真のアップロード
+  // 先と同一）を優先し、その世帯での editor+ を検証する。Cookie の現在世帯に依存する
+  // と、別タブで切り替えた後の送信で記録と写真パスの世帯が食い違う。
+  // hidden が無い場合（未所属フォールバック）のみ従来どおり現在世帯を解決する。
+  const formHousehold = String(formData.get("household_id") || "").trim();
+  let householdId: string | null;
+  if (UUID_RE.test(formHousehold)) {
+    const role = await getRoleInHousehold(supabase, user.id, formHousehold);
+    if (!role) {
+      throw new Error("この世帯のメンバーではありません");
+    }
+    if (!canEdit(role)) {
+      throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
+    }
+    householdId = formHousehold;
+  } else {
+    householdId = await requireEditableHousehold(supabase, user.id);
+  }
   const pet_id = await resolvePetId(supabase, user.id, householdId, formData);
 
   const { error } = await supabase
@@ -287,15 +333,18 @@ export async function updateRecord(recordId: string, formData: FormData) {
   if (!user) redirect("/login");
 
   const fields = parseRecordFields(formData);
-  // ロール検査（viewer は書き込み不可）+ 所属世帯の解決。null（未所属）のときは
-  // 既存 household_id を上書きしない。
-  const householdId = await requireEditableHousehold(supabase, user.id);
-  const householdPatch = householdId ? { household_id: householdId } : {};
+  // 対象の記録が属する世帯で権限を検査し、以降の検証・タグ同期もその世帯で行う
+  // （Cookie の現在世帯には依存しない = 記録が世帯間を移動することはない）。
+  const householdId = await requireEditableRecordHousehold(
+    supabase,
+    user.id,
+    recordId,
+  );
   const pet_id = await resolvePetId(supabase, user.id, householdId, formData);
 
   const { error } = await supabase
     .from("daycare_records")
-    .update({ ...fields, ...householdPatch, pet_id })
+    .update({ ...fields, pet_id })
     .eq("id", recordId);
 
   if (error) {
@@ -328,7 +377,7 @@ export async function deletePhoto(photoId: string, recordId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  await requireEditableHousehold(supabase, user.id);
+  await requireEditableRecordHousehold(supabase, user.id, recordId);
 
   const { data: photo, error: fetchError } = await supabase
     .from("record_photos")
@@ -361,7 +410,7 @@ export async function deleteRecord(recordId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  await requireEditableHousehold(supabase, user.id);
+  await requireEditableRecordHousehold(supabase, user.id, recordId);
 
   // 紐づく Storage オブジェクトを先に削除 (DB 行は ON DELETE CASCADE)
   const { data: photos } = await supabase
