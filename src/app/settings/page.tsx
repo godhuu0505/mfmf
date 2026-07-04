@@ -6,7 +6,12 @@ import { getCurrentProfile } from "@/lib/profile";
 import AppHeader from "@/components/AppHeader";
 import SubmitButton from "@/components/SubmitButton";
 import { ProfileForm, PasswordForm } from "@/app/settings/SettingsForms";
-import { renameHousehold, updateMemberRole } from "@/app/settings/actions";
+import {
+  createInvite,
+  renameHousehold,
+  revokeInvite,
+  updateMemberRole,
+} from "@/app/settings/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +50,28 @@ export default async function SettingsPage() {
           .order("created_at", { ascending: true }),
       ])
     : [{ data: null }, { data: null }];
+
+  // 招待一覧（owner のみ。RLS invites_select_owner が強制）。
+  const { data: invites } =
+    membership && isOwner
+      ? await supabase
+          .from("household_invites")
+          .select("id, email, role, token, expires_at, accepted_at, revoked_at")
+          .eq("household_id", membership.householdId)
+          .order("created_at", { ascending: false })
+          .limit(20)
+      : { data: null };
+
+  const inviteStatus = (inv: {
+    expires_at: string;
+    accepted_at: string | null;
+    revoked_at: string | null;
+  }): string => {
+    if (inv.accepted_at) return "受諾済み";
+    if (inv.revoked_at) return "取消済み";
+    if (new Date(inv.expires_at).getTime() < Date.now()) return "期限切れ";
+    return "有効";
+  };
 
   return (
     <>
@@ -143,10 +170,84 @@ export default async function SettingsPage() {
                   ))}
                 </ul>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  メンバーの招待・削除・退出は今後のアップデート（S3 内部招待）で対応予定です。
+                  メンバーの削除・退出は今後のアップデートで対応予定です。
                   世帯には最低 1 人の owner が必要です。
                 </p>
               </div>
+
+              {/* 招待（owner のみ / UC-O09〜O11。宛先メール固定 D12） */}
+              {isOwner && (
+                <div className="border-t border-border pt-4">
+                  <h3 className="mb-2 text-sm font-medium text-foreground">
+                    メンバーを招待
+                  </h3>
+                  <form action={createInvite} className="flex flex-wrap items-end gap-2">
+                    <div className="flex-1 min-w-[12rem]">
+                      <label
+                        htmlFor="invite_email"
+                        className="mb-1 block text-xs text-muted-foreground"
+                      >
+                        宛先メールアドレス（このアドレスのアカウントだけが参加できます）
+                      </label>
+                      <input
+                        id="invite_email"
+                        name="invite_email"
+                        type="email"
+                        required
+                        placeholder="family@example.com"
+                        className="w-full rounded-lg border border-border px-3 py-2 text-sm text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
+                      />
+                    </div>
+                    <select
+                      name="invite_role"
+                      defaultValue="editor"
+                      className="rounded-lg border border-border px-2 py-2 text-sm text-foreground"
+                    >
+                      <option value="editor">editor（編集可）</option>
+                      <option value="viewer">viewer（閲覧のみ）</option>
+                    </select>
+                    <SubmitButton
+                      pendingLabel="発行中…"
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
+                    >
+                      招待を発行
+                    </SubmitButton>
+                  </form>
+
+                  {(invites ?? []).length > 0 && (
+                    <ul className="mt-3 space-y-2">
+                      {(invites ?? []).map((inv) => (
+                        <li
+                          key={inv.id}
+                          className="rounded-lg bg-surface-muted px-3 py-2 text-sm"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-foreground">
+                              {inv.email}（{inv.role}） ・ {inviteStatus(inv)}
+                            </span>
+                            {inviteStatus(inv) === "有効" && (
+                              <form action={revokeInvite.bind(null, inv.id)}>
+                                <SubmitButton
+                                  pendingLabel="取消中…"
+                                  className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
+                                >
+                                  取り消す
+                                </SubmitButton>
+                              </form>
+                            )}
+                          </div>
+                          {inviteStatus(inv) === "有効" && (
+                            <p className="mt-1 break-all text-xs text-muted-foreground">
+                              招待リンク: /invite/{inv.token}
+                              （このリンクを本人に共有してください）
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </section>
           )}
 

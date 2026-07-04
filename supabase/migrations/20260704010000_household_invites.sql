@@ -117,17 +117,26 @@ begin
   if inv.revoked_at is not null then
     raise exception 'この招待は取り消されています' using errcode = 'P0002';
   end if;
+  -- D12/D13: 宛先メール一致の強制（不一致は拒否。使用済み判定より先に行い、
+  -- 他人宛て招待の状態を漏らさない）
+  if v_email is null or v_email <> lower(inv.email) then
+    raise exception 'ログイン中のアカウントのメールアドレスが招待の宛先と一致しません'
+      using errcode = '42501';
+  end if;
   if inv.accepted_at is not null then
+    -- 冪等リトライ: 本人が受諾済み（成功後のタイムアウト再試行・リンク再訪）は
+    -- 失敗ではなく成功として返す。それ以外の使用済みは拒否。
+    if inv.accepted_by = v_uid then
+      return inv.household_id;
+    end if;
     raise exception 'この招待は使用済みです' using errcode = 'P0002';
   end if;
   if inv.expires_at < now() then
     raise exception 'この招待は期限切れです' using errcode = 'P0002';
   end if;
-  -- D12/D13: 宛先メール一致の強制（不一致は拒否）
-  if v_email is null or v_email <> lower(inv.email) then
-    raise exception 'ログイン中のアカウントのメールアドレスが招待の宛先と一致しません'
-      using errcode = '42501';
-  end if;
+  -- ユーザー単位で受諾を直列化する（異なる招待の同時受諾で D2 の単一世帯制限を
+  -- すり抜けて複数 membership が作られるレースを防ぐ）。
+  perform pg_advisory_xact_lock(hashtext('accept_household_invite:' || v_uid::text));
   -- 既にメンバーなら冪等に成功扱い（受諾済みマークだけ付ける）
   if not exists (
     select 1 from public.household_members m
