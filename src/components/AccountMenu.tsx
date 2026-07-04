@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { LogOut, MessageSquare, Settings, UserRound } from "lucide-react";
 
@@ -140,7 +141,13 @@ function LogoutConfirmDialog({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
-  return (
+  // ヘッダーは sticky+z-10 で重なり文脈を、backdrop-blur で固定配置の含有ブロックを
+  // 作る。ダイアログをその中に置くと、暗幕が viewport ではなくヘッダー内に閉じ込め
+  // られ、FeedbackWidget（z-40, body 直下）が上に残ってしまう。body 直下へポータル
+  // して、ページ全体を確実に覆う。
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
@@ -184,6 +191,7 @@ function LogoutConfirmDialog({ onClose }: { onClose: () => void }) {
           </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
