@@ -94,22 +94,22 @@ select ok(
 );
 
 select ok(
-  exists (select 1 from pg_policies
+  not exists (select 1 from pg_policies
           where schemaname = 'storage' and tablename = 'objects'
             and policyname = 'daycare_photos_select_own'),
-  '既存 Storage own ポリシー daycare_photos_select_own が併存追加後も残存している'
+  'daycare_photos_select_own は S3 で撤去済み（読取は記録の世帯メンバーシップのみ）'
 );
 select ok(
   exists (select 1 from pg_policies
           where schemaname = 'public' and tablename = 'tags'
             and policyname = 'tags_select_own'),
-  '既存 owner_id ポリシー tags_select_own が残存している'
+  'tags_select_own は未所属タグの昇格用に残存（household_id IS NULL に限定）'
 );
 select ok(
-  exists (select 1 from pg_policies
+  not exists (select 1 from pg_policies
           where schemaname = 'public' and tablename = 'record_tags'
             and policyname = 'record_tags_select_own'),
-  '既存 owner_id ポリシー record_tags_select_own が残存している'
+  'record_tags_select_own は S3 で撤去済み'
 );
 
 select ok(
@@ -131,7 +131,7 @@ select results_eq(
     where bucket_id = 'daycare-photos'
       and name = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/aaaa0000-0000-0000-0000-000000000001/a.jpg'$$,
   $$values (1)$$,
-  'owner A は旧規約 {owner_id}/... の自分のオブジェクトを従来どおり select 可（own ポリシー）'
+  'owner A は旧規約 {owner_id}/... の自分のオブジェクトを select 可（記録の世帯メンバーとして）'
 );
 select lives_ok(
   $$insert into storage.objects (bucket_id, name)
@@ -381,14 +381,12 @@ select throws_ok(
   null,
   'household 未所属のタグは他メンバーの記録へ持ち込めない（t.household_id = r.household_id を要求）'
 );
-select throws_ok(
+select lives_ok(
   $$insert into public.record_tags (record_id, tag_id, owner_id)
     values ('aaaa0000-0000-0000-0000-000000000001',
             'bbbb7777-0000-0000-0000-000000000005',
             'cccccccc-cccc-cccc-cccc-cccccccccccc')$$,
-  '42501',
-  null,
-  '注入された不整合タグ（owner ∉ household）は record_tags へ持ち込めない（整合強制）'
+  '世帯の辞書に属するタグは作成者の所属に関わらず付与できる（UC-H10: 退出者のタグも世帯の資産として使える）'
 );
 select isnt_empty(
   $$delete from public.record_tags
@@ -418,8 +416,8 @@ select set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 select results_eq(
   $$select count(*)::int from public.tags where id = 'bbbb7777-0000-0000-0000-000000000005'$$,
-  $$values (0)$$,
-  'HA メンバー(A)にも B の注入タグは見えない（is_household_member による owner ⇄ household 整合の強制）'
+  $$values (1)$$,
+  'household_id が世帯を指すタグは owner の所属に関わらず世帯に見える（UC-H10 の読取緩和。作成経路は S2 で閉鎖済みで、世帯側で削除・整理できる）'
 );
 
 reset role;

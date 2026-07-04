@@ -33,7 +33,7 @@ S1（[#92](https://github.com/godhuu0505/mfmf/issues/92)）の無停止移行8�
 | 8 | **Storage パスの household 化** | ✅ | `20260703120000_storage_household_paths.sql`。新規アップロードは `{household_id}/...`、既存 `{owner_id}/...` は移動せず世帯メンバー読取ポリシーを併存 |
 
 - **S2 RBAC（[#46](https://github.com/godhuu0505/mfmf/issues/46)）**: **DB/RLS は完了**。role は CHECK 制約（owner/editor/viewer, `20260703170000`）、write は editor 以上に限定、旧 owner_id write ポリシーは切替済み（drop, `20260704000000`。feedback 送信・タグ昇格用 update 等の意図した例外は migration ヘッダー参照）。ロール変更（UC-H04）/世帯名変更（UC-H02）の RLS と D6（最後の owner 保護）トリガも導入済み。メンバー削除/退出（UC-H05/H06）は UC-H10 の読取述語緩和と一体で S3 #45 にて解禁。アプリ層も完了: Server Action のロール検査（`requireEditableHousehold`）、viewer への UI 出し分け（一覧/詳細/新規/ペット, UC-A06）、/settings の世帯セクション（世帯名変更 UC-H02・メンバー一覧 UC-H03・ロール変更 UC-H04）。**S2 はこれで完了**（招待・削除・退出の UI は S3）。
-- **S3 内部招待（[#45](https://github.com/godhuu0505/mfmf/issues/45)）**: `household_invites` テーブルなし・**未着手**。
+- **S3 内部招待（[#45](https://github.com/godhuu0505/mfmf/issues/45)）**: 招待（`household_invites` + 宛先メール固定の受諾 D12/D13、UC-O09〜O11）と退出/削除（UC-H05/H06 + D6 保護、UC-H10 の読取述語緩和込み）まで実装済み。**残**: 世帯切替 UI（D2 解除・UC-H08）とメンバー表示のメール/名前解決。
 - **S4 外部ゲスト（[#93](https://github.com/godhuu0505/mfmf/issues/93)）**: `guest_grants` テーブルなし・**未着手**。
 - **S5 公開サインアップ（[#47](https://github.com/godhuu0505/mfmf/issues/47)）**: ログインは **Google OAuth 一択**（`drive.file` スコープ要求）。email/password なし・セルフ登録 UI なし。
 - **既存の共有**: Phase 2 の `share_links`（`/shares`・`/share/[token]`、read-only トークン、**写真なし**、`get_shared_view` SECURITY DEFINER 経由、`owner_id` ベース）。S4 と思想が重複 → **統合対象**（D4）。

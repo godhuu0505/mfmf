@@ -15,7 +15,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(31);
+select plan(33);
 
 -- fixture: HA に A(owner) / E(editor) / V(viewer)。record RA・tag TA・photo PH は A 作成。
 insert into auth.users (id, email) values
@@ -172,8 +172,9 @@ select set_config('request.jwt.claims',
   '{"sub":"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee","role":"authenticated"}', true);
 
 select lives_ok(
-  $$insert into public.daycare_records (owner_id, household_id, body)
-    values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'by editor')$$,
+  $$insert into public.daycare_records (id, owner_id, household_id, body)
+    values ('eeee0000-0000-0000-0000-000000000001',
+            'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'by editor')$$,
   'editor は世帯へ記録を insert 可'
 );
 select lives_ok(
@@ -237,11 +238,13 @@ select throws_ok(
   null,
   '最後の owner は自分を降格できない（D6）'
 );
-select is_empty(
+select throws_ok(
   $$delete from public.household_members
     where household_id = '11111111-1111-1111-1111-111111111111'
-      and user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' returning 1$$,
-  'membership の delete ポリシーは未導入（退出/削除は UC-H10 の読取緩和と一体で S3 #45 にて解禁・deny by default）'
+      and user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'$$,
+  'P0001',
+  null,
+  '最後の owner は退出・削除できない（D6。S3 で delete 解禁後もトリガが保護）'
 );
 select throws_ok(
   $$update public.household_members set user_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd'
@@ -257,14 +260,28 @@ select isnt_empty(
   'owner は世帯名を変更できる（UC-H02）'
 );
 
--- 本人退出（UC-H06）はまだ解禁しない（S3 #45。UC-H10 の読取緩和と一体で導入）
+-- 本人退出（UC-H06）と UC-H10（退出者の記録は世帯に残る・本人は不可視になる）
 select set_config('request.jwt.claims',
   '{"sub":"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee","role":"authenticated"}', true);
-select is_empty(
+select isnt_empty(
   $$delete from public.household_members
     where household_id = '11111111-1111-1111-1111-111111111111'
       and user_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' returning 1$$,
-  '本人退出も現状は deny by default（UC-H06 は S3 #45 で解禁）'
+  'メンバー本人は世帯から退出できる（UC-H06。最後の owner ではないので D6 に触れない）'
+);
+select results_eq(
+  $$select count(*)::int from public.daycare_records
+    where id = 'eeee0000-0000-0000-0000-000000000001'$$,
+  $$values (0)$$,
+  '退出した本人は自分が書いた世帯の記録も見えない（own select 撤去 = UC-H05/H06 の遮断）'
+);
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+select results_eq(
+  $$select count(*)::int from public.daycare_records
+    where id = 'eeee0000-0000-0000-0000-000000000001'$$,
+  $$values (1)$$,
+  '退出メンバーが作った記録は世帯に残り、残ったメンバーから見える（UC-H10）'
 );
 
 reset role;

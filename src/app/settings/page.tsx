@@ -8,6 +8,8 @@ import SubmitButton from "@/components/SubmitButton";
 import { ProfileForm, PasswordForm } from "@/app/settings/SettingsForms";
 import {
   createInvite,
+  leaveHousehold,
+  removeMember,
   renameHousehold,
   revokeInvite,
   updateMemberRole,
@@ -143,26 +145,36 @@ export default async function SettingsPage() {
                           : `メンバー ${m.user_id.slice(0, 8)}…`}
                       </span>
                       {isOwner && m.user_id !== user.id ? (
-                        <form
-                          action={updateMemberRole.bind(null, m.user_id)}
-                          className="flex items-center gap-2"
-                        >
-                          <select
-                            name="role"
-                            defaultValue={m.role}
-                            className="rounded-lg border border-border px-2 py-1 text-sm text-foreground"
+                        <div className="flex items-center gap-2">
+                          <form
+                            action={updateMemberRole.bind(null, m.user_id)}
+                            className="flex items-center gap-2"
                           >
-                            <option value="owner">owner</option>
-                            <option value="editor">editor</option>
-                            <option value="viewer">viewer</option>
-                          </select>
-                          <SubmitButton
-                            pendingLabel="変更中…"
-                            className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
-                          >
-                            変更
-                          </SubmitButton>
-                        </form>
+                            <select
+                              name="role"
+                              defaultValue={m.role}
+                              className="rounded-lg border border-border px-2 py-1 text-sm text-foreground"
+                            >
+                              <option value="owner">owner</option>
+                              <option value="editor">editor</option>
+                              <option value="viewer">viewer</option>
+                            </select>
+                            <SubmitButton
+                              pendingLabel="変更中…"
+                              className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+                            >
+                              変更
+                            </SubmitButton>
+                          </form>
+                          <form action={removeMember.bind(null, m.user_id)}>
+                            <SubmitButton
+                              pendingLabel="削除中…"
+                              className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
+                            >
+                              削除
+                            </SubmitButton>
+                          </form>
+                        </div>
                       ) : (
                         <span className="text-muted-foreground">{m.role}</span>
                       )}
@@ -170,9 +182,17 @@ export default async function SettingsPage() {
                   ))}
                 </ul>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  メンバーの削除・退出は今後のアップデートで対応予定です。
-                  世帯には最低 1 人の owner が必要です。
+                  削除・退出しても、その人が書いた記録は世帯に残ります。
+                  世帯には最低 1 人の owner が必要です（最後の owner は降格・退出できません）。
                 </p>
+                <form action={leaveHousehold} className="mt-3">
+                  <SubmitButton
+                    pendingLabel="退出中…"
+                    className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
+                  >
+                    この世帯から退出する
+                  </SubmitButton>
+                </form>
               </div>
 
               {/* 招待（owner のみ / UC-O09〜O11。宛先メール固定 D12） */}
