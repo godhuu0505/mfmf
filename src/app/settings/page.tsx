@@ -7,6 +7,7 @@ import SubmitButton from "@/components/SubmitButton";
 import {
   createGuestInvite,
   createInvite,
+  deleteHousehold,
   leaveHousehold,
   removeMember,
   renameHousehold,
@@ -15,6 +16,7 @@ import {
   switchHousehold,
   updateMemberRole,
 } from "@/app/settings/actions";
+import DeleteHouseholdForm from "@/app/settings/DeleteHouseholdForm";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +105,23 @@ export default async function SettingsPage() {
     created_at: string;
   }[];
   const petNameById = new Map((householdPets ?? []).map((p) => [p.id, p.name]));
+
+  // 世帯削除（UC-H09）の出し分け: 参照データが無い世帯だけ削除できる。
+  // pets / invites / guests は上で取得済み。記録件数だけ head+count で軽く確認する
+  // （tags・feedback 等の稀な残存は RPC delete_own_household 側が最終的に拒否する）。
+  const { count: recordCount } =
+    membership && isOwner
+      ? await supabase
+          .from("daycare_records")
+          .select("id", { count: "exact", head: true })
+          .eq("household_id", membership.householdId)
+      : { count: 0 };
+  const householdEmpty =
+    isOwner &&
+    (householdPets?.length ?? 0) === 0 &&
+    (recordCount ?? 0) === 0 &&
+    (invites?.length ?? 0) === 0 &&
+    guestRows.length === 0;
 
   const guestStatus = (g: {
     valid_from: string;
@@ -544,6 +563,33 @@ export default async function SettingsPage() {
                         </li>
                       ))}
                     </ul>
+                  )}
+                </div>
+              )}
+
+              {/* 世帯の削除（owner のみ / UC-H09）。参照データの無い世帯だけ削除できる。 */}
+              {isOwner && (
+                <div className="border-t border-border pt-4">
+                  <h3 className="mb-1 text-sm font-medium text-red-600">
+                    世帯を削除する
+                  </h3>
+                  {householdEmpty ? (
+                    <>
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        記録・写真・ペットなどのデータが無いこの世帯を削除します。
+                        削除すると元に戻せません。
+                      </p>
+                      <DeleteHouseholdForm
+                        action={deleteHousehold.bind(null, membership.householdId)}
+                        householdName={household?.name ?? ""}
+                      />
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      記録・ペットなどのデータがある世帯は、まだ削除できません。
+                      データをエクスポートしてから世帯・アカウントを削除する導線は
+                      準備中です（#51）。
+                    </p>
                   )}
                 </div>
               )}

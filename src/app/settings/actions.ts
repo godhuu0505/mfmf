@@ -298,6 +298,30 @@ export async function leaveHousehold(householdId: string) {
   redirect("/");
 }
 
+// 世帯を削除する（owner のみ / UC-H09。参照データの無い世帯だけ削除できる）。
+// 一次防衛線は delete_own_household RPC（owner 検査・データ検出・D6 ガードを DB 側で強制）。
+// データのある世帯の完全削除（エクスポート後のカスケード削除）は #51 で扱う。
+export async function deleteHousehold(householdId: string) {
+  const { supabase } = await requireOwnerOf(householdId);
+
+  const { error } = await supabase.rpc("delete_own_household", {
+    p_household_id: householdId,
+  });
+  if (error) {
+    // RPC のメッセージ（owner でない / データがある 等）をそのまま届ける。
+    throw new Error(`世帯を削除できませんでした: ${error.message}`);
+  }
+
+  // 現在世帯 Cookie が削除した世帯を指していたら畳む（次のリクエストで再解決させる）。
+  const cookieStore = await cookies();
+  if (cookieStore.get(HOUSEHOLD_COOKIE)?.value === householdId) {
+    cookieStore.delete(HOUSEHOLD_COOKIE);
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+
 // 「現在の世帯」を切り替える（UC-H08）。Cookie に保持し、全画面が追従する。
 // 実在する自分のメンバーシップのみ受理（Cookie 偽装は household.ts 側でも無視される）。
 export async function switchHousehold(householdId: string) {
