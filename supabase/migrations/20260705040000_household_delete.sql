@@ -125,6 +125,17 @@ begin
   -- よって世帯プレフィックスに 1 つでもオブジェクトが残っていれば削除を拒否する
   -- （SQL で storage.objects 行を消すと S3 実体が孤児化するため、消さずに拒否して
   --  Storage API 経由の後始末＝#51 へ委ねる）。
+  --
+  -- 【既知の限界 / 残存レース】この Storage チェックは時点読み取りである。storage.objects は
+  -- households への FK を持たず、アップロードの insert ポリシー（has_household_role）は
+  -- READ COMMITTED 下で本 delete がコミットするまで旧 household_members を見られる。
+  -- そのため「本チェックの後・本 delete のコミット前」に別トランザクションが
+  -- {household_id}/... へアップロードすると、その 1 オブジェクトはメンバー cascade 後も
+  -- 残り、同種の孤児になり得る。これを確実に塞ぐには全メンバーシップ判定
+  -- （has_household_role = アプリ全体のホットパス）にロックを足す必要があり、極めて稀な
+  -- 事象（空世帯の削除と同世帯へのアップロードの同時実行）に対して割に合わない。
+  -- 権威ある孤児クリーンアップ（このレース分を含む）は #51 の完了条件
+  -- 「削除後に孤児 Storage オブジェクトが無い」＝Storage API 経由の掃引に委ねる。
   if exists (select 1 from public.pets              where household_id = p_household_id)
      or exists (select 1 from public.daycare_records  where household_id = p_household_id)
      or exists (select 1 from public.record_photos    where household_id = p_household_id)
