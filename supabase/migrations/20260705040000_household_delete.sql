@@ -20,6 +20,8 @@
 --
 -- 設計:
 --   1. delete_own_household(uuid) SECURITY DEFINER RPC:
+--      - 空判定より前に対象 households 行を FOR UPDATE でロックし、FK を持つ子テーブルへの
+--        同時 insert（親行の FOR KEY SHARE を要する）と直列化する（check→delete をアトミック化）。
 --      - 呼び出し元が対象世帯の owner であることを RLS 迂回で厳格判定。
 --      - 参照データが 1 行でもあれば拒否（P0001。UI が #51 待ちの案内を出す）。
 --      - トランザクション局所の GUC `mfmf.deleting_household` に対象 household_id を
@@ -103,6 +105,18 @@ begin
     raise exception 'ログインが必要です' using errcode = '42501';
   end if;
 
+  -- 空判定より前に世帯行をロックし、チェック→削除を FK 子テーブルに対してアトミックにする。
+  -- FK を持つ子テーブル（pets / daycare_records / record_photos / tags / feedback /
+  -- household_invites / guest_grants）への同時 insert は親 households 行の FOR KEY SHARE を
+  -- 要するため、この FOR UPDATE と競合してブロックされる。これにより「空判定の後・本 delete の
+  -- コミット前」に別トランザクションが子行を差し込む余地が無くなる（例: 別 owner が同時に発行した
+  -- 招待は household_id が ON DELETE CASCADE のため、放置すると silently 巻き込み削除され得た）。
+  -- ロックを先に取った側が勝ち: delete が先ならその後の子 insert は FK 違反で失敗し、子 insert が
+  -- 先ならロック解放後の空判定がその行を見て P0001 で拒否する。
+  -- ※ storage.objects は households への FK を持たずこのロックの影響を受けないため、そちらの
+  --    time-of-check レースだけは別途 #51（Storage API 経由の掃引）に委ねる（下記）。
+  perform 1 from public.households where id = p_household_id for update;
+
   -- 呼び出し元が対象世帯の owner か（RLS 迂回で厳格判定）。
   if not exists (
     select 1 from public.household_members m
@@ -126,8 +140,9 @@ begin
   -- （SQL で storage.objects 行を消すと S3 実体が孤児化するため、消さずに拒否して
   --  Storage API 経由の後始末＝#51 へ委ねる）。
   --
-  -- 【既知の限界 / 残存レース】この Storage チェックは時点読み取りである。storage.objects は
-  -- households への FK を持たず、アップロードの insert ポリシー（has_household_role）は
+  -- 【既知の限界 / 残存レース（Storage のみ）】上の FOR UPDATE ロックで FK を持つ子テーブルの
+  -- 同時 insert は直列化されるが、Storage は別。この Storage チェックは時点読み取りである。
+  -- storage.objects は households への FK を持たず、アップロードの insert ポリシー（has_household_role）は
   -- READ COMMITTED 下で本 delete がコミットするまで旧 household_members を見られる。
   -- そのため「本チェックの後・本 delete のコミット前」に別トランザクションが
   -- {household_id}/... へアップロードすると、その 1 オブジェクトはメンバー cascade 後も
