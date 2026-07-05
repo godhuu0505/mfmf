@@ -12,10 +12,11 @@
 --   owner が「参照データの無い世帯」を削除できるようにする。
 --   - オンボーディングで世帯を作ったがペットを登録せず放置した、招待で作った予備の
 --     世帯を畳む、といった “空の世帯の後始末” が対象。
---   - **データ（記録・写真・ペット・タグ・フィードバック・招待・ゲスト付与）のある
---     世帯の削除は本 migration では扱わない**。エクスポート後のカスケード削除・
+--   - **データ（記録・写真・ペット・タグ・フィードバック・招待・ゲスト付与）や、
+--     世帯プレフィックス配下の Storage オブジェクト（DB 行の無い孤児写真を含む）が
+--     ある世帯の削除は本 migration では扱わない**。エクスポート後のカスケード削除・
 --     Storage の完全消去・確認/猶予/監査は #51（Phase 5・データエクスポート/
---     アカウント削除）で設計する。RPC は参照データを検出したら拒否する。
+--     アカウント削除）で設計する。RPC は参照データ/オブジェクトを検出したら拒否する。
 --
 -- 設計:
 --   1. delete_own_household(uuid) SECURITY DEFINER RPC:
@@ -114,13 +115,28 @@ begin
 
   -- 参照データのある世帯は削除しない（孤児化防止）。1 行でもあれば拒否。
   -- 完全削除（エクスポート後のカスケード削除・Storage 消去）は #51 で扱う。
+  --
+  -- Storage も確認する: 写真は Server Action が record_photos 行を作る *前に*
+  -- クライアントから {household_id}/{record_id}/... へ直接アップロードされる。
+  -- アップロード成功後に後続の書き込みが失敗/中断すると、DB 行ゼロでも世帯
+  -- プレフィックス配下に孤児オブジェクトが残り得る。この状態で世帯を消すと
+  -- メンバーシップが cascade で消え、新規約 Storage ポリシー（has_household_role
+  -- 依存）により以後その private ファイルを誰も select/delete できなくなる。
+  -- よって世帯プレフィックスに 1 つでもオブジェクトが残っていれば削除を拒否する
+  -- （SQL で storage.objects 行を消すと S3 実体が孤児化するため、消さずに拒否して
+  --  Storage API 経由の後始末＝#51 へ委ねる）。
   if exists (select 1 from public.pets              where household_id = p_household_id)
      or exists (select 1 from public.daycare_records  where household_id = p_household_id)
      or exists (select 1 from public.record_photos    where household_id = p_household_id)
      or exists (select 1 from public.tags             where household_id = p_household_id)
      or exists (select 1 from public.feedback         where household_id = p_household_id)
      or exists (select 1 from public.household_invites where household_id = p_household_id)
-     or exists (select 1 from public.guest_grants     where household_id = p_household_id) then
+     or exists (select 1 from public.guest_grants     where household_id = p_household_id)
+     or exists (
+          select 1 from storage.objects o
+          where o.bucket_id = 'daycare-photos'
+            and (storage.foldername(o.name))[1] = p_household_id::text
+        ) then
     raise exception 'データのある世帯は削除できません。記録・写真・ペットなどのエクスポート後に削除する導線は準備中です（#51）'
       using errcode = 'P0001';
   end if;

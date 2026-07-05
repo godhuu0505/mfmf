@@ -13,29 +13,38 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(7);
+select plan(8);
 
 -- fixture（postgres ロール = RLS 迂回で投入）:
 --   HE = 空の世帯（owner AE / editor ED）, HD = 記録のある世帯（owner AD）, OT = 部外者
+--   HO = DB 行は無いが世帯プレフィックス配下に孤児 Storage オブジェクトがある世帯（owner AO）
 insert into auth.users (id, email) values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'ae@test.local'),
   ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'ed@test.local'),
   ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'ad@test.local'),
-  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'ot@test.local');
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'ot@test.local'),
+  ('babababa-baba-baba-baba-babababababa', 'ao@test.local');
 
 insert into public.households (id, name) values
   ('11111111-1111-1111-1111-111111111111', 'HE'),
-  ('22222222-2222-2222-2222-222222222222', 'HD');
+  ('22222222-2222-2222-2222-222222222222', 'HD'),
+  ('33333333-3333-3333-3333-333333333333', 'HO');
 
 insert into public.household_members (household_id, user_id, role) values
   ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'owner'),
   ('11111111-1111-1111-1111-111111111111', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'editor'),
-  ('22222222-2222-2222-2222-222222222222', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'owner');
+  ('22222222-2222-2222-2222-222222222222', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'owner'),
+  ('33333333-3333-3333-3333-333333333333', 'babababa-baba-baba-baba-babababababa', 'owner');
 
 -- HD には記録が 1 件ある（= 参照データありの世帯）。HE は空のまま。
 insert into public.daycare_records (id, owner_id, household_id, body) values
   ('22220000-0000-0000-0000-000000000001', 'dddddddd-dddd-dddd-dddd-dddddddddddd',
    '22222222-2222-2222-2222-222222222222', 'HD record');
+
+-- HO は DB 行ゼロだが、写真アップロード後に後続の書き込みが失敗した想定で
+-- {HO}/{record_id}/... に孤児オブジェクトが残っている（bucket は init.sql が作成済み）。
+insert into storage.objects (bucket_id, name) values
+  ('daycare-photos', '33333333-3333-3333-3333-333333333333/33330000-0000-0000-0000-000000000001/orphan.jpg');
 
 -- ---------------------------------------------------------------
 -- 非 owner は削除できない（42501）
@@ -69,6 +78,17 @@ select throws_ok(
   'P0001',
   null,
   'owner でも記録のある世帯は削除できない（#51 で対応）'
+);
+
+-- DB 行は無くても、世帯プレフィックス配下に孤児 Storage オブジェクトが残っていれば
+-- 削除しない（消すと private ファイルが RLS 上クリーンアップ不能になるため）。
+select set_config('request.jwt.claims',
+  '{"sub":"babababa-baba-baba-baba-babababababa","role":"authenticated"}', true);
+select throws_ok(
+  $$select public.delete_own_household('33333333-3333-3333-3333-333333333333')$$,
+  'P0001',
+  null,
+  '孤児 Storage オブジェクトの残る世帯は削除できない（DB 行ゼロでも拒否・#51 で対応）'
 );
 
 -- ---------------------------------------------------------------
