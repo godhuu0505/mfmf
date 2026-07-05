@@ -23,7 +23,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(44);
+select plan(43);
 
 -- ---------------------------------------------------------------
 -- 固定 UUID（fixture）
@@ -74,10 +74,6 @@ insert into public.tags (id, owner_id, household_id, name) values
 
 insert into public.record_tags (record_id, tag_id, owner_id) values
   ('aaaa0000-0000-0000-0000-000000000001', 'aaaa7777-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
-
--- 共有リンク（owner A・世帯 HA）。複数世帯の作成者でもリンクの世帯の記録しか返さないことを検証する。
-insert into public.share_links (owner_id, household_id, token) values
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'share-ha-token');
 
 -- storage の protect_objects_delete トリガ（storage migration 0055-prevent-direct-deletes、
 -- 文レベル・0 行でも発火）は SQL 直接 DELETE を一律拒否する。これは「Storage API を
@@ -425,13 +421,6 @@ select results_eq(
 );
 
 reset role;
-
--- 匿名共有リンク（share_links）は D4/UC-S01 で廃止済み。get_shared_view は
--- トークンの有効・無効・世帯に関わらず常に無効を返す（匿名閲覧の完全停止）。
-select ok(
-  (public.get_shared_view('share-ha-token') ->> 'valid') = 'false',
-  '匿名共有は廃止され、既存トークンでも get_shared_view は記録を返さない（D4/UC-S01）'
-);
 
 select * from finish();
 rollback;

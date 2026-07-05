@@ -1,0 +1,44 @@
+-- =============================================================
+-- mfmf / Phase 3.5 フォローアップ (Issue #117 §1) —
+--   匿名共有リンク（share_links）の物理 DROP（D4 / UC-S01 のクリーンアップ）
+--
+-- 背景:
+--   S4（#93 / PR #116, `20260705020000`）で匿名共有リンクは**機能廃止**済み。
+--   `get_shared_view` は常に {valid:false} を返し、既存リンクは一括失効させたが、
+--   テーブル・RLS ポリシー・関数は「低リスク段階廃止」のため温存していた。
+--   その後、アプリ・pgTAP・ドキュメントから share_links / get_shared_view への
+--   参照を完全に撤去したため（本 PR）、実体を物理削除する。
+--
+-- 参照が完全に無いことの確認（本 PR で対応済み）:
+--   - `src/app/share/[token]/page.tsx`: `get_shared_view` RPC 呼び出しを撤去、静的な
+--     終了案内へ差し替え。
+--   - `src/types/database.ts`: `ShareLink` / `SharedRecord` / `SharedView` 型を削除。
+--   - `supabase/tests/*.sql`: share_links への insert / get_shared_view アサートを削除。
+--   - `src/app/help/page.tsx` / `docs/`: 共有リンクの案内を招待ベースへ更新。
+--   - anon ロールは share_links を経由した公開が唯一の用途だったが、`get_shared_view`
+--     撤去後はテーブル参照経路が残っていても匿名露出は起きない（機能廃止済みのため）。
+--
+-- 破壊的変更（DROP）:
+--   Free プランは自動バックアップが無く戻せないため、PR 段階でローカル
+--   `supabase db reset`（全 migration 再適用）+ `supabase test db`（pgTAP）で
+--   スキーマ整合とテナント分離が緑になることを確認する。main マージで
+--   deploy-production.yml の migrate ジョブが本番 Supabase に自動適用する。
+--
+-- ロールバック手順（本 migration を取り消す場合）:
+--   1. `20260616130712_share_links.sql`（テーブル + own ポリシー + get_shared_view）を
+--      再適用する。
+--   2. share_links への household 化・RBAC 制限（`household_id` 追加 =
+--      `20260630130100`、editor+ 限定 insert = `20260703170000` §9、世帯スコープの
+--      get_shared_view = `20260704030000`）を順に再適用する。
+--   3. `20260705020000_deprecate_share_links.sql` を再適用して機能廃止状態へ戻す。
+--   ※ いずれも実データ（発行済みリンク行）は復元されない。機能廃止済みのため実害なし。
+-- =============================================================
+
+-- 1. トークン検証関数を撤去する（share_links を参照しない自明版だが、公開 API 面を畳む）。
+--    anon / authenticated への grant execute も関数削除で消える。
+drop function if exists public.get_shared_view(text);
+
+-- 2. テーブル本体を撤去する。RLS ポリシー・インデックス・付随の grant / default
+--    privileges・過去 migration で追加した household_id カラム等は CASCADE で一括削除。
+--    share_links を参照する他オブジェクト（FK 等）は存在しない。
+drop table if exists public.share_links cascade;
