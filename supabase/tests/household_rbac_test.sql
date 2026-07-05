@@ -15,7 +15,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(35);
+select plan(31);
 
 -- fixture: HA に A(owner) / E(editor) / V(viewer)。record RA・tag TA・photo PH は A 作成。
 insert into auth.users (id, email) values
@@ -157,13 +157,6 @@ select lives_ok(
     values ('dddddddd-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', 'viewer feedback')$$,
   'viewer も自分名義のフィードバックは送信できる（owner 経路・設計どおり）'
 );
-select throws_ok(
-  $$insert into public.share_links (owner_id, token)
-    values ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'token-by-viewer')$$,
-  '42501',
-  null,
-  'viewer は匿名共有リンクを新規発行できない（share_links_insert_own の editor+ 限定）'
-);
 
 -- ---------------------------------------------------------------
 -- editor E: 他人の記録も編集・削除できる（D5 / D11）
@@ -176,19 +169,6 @@ select lives_ok(
     values ('eeee0000-0000-0000-0000-000000000001',
             'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'by editor')$$,
   'editor は世帯へ記録を insert 可'
-);
-select lives_ok(
-  $$insert into public.share_links (owner_id, household_id, token)
-    values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-            '11111111-1111-1111-1111-111111111111', 'token-by-editor')$$,
-  'editor は自分が editor+ の世帯を指定して共有リンクを発行できる'
-);
-select throws_ok(
-  $$insert into public.share_links (owner_id, token)
-    values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'token-no-household')$$,
-  '42501',
-  null,
-  '世帯未指定（household_id null）の共有リンクは作成できない（移行期分岐による全世帯露出の防止）'
 );
 select isnt_empty(
   $$update public.daycare_records set body = 'edited by editor'
@@ -293,13 +273,6 @@ select results_eq(
 );
 
 reset role;
-
--- 退出した発行者（E）の共有リンクは自動的に無効になる（get_shared_view が
--- 「発行者がリンクの世帯のメンバーであること」を要求するため）。
-select ok(
-  (public.get_shared_view('token-by-editor') ->> 'valid') = 'false',
-  '発行者が世帯を退出すると、その共有リンクは無効になる（UC-H05/H06 のリンク残置防止）'
-);
 
 select * from finish();
 rollback;

@@ -35,8 +35,8 @@ DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/) です�
 | `/calendar` | 月カレンダーで記録を俯瞰（`?ym=YYYY-MM` で月送り） |
 | `/gallery` | すべての写真を新しい順に表示・ライトボックスで拡大 |
 | `/pets` | ペットの追加・編集・削除 |
-| `/shares` | 読み取り専用の共有リンクの作成・失効・削除（要ログイン） |
-| `/share/[token]` | 共有された記録の閲覧専用ビュー（**認証不要**・トークン検証） |
+| `/shares` | 匿名共有リンク廃止（D4/UC-S01）の終了案内。共有は招待へ誘導（要ログイン） |
+| `/share/[token]` | 匿名共有リンク廃止の終了案内（**認証不要**・DB 参照なし・旧リンクの受け皿） |
 | `/settings` | プロフィール / アカウント設定 |
 | `/offline` | オフラインフォールバック（PWA） |
 
@@ -59,7 +59,10 @@ DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/) です�
 | `feedback` | ご意見・不具合フォームの送信内容 | `owner_id`, `kind`, `body`, 任意項目, `context`(自動収集), `github_issue_url` ほか |
 | `profiles` | ユーザーのプロフィール / 設定 | `owner_id`(unique), `display_name`, `default_author`, タイムスタンプ |
 | `pets` | 飼っているペット（多頭飼い対応の素地） | `owner_id`, `name`, `species`, `birthday`, タイムスタンプ |
-| `share_links` | 読み取り専用の共有リンク | `owner_id`, `token`(unique), `label`, `from_date`, `to_date`, `expires_at`, `revoked_at` |
+
+> `share_links`（匿名共有リンク）は Phase 3.5 S4 で機能廃止し、フォローアップ（#117）で
+> テーブル・`get_shared_view` 関数を物理削除した（`20260705030000_drop_share_links.sql`）。
+> 閲覧共有は viewer 招待またはゲスト招待（`guest_grants`）へ一本化。
 
 ## 認可・RLS・Storage
 

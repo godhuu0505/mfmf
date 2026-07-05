@@ -11,7 +11,6 @@ import {
   PawPrint,
   School,
   Settings,
-  Share2,
 } from "lucide-react";
 
 // 文中に差し込む小さなアイコン（テキストのベースラインに揃える）。
@@ -77,7 +76,7 @@ export default async function HelpPage() {
             </li>
             <li>
               <a href="#shares" className={inlineLink}>
-                共有リンク
+                家族・第三者と共有する
               </a>
             </li>
             <li>
@@ -100,8 +99,7 @@ export default async function HelpPage() {
               画面上部のヘッダーから、ギャラリー
               <Images className={inlineIcon} aria-hidden="true" /> / カレンダー
               <CalendarDays className={inlineIcon} aria-hidden="true" /> / ペット
-              <PawPrint className={inlineIcon} aria-hidden="true" /> / 共有リンク
-              <Share2 className={inlineIcon} aria-hidden="true" /> / ヘルプ
+              <PawPrint className={inlineIcon} aria-hidden="true" /> / ヘルプ
               <CircleHelp className={inlineIcon} aria-hidden="true" /> / 設定
               <Settings className={inlineIcon} aria-hidden="true" /> に移動できます。
             </p>
@@ -178,22 +176,31 @@ export default async function HelpPage() {
           </section>
 
           <section id="shares" className={sectionClass}>
-            <h2 className={h2Class}>共有リンク</h2>
+            <h2 className={h2Class}>家族・第三者と共有する</h2>
             <p className={pClass}>
-              祖父母など、アプリにログインしない人にも記録を見せたい場合は、
-              <Link href="/shares" className={inlineLink}>
-                共有リンク
-                <Share2 className={inlineIcon} aria-hidden="true" />
+              記録を家族や保育園にも見てもらいたい場合は、
+              <Link href="/settings" className={inlineLink}>
+                設定
+                <Settings className={inlineIcon} aria-hidden="true" />
               </Link>
-              から閲覧専用のリンクを発行できます。
+              から相手を招待します。相手にもアカウントで参加してもらう形になり、
+              誰がいつ見たかがわかる安全な共有になります。
             </p>
             <ul className={ulClass}>
-              <li>ラベル（メモ書き）・期間・有効期限を指定できます。</li>
               <li>
-                <strong>写真は含まれず、テキストのみ</strong>が共有されます。
+                祖父母など家族に見せる → <strong>viewer として招待</strong>
+                （閲覧のみ・世帯の記録すべて）。
               </li>
-              <li>「失効」をいつでも押せば、それ以降そのリンクは使えなくなります。</li>
+              <li>
+                保育園・シッターに預ける → <strong>ゲストとして招待</strong>
+                （対象のペット・期間を限定）。
+              </li>
+              <li>招待はいつでも取り消せます。取り消すと相手は見られなくなります。</li>
             </ul>
+            <p className={pClass}>
+              以前あった、URL を知っていれば誰でも見られる「匿名の共有リンク」は
+              廃止されました。
+            </p>
           </section>
 
           <section id="troubleshoot" className={sectionClass}>
