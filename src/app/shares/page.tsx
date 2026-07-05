@@ -53,7 +53,7 @@ export default async function SharesPage() {
             href="/settings"
             className="inline-block rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover"
           >
-            設定で招待する
+            世帯の設定で招待する
           </Link>
         </section>
       </main>

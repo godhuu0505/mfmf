@@ -16,7 +16,7 @@ import { setFeedbackStatus, deleteFeedback } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "フィードバック" };
+export const metadata = { title: "送信したフィードバック" };
 
 function formatDateTime(iso: string) {
   return new Intl.DateTimeFormat("ja-JP", {
@@ -98,10 +98,10 @@ export default async function FeedbackTriagePage({
           </Link>
         </div>
         <h1 className="mb-1 text-xl font-bold text-foreground">
-          フィードバックのトリアージ
+          送信したフィードバック
         </h1>
         <p className="mb-6 text-sm text-muted-foreground">
-          自分が送ったご意見・不具合報告の状態を管理します。
+          自分が送ったご意見・不具合報告の一覧です。状態の変更や整理もできます。
           GitHub Issue 化は <code>npm run feedback:issues</code> で行います。
         </p>
 

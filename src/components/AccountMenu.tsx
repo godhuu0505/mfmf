@@ -78,7 +78,7 @@ export default function AccountMenu({
           </div>
 
           <Link
-            href="/settings"
+            href="/settings/account"
             role="menuitem"
             onClick={() => setMenuOpen(false)}
             className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground transition hover:bg-surface-muted"
