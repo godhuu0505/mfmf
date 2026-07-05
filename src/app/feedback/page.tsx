@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getHouseholdIdForUser, householdScopeFilter } from "@/lib/household";
 import {
   FEEDBACK_STATUS_LABEL,
   FEEDBACK_STATUSES,
@@ -16,7 +15,7 @@ import { setFeedbackStatus, deleteFeedback } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "フィードバック" };
+export const metadata = { title: "送信したフィードバック" };
 
 function formatDateTime(iso: string) {
   return new Intl.DateTimeFormat("ja-JP", {
@@ -57,24 +56,24 @@ export default async function FeedbackTriagePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
-  const householdId = await getHouseholdIdForUser(supabase, user.id);
-
+  // この画面は「自分が送ったフィードバック」に限定する。世帯に複数メンバーが
+  // いても、他メンバーの報告は一覧にも件数にも含めない（見出しと実態を一致させ、
+  // 他人の報告を自分のものと思って削除・変更する事故を防ぐ）。
   let query = supabase
     .from("feedback")
     .select("*")
+    .eq("owner_id", user.id)
     .order("created_at", { ascending: false });
-  if (householdId) query = query.or(householdScopeFilter(householdId));
   if (activeStatus) query = query.eq("status", activeStatus);
   const { data } = await query.returns<Feedback[]>();
   const items = data ?? [];
 
-  // 各 status の件数（フィルタ無しで取得して集計）
-  let countsQuery = supabase.from("feedback").select("status");
-  if (householdId) countsQuery = countsQuery.or(householdScopeFilter(householdId));
-  const { data: countsData } = await countsQuery.returns<
-    Pick<Feedback, "status">[]
-  >();
+  // 各 status の件数（自分のぶんだけ集計）
+  const { data: countsData } = await supabase
+    .from("feedback")
+    .select("status")
+    .eq("owner_id", user.id)
+    .returns<Pick<Feedback, "status">[]>();
   const counts: Record<FeedbackStatus, number> = {
     open: 0,
     triaged: 0,
@@ -98,10 +97,10 @@ export default async function FeedbackTriagePage({
           </Link>
         </div>
         <h1 className="mb-1 text-xl font-bold text-foreground">
-          フィードバックのトリアージ
+          送信したフィードバック
         </h1>
         <p className="mb-6 text-sm text-muted-foreground">
-          自分が送ったご意見・不具合報告の状態を管理します。
+          自分が送ったご意見・不具合報告の一覧です。状態の変更や整理もできます。
           GitHub Issue 化は <code>npm run feedback:issues</code> で行います。
         </p>
 

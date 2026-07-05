@@ -101,7 +101,8 @@ export async function submitFeedback(
   };
 }
 
-// トリアージ画面から status を切り替える。RLS で本人の行のみ更新可能。
+// 一覧から status を切り替える。owner_id 一致を明示し、本人の行のみ更新する
+// （世帯 RLS は他メンバー行も許可するため、UI と同じく自分のぶんに限定する）。
 export async function setFeedbackStatus(id: string, formData: FormData) {
   const supabase = await createClient();
   const {
@@ -114,7 +115,8 @@ export async function setFeedbackStatus(id: string, formData: FormData) {
   const { error } = await supabase
     .from("feedback")
     .update({ status: newStatus, status_changed_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("owner_id", user.id);
 
   if (error) {
     throw new Error(`フィードバックの状態更新に失敗しました: ${error.message}`);
@@ -131,7 +133,11 @@ export async function deleteFeedback(id: string) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { error } = await supabase.from("feedback").delete().eq("id", id);
+  const { error } = await supabase
+    .from("feedback")
+    .delete()
+    .eq("id", id)
+    .eq("owner_id", user.id);
 
   if (error) {
     throw new Error(`フィードバックの削除に失敗しました: ${error.message}`);

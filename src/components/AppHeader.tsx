@@ -1,17 +1,25 @@
 import Link from "next/link";
 import Image from "next/image";
-import {
-  CalendarDays,
-  CircleHelp,
-  Images,
-  LogOut,
-  PawPrint,
-  Settings,
-} from "lucide-react";
+import { CalendarDays, CircleHelp, Images, PawPrint } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import AccountMenu from "@/components/AccountMenu";
 
-// 共通ヘッダー。右側にログアウトボタン。
+// 共通ヘッダー。右側にアカウントアイコン（押下でメニュー）。
 // アイコンは lucide-react（線画・currentColor 継承）。色はテーマトークンに追従する。
-export default function AppHeader() {
+export default async function AppHeader() {
+  // アバターに表示名/メールの頭文字を出すため、現在のユーザーと表示名を取得する。
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("owner_id", user.id)
+        .maybeSingle()
+    : { data: null };
+
   return (
     <header className="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
       <div className="safe-px mx-auto flex max-w-2xl items-center justify-between py-3">
@@ -62,25 +70,10 @@ export default function AppHeader() {
           >
             <CircleHelp className="h-5 w-5" aria-hidden="true" />
           </Link>
-          <Link
-            href="/settings"
-            className="text-muted-foreground transition hover:text-foreground"
-            aria-label="設定"
-            title="設定"
-          >
-            <Settings className="h-5 w-5" aria-hidden="true" />
-          </Link>
-          <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              aria-label="ログアウト"
-              className="flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
-            >
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-              {/* 狭い画面ではアイコンのみ表示してヘッダーのはみ出しを防ぐ */}
-              <span className="hidden sm:inline">ログアウト</span>
-            </button>
-          </form>
+          <AccountMenu
+            email={user?.email ?? null}
+            displayName={profile?.display_name ?? null}
+          />
         </div>
       </div>
     </header>

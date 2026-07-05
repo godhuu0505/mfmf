@@ -40,6 +40,7 @@ export async function updateProfile(
   }
 
   revalidatePath("/settings");
+  revalidatePath("/settings/account");
   revalidatePath("/records/new");
   return { ok: true, message: "プロフィールを保存しました。" };
 }
