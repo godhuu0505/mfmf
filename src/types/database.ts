@@ -55,6 +55,7 @@ export type GuestGrant = {
 export type Household = {
   id: string;
   name: string;
+  avatar_path: string | null; // avatars バケット内の世帯アバターパス（任意）
   created_at: string;
 };
 
@@ -73,6 +74,7 @@ export type Pet = {
   name: string;
   species: string | null;
   birthday: string | null; // YYYY-MM-DD
+  avatar_path: string | null; // avatars バケット内のアバターパス（任意）。世帯で共有。
   created_at: string;
   updated_at: string;
 };
@@ -124,6 +126,10 @@ export function tagsFromJoin(
 }
 
 export const PHOTO_BUCKET = "daycare-photos";
+
+// アバター画像（ペット / 世帯 / ユーザー）の private バケット。
+// パス規約: {scope_id}/avatars/{uuid}-{filename}（scope_id = household_id または owner_id）
+export const AVATAR_BUCKET = "avatars";
 
 // ---------------------------------------------------------------
 // Google Drive 連携クレデンシャル (google_credentials)
@@ -210,6 +216,7 @@ export type Profile = {
   owner_id: string;
   display_name: string | null;
   default_author: string | null; // 記録フォームの「記入者」の既定値
+  avatar_path: string | null; // avatars バケット内のユーザーアバターパス（任意・個人スコープ）
   created_at: string;
   updated_at: string;
 };

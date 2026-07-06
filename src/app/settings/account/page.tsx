@@ -4,8 +4,11 @@ import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/household";
 import { getCurrentProfile } from "@/lib/profile";
+import { createAvatarSignedUrl } from "@/lib/avatars";
 import AppHeader from "@/components/AppHeader";
+import AvatarUploader from "@/components/AvatarUploader";
 import { ProfileForm, PasswordForm } from "@/app/settings/SettingsForms";
+import { updateUserAvatar } from "@/app/settings/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +27,7 @@ export default async function AccountSettingsPage() {
     getCurrentProfile(),
     getCurrentMembership(supabase),
   ]);
+  const avatarUrl = await createAvatarSignedUrl(profile?.avatar_path);
 
   return (
     <>
@@ -40,6 +44,22 @@ export default async function AccountSettingsPage() {
         <h1 className="mb-6 text-xl font-bold text-foreground">アカウント設定</h1>
 
         <div className="space-y-6">
+          <section className="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+            <div>
+              <h2 className="text-base font-bold text-foreground">プロフィール画像</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                あなたのアバター画像です（自分だけに表示されます）。
+              </p>
+            </div>
+            <AvatarUploader
+              scopeId={user.id}
+              currentUrl={avatarUrl}
+              action={updateUserAvatar}
+              alt="あなたのアバター"
+              label="アバター画像"
+            />
+          </section>
+
           <ProfileForm
             defaultDisplayName={profile?.display_name ?? ""}
             defaultAuthor={profile?.default_author ?? ""}
@@ -87,8 +107,6 @@ export default async function AccountSettingsPage() {
             </section>
           )}
         </div>
-
-        {/* アバター画像のアップロードは将来対応 */}
       </main>
     </>
   );

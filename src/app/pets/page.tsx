@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listPets } from "@/lib/pets";
 import { canEdit, getCurrentMembership } from "@/lib/household";
+import { createAvatarSignedUrls } from "@/lib/avatars";
 import AppHeader from "@/components/AppHeader";
+import AvatarUploader from "@/components/AvatarUploader";
 import SubmitButton from "@/components/SubmitButton";
-import { createPet, updatePet, deletePet } from "@/app/pets/actions";
+import { createPet, updatePet, deletePet, updatePetAvatar } from "@/app/pets/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +28,10 @@ export default async function PetsPage() {
   // viewer には編集フォームを出さず、閲覧用の一覧のみ表示する（UC-A06）。
   const membership = await getCurrentMembership(supabase);
   const readOnly = membership !== null && !canEdit(membership.role);
+  // 各ペットのアバター（private バケット）の署名付き URL をまとめて解決する。
+  const avatarUrls = await createAvatarSignedUrls(
+    pets.map((p) => p.avatar_path).filter((p): p is string => Boolean(p)),
+  );
 
   return (
     <>
@@ -49,6 +55,20 @@ export default async function PetsPage() {
                 key={pet.id}
                 className="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border"
               >
+                <div className="mb-3">
+                  <AvatarUploader
+                    scopeId={pet.household_id}
+                    currentUrl={
+                      pet.avatar_path
+                        ? avatarUrls.get(pet.avatar_path) ?? null
+                        : null
+                    }
+                    action={updatePetAvatar.bind(null, pet.id)}
+                    alt={`${pet.name}の写真`}
+                    label={`${pet.name} の写真`}
+                    disabled={readOnly}
+                  />
+                </div>
                 {readOnly ? (
                   <div>
                     <p className="font-medium text-foreground">{pet.name}</p>
@@ -196,7 +216,6 @@ export default async function PetsPage() {
         </section>
         )}
 
-        {/* ペット画像（アバター）アップロードは将来対応 */}
       </main>
     </>
   );

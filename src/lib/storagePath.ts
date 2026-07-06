@@ -20,6 +20,21 @@ export function buildStoragePath(
   return `${scopeId}/${recordId}/${crypto.randomUUID()}-${sanitizeFileName(fileName)}`;
 }
 
+// アバター画像のアップロード先パスを生成する。
+// 規約: {scope_id}/avatars/{uuid}-{sanitized_filename}
+//   scope_id は household_id（ペット/世帯アバター）または owner_id（ユーザーアバター）。
+// Storage RLS が先頭セグメント（scope_id）でメンバーシップ / 本人を判定する
+// （20260706120000_avatars.sql）。
+export function buildAvatarPath(scopeId: string, fileName: string): string {
+  return `${scopeId}/avatars/${crypto.randomUUID()}-${sanitizeFileName(fileName)}`;
+}
+
+// クライアント由来のアバターパスが当該 scope_id/avatars 配下かを検証する（防御的サニタイズ）。
+// 一次防衛線は Storage RLS だが、Server Action でも他 scope のパスを紐付けられないよう確認する。
+export function isAvatarPathForScope(path: string, scopeId: string): boolean {
+  return path.startsWith(`${scopeId}/avatars/`);
+}
+
 // クライアント由来のパスが当該 scope_id / record_id 配下かを検証する（防御的サニタイズ）。
 // scope プレフィックスだけだと別 record のパスを紐付けられてしまうため、
 // 規約 {scope_id}/{record_id}/... の 2 セグメントまで一致を要求する。

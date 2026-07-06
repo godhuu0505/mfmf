@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership, listCurrentMemberships } from "@/lib/household";
+import { createAvatarSignedUrl } from "@/lib/avatars";
 import AppHeader from "@/components/AppHeader";
+import AvatarUploader from "@/components/AvatarUploader";
 import SubmitButton from "@/components/SubmitButton";
 import {
   createGuestInvite,
@@ -14,6 +16,7 @@ import {
   revokeGuestGrant,
   revokeInvite,
   switchHousehold,
+  updateHouseholdAvatar,
   updateMemberRole,
 } from "@/app/settings/actions";
 import DeleteHouseholdForm from "@/app/settings/DeleteHouseholdForm";
@@ -52,7 +55,7 @@ export default async function SettingsPage() {
     ? await Promise.all([
         supabase
           .from("households")
-          .select("id, name")
+          .select("id, name, avatar_path")
           .eq("id", membership.householdId)
           .maybeSingle(),
         // メール・表示名は個人スコープ（UC-M03）のため、世帯メンバーに限って返す
@@ -70,6 +73,12 @@ export default async function SettingsPage() {
     email: string | null;
     display_name: string | null;
   }[];
+  const householdData = household as
+    | { id: string; name: string; avatar_path: string | null }
+    | null;
+  const householdAvatarUrl = await createAvatarSignedUrl(
+    householdData?.avatar_path ?? null,
+  );
 
   // 招待一覧（owner のみ。RLS invites_select_owner が強制）。
   // ゲスト管理（S4 / UC-G01）用にペット一覧とゲスト付与一覧も owner のみ取得する。
@@ -258,6 +267,16 @@ export default async function SettingsPage() {
                   世帯の名前: {household?.name || "（未設定）"}
                 </p>
               )}
+
+              {/* 世帯のアバター画像（owner のみ変更可・世帯で共有） */}
+              <AvatarUploader
+                scopeId={membership.householdId}
+                currentUrl={householdAvatarUrl}
+                action={updateHouseholdAvatar.bind(null, membership.householdId)}
+                alt="世帯のアバター"
+                label="世帯の画像"
+                disabled={!isOwner}
+              />
 
               <div>
                 <h3 className="mb-2 text-sm font-medium text-foreground">メンバー</h3>
@@ -596,8 +615,6 @@ export default async function SettingsPage() {
             </section>
           )}
         </div>
-
-        {/* アバター画像のアップロードは将来対応 */}
       </main>
     </>
   );
