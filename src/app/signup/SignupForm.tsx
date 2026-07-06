@@ -165,8 +165,22 @@ export default function SignupForm() {
             required
           />
           <span>
-            利用規約・プライバシーポリシーに同意します
-            <span className="ml-1 text-xs text-muted-foreground">（文書は準備中）</span>
+            <Link
+              href="/terms"
+              target="_blank"
+              className="text-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              利用規約
+            </Link>
+            ・
+            <Link
+              href="/privacy"
+              target="_blank"
+              className="text-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              プライバシーポリシー
+            </Link>
+            に同意します
           </span>
         </label>
 
