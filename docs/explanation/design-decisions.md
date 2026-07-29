@@ -1,5 +1,15 @@
 # 設計上の判断（なぜこうなっているか）
 
+> ⚠️ **一部が陳腐化しています（2026-07-29 時点）。**
+> 下記「共有方針: (A) 1 アカウント共用」と「セキュリティ」節の
+> 「RLS は `owner_id = auth.uid()`」は**現状と異なります**。
+> Phase 3.5（S1〜S5）で **`households` / `household_members` ベースのマルチテナント**
+> ＋ owner/editor/viewer の RBAC ＋ 外部ゲスト（`guest_grants`）へ移行済みです。
+> 正は [`supabase/migrations/`](../../supabase/migrations/) と
+> [phase-3-5-use-cases.md](./phase-3-5-use-cases.md)。
+> 本書をどう畳むか（現状記述を削って「なぜ」だけに絞る / 削除する）は未決 —
+> 経緯は [prototype-first.md §1-5](./prototype-first.md) を参照。
+
 mfmf がいまの構成を選んでいる理由をまとめます。「何が」あるかは
 [reference/architecture.md](../reference/architecture.md)、手順は各 [guides/](../guides/) を参照。
 

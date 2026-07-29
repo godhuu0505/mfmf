@@ -60,20 +60,59 @@ src/app/proto/quick-record/
 
 ### 3. 実機で触る
 
+**先に `/proto` を認証から外す。** `src/middleware.ts` は全ルートに認証を要求するので、
+外さないとスマホは `/login` に飛ばされる。捨てるブランチなので安全に外せる:
+
+```diff
+  // src/lib/supabase/middleware.ts の isPublicRoute
+    const isPublicRoute =
+      pathname === "/offline" ||
++     pathname.startsWith("/proto") ||
+      pathname.startsWith("/auth") ||
+```
+
+> **ローカル Supabase を使っている場合の注意**: `just setup` が書く
+> `NEXT_PUBLIC_SUPABASE_URL` は `http://127.0.0.1:54321` で、スマホから見ると
+> 「スマホ自身」を指すため到達できない。プロトは固定データなので Supabase は不要だが、
+> `AppHeader` は Server Component で `getUser()` を呼ぶ。ローカル Supabase 構成のまま
+> 使うならヘッダーはプロト内で静的なものに差し替えるか、
+> リモート Supabase 構成（README クイックスタート A）で起動する。
+
 ```bash
 just dev-lan
 ```
 
 同じ Wi-Fi のスマホから `http://<表示された LAN IP>:3000/proto/quick-record` を開く。
-mfmf は PWA なので、**片手操作・セーフエリア・IME・スクロールの確認は実機でしかできない**。
-ここが静的モックに対する最大の優位点なので、省略しない。
 
-現行画面と並べたいときは worktree:
+**この経路で確認できること**（＝静的モックに対する優位点。省略しない）:
+
+- 片手で親指が届くか / タップ領域の大きさ
+- IME が立ち上がったときにフォームが隠れないか
+- スクロールの挙動、0 件のとき / 200 件あるときの成立
+- ダークモード追従、セーフエリア（`env(safe-area-inset-*)` は通常のブラウザでも効く）
+
+**この経路では確認できないこと**（ここは正直に割り切る）:
+
+- **PWA スタンドアロン表示**（ホーム画面から起動した状態）。
+  Service Worker は secure context（HTTPS か localhost）でしか動かず、
+  LAN IP の平文 HTTP は secure context ではない。加えて
+  `src/components/ServiceWorkerRegister.tsx` は `NODE_ENV !== "production"` のとき
+  登録自体をスキップする
+- オフライン挙動・SW キャッシュ
+
+standalone 表示まで見たい場合だけ、`npm run build && npm run start` を
+HTTPS 経由（トンネル等）で当てる。プロト段階では通常そこまでやらない。
+
+#### 現行画面と並べる（worktree）
+
+`node_modules` は gitignore されていて新しい worktree には存在しないので、
+**依存のインストールが要る**:
 
 ```bash
 git worktree add ../mfmf-main origin/main
-cd ../mfmf-main && npm run dev -- -p 3001    # :3000=proto, :3001=現行
-git worktree remove ../mfmf-main             # 済んだら消す
+cd ../mfmf-main && npm ci                    # ← これが無いと next: not found
+npm run dev -- -p 3001                       # :3000=proto, :3001=現行
+cd - && git worktree remove ../mfmf-main     # 済んだら消す
 ```
 
 ### 4. 決定ログを書く（★ 順序に注意）
@@ -109,10 +148,21 @@ git switch -c claude/<topic>-<hash> origin/main
 
 ```bash
 git switch proto/quick-record
+git fetch origin main
+git rebase origin/main              # ★ 先に main へ追従させる（下記の理由）
 git reset --soft origin/main        # 履歴だけ畳む。作業ツリーは残る
 git switch -c claude/<topic>-<hash>
 git branch -D proto/quick-record
 ```
+
+> ⚠️ **`git rebase` を飛ばすと upstream の変更を巻き戻すコミットができる。**
+> プロトを切ったあとに `origin/main` が進んでいる場合、`reset --soft` は
+> HEAD を新しい main へ移す一方で**インデックスには古い main 基準のツリーが残る**。
+> そのままコミットすると、プロトの変更に加えて
+> **フォーク後に main へ入った全変更の削除・巻き戻しがステージされる**。
+> セッションをまたいだプロトでは特に起きやすい。先に rebase して同じ基準に揃える。
+>
+> rebase が競合して面倒なら、道 B（捨てて書き直す）に切り替えたほうが速い。
 
 迷ったら **B**。書き直しは思ったより速い。
 
@@ -120,8 +170,8 @@ git branch -D proto/quick-record
 
 | prefix | push | PR | CI | 寿命 |
 | --- | --- | --- | --- | --- |
-| `claude/<topic>-<hash>`（実装） | する | **作る** | 走る | PR マージまで |
-| **`proto/<slug>`** | **原則しない** | **作らない** | 走らせない | 合意まで |
+| `claude/<topic>-<hash>`（実装） | する | **作る** | PR で走る | PR マージまで |
+| **`proto/<slug>`** | **原則しない** | **作らない** | **走らない**（PR が無いため） | 合意まで |
 
 `proto/` prefix 自体が「PR にしないブランチ」の宣言。
 
@@ -137,8 +187,13 @@ git push -u origin proto/quick-record
 git push origin --delete proto/quick-record
 ```
 
-push すると `src/app/proto/` も CI の lint / typecheck / build 対象に入るので、
-型が通っている必要がある。
+**push しても CI は走らない。** `.github/workflows/ci.yml` の
+トリガーは `pull_request` と `workflow_call` だけで、`proto/` に PR は作らないため。
+つまりリモートの `proto/` ブランチは lint / typecheck / build を一度も通っていない状態で残る。
+
+これは意図どおり（プロトに CI を回すのは無駄）だが、**そのブランチをそのまま
+実装に育てる（道 A）つもりなら、push 前にローカルで `just check` を通しておく**。
+捨てる前提（道 B）なら不要。
 
 ### 遠隔の相手に見せる
 
