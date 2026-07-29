@@ -357,7 +357,9 @@ export function survey(files, { samples = 3 } = {}) {
       [/業種/, /業の種類/, /業.*区分/, /登録.*種別/, /種別/, /種類/],
       // 除外は**動物の種類**を指す見出しに限る。/動物/ で丸ごと弾くと、
       // 法定の「動物取扱業種別」まで落ちて、そのファイルが集計から消える。
-      { exclude: [/動物種別/, /取扱動物/, /動物の種類/, /品種/, /犬種/, /哺乳|鳥類|爬虫/] },
+      // 「動物の種別」のように助詞が入る表記もあるため /動物の?種別/ で拾う
+      // （「動物取扱業種別」は 動物 の直後が「取」なので該当しない）。
+      { exclude: [/動物の?種別/, /動物の?種類/, /取扱動物/, /品種/, /犬種/, /哺乳|鳥類|爬虫/] },
     );
     // 「業種1」「業種2」のように登録業種が複数列に分かれる登録簿があるため、
     // 1列だけ読むと保管を取り逃す。該当する列は**すべて**見る。
@@ -387,7 +389,13 @@ export function survey(files, { samples = 3 } = {}) {
     for (const r of rows.slice(h + 1)) {
       // 候補列の値を**すべて**拾う。行によって埋まっている列が違うため、
       // 「その行で最初に埋まっていた値」を鍵にすると同じ店舗が割れる。
-      const rowNames = nameIdxs.map((i) => (r[i] ?? "").trim()).filter(Boolean);
+      // 列の優先順位（屋号 > 事業所名 > … > 法人名）を**保持したまま**拾う。
+      // 順位を捨てて集約すると、法人名（「犬の保育園株式会社」）が実際の店舗の
+      // 屋号（「ABCトリミング」）を上書きしてしまう。
+      const rowNamed = nameIdxs
+        .map((i, rank) => ({ name: (r[i] ?? "").trim(), rank }))
+        .filter((x) => x.name);
+      const rowNames = rowNamed.map((x) => x.name);
       if (!rowNames.length) continue;
       n++;
       // 業種の値は表記ゆれ（「保　管」等）があるので正規化してから保持する
@@ -422,7 +430,7 @@ export function survey(files, { samples = 3 } = {}) {
       }
       let entry;
       if (!hit.length) {
-        entry = { names: new Set(), normNames: new Set(), kinds: new Set() };
+        entry = { names: new Set(), normNames: new Set(), kinds: new Set(), ranked: [] };
         clusters.push(entry);
         byName.set(bucket, clusters);
       } else {
@@ -432,10 +440,15 @@ export function survey(files, { samples = 3 } = {}) {
           for (const v of other.names) entry.names.add(v);
           for (const v of other.normNames) entry.normNames.add(v);
           for (const v of other.kinds) entry.kinds.add(v);
+          entry.ranked.push(...other.ranked);
           clusters.splice(clusters.indexOf(other), 1);
         }
       }
-      rowNames.forEach((nm, i) => { entry.names.add(nm); entry.normNames.add(norm[i]); });
+      rowNamed.forEach((x, i) => {
+        entry.names.add(x.name);
+        entry.normNames.add(norm[i]);
+        entry.ranked.push(x);
+      });
       for (const k of kinds) entry.kinds.add(k);
     }
     const idNote = addrIdx >= 0
@@ -464,16 +477,20 @@ export function survey(files, { samples = 3 } = {}) {
   // **業態が判別できる呼称**を優先して分類する（法人名だけ見て unknown にしない）。
   const entries = [...byName.values()].flat().map((e) => {
     const names = [...e.names];
-    // ⚠ 最初に非 unknown になった別名で決めない。CSV の行順で結果が変わってしまう。
-    //    別名を**すべて**分類し、RULES の宣言順（保育園 → しつけ → …）で選ぶ。
-    const classified = names.map((nm) => ({ nm, c: classify(nm) }));
+    // 分類の優先順位は **①列の優先度（屋号＞…＞法人名） → ②RULES の宣言順**。
+    //   ① を先に見るのは、実際の店舗を表すのは屋号であって法人名ではないため
+    //      （「屋号=ABCトリミング / 法人名=犬の保育園株式会社」は grooming）。
+    //   ② を後段に置くのは、同順位で複数の別名が並んだときに CSV の行順で
+    //      結果が変わらないようにするため。
+    const order = [...RULES.map((r) => r.key), "cat_only"];
+    const rank2 = (c) => { const i = order.indexOf(c); return i < 0 ? order.length : i; };
+    const ranked = [...e.ranked]
+      .map((x) => ({ ...x, c: classify(x.name) }))
+      .sort((a, b) => a.rank - b.rank || rank2(a.c) - rank2(b.c));
     let category = "unknown";
     let display = names[0] ?? "";
-    const order = [...RULES.map((r) => r.key), "cat_only"];
-    for (const key of order) {
-      const found = classified.find((x) => x.c === key);
-      if (found) { category = key; display = found.nm; break; }
-    }
+    const first = ranked.find((x) => x.c !== "unknown");
+    if (first) { category = first.c; display = first.name; }
     return { name: display, names, category, kinds: e.kinds };
   });
   const counts = {};
