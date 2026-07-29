@@ -29,11 +29,29 @@ function deny(reason) {
 // （`git worktree remove "$WT" $FLAGS` など）は原理的に見抜けない。
 // 「うっかり」を止めるための層であり、意図的な回避に対する境界ではない。
 // 本当の安全策は worktree の中身を消される前に確認すること（deny の文言で誘導している）。
+// ANSI-C 引用 `$'...'` の中身を復元する。`\x2d` `\055` `\u002d` `\n` などを実際の文字に戻す。
+// エスケープの「形」を 1 つずつ潰すのではなく、この構文をまとめて解釈することで
+// `$'\x2d\x2dforce'` `$'\055\055force'` `--fo$'\x72'ce` をすべて同じ `--force` に落とす。
+const ANSI_C_ESCAPE = /\\(x[0-9A-Fa-f]{1,2}|u[0-9A-Fa-f]{1,4}|[0-7]{1,3}|.)/g;
+const ANSI_C_SIMPLE = { n: "\n", t: "\t", r: "\r", a: "\x07", b: "\b", f: "\f", v: "\v", e: "\x1b" };
+function decodeAnsiCQuotes(token) {
+  return token.replace(/\$'((?:[^'\\]|\\.)*)'/g, (_, body) =>
+    body.replace(ANSI_C_ESCAPE, (_m, esc) => {
+      if (esc[0] === "x" && esc.length > 1) return String.fromCharCode(parseInt(esc.slice(1), 16));
+      if (esc[0] === "u" && esc.length > 1) return String.fromCharCode(parseInt(esc.slice(1), 16));
+      if (/^[0-7]+$/.test(esc)) return String.fromCharCode(parseInt(esc, 8));
+      return ANSI_C_SIMPLE[esc] ?? esc;
+    }),
+  );
+}
+
 function isForcedWorktreeRemoval(command) {
   // 構文としての引用符・エスケープを外す。シェルは `"--force"` も `--fo"rce"` も
-  // `\-\-force` も `$'--force'`（ANSI-C 引用）も、git には同じ `--force` として渡す。
-  // `$` は引用符が続くときだけ落とす（`$FLAGS` のような変数参照は残す＝下記の限界）。
-  const unquote = (t) => t.replace(/\$(?=["'])/g, "").replace(/["'\\]/g, "");
+  // `\-\-force` も `$'--force'` も `$'\x2d\x2dforce'` も、git には同じ `--force` として渡す。
+  // ANSI-C の中身は**バックスラッシュを落とす前に**復元する（順序を逆にすると `\x2d` が
+  // `x2d` になって一致しなくなる）。`$` は引用符が続くときだけ落とす
+  // （`$FLAGS` のような変数参照は残す＝下記の限界）。
+  const unquote = (t) => decodeAnsiCQuotes(t).replace(/\$(?=["'])/g, "").replace(/["'\\]/g, "");
   // パイプ・リスト区切りでコマンド単位に割る
   for (const segment of command.split(/[|;&\n]+/)) {
     const tokens = segment.trim().split(/\s+/).filter(Boolean).map(unquote);
