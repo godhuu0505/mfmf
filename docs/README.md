@@ -35,6 +35,7 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [explanation/vision-and-roadmap.md](./explanation/vision-and-roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
 - [explanation/phase-3-5-use-cases.md](./explanation/phase-3-5-use-cases.md) — Phase 3.5（家族・権限・サインアップ・共有）のユースケース・バックログ（受け入れ条件・決定ログ・未決事項）。
 - [explanation/business-strategy.md](./explanation/business-strategy.md) — 事業戦略（ユーザー獲得・収益モデル・法規制ゲート・デバイス構想）。
+- [explanation/market-analysis.md](./explanation/market-analysis.md) — 日本市場のマーケティング分析（3C・5F・SWOT・バリューチェーン・KSF・自己批判）。
 
 ---
 
