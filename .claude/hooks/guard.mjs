@@ -23,10 +23,19 @@ function deny(reason) {
 
 // `git ... worktree remove ...` に force 相当のオプションが付いているか。
 // 正規表現 1 本ではなくトークン列で判定する（省略形・語順・グローバルオプションに強い）。
+//
+// ⚠️ これは多層防御の 1 枚であって、シェルの完全な解釈ではない。
+// シェル文字列から静的に意図を判定する以上、変数展開・コマンド置換・eval
+// （`git worktree remove "$WT" $FLAGS` など）は原理的に見抜けない。
+// 「うっかり」を止めるための層であり、意図的な回避に対する境界ではない。
+// 本当の安全策は worktree の中身を消される前に確認すること（deny の文言で誘導している）。
 function isForcedWorktreeRemoval(command) {
+  // 構文としての引用符・エスケープを外す。シェルは `"--force"` も `--fo"rce"` も
+  // `\-\-force` も、git には同じ `--force` として渡すため、これを外さないと素通りする。
+  const unquote = (t) => t.replace(/["'\\]/g, "");
   // パイプ・リスト区切りでコマンド単位に割る
   for (const segment of command.split(/[|;&\n]+/)) {
-    const tokens = segment.trim().split(/\s+/).filter(Boolean);
+    const tokens = segment.trim().split(/\s+/).filter(Boolean).map(unquote);
     const gitAt = tokens.findIndex((t) => t === "git" || t.endsWith("/git"));
     if (gitAt < 0) continue;
     const rest = tokens.slice(gitAt + 1);
