@@ -49,8 +49,10 @@ const RULES = [
       // 犬・パピー・しつけ等の文脈を要求する。
       /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy|しつけ|obedience)[^、]{0,8}(スクール|school|学園)/i,
       /デイケア/, /デイサービス/, /daycare/i, /day\s*care/i,
-      // 「園」は犬・ドッグ等の文脈がある場合のみ拾う
-      /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy)[^、]{0,8}園/i,
+      // 「園」は犬・ドッグ等の**直後**に来る場合のみ拾う（「犬の○○園」の形）。
+      // 距離を空けると「ドッグサロン花園」の「ドッグ…花園」まで拾ってしまう。
+      // さらに下の looksGrooming() でサロン系を除外している。
+      /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy)の?[^、]{0,3}園/i,
     ],
   },
   {
@@ -83,6 +85,10 @@ const RULES = [
 // 「保管」業種を表す表記の揺れ
 const HOKAN_PATTERNS = [/保管/];
 
+// 法定の業種区分。列見出しだけで業種列と決めつけず、**中身がこれらを含むか**で検証する
+// （「事業者種別（法人/個人）」のような無関係な列を業種列と誤認しないため）。
+const STATUTORY_KINDS = [/販売/, /保管/, /貸出/, /訓練/, /展示/, /競り/, /譲受/];
+
 // 犬の保育園の推定分子に寄与するカテゴリ。
 // しつけ・訓練も「保管」を持てば定期通園の預かり業態（market-analysis.md §18-6）。
 const TARGET_CATEGORIES = ["daycare", "training"];
@@ -105,11 +111,22 @@ const CAT_PATTERNS = [/猫/, /ねこ/, /ネコ/, /キャット/, /にゃん/, /�
 // トリマー/訓練士の**養成校**。屋号に犬の語が入る（「愛犬」等）ため犬の文脈を
 // 要求しても弾けない。美容・トリミング系の語と学校系の語が同居したら養成校とみなす。
 // 例) 東京愛犬美容学園 / ○○トリミングスクール
-const GROOMING_WORDS = [/美容/, /トリミング/, /グルーミング/, /trimming/i, /grooming/i];
+const GROOMING_WORDS = [/美容/, /トリミング/, /グルーミング/, /trimming/i, /grooming/i, /サロン/, /salon/i];
 const SCHOOL_WORDS = [/学園/, /スクール/, /school/i, /専門学校/, /養成/, /学院/];
+// 人材（トリマー・訓練士）の養成校を示す語。犬の語を含むので通常の判定では弾けない。
+const VOCATIONAL_WORDS = [/養成/, /専門学校/, /学院/, /トレーナー(養成|科)/, /訓練士/, /資格/];
 
 function isGroomingSchool(name) {
-  return GROOMING_WORDS.some((re) => re.test(name)) && SCHOOL_WORDS.some((re) => re.test(name));
+  // 美容・サロン系 × 学校系 → トリマー養成校
+  if (GROOMING_WORDS.some((re) => re.test(name)) && SCHOOL_WORDS.some((re) => re.test(name))) return true;
+  // 「ドッグトレーナー養成スクール」のように、人を育てる語 × 学校系 → 訓練士養成校
+  if (VOCATIONAL_WORDS.some((re) => re.test(name)) && SCHOOL_WORDS.some((re) => re.test(name))) return true;
+  return false;
+}
+
+/** 屋号にトリミング・サロン系の語があるか（「園」の緩い判定を上書きするために使う）。 */
+function looksGrooming(name) {
+  return GROOMING_WORDS.some((re) => re.test(name));
 }
 
 /** 屋号が「猫だけ」を示すか（猫の語があり、犬の語が無い）。 */
@@ -176,8 +193,11 @@ function normalizeForMatch(v) {
 export function classify(name) {
   const n = normalizeForMatch(name);
   if (!n) return "unknown";
-  // 養成校は「犬」の語を含むので、通常の優先順位だと保育園に化ける。先に落とす。
+  // 養成校（トリマー/訓練士）は「犬」の語を含むので、通常の優先順位だと保育園に化ける。先に落とす。
   if (isGroomingSchool(n)) return "grooming";
+  // 「ドッグサロン花園」のようにサロン名に「園」が入るケース。
+  // 保育園ルールの緩い「園」判定より、サロンの語を優先する。
+  if (looksGrooming(n) && !/保育園|幼稚園|ようちえん|ほいくえん|デイケア/.test(n)) return "grooming";
   for (const rule of RULES) {
     if (rule.patterns.some((re) => re.test(n))) {
       // 犬の推定分子に入るカテゴリ（保育園系・しつけ系）のうち「猫だけ」の施設は外す。
@@ -352,7 +372,7 @@ export function survey(files, { samples = 3 } = {}) {
     // 「業種」の列。法定様式では「業の種類」表記もある。
     // 一方で「動物種別」「取扱動物の種類」といった**動物の種類**の列が併存するため、
     // 汎用の /種別|種類/ でそれを掴まないよう除外する。
-    const kindIdxs = pickColumns(
+    const kindIdxsRaw = pickColumns(
       header,
       [/業種/, /業の種類/, /業.*区分/, /登録.*種別/, /種別/, /種類/],
       // 除外は**動物の種類**を指す見出しに限る。/動物/ で丸ごと弾くと、
@@ -363,6 +383,14 @@ export function survey(files, { samples = 3 } = {}) {
     );
     // 「業種1」「業種2」のように登録業種が複数列に分かれる登録簿があるため、
     // 1列だけ読むと保管を取り逃す。該当する列は**すべて**見る。
+    // さらに、見出しが当たっても**中身が法定業種でない列は捨てる**
+    // （「事業者種別=法人/個人」を業種列と誤認すると、評価済み扱いのまま
+    //   保管ゼロを「意味のあるゼロ」と報告してしまう）。
+    const dataRows = rows.slice(h + 1);
+    const validKindIdxs = kindIdxsRaw.filter((i) =>
+      dataRows.some((r) => STATUTORY_KINDS.some((re) => re.test(normalize(r[i] ?? "")))),
+    );
+    const kindIdxs = validKindIdxs;
     // 名寄せの鍵は「屋号＋所在地」（＝店舗の実体）。登録番号は業種ごとに振られる
     // 自治体があり、鍵に使うと1店舗が業種の数だけ二重計上されるため使わない。
     // ⚠ 順序に意味がある。「事業者所在地」と「事業所所在地」が併存する場合、
@@ -386,7 +414,8 @@ export function survey(files, { samples = 3 } = {}) {
     let n = 0;
     let sitelessRows = 0;
     let unqualifiedAddrRows = 0;
-    for (const r of rows.slice(h + 1)) {
+    let lastEntry = null;
+    for (const r of dataRows) {
       // 候補列の値を**すべて**拾う。行によって埋まっている列が違うため、
       // 「その行で最初に埋まっていた値」を鍵にすると同じ店舗が割れる。
       // 列の優先順位（屋号 > 事業所名 > … > 法人名）を**保持したまま**拾う。
@@ -396,7 +425,17 @@ export function survey(files, { samples = 3 } = {}) {
         .map((i, rank) => ({ name: (r[i] ?? "").trim(), rank }))
         .filter((x) => x.name);
       const rowNames = rowNamed.map((x) => x.name);
-      if (!rowNames.length) continue;
+      // Excel の結合セルを CSV 化すると、業種ごとに「,保管,」のような**継続行**が出る。
+      // 名前が空だからと捨てると、その施設の保管登録が丸ごと失われる。
+      // 直前の施設に業種だけを足す。
+      if (!rowNames.length) {
+        const contKinds = kindIdxs.map((i) => normalize(r[i] ?? "")).filter(Boolean);
+        if (lastEntry && contKinds.length) {
+          n++;
+          for (const k of contKinds) lastEntry.kinds.add(k);
+        }
+        continue;
+      }
       n++;
       // 業種の値は表記ゆれ（「保　管」等）があるので正規化してから保持する
       const kinds = kindIdxs.map((i) => normalize(r[i] ?? "")).filter(Boolean);
@@ -450,6 +489,7 @@ export function survey(files, { samples = 3 } = {}) {
         entry.ranked.push(x);
       });
       for (const k of kinds) entry.kinds.add(k);
+      lastEntry = entry;
     }
     const idNote = addrIdx >= 0
       ? "所在地で名寄せ（屋号は別名として集約）"
