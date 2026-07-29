@@ -61,6 +61,13 @@
   `/guest`・`/guest/records/new`（外部ゲストの閲覧/記入 UC-G02/G03）,
   `/feedback`, `/offline`, `/auth/*`。`/shares`・`/share/[token]` は匿名共有廃止（D4）の終了案内。
 
+## 新機能の画面を検討するとき
+
+UI のある新機能は、仕様を文章で固める前に **`proto/<slug>` 使い捨てブランチの実コード**で
+画面を作り、実機で触って合意する。手順は **`prototype` skill**（`.claude/skills/prototype/`）。
+バックエンドのみの変更・小改修・バグ修正では使わない。
+採用/却下の結論は [docs/explanation/decisions.md](./docs/explanation/decisions.md) に 1 行残す。
+
 ## セキュリティ（厳守）
 
 - **秘密情報をコミット/出力しない。** `.env.local` 等の実 env ファイルは読まない・編集しない

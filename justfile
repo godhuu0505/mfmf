@@ -8,6 +8,21 @@ default:
 dev:
     npm run dev
 
+# Dev server bound to the LAN, for checking prototypes on a real phone.
+# mfmf is a PWA: one-handed use, safe areas and IME can only be judged on a device.
+dev-lan:
+    @set -e; \
+    IP="$(hostname -I 2>/dev/null | awk '{print $1}')"; \
+    if [ -z "$IP" ]; then \
+        IP="$(ipconfig getifaddr en0 2>/dev/null || true)"; \
+    fi; \
+    if [ -n "$IP" ]; then \
+        echo "[dev-lan] スマホから開く: http://$IP:3000"; \
+    else \
+        echo "[dev-lan] LAN IP を自動判定できませんでした。手元の IP を確認してください。"; \
+    fi; \
+    npm run dev -- -H 0.0.0.0
+
 # CI gate: lint -> typecheck -> build
 check:
     npm run lint

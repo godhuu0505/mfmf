@@ -31,7 +31,9 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 
 ## 解説（explanation/）
 
+- [explanation/decisions.md](./explanation/decisions.md) — 設計決定ログ（D ログ）。**却下した案とその理由**を 1 行で残す唯一の場所。
 - [explanation/design-decisions.md](./explanation/design-decisions.md) — 共有方針・スコープ・PWA・セキュリティ・デプロイ方針の「なぜ」。
+- [explanation/prototype-first.md](./explanation/prototype-first.md) — 新機能の画面を使い捨てブランチのプロトタイプで決める理由（静的モックを却下した経緯）。
 - [explanation/vision-and-roadmap.md](./explanation/vision-and-roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
 - [explanation/phase-3-5-use-cases.md](./explanation/phase-3-5-use-cases.md) — Phase 3.5（家族・権限・サインアップ・共有）のユースケース・バックログ（受け入れ条件・決定ログ・未決事項）。
 

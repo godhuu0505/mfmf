@@ -23,7 +23,9 @@
       "Bash(git switch:*)",
       "Bash(git stash:*)",
       "Bash(git restore:*)",
-      "Bash(git push -u origin:*)"
+      "Bash(git push -u origin:*)",
+      "Bash(git reset --soft:*)",
+      "Bash(git worktree:*)"
     ],
     "deny": [
       "Read(.env)",
