@@ -113,6 +113,23 @@ src/app/proto/quick-record/
       pathname.startsWith("/auth") ||
 ```
 
+**あわせて `FeedbackWidget` を止める。** `src/app/layout.tsx` が全ルートに無条件で描画しており、
+`submitFeedback` は実 `feedback` テーブルに insert する（`src/app/feedback/actions.ts:75`）。
+**プロト側が何も import しなくても勝手に付いてくる**ので、リモート Supabase 構成で触ると
+プロトの画面から本物の行が入る（未ログインなら送信が必ず失敗する UI が出る）。
+
+```diff
+  // src/app/layout.tsx
+        {children}
+-       <FeedbackWidget />
++       {/* proto ブランチでは無効化（実 feedback テーブルに書くため）。畳むとき戻す */}
+        <ServiceWorkerRegister />
+```
+
+> **`layout.tsx` から継承されるものに注意。** §2 の「バックエンドを書き換えるものを
+> import しない」は自分で書くコードの話。レイアウト経由で**自動的に載るもの**は
+> import していなくても付いてくるので、別途止める必要がある。
+
 > **ローカル Supabase を使っている場合の注意**: `just setup` が書く
 > `NEXT_PUBLIC_SUPABASE_URL` は `http://127.0.0.1:54321` で、スマホから見ると
 > 「スマホ自身」を指すため到達できない。プロトは固定データなので Supabase は不要だが、
@@ -228,30 +245,33 @@ git reset --soft origin/main        # 履歴だけ畳む。作業ツリーは残
 git switch -c claude/<topic>-<hash>
 git branch -D proto/quick-record
 
-# ★ 1) 育てたい UI を本来のルートへ移す（先にこれ。順序を逆にすると消える）
+# ★ 1) 採用した画面を本来のルートへ移す（先にこれ。順序を逆にすると消える）
 mkdir -p src/app/<本来のルート>
 git mv src/app/proto/quick-record/page.tsx src/app/<本来のルート>/page.tsx
-#    プロト内に切り出した client コンポーネントがあれば同様に移す
+#    複数案を作った場合は「採用した案」を移す（a/page.tsx など）。
+#    比較用の入口 page.tsx（リンクとメモだけ）は移さず捨てる。
+#    プロト内に切り出した client コンポーネントも忘れず移す。
 
-# ★ 2) 残ったプロト専用の足場を落とす
-git rm -r --quiet --ignore-unmatch src/app/proto   # ← 空でもエラーにしない（下記）
+# ★ 2) プロト用に触った「実アプリ側」のファイルを全部 origin/main に戻す
 git restore --source=origin/main --staged --worktree \
-  src/lib/supabase/middleware.ts                   # /proto の認証除外を戻す
-git restore --source=origin/main --staged --worktree \
-  src/app/manifest.ts                              # start_url を一時変更した場合（§3）
+  src/lib/supabase/middleware.ts \
+  src/app/layout.tsx \
+  src/app/manifest.ts
+git rm -r --quiet --ignore-unmatch src/app/proto
 
-# ★ 3) 確認
-git diff --cached --stat    # src/app/proto / middleware.ts / manifest.ts が無いこと
+# ★ 3) 最終確認
+git diff --cached --stat    # 実装に必要と説明できるファイルだけが残っているか
 ```
 
+> 🧹 **掃除の規則（ファイル名を覚えるのではなく、これを守る）**
+> **`src/app/proto/` の外で触った実アプリのファイルは、プロト都合なら全部戻す。**
+> `git diff --cached --stat` を見て、**実装に必要だと一言で説明できないファイルは戻す**。
+> §3 で触りうるのは典型的に上の 3 つ（`/proto` の認証除外・`FeedbackWidget` の無効化・
+> `start_url` の一時変更）だが、**列挙を覚えるのではなく差分を見て判断する**こと。
+>
 > `--ignore-unmatch` が要る理由: プロトが `page.tsx` 1 枚だけだった場合、
 > 1) の `git mv` で追跡ファイルが無くなり `src/app/proto` 自体が消える。
 > そのまま `git rm` すると `pathspec ... did not match any files` で**止まる**。
-> 足場が残っている場合と空になった場合の**両方で通る**ようにしておく。
->
-> `manifest.ts` が要る理由: §3 の standalone 検証で `start_url` をプロトのパスへ
-> 向けた場合、その変更も `reset --soft` でステージされる。戻し忘れると
-> **削除済みの `/proto/...` を start_url に持つ manifest が本番に出る**。
 
 > ⚠️ **順序が命。** 育てたい UI は `src/app/proto/<slug>/` の中にある。
 > 先に `git rm -r src/app/proto` すると、**残るのはプロト外の些末な変更だけ**になり、
@@ -353,10 +373,9 @@ LAN が使えない相手には**画面録画（iOS / Android 標準）を送る
 ## やらないこと
 
 - **プロト専用の変更を実装 PR に混ぜない。** main マージ＝本番リリースなので、
-  混ざると本番に出る。対象は `src/app/proto/`・`/proto` の認証除外
-  （`src/lib/supabase/middleware.ts`）・`start_url` の一時変更（`src/app/manifest.ts`）。
-  道 A の最後で必ず落とし、PR を出す前に
-  `git diff origin/main --stat` にどれも現れないことを確認する
+  混ざると本番に出る（認証不要の `/proto`・壊れた `start_url`・フィードバック導線の欠落）。
+  道 A の最後で必ず落とし、PR を出す前に `git diff origin/main --stat` を見て
+  **実装に必要だと一言で説明できないファイルが無い**ことを確認する
 - `mocks/` のような静的 HTML 置き場を作らない（実装プロトの方が速く情報量も多い）
 - `proto/` に PR を作らない
 - プロトタイプ用の feature flag を常設しない（消し忘れが残骸を生む）
