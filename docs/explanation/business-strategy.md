@@ -386,6 +386,16 @@ daycare_records    (… attendance_id を追加)
 > **記録から参照された時点でこれらのスコープ鍵を immutable にする**（変更が要るなら、
 > 依存する全行を再検証する**別途認可された移行処理**として行う）。
 > **付け替えを試みる pgTAP ケース**を S1 に含める。
+>
+> 🔴 **凍結対象に `pets.household_id` を含めること。** 連鎖の終端はペットの所属世帯であり、
+> ここが動けば上流を全部固めても意味がない。`pets_update_member` は USING / WITH CHECK とも
+> `has_household_role(household_id)` だけを見る（`20260704020000:129-133`）ので、
+> **世帯 A と B の両方で owner/editor を持つ人は、API から直接ペットを移せる**（両側の検査を通る）。
+>
+> その結果、施設レポートの導出スコープが静かに別世帯へ移るか、
+> 保存済みの `daycare_records.household_id` と導出結果が食い違う。
+> 凍結すべき鍵は **`attendances.enrollment_id` / `enrollments.pet_id` / `enrollments.facility_id` /
+> `pets.household_id` の4本**であり、付け替えの pgTAP にもこれを含める。
 
 > ⚠️ **`record_date` を attendance から導出する。** スタッフが attendance を選びつつ
 > 別の `record_date` を送れると、レポートは世帯のカレンダー・ギャラリー・体重履歴では A 日に、
@@ -566,7 +576,7 @@ S2 の目玉である「施設からの写真添付」は、**認可の2層で�
 - 上記すべての pgTAP（クロス世帯・在籍なし・期間外・owner 承認なし・**ミスマッチな attendance**・
   **attendance と食い違う `household_id`**・**世帯側からの `attendance_id` なりすまし**・
   **未プロビジョニングのユーザーによる施設/招待の作成**・**取り消し/延長後のアクセス**・
-  **スコープ鍵の付け替え（`enrollment_id` / `pet_id` / `facility_id`）**・
+  **スコープ鍵の付け替え（`enrollment_id` / `pet_id` / `facility_id` / `pets.household_id`）**・
   **世帯からの施設レポート改変/削除**・**承認期間外の登園（過去側・未来側）**・**施設の廃業**・
   **重複在籍が取り消しを生き延びないこと**・**登園作成のリトライで行が増えないこと**・
   **他施設のデータが見えないこと**・
