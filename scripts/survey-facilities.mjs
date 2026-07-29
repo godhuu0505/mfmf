@@ -135,14 +135,25 @@ function normalize(v) {
  * 「中央1-1」のような相対住所は自治体をまたぐと衝突するため、
  * ファイルを横断した名寄せに使えない。
  */
+const PREFECTURES = [
+  "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+  "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+  "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
+  "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
+  "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+  "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
+  "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
+];
+
 function isQualifiedAddress(v) {
   const n = normalize(v);
   if (!n) return false;
-  // 都道府県があれば確実。市名は概ね全国で一意なので許容する。
-  // 「区」「町」「村」は全国に同名が多数あり（中央区・本町・○○村）、
-  // これを根拠に自治体をまたいで名寄せすると別施設が潰れる。
-  // 例) 「本町1-1」は /町/ に当たるが、全国で一意ではない。
-  return /[都道府県]/.test(n) || /市/.test(n);
+  // ⚠ 文字が「含まれる」だけでは判定できない。
+  //    「府中町1-1」は府を、「市川1-1」は市を含むが、どちらも全国で一意ではない。
+  //    **先頭が実在の都道府県名**か、**先頭付近で市/郡が閉じている**ことを要求する。
+  if (PREFECTURES.some((pref) => n.startsWith(pref))) return true;
+  // 「柏市…」「市原市…」は可。「市川1-1」（市が先頭）や「府中町…」は不可。
+  return /^.{1,5}[市郡]/.test(n);
 }
 
 /**
@@ -241,6 +252,10 @@ const NAME_PATTERNS = [
   /名称/, /事業者.*名/, /法人.*名/,
 ];
 
+// ⚠ 人名の列を掴まないための除外。「事業所代表者氏名」は /事業所.*名/ に当たるため、
+// 除外しないと代表者名を屋号として分類してしまい（→ unknown）、施設が分子から消える。
+const NAME_EXCLUDE = [/氏名/, /代表者/, /責任者/, /担当者/, /管理者/];
+
 /**
  * ヘッダ行を推定する。自治体ごとに列名も位置もばらつくので、
  * 「実際に事業所名の列を取り出せる」最初の行をヘッダとして扱う。
@@ -269,7 +284,7 @@ function findHeader(rows) {
   for (let i = 0; i < Math.min(rows.length, 20); i++) {
     const cells = rows[i].map((c) => c.trim());
     if (cells.filter((c) => c !== "").length < 2) continue;
-    if (pickColumn(cells, NAME_PATTERNS) < 0) continue;
+    if (pickColumn(cells, NAME_PATTERNS, { exclude: NAME_EXCLUDE }) < 0) continue;
     const others = OTHER_COLUMN_PATTERNS.filter(
       (group) => pickColumn(cells, group) >= 0,
     ).length;
@@ -332,18 +347,20 @@ export function survey(files, { samples = 3 } = {}) {
     // 名前列は**優先順位つきで複数**保持する。「屋号」を優先しつつ、
     // その行で空なら「事業所の名称」へ落ちる（屋号は任意入力の登録簿が多く、
     // 1列に固定すると空の行を丸ごと捨ててしまう）。
-    const nameIdxs = pickColumns(header, NAME_PATTERNS);
+    const nameIdxs = pickColumns(header, NAME_PATTERNS, { exclude: NAME_EXCLUDE });
     const nameIdx = nameIdxs.length ? nameIdxs[0] : -1;
     // 「業種」の列。法定様式では「業の種類」表記もある。
     // 一方で「動物種別」「取扱動物の種類」といった**動物の種類**の列が併存するため、
     // 汎用の /種別|種類/ でそれを掴まないよう除外する。
-    const kindIdx = pickColumn(
+    const kindIdxs = pickColumns(
       header,
       [/業種/, /業の種類/, /業.*区分/, /登録.*種別/, /種別/, /種類/],
       // 除外は**動物の種類**を指す見出しに限る。/動物/ で丸ごと弾くと、
       // 法定の「動物取扱業種別」まで落ちて、そのファイルが集計から消える。
       { exclude: [/動物種別/, /取扱動物/, /動物の種類/, /品種/, /犬種/, /哺乳|鳥類|爬虫/] },
     );
+    // 「業種1」「業種2」のように登録業種が複数列に分かれる登録簿があるため、
+    // 1列だけ読むと保管を取り逃す。該当する列は**すべて**見る。
     // 名寄せの鍵は「屋号＋所在地」（＝店舗の実体）。登録番号は業種ごとに振られる
     // 自治体があり、鍵に使うと1店舗が業種の数だけ二重計上されるため使わない。
     // ⚠ 順序に意味がある。「事業者所在地」と「事業所所在地」が併存する場合、
@@ -371,7 +388,7 @@ export function survey(files, { samples = 3 } = {}) {
       }
       if (!name) continue;
       n++;
-      const kind = kindIdx >= 0 ? (r[kindIdx] ?? "").trim() : "";
+      const kinds = kindIdxs.map((i) => (r[i] ?? "").trim()).filter(Boolean);
       // 数えたいのは「事業所（店舗）」であって「登録（ライセンス）」ではない。
       //   - 同じ店舗が業種ごとに複数行  → まとめたい
       //   - 同名の別店舗（チェーン等）  → 分けたい
@@ -393,7 +410,7 @@ export function survey(files, { samples = 3 } = {}) {
       if (!byName.has(key)) {
         byName.set(key, { name, category: classify(name), kinds: new Set() });
       }
-      if (kind) byName.get(key).kinds.add(kind);
+      for (const k of kinds) byName.get(key).kinds.add(k);
     }
     const idNote = addrIdx >= 0
       ? "屋号＋所在地で名寄せ"
@@ -407,12 +424,12 @@ export function survey(files, { samples = 3 } = {}) {
         + `分けている場合は結合してから渡すこと）`
       : "";
     filesEvaluated++;
-    if (kindIdx >= 0) filesWithKind++;
+    if (kindIdxs.length > 0) filesWithKind++;
     perFile.push({
       file,
       rows: n,
-      kindColumn: kindIdx >= 0 ? header[kindIdx] : null,
-      note: [kindIdx < 0 ? "業種列なし（保管の判定は不可）" : `業種列=「${header[kindIdx]}」`, idNote, sitelessNote, unqualifiedNote]
+      kindColumns: kindIdxs.map((i) => header[i]),
+      note: [kindIdxs.length === 0 ? "業種列なし（保管の判定は不可）" : `業種列=「${kindIdxs.map((i) => header[i]).join("」「")}」`, idNote, sitelessNote, unqualifiedNote]
         .filter(Boolean).join(" / "),
     });
   }
