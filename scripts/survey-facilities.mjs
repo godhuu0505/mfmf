@@ -130,21 +130,33 @@ function parseCsv(text) {
   return rows.filter((r) => r.some((v) => v.trim() !== ""));
 }
 
+// 事業所名の列を表す表記の揺れ。ヘッダ判定にも列選択にも同じものを使う。
+const NAME_PATTERNS = [/事業所.*名/, /施設.*名/, /名称/, /屋号/, /事業者.*名/];
+
 /**
  * ヘッダ行を推定する。自治体ごとに列名も位置もばらつくので、
- * 「それらしい列名」を含む最初の行をヘッダとして扱う。
+ * 「実際に事業所名の列を取り出せる」最初の行をヘッダとして扱う。
+ *
+ * 単に「事業所」を含む行を選ぶと、先頭のタイトル行
+ * （例:「第一種動物取扱業登録事業所一覧」）を掴んでしまい、
+ * 列が見つからずファイルごとスキップしてしまうため、
+ * **候補行に対して実際に列選択を試して**から採用する。
  */
 function findHeader(rows) {
-  const NAME_HINT = /(事業所|施設|名称|屋号|事業者)/;
   for (let i = 0; i < Math.min(rows.length, 20); i++) {
-    if (rows[i].some((c) => NAME_HINT.test(c))) return i;
+    const cells = rows[i].map((c) => c.trim());
+    // 1セルしか無い行はタイトル行とみなす（ヘッダは通常複数列）
+    if (cells.filter((c) => c !== "").length < 2) continue;
+    if (pickColumn(cells, NAME_PATTERNS) >= 0) return i;
   }
   return 0;
 }
 
-function pickColumn(header, patterns) {
+function pickColumn(header, patterns, { exclude = [] } = {}) {
   for (const re of patterns) {
-    const idx = header.findIndex((h) => re.test(h));
+    const idx = header.findIndex(
+      (h) => re.test(h) && !exclude.some((ex) => ex.test(h)),
+    );
     if (idx >= 0) return idx;
   }
   return -1;
@@ -156,6 +168,8 @@ export function survey(files, { samples = 3 } = {}) {
   /** 事業所名 -> { kinds:Set, category } で名寄せする（同一事業所が業種ごとに複数行ある） */
   const byName = new Map();
   const perFile = [];
+  // 「業種列が無い」と「業種列はあるが保管が0件」は意味が違うので区別する
+  let anyKindColumn = false;
 
   for (const file of files) {
     const rows = parseCsv(decode(readFileSync(file)));
@@ -163,8 +177,15 @@ export function survey(files, { samples = 3 } = {}) {
 
     const h = findHeader(rows);
     const header = rows[h].map((c) => c.trim());
-    const nameIdx = pickColumn(header, [/事業所.*名/, /施設.*名/, /名称/, /屋号/, /事業者.*名/]);
-    const kindIdx = pickColumn(header, [/業種/, /登録.*種別/, /種別/]);
+    const nameIdx = pickColumn(header, NAME_PATTERNS);
+    // 「業種」の列。法定様式では「業の種類」表記もある。
+    // 一方で「動物種別」「取扱動物の種類」といった**動物の種類**の列が併存するため、
+    // 汎用の /種別|種類/ でそれを掴まないよう除外する。
+    const kindIdx = pickColumn(
+      header,
+      [/業種/, /業の種類/, /業.*区分/, /登録.*種別/, /種別/, /種類/],
+      { exclude: [/動物/, /品種/, /犬種/, /哺乳|鳥類|爬虫/] },
+    );
     // 名寄せの鍵。同名の別店舗（チェーン・のれん分け）を1件に潰さないため、
     // 登録番号 > 所在地 の順で識別子を探す。どちらも無ければ名前のみ（＝過小計上の恐れ）。
     const idIdx = pickColumn(header, [/登録番号/, /登録.*番号/, /許可番号/]);
@@ -176,15 +197,19 @@ export function survey(files, { samples = 3 } = {}) {
     }
 
     let n = 0;
+    let sitelessRows = 0;
     for (const r of rows.slice(h + 1)) {
       const name = (r[nameIdx] ?? "").trim();
       if (!name) continue;
       n++;
       const kind = kindIdx >= 0 ? (r[kindIdx] ?? "").trim() : "";
       // 同一事業所は業種ごとに複数行あるのでまとめる。ただし別店舗は分ける。
-      const site = idIdx >= 0 ? (r[idIdx] ?? "").trim()
-        : addrIdx >= 0 ? (r[addrIdx] ?? "").trim()
-        : "";
+      // 登録番号の列があっても**行によっては空**なことがあるので、
+      // 列の有無ではなく**その行の値**を見て所在地へフォールバックする。
+      const regNo = idIdx >= 0 ? (r[idIdx] ?? "").trim() : "";
+      const addr = addrIdx >= 0 ? (r[addrIdx] ?? "").trim() : "";
+      const site = regNo || addr;
+      if (!regNo && !addr) sitelessRows++;
       const key = `${file}::${name}::${site}`;
       if (!byName.has(key)) {
         byName.set(key, { name, category: classify(name), kinds: new Set() });
@@ -194,10 +219,16 @@ export function survey(files, { samples = 3 } = {}) {
     const idNote = idIdx >= 0 ? "登録番号で名寄せ"
       : addrIdx >= 0 ? "所在地で名寄せ"
       : "⚠ 識別子が無く名前のみで名寄せ（同名の別店舗を1件に潰す＝過小計上）";
+    const sitelessNote = sitelessRows
+      ? `⚠ 識別子が空の行 ${sitelessRows} 件（同名なら潰れる＝過小計上）`
+      : "";
+    if (kindIdx >= 0) anyKindColumn = true;
     perFile.push({
       file,
       rows: n,
-      note: [kindIdx < 0 ? "業種列なし（保管の判定は不可）" : "", idNote].filter(Boolean).join(" / "),
+      kindColumn: kindIdx >= 0 ? header[kindIdx] : null,
+      note: [kindIdx < 0 ? "業種列なし（保管の判定は不可）" : `業種列=「${header[kindIdx]}」`, idNote, sitelessNote]
+        .filter(Boolean).join(" / "),
     });
   }
 
@@ -233,6 +264,7 @@ export function survey(files, { samples = 3 } = {}) {
 
   return {
     files: perFile,
+    anyKindColumn,
     total: entries.length,
     counts,
     examples,
@@ -295,6 +327,10 @@ Excel しか無い自治体は CSV に書き出してから渡してください
     console.log(`    下限 ${pct(r.daycareRatioLow)}  … 不明を全部「保育園でない」とみなす`);
     console.log(`    上限 ${pct(r.daycareRatioHigh)}  … 不明を全部「保育園」とみなす`);
     console.log(`    → この幅がそのまま全国推定のブレ幅になる。`);
+  } else if (r.anyKindColumn) {
+    console.log(`\n=== 業種「保管」で登録: 0 事業所 ===`);
+    console.log(`  業種列は読めているが、保管の登録が1件も無い（＝意味のあるゼロ）。`);
+    console.log(`  該当自治体に保管業態が無いのか、業種の表記が想定と違うのかを確認すること。`);
   } else {
     console.log(`\n※ 業種列が無いため「保管」の集計は不可。屋号ベースの推定のみ。`);
   }
