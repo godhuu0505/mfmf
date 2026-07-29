@@ -561,8 +561,14 @@ S2 の目玉である「施設からの写真添付」は、**認可の2層で�
 - **施設向けの削除 Server Action** — 同様に `deleteRecord` も
   `requireEditableRecordHousehold()` で RLS に到達する前に弾く（`src/app/records/actions.ts:413`）。
   DELETE ポリシーを足しても**誤って作ったレポートを消せない**。スタッフを認証し、記録の attendance と
-  選択中の施設を検証し、**Storage オブジェクトを先に削除してから行を消す**経路を用意する
-  （既存の `deleteRecord` と同じ順序）
+  選択中の施設を検証する経路を用意する。
+  🔴 **ただし既存 `deleteRecord` の順序（Storage を消してから DB 行を消す）をそのまま真似ない。**
+  Storage の削除が成功して DB の DELETE が失敗すると（一時障害・ポリシー競合・制約違反）、
+  **記録と写真メタデータは残ったまま画像だけが不可逆に消える**。
+  施設レポートにも同じ壊れ方を広げないため、**先に DB 側を論理削除**して画面から外し、
+  **実体の削除は後追い**にする（掃除ジョブ／アウトボックス）か、失敗時に取り消せる
+  段階的削除にすること。既存の `deleteRecord` も同じ問題を抱えているので、
+  **併せて直す候補**として記録しておく
 - **作成者（`owner_id`）の削除セマンティクス**（下記 ⚠️）
 - 🔴 **新テーブル自体へのスタッフ側 SELECT / 更新ポリシー**（`attendances` / `enrollments` /
   `facilities` / `facility_staff`）— S2 が今日のリストを引くには、まず `attendances` と

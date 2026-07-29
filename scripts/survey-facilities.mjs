@@ -44,7 +44,10 @@ const RULES = [
     patterns: [
       /保育園/, /ほいくえん/, /ホイクエン/,
       /幼稚園/, /ようちえん/, /ヨウチエン/,
-      /学園/, /スクール/, /school/i,
+      /学園/,
+      // 「スクール」は単体で使わない。「トリミングスクール」（トリマー養成校）が
+      // 保育園に化けて分子を膨らませるため、犬・パピー等の文脈を要求する。
+      /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy|しつけ|obedience)[^、]{0,8}(スクール|school)/i,
       /デイケア/, /デイサービス/, /daycare/i, /day\s*care/i,
       // 「園」は犬・ドッグ等の文脈がある場合のみ拾う
       /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy)[^、]{0,8}園/i,
@@ -114,6 +117,17 @@ function normalize(v) {
 }
 
 /**
+ * 住所が「全国で一意」と言える形か（都道府県または市区町村から始まる）。
+ * 「中央1-1」のような相対住所は自治体をまたぐと衝突するため、
+ * ファイルを横断した名寄せに使えない。
+ */
+function isQualifiedAddress(v) {
+  const n = normalize(v);
+  if (!n) return false;
+  return /(都|道|府|県)/.test(n) || /(市|区|町|村)/.test(n);
+}
+
+/**
  * 分類用の正規化。全角→半角は行うが **スペースは1つに詰めるだけで消さない**。
  * 消すと "CATCH PET SCHOOL" が "CATCHPETSCHOOL" になり、英単語の語境界判定が壊れる。
  */
@@ -150,12 +164,18 @@ export function classify(name) {
  * UTF-8 として解釈したときに置換文字(U+FFFD)が出るなら Shift_JIS とみなす。
  */
 function decode(buf) {
-  const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(buf);
-  if (!utf8.includes("�")) return utf8;
+  // U+FFFD の有無で判定してはいけない。正しい UTF-8 のファイルでも、値の中に
+  // 置換文字が1つ紛れていれば全体を Shift_JIS と誤認し、ヘッダごと文字化けして
+  // 全行スキップになる。**不正なバイト列かどうか**を fatal デコーダで判定する。
   try {
-    return new TextDecoder("shift_jis", { fatal: false }).decode(buf);
+    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
   } catch {
-    return utf8; // shift_jis 非対応環境ならそのまま返す
+    // UTF-8 として不正 → Shift_JIS（自治体 CSV に多い）とみなす
+    try {
+      return new TextDecoder("shift_jis", { fatal: false }).decode(buf);
+    } catch {
+      return new TextDecoder("utf-8", { fatal: false }).decode(buf);
+    }
   }
 }
 
@@ -209,11 +229,24 @@ const NAME_PATTERNS = [
  * **候補行に対して実際に列選択を試して**から採用する。
  */
 function findHeader(rows) {
+  // ヘッダらしさは「名前列があること」だけでは足りない。
+  //   例) 「第一種動物取扱業事業所名簿, 2026年7月」
+  // は2セルあり /事業所.*名/ にも当たるが、これはタイトル行。
+  // **名前列に加えて、他の既知の列（所在地・業種・番号）が最低1つある**ことを要求する。
+  const OTHER_COLUMN_PATTERNS = [
+    [/所在地/, /住所/],
+    [/業種/, /業の種類/, /業.*区分/, /種別/, /種類/],
+    [/登録番号/, /許可番号/, /番号/],
+    [/登録年月日/, /有効期間/, /責任者/],
+  ];
   for (let i = 0; i < Math.min(rows.length, 20); i++) {
     const cells = rows[i].map((c) => c.trim());
-    // 1セルしか無い行はタイトル行とみなす（ヘッダは通常複数列）
     if (cells.filter((c) => c !== "").length < 2) continue;
-    if (pickColumn(cells, NAME_PATTERNS) >= 0) return i;
+    if (pickColumn(cells, NAME_PATTERNS) < 0) continue;
+    const others = OTHER_COLUMN_PATTERNS.filter(
+      (group) => pickColumn(cells, group) >= 0,
+    ).length;
+    if (others >= 1) return i;
   }
   return 0;
 }
@@ -278,6 +311,7 @@ export function survey(files, { samples = 3 } = {}) {
 
     let n = 0;
     let sitelessRows = 0;
+    let unqualifiedAddrRows = 0;
     for (const r of rows.slice(h + 1)) {
       const name = (r[nameIdx] ?? "").trim();
       if (!name) continue;
@@ -289,9 +323,15 @@ export function survey(files, { samples = 3 } = {}) {
       // 登録番号は**業種ごとに別番号**が振られる自治体があり、それを鍵にすると
       // 1店舗が業種の数だけ二重計上される。したがって鍵は
       // **正規化した屋号 + 所在地**（＝店舗の実体）とし、登録番号は鍵に使わない。
-      const addr = addrIdx >= 0 ? normalize(r[addrIdx] ?? "") : "";
-      const site = addr;
+      const rawAddr = addrIdx >= 0 ? (r[addrIdx] ?? "") : "";
+      const addr = normalize(rawAddr);
       if (!addr) sitelessRows++;
+      // 相対住所（「中央1-1」等）は自治体をまたぐと衝突するので、
+      // その行だけファイル名で名前空間を切る。全国で一意な住所ならファイル横断で名寄せする
+      // （自治体が業種ごとに別 CSV を出すケースを潰さないため）。
+      const qualified = isQualifiedAddress(rawAddr);
+      if (addr && !qualified) unqualifiedAddrRows++;
+      const site = qualified ? addr : `${file}|${addr}`;
       // 鍵にファイル名を含めない。自治体が業種ごとに別 CSV を出す／エクスポートが
       // 重複する場合に、同じ店舗が入力ファイルの数だけ二重計上されるため。
       const key = `${normalize(name)}::${site}`;
@@ -306,13 +346,18 @@ export function survey(files, { samples = 3 } = {}) {
     const sitelessNote = sitelessRows
       ? `⚠ 所在地が空の行 ${sitelessRows} 件（同名なら潰れる＝過小計上）`
       : "";
+    const unqualifiedNote = unqualifiedAddrRows
+      ? `⚠ 都道府県/市区町村から始まらない住所 ${unqualifiedAddrRows} 件`
+        + `（自治体をまたぐ衝突を避けるためファイル単位で分離。同一自治体を複数 CSV に`
+        + `分けている場合は結合してから渡すこと）`
+      : "";
     filesEvaluated++;
     if (kindIdx >= 0) filesWithKind++;
     perFile.push({
       file,
       rows: n,
       kindColumn: kindIdx >= 0 ? header[kindIdx] : null,
-      note: [kindIdx < 0 ? "業種列なし（保管の判定は不可）" : `業種列=「${header[kindIdx]}」`, idNote, sitelessNote]
+      note: [kindIdx < 0 ? "業種列なし（保管の判定は不可）" : `業種列=「${header[kindIdx]}」`, idNote, sitelessNote, unqualifiedNote]
         .filter(Boolean).join(" / "),
     });
   }
