@@ -94,9 +94,13 @@ cc-sdd には**承認だけを行うコマンドがありません**。`/kiro-sp
 `/kiro-spec-design <feature> -y` のみで、これが requirements を自動承認します
 （design → tasks 間も同じ構造）。
 
+これは design → tasks 間も同じで、`kiro-spec-tasks` の `allowed-tools`
+（`Read, Write, Edit, Glob, Grep, Agent`）にも `AskUserQuestion` が無いため、
+生成した計画の承認を対話で取ることができません。**`-y` 以外に前進する手段がない**構造です。
+
 **運用**: `-y` は「人間が読んで承認済み」の意思表示として使う。付ける前に必ず
-`.kiro/specs/<feature>/requirements.md`（design なら `design.md`）に目を通すこと。
-読まずに `-y` を付けるのは、このリポジトリのルール違反です。
+`.kiro/specs/<feature>/requirements.md`（design なら `design.md`、tasks なら `tasks.md`）に
+目を通すこと。読まずに `-y` を付けるのは、このリポジトリのルール違反です。
 
 ### `/kiro-spec-quick` の対話モードは tasks を無レビューで通す
 
@@ -119,6 +123,13 @@ cc-sdd には**承認だけを行うコマンドがありません**。`/kiro-sp
 なり得ます。
 
 **運用**: `/kiro-spec-tasks` の出力に単体 major task があれば、`1.1` などの子タスクに割り直す。
+
+逆に、テンプレートが「後回しにできるテスト」用に定める **optional マーカー `- [ ]* X.Y`**
+（`tasks.md` テンプレート 24 行目）は、`/kiro-impl` のキューでは通常の実行対象として拾われます。
+MVP 後に回すつもりのタスクまで自律モードが実装し、その失敗が feature 全体を止め得ます。
+
+**運用**: optional タスクを含む計画で `/kiro-impl` を回すときは、**タスク番号を明示指定**して
+必要なものだけ実行する。
 
 ### `/kiro-impl` は作業ツリーをクリーンにしてから走らせる
 
@@ -178,8 +189,13 @@ Sync フロー（コア 3 ファイルが揃っている場合）は「更新を
 「Steering Updated」と報告され得ます。また `/kiro-steering-custom` は `allowed-tools` に
 `AskUserQuestion` が無いため、トピックや文書化したい内容を対話で聞き出せません。
 
+さらに `/kiro-steering-custom` を**同じトピックで再実行すると、既存の
+`.kiro/steering/{name}.md` を読まずにテンプレートから生成して上書きします**。
+手で書き足した内容が消えます。
+
 **運用**: `/kiro-steering` の実行後は `git diff .kiro/steering/` で実際に反映されたか必ず確認する。
 `/kiro-steering-custom` は**トピックと書きたい内容を最初の引数で渡しきる**。
+既存の custom steering を育てたいときは、コマンドを再実行せず**直接エディタで編集する**。
 
 ### requirements を作り直したら design / tasks も作り直す
 
@@ -197,6 +213,9 @@ Sync フロー（コア 3 ファイルが揃っている場合）は「更新を
 （`- [ ] 1.`）も母数に数えるため、実行対象がすべて終わっても 100% になりません。
 
 **運用**: どちらの出力も参考値として扱い、完了判定は `tasks.md` の `X.Y` タスクを直接見る。
+なお `/kiro-spec-status` は Step 1 でいきなり `.kiro/specs/$ARGUMENTS/spec.json` を読むため、
+**引数なしで呼ぶと「spec が無い」扱いになります**（README が謳う一覧モードに入らない）。
+必ず feature 名を渡すこと。
 
 ### `/kiro-spec-batch` は失敗した wave の下流を止めない
 
