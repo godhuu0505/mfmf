@@ -44,10 +44,10 @@ const RULES = [
     patterns: [
       /保育園/, /ほいくえん/, /ホイクエン/,
       /幼稚園/, /ようちえん/, /ヨウチエン/,
-      /学園/,
-      // 「スクール」は単体で使わない。「トリミングスクール」（トリマー養成校）が
-      // 保育園に化けて分子を膨らませるため、犬・パピー等の文脈を要求する。
-      /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy|しつけ|obedience)[^、]{0,8}(スクール|school)/i,
+      // 「スクール」「学園」は単体で使わない。「トリミングスクール」「東京愛犬美容学園」
+      // （いずれもトリマー養成校）が保育園に化けて分子を膨らませるため、
+      // 犬・パピー・しつけ等の文脈を要求する。
+      /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy|しつけ|obedience)[^、]{0,8}(スクール|school|学園)/i,
       /デイケア/, /デイサービス/, /daycare/i, /day\s*care/i,
       // 「園」は犬・ドッグ等の文脈がある場合のみ拾う
       /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy)[^、]{0,8}園/i,
@@ -98,6 +98,16 @@ const ALL_CATEGORIES = () => [...RULES, ...EXTRA_CATEGORIES];
 const DOG_PATTERNS = [/犬/, /いぬ/, /イヌ/, /ドッグ/, /dog/i, /わん/, /ワン/, /パピー/, /puppy/i];
 const CAT_PATTERNS = [/猫/, /ねこ/, /ネコ/, /キャット/, /にゃん/, /ニャン/, /\bcats?\b/i];
 
+// トリマー/訓練士の**養成校**。屋号に犬の語が入る（「愛犬」等）ため犬の文脈を
+// 要求しても弾けない。美容・トリミング系の語と学校系の語が同居したら養成校とみなす。
+// 例) 東京愛犬美容学園 / ○○トリミングスクール
+const GROOMING_WORDS = [/美容/, /トリミング/, /グルーミング/, /trimming/i, /grooming/i];
+const SCHOOL_WORDS = [/学園/, /スクール/, /school/i, /専門学校/, /養成/, /学院/];
+
+function isGroomingSchool(name) {
+  return GROOMING_WORDS.some((re) => re.test(name)) && SCHOOL_WORDS.some((re) => re.test(name));
+}
+
 /** 屋号が「猫だけ」を示すか（猫の語があり、犬の語が無い）。 */
 function isCatOnly(name) {
   return CAT_PATTERNS.some((re) => re.test(name)) && !DOG_PATTERNS.some((re) => re.test(name));
@@ -124,7 +134,11 @@ function normalize(v) {
 function isQualifiedAddress(v) {
   const n = normalize(v);
   if (!n) return false;
-  return /(都|道|府|県)/.test(n) || /(市|区|町|村)/.test(n);
+  // 都道府県があれば確実。市名は概ね全国で一意なので許容する。
+  // 「区」「町」「村」は全国に同名が多数あり（中央区・本町・○○村）、
+  // これを根拠に自治体をまたいで名寄せすると別施設が潰れる。
+  // 例) 「本町1-1」は /町/ に当たるが、全国で一意ではない。
+  return /[都道府県]/.test(n) || /市/.test(n);
 }
 
 /**
@@ -147,6 +161,8 @@ function normalizeForMatch(v) {
 export function classify(name) {
   const n = normalizeForMatch(name);
   if (!n) return "unknown";
+  // 養成校は「犬」の語を含むので、通常の優先順位だと保育園に化ける。先に落とす。
+  if (isGroomingSchool(n)) return "grooming";
   for (const rule of RULES) {
     if (rule.patterns.some((re) => re.test(n))) {
       // 保育園系のうち「猫だけ」の施設は、犬の保育園の推定分子から外す
@@ -371,6 +387,7 @@ export function survey(files, { samples = 3 } = {}) {
   }
   let hokan = 0;
   let hokanDaycare = 0;
+  let hokanTraining = 0;
   let hokanUnknown = 0;
 
   for (const e of entries) {
@@ -380,6 +397,10 @@ export function survey(files, { samples = 3 } = {}) {
     if (isHokan) {
       hokan++;
       if (e.category === "daycare") hokanDaycare++;
+      // 「保管」を持つしつけ・訓練施設は、預かって面倒を見ている＝保育園業態。
+      // market-analysis.md §18-6 が「定期通園するしつけ教室はターゲットに含む」と
+      // 定めているので、分子から落とすと過小評価になる。
+      if (e.category === "training") hokanTraining++;
       if (e.category === "unknown") hokanUnknown++;
     }
   }
@@ -388,9 +409,11 @@ export function survey(files, { samples = 3 } = {}) {
   // 「全体の不明率」ではなく「保管の中の不明率」で測らないと誤認する。
   // 例) 保管2件（うち不明1）＋ 販売8件 → 全体の不明率10% だが、分母の半分が不明。
   const hokanUnknownRatio = hokan ? hokanUnknown / hokan : null;
-  // 不明を全部 daycare と仮定した場合の上限（＝推定のブレ幅）
-  const daycareRatioLow = hokan ? hokanDaycare / hokan : null;
-  const daycareRatioHigh = hokan ? (hokanDaycare + hokanUnknown) / hokan : null;
+  // 分子は「保育園系」＋「保管を持つしつけ・訓練系」（＝定期通園の預かり業態）
+  const hokanTarget = hokanDaycare + hokanTraining;
+  // 不明を全部ターゲットと仮定した場合の上限（＝推定のブレ幅）
+  const daycareRatioLow = hokan ? hokanTarget / hokan : null;
+  const daycareRatioHigh = hokan ? (hokanTarget + hokanUnknown) / hokan : null;
 
   return {
     files: perFile,
@@ -404,6 +427,8 @@ export function survey(files, { samples = 3 } = {}) {
     examples,
     hokan,
     hokanDaycare,
+    hokanTraining,
+    hokanTarget,
     hokanUnknown,
     hokanUnknownRatio,
     daycareRatioLow,
@@ -454,12 +479,14 @@ Excel しか無い自治体は CSV に書き出してから渡してください
 
   if (r.hokan) {
     console.log(`\n=== 業種「保管」で登録: ${r.hokan} 事業所（全国推定の分母） ===`);
-    console.log(`  うち屋号が保育園・幼稚園系: ${r.hokanDaycare}`);
-    console.log(`  うち屋号から判別不可      : ${r.hokanUnknown}`);
+    console.log(`  うち屋号が保育園・幼稚園系  : ${r.hokanDaycare}`);
+    console.log(`  うちしつけ・訓練系（保管あり）: ${r.hokanTraining}  ← 定期通園の預かり業態として分子に含む`);
+    console.log(`  合計（推定の分子）          : ${r.hokanTarget}`);
+    console.log(`  うち屋号から判別不可        : ${r.hokanUnknown}`);
     console.log(`  ※「保管」にはホテル・トリミング・シッターも含まれるため、これは上限（天井）。`);
-    console.log(`\n  保育園比率（全国推定に掛ける値）:`);
-    console.log(`    下限 ${pct(r.daycareRatioLow)}  … 不明を全部「保育園でない」とみなす`);
-    console.log(`    上限 ${pct(r.daycareRatioHigh)}  … 不明を全部「保育園」とみなす`);
+    console.log(`\n  対象業態の比率（全国推定に掛ける値）:`);
+    console.log(`    下限 ${pct(r.daycareRatioLow)}  … 不明を全部「対象業態でない」とみなす`);
+    console.log(`    上限 ${pct(r.daycareRatioHigh)}  … 不明を全部「対象業態」とみなす`);
     console.log(`    → この幅がそのまま全国推定のブレ幅になる。`);
     if (!r.allFilesHaveKind) {
       console.log(`\n  ⚠ この比率は入力の一部だけから計算されている`);
