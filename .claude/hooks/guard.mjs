@@ -30,13 +30,16 @@ function isForcedWorktreeRemoval(command) {
     const gitAt = tokens.findIndex((t) => t === "git" || t.endsWith("/git"));
     if (gitAt < 0) continue;
     const rest = tokens.slice(gitAt + 1);
-    // サブコマンドは `worktree remove` の順で現れる必要がある（間のグローバルオプションは問わない）
-    const wt = rest.indexOf("worktree");
-    if (wt < 0 || rest[wt + 1] !== "remove") continue;
     // `--force` の曖昧でない省略形（--f 〜 --force）と、-f を含む短オプション束
     const isForce = (t) =>
       /^--f(?:o(?:r(?:c(?:e)?)?)?)?$/.test(t) || /^-[A-Za-z]*f[A-Za-z]*$/.test(t);
-    if (rest.slice(wt + 2).some(isForce)) return true;
+    // `worktree remove` の並びを**最初の 1 つで打ち切らずに全部**探す。
+    // 最初の一致で止めると `git -C worktree worktree remove ... --force` を取り逃す
+    // （`-C` の値が worktree だと、そこで「次は remove ではない」と判断してしまう）。
+    for (let i = 0; i + 1 < rest.length; i++) {
+      if (rest[i] !== "worktree" || rest[i + 1] !== "remove") continue;
+      if (rest.slice(i + 2).some(isForce)) return true;
+    }
   }
   return false;
 }
