@@ -138,6 +138,12 @@ src/app/proto/quick-record/
         <ServiceWorkerRegister />
 ```
 
+**`import FeedbackWidget` の行はそのまま残す**（消さない）。この構成では未使用 import は
+`npm run lint`（`next/core-web-vitals` に `no-unused-vars` は入っていない）でも
+`npm run typecheck`（`tsconfig.json` に `noUnusedLocals` を置いていない）でも
+**検出されない**ので、残しても 3 ゲートは通る。残しておけば §4 で戻すのが
+JSX 1 行の復帰で済む。import も消すと復帰が 2 箇所になり、戻し忘れの面が増える。
+
 > **`layout.tsx` から継承されるものに注意。** §2 の「バックエンドを書き換えるものを
 > import しない」は自分で書くコードの話。レイアウト経由で**自動的に載るもの**は
 > import していなくても付いてくるので、別途止める必要がある。
@@ -223,6 +229,13 @@ cd - && git worktree remove ../mfmf-main          # 済んだら消す
 無いと `src/lib/supabase/middleware.ts` がクライアントを組めず、:3001 は現行画面を描けない。
 **symlink で渡す**（`cat` などで中身を読み出さない。ガードフックにも抵触しない）。
 
+最後の `git worktree remove` は、`npm ci` / `npm run dev` が作った `node_modules` `.next` と
+上の `.env.local` symlink が残っていても **`--force` なしで成功する**（実測。exit 0）。
+3 つとも `.gitignore` 済みで `git status --porcelain` が空 ＝ git はこの worktree を
+clean と見なすため。**`--force` を足さないこと** —— `.claude/settings.json` で
+`git worktree remove --force` / `-f` は deny してある（無視対象でない編集中の変更ごと
+消し飛ばす操作なので、通したくない）。
+
 ### 4. 畳む（★ 決定ログより先。順序を逆にすると詰む）
 
 合意 or 却下が出たら、**まずブランチを畳んで、行き先のブランチを作る**。
@@ -296,6 +309,13 @@ git diff --cached
 > （§1 が明示的に対象にしているケース）。全体を戻すと、その実装変更まで消える。
 > しかも消えたファイルは `git diff --cached --stat` に現れないので、
 > **`--stat` では気づけない**。最終確認は `--stat` ではなく差分の中身を見ること。
+>
+> 🚨 **戻し忘れを検出する自動ゲートは無い。** `<FeedbackWidget />` を消したまま
+> merge しても `lint` / `typecheck` / `build` は**3 つとも通る**（未使用 import も
+> 素通りすることは §3 のとおり）。このリポジトリは **merge = 本番リリース**なので、
+> 戻し忘れは「本番からご意見フォームが消える」形で出る。しかも消えたのは
+> プロト都合の一時変更なので、レビューでも変更意図に見える。
+> **`git diff --cached` を目で見る ★3 が唯一の防波堤**。省略しない。
 >
 > `--ignore-unmatch` が要る理由: プロトが `page.tsx` 1 枚だけだった場合、
 > 1) の `git mv` で追跡ファイルが無くなり `src/app/proto` 自体が消える。
