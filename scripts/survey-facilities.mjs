@@ -83,9 +83,13 @@ const RULES = [
 // 「保管」業種を表す表記の揺れ
 const HOKAN_PATTERNS = [/保管/];
 
+// 犬の保育園の推定分子に寄与するカテゴリ。
+// しつけ・訓練も「保管」を持てば定期通園の預かり業態（market-analysis.md §18-6）。
+const TARGET_CATEGORIES = ["daycare", "training"];
+
 // classify() が返しうるが RULES に無い擬似カテゴリ（集計・表示用）
 const EXTRA_CATEGORIES = [
-  { key: "daycare_cat", label: "保育園（猫のみ・犬の推定から除外）" },
+  { key: "cat_only", label: "猫のみの施設（犬の推定から除外）" },
   { key: "unknown", label: "不明（屋号から判別不可）" },
 ];
 const ALL_CATEGORIES = () => [...RULES, ...EXTRA_CATEGORIES];
@@ -165,8 +169,10 @@ export function classify(name) {
   if (isGroomingSchool(n)) return "grooming";
   for (const rule of RULES) {
     if (rule.patterns.some((re) => re.test(n))) {
-      // 保育園系のうち「猫だけ」の施設は、犬の保育園の推定分子から外す
-      if (rule.key === "daycare" && isCatOnly(n)) return "daycare_cat";
+      // 犬の推定分子に入るカテゴリ（保育園系・しつけ系）のうち「猫だけ」の施設は外す。
+      // ⚠ 分子に寄与するカテゴリ**すべて**に適用すること。片方だけだと
+      //    「猫のしつけ教室」が犬の分子に入る。
+      if (TARGET_CATEGORIES.includes(rule.key) && isCatOnly(n)) return "cat_only";
       return rule.key;
     }
   }
@@ -255,6 +261,11 @@ function findHeader(rows) {
     [/登録番号/, /許可番号/, /番号/],
     [/登録年月日/, /有効期間/, /責任者/],
   ];
+  // 日付らしいセルを含む行はタイトル行とみなす（「2026年7月」等）
+  const looksDated = (cells) =>
+    cells.some((c) => /\d{4}\s*年|\d{4}[/-]\d{1,2}|現在/.test(c));
+
+  let relaxed = -1;
   for (let i = 0; i < Math.min(rows.length, 20); i++) {
     const cells = rows[i].map((c) => c.trim());
     if (cells.filter((c) => c !== "").length < 2) continue;
@@ -263,8 +274,23 @@ function findHeader(rows) {
       (group) => pickColumn(cells, group) >= 0,
     ).length;
     if (others >= 1) return i;
+    // 名前列はあるが他の既知列が無い行。タイトル行でなければ次善の候補として控える。
+    if (relaxed < 0 && !looksDated(cells)) relaxed = i;
   }
-  return 0;
+  // ⚠ 見つからないときに 0（＝タイトル行）へ落とさない。
+  //    落とすと本物のヘッダ行が1件の「事業所」として数えられ、総数と不明率が汚れる。
+  return relaxed;
+}
+
+/** マッチする列を優先順位の順に**すべて**返す（重複は除く）。 */
+function pickColumns(header, patterns, { exclude = [] } = {}) {
+  const found = [];
+  for (const re of patterns) {
+    header.forEach((h, i) => {
+      if (re.test(h) && !exclude.some((ex) => ex.test(h)) && !found.includes(i)) found.push(i);
+    });
+  }
+  return found;
 }
 
 function pickColumn(header, patterns, { exclude = [] } = {}) {
@@ -297,8 +323,17 @@ export function survey(files, { samples = 3 } = {}) {
     if (!rows.length) { perFile.push({ file, rows: 0, note: "空ファイル" }); continue; }
 
     const h = findHeader(rows);
+    if (h < 0) {
+      filesSkipped++;
+      perFile.push({ file, rows: rows.length, note: "⚠ ヘッダ行を特定できず（スキップ）" });
+      continue;
+    }
     const header = rows[h].map((c) => c.trim());
-    const nameIdx = pickColumn(header, NAME_PATTERNS);
+    // 名前列は**優先順位つきで複数**保持する。「屋号」を優先しつつ、
+    // その行で空なら「事業所の名称」へ落ちる（屋号は任意入力の登録簿が多く、
+    // 1列に固定すると空の行を丸ごと捨ててしまう）。
+    const nameIdxs = pickColumns(header, NAME_PATTERNS);
+    const nameIdx = nameIdxs.length ? nameIdxs[0] : -1;
     // 「業種」の列。法定様式では「業の種類」表記もある。
     // 一方で「動物種別」「取扱動物の種類」といった**動物の種類**の列が併存するため、
     // 汎用の /種別|種類/ でそれを掴まないよう除外する。
@@ -329,7 +364,11 @@ export function survey(files, { samples = 3 } = {}) {
     let sitelessRows = 0;
     let unqualifiedAddrRows = 0;
     for (const r of rows.slice(h + 1)) {
-      const name = (r[nameIdx] ?? "").trim();
+      let name = "";
+      for (const idx of nameIdxs) {
+        const v = (r[idx] ?? "").trim();
+        if (v) { name = v; break; }
+      }
       if (!name) continue;
       n++;
       const kind = kindIdx >= 0 ? (r[kindIdx] ?? "").trim() : "";
