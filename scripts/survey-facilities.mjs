@@ -37,13 +37,17 @@ const RULES = [
   {
     key: "daycare",
     label: "保育園・幼稚園・デイケア",
-    // ひらがな/カタカナ/漢字/英語の揺れを吸収する
+    // ひらがな/カタカナ/漢字/英語の揺れを吸収する。
+    // ⚠ 語尾の「園」だけを見るルールは置かない。「ペットサロン花園」「○○楽園」のような
+    //   無関係な屋号を保育園に誤分類し、その比率が全国推定に直接掛かって過大評価になる。
+    //   曖昧な屋号は unknown に落として目視分類へ回す方が安全。
     patterns: [
       /保育園/, /ほいくえん/, /ホイクエン/,
       /幼稚園/, /ようちえん/, /ヨウチエン/,
       /学園/, /スクール/, /school/i,
       /デイケア/, /デイサービス/, /daycare/i, /day\s*care/i,
-      /園$/,
+      // 「園」は犬・ドッグ等の文脈がある場合のみ拾う
+      /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy)[^、]{0,8}園/i,
     ],
   },
   {
@@ -75,6 +79,19 @@ const RULES = [
 
 // 「保管」業種を表す表記の揺れ
 const HOKAN_PATTERNS = [/保管/];
+
+/**
+ * 名寄せ用の正規化。全角/半角スペース・記号の揺れで別店舗に割れるのを防ぐ。
+ * 住所の「1-1」「１−１」「一丁目1番1号」等の完全な正規化までは踏み込まない
+ * （やり過ぎると別店舗を潰す）。
+ */
+function normalize(v) {
+  return String(v ?? "")
+    .normalize("NFKC")
+    .replace(/[\s\u3000]+/g, "")
+    .replace(/[（）()「」【】]/g, "")
+    .trim();
+}
 
 /** 事業所名から業態を推定する。当たらなければ unknown。 */
 export function classify(name) {
@@ -168,8 +185,11 @@ export function survey(files, { samples = 3 } = {}) {
   /** 事業所名 -> { kinds:Set, category } で名寄せする（同一事業所が業種ごとに複数行ある） */
   const byName = new Map();
   const perFile = [];
-  // 「業種列が無い」と「業種列はあるが保管が0件」は意味が違うので区別する
-  let anyKindColumn = false;
+  // 「業種列が無い」と「業種列はあるが保管が0件」は意味が違うので区別する。
+  // 複数ファイルのうち一部しか業種列を持たない場合、保管0件を「意味のあるゼロ」と
+  // 断定できない（残りは判定されていない）ので、全ファイルが持つかを見る。
+  let filesWithKind = 0;
+  let filesEvaluated = 0;
 
   for (const file of files) {
     const rows = parseCsv(decode(readFileSync(file)));
@@ -186,9 +206,8 @@ export function survey(files, { samples = 3 } = {}) {
       [/業種/, /業の種類/, /業.*区分/, /登録.*種別/, /種別/, /種類/],
       { exclude: [/動物/, /品種/, /犬種/, /哺乳|鳥類|爬虫/] },
     );
-    // 名寄せの鍵。同名の別店舗（チェーン・のれん分け）を1件に潰さないため、
-    // 登録番号 > 所在地 の順で識別子を探す。どちらも無ければ名前のみ（＝過小計上の恐れ）。
-    const idIdx = pickColumn(header, [/登録番号/, /登録.*番号/, /許可番号/]);
+    // 名寄せの鍵は「屋号＋所在地」（＝店舗の実体）。登録番号は業種ごとに振られる
+    // 自治体があり、鍵に使うと1店舗が業種の数だけ二重計上されるため使わない。
     const addrIdx = pickColumn(header, [/所在地/, /住所/, /事業所.*所在/]);
 
     if (nameIdx < 0) {
@@ -203,26 +222,29 @@ export function survey(files, { samples = 3 } = {}) {
       if (!name) continue;
       n++;
       const kind = kindIdx >= 0 ? (r[kindIdx] ?? "").trim() : "";
-      // 同一事業所は業種ごとに複数行あるのでまとめる。ただし別店舗は分ける。
-      // 登録番号の列があっても**行によっては空**なことがあるので、
-      // 列の有無ではなく**その行の値**を見て所在地へフォールバックする。
-      const regNo = idIdx >= 0 ? (r[idIdx] ?? "").trim() : "";
-      const addr = addrIdx >= 0 ? (r[addrIdx] ?? "").trim() : "";
-      const site = regNo || addr;
-      if (!regNo && !addr) sitelessRows++;
-      const key = `${file}::${name}::${site}`;
+      // 数えたいのは「事業所（店舗）」であって「登録（ライセンス）」ではない。
+      //   - 同じ店舗が業種ごとに複数行  → まとめたい
+      //   - 同名の別店舗（チェーン等）  → 分けたい
+      // 登録番号は**業種ごとに別番号**が振られる自治体があり、それを鍵にすると
+      // 1店舗が業種の数だけ二重計上される。したがって鍵は
+      // **正規化した屋号 + 所在地**（＝店舗の実体）とし、登録番号は鍵に使わない。
+      const addr = addrIdx >= 0 ? normalize(r[addrIdx] ?? "") : "";
+      const site = addr;
+      if (!addr) sitelessRows++;
+      const key = `${file}::${normalize(name)}::${site}`;
       if (!byName.has(key)) {
         byName.set(key, { name, category: classify(name), kinds: new Set() });
       }
       if (kind) byName.get(key).kinds.add(kind);
     }
-    const idNote = idIdx >= 0 ? "登録番号で名寄せ"
-      : addrIdx >= 0 ? "所在地で名寄せ"
-      : "⚠ 識別子が無く名前のみで名寄せ（同名の別店舗を1件に潰す＝過小計上）";
+    const idNote = addrIdx >= 0
+      ? "屋号＋所在地で名寄せ"
+      : "⚠ 所在地列が無く屋号のみで名寄せ（同名の別店舗を1件に潰す＝過小計上）";
     const sitelessNote = sitelessRows
-      ? `⚠ 識別子が空の行 ${sitelessRows} 件（同名なら潰れる＝過小計上）`
+      ? `⚠ 所在地が空の行 ${sitelessRows} 件（同名なら潰れる＝過小計上）`
       : "";
-    if (kindIdx >= 0) anyKindColumn = true;
+    filesEvaluated++;
+    if (kindIdx >= 0) filesWithKind++;
     perFile.push({
       file,
       rows: n,
@@ -264,7 +286,9 @@ export function survey(files, { samples = 3 } = {}) {
 
   return {
     files: perFile,
-    anyKindColumn,
+    filesWithKind,
+    filesEvaluated,
+    allFilesHaveKind: filesEvaluated > 0 && filesWithKind === filesEvaluated,
     total: entries.length,
     counts,
     examples,
@@ -327,10 +351,15 @@ Excel しか無い自治体は CSV に書き出してから渡してください
     console.log(`    下限 ${pct(r.daycareRatioLow)}  … 不明を全部「保育園でない」とみなす`);
     console.log(`    上限 ${pct(r.daycareRatioHigh)}  … 不明を全部「保育園」とみなす`);
     console.log(`    → この幅がそのまま全国推定のブレ幅になる。`);
-  } else if (r.anyKindColumn) {
+  } else if (r.allFilesHaveKind) {
     console.log(`\n=== 業種「保管」で登録: 0 事業所 ===`);
-    console.log(`  業種列は読めているが、保管の登録が1件も無い（＝意味のあるゼロ）。`);
+    console.log(`  全ファイルで業種列を読めており、保管の登録が1件も無い（＝意味のあるゼロ）。`);
     console.log(`  該当自治体に保管業態が無いのか、業種の表記が想定と違うのかを確認すること。`);
+  } else if (r.filesWithKind > 0) {
+    console.log(`\n=== 業種「保管」で登録: 0 事業所（⚠ 部分的な結果） ===`);
+    console.log(`  業種列を読めたのは ${r.filesWithKind}/${r.filesEvaluated} ファイルだけ。`);
+    console.log(`  残りは保管かどうか判定できていないため、このゼロは「保管が無い」ことを意味しない。`);
+    console.log(`  業種列のあるファイルだけで集計し直すか、列名を確認すること。`);
   } else {
     console.log(`\n※ 業種列が無いため「保管」の集計は不可。屋号ベースの推定のみ。`);
   }
