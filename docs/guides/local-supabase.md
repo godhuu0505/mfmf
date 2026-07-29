@@ -60,11 +60,15 @@ just setup
 > NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase status の anon key>
 > ```
 
-## 4. Google ログインを設定
+## 4. Google ログインを設定（任意）
 
-本アプリは **Google OAuth 一本化**で、メール/パスワードログインの UI はありません。
-Google Cloud Console での OAuth クライアント発行（手動・約 5 分）→ 認証情報を投入する
-流れになります。
+ログインは **Google OAuth** と **メール/パスワード**の 2 方式があります。
+**メール/パスワードだけで動かすならこの章は不要です**（手順は
+[../../README.md](../../README.md) のクイックスタート B を参照。ローカルでは
+確認メールが Mailpit `http://127.0.0.1:54324` に届くので、そこで確認リンクを踏みます）。
+
+Google ログイン / Drive 連携を使う場合は、Google Cloud Console での
+OAuth クライアント発行（手動・約 5 分）→ 認証情報を投入する流れになります。
 
 ### 4-1. Google Cloud Console で OAuth クライアントを発行
 

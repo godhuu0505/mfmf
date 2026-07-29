@@ -51,16 +51,26 @@ git switch -c proto/quick-record origin/main
 - **`page.tsx` は Server Component のままにする。** データ取得を消して固定配列を
   直書きするだけでよい。操作が要る部分は**入れ子の `"use client"` コンポーネント**に切り出す
 - **表示専用のもの**は既存を `import` して使う（ここが速さの源）:
-  `AppHeader` / `PhotoGallery` / `SourceIcon` / `PageSkeleton` /
+  `PhotoGallery` / `SourceIcon` / `PageSkeleton` /
   デザイントークン / ダークモード / セーフエリア
+- **ヘッダーはプロト内に静的なものを置く**（`AppHeader` は import しない → 下記）
 
-> ⚠️ **`page.tsx` を `"use client"` にすると `AppHeader` が使えなくなる。**
-> `AppHeader` は async な Server Component で `@/lib/supabase/server` →
-> `next/headers` に依存しており、Client Component からは import できない
-> （Next.js がビルド時に弾く）。
-> 「固定データだから全部クライアントで」と考えると、この境界で詰まる。
-> **Server Component の `page.tsx` ＋ 入れ子の client コンポーネント**が正解。
-> どうしても全部クライアントにしたいなら、ヘッダーはプロト内の静的なものに差し替える。
+> ⚠️ **`AppHeader` は表示専用ではない。**
+> `AccountMenu` を内包しており（`src/components/AppHeader.tsx:5,73`）、その中には
+> **`<form action="/auth/signout" method="post">`**（実セッションのログアウト）と
+> `/settings/account` `/feedback` への遷移がある。
+> リモート Supabase 構成で評価中にアカウントアイコンを触られると、
+> **本物のログアウトが起きる**か、固定データの世界から実データを触れる画面へ出てしまう。
+>
+> プロトでは `src/app/proto/<slug>/` に**静的ヘッダー**を置く。
+> `AppHeader` の外枠クラスをそのまま写せば見た目は保てる:
+> `safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur` ＋
+> 内側に `safe-px mx-auto flex max-w-2xl items-center justify-between py-3`。
+> ロゴとアイコンは `<span>` にして遷移させない。
+>
+> 副次的な利点として、`page.tsx` を `"use client"` にしたい場合の詰まりも消える
+> （`AppHeader` は async な Server Component で `@/lib/supabase/server` →
+> `next/headers` に依存するため Client Component から import できない）。
 
 > ⚠️ **バックエンドを書き換えるコンポーネントをそのまま import しない。**
 > 代表例が `RecordForm` —— `handleSubmit` は渡された action を呼ぶ**前に**
@@ -132,10 +142,9 @@ src/app/proto/quick-record/
 
 > **ローカル Supabase を使っている場合の注意**: `just setup` が書く
 > `NEXT_PUBLIC_SUPABASE_URL` は `http://127.0.0.1:54321` で、スマホから見ると
-> 「スマホ自身」を指すため到達できない。プロトは固定データなので Supabase は不要だが、
-> `AppHeader` は Server Component で `getUser()` を呼ぶ。ローカル Supabase 構成のまま
-> 使うならヘッダーはプロト内で静的なものに差し替えるか、
-> リモート Supabase 構成（README クイックスタート A）で起動する。
+> 「スマホ自身」を指すため到達できない。
+> ただし §2 のとおりプロトは固定データ ＋ 静的ヘッダーで組むので、
+> **プロト画面自体は Supabase に触らず、ローカル構成のままで問題ない**。
 
 ```bash
 just dev-lan

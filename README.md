@@ -60,8 +60,14 @@ just setup-google    # CLIENT_ID/SECRET を対話入力 → 全箇所に投入 +
 ```
 
 **メール/パスワードだけで動かす場合**は上記は不要です。ローカルで自分のアカウントを
-作るには `.env.local` に `SIGNUP_ENABLED=true` を設定して `/signup` を開放してください
-（本番では既定で閉じています）。
+作る手順:
+
+1. `.env.local` に `SIGNUP_ENABLED=true` を設定（本番では既定で閉じています）
+2. `/signup` で登録する
+3. **確認メールは実際のメールボックスには届きません。** ローカルスタックは
+   `enable_confirmations = true`（`supabase/config.toml`）で、メールは Mailpit が受け取ります。
+   **`http://127.0.0.1:54324` を開いて確認リンクを踏んでください**
+4. `/login` からログイン
 
 詳細・トラブルシュートは **[docs/guides/local-supabase.md](./docs/guides/local-supabase.md)**。
 
