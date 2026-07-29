@@ -95,7 +95,7 @@ const TARGET_CATEGORIES = ["daycare", "training"];
 
 // classify() が返しうるが RULES に無い擬似カテゴリ（集計・表示用）
 const EXTRA_CATEGORIES = [
-  { key: "cat_only", label: "猫のみの施設（犬の推定から除外）" },
+  { key: "non_dog", label: "犬以外の動物向け（犬の推定から除外）" },
   { key: "unknown", label: "不明（屋号から判別不可）" },
 ];
 const ALL_CATEGORIES = () => [...RULES, ...EXTRA_CATEGORIES];
@@ -106,7 +106,17 @@ const ALL_CATEGORIES = () => [...RULES, ...EXTRA_CATEGORIES];
 // 英単語は **語境界**で判定する。EDUCATION / CATCH のような語の内部に cat が入る屋号を
 // 猫扱いしてしまうため（この判定はスペースを残した文字列に対して行う）。
 const DOG_PATTERNS = [/犬/, /いぬ/, /イヌ/, /ドッグ/, /dog/i, /わん/, /ワン/, /パピー/, /puppy/i];
-const CAT_PATTERNS = [/猫/, /ねこ/, /ネコ/, /キャット/, /にゃん/, /ニャン/, /\bcats?\b/i];
+// 犬以外の動物が明示されている屋号。犬の語が無ければ推定分子から外す。
+// ⚠ 「犬の語が無い＝除外」にはしない。「ペット保育園さくら」のように種を書かない
+//    屋号が多く、そこまで要求すると取りこぼしで過小評価になる。
+//    **別の種が明示されている**ときだけ落とす。
+const OTHER_SPECIES_PATTERNS = [
+  /猫/, /ねこ/, /ネコ/, /キャット/, /にゃん/, /ニャン/, /\bcats?\b/i,
+  /うさぎ/, /ウサギ/, /兎/, /\brabbits?\b/i,
+  /馬/, /ホース/, /\bhorses?\b/i,
+  /鳥/, /インコ/, /\bbirds?\b/i,
+  /フェレット/, /ハムスター/, /爬虫/, /リクガメ/, /\breptiles?\b/i,
+];
 
 // トリマー/訓練士の**養成校**。屋号に犬の語が入る（「愛犬」等）ため犬の文脈を
 // 要求しても弾けない。美容・トリミング系の語と学校系の語が同居したら養成校とみなす。
@@ -129,9 +139,9 @@ function looksGrooming(name) {
   return GROOMING_WORDS.some((re) => re.test(name));
 }
 
-/** 屋号が「猫だけ」を示すか（猫の語があり、犬の語が無い）。 */
-function isCatOnly(name) {
-  return CAT_PATTERNS.some((re) => re.test(name)) && !DOG_PATTERNS.some((re) => re.test(name));
+/** 屋号が「犬以外の動物向け」を示すか（別の種が明示され、犬の語が無い）。 */
+function isNonDog(name) {
+  return OTHER_SPECIES_PATTERNS.some((re) => re.test(name)) && !DOG_PATTERNS.some((re) => re.test(name));
 }
 
 /**
@@ -195,15 +205,22 @@ export function classify(name) {
   if (!n) return "unknown";
   // 養成校（トリマー/訓練士）は「犬」の語を含むので、通常の優先順位だと保育園に化ける。先に落とす。
   if (isGroomingSchool(n)) return "grooming";
-  // 「ドッグサロン花園」のようにサロン名に「園」が入るケース。
-  // 保育園ルールの緩い「園」判定より、サロンの語を優先する。
-  if (looksGrooming(n) && !/保育園|幼稚園|ようちえん|ほいくえん|デイケア/.test(n)) return "grooming";
+  // 「ドッグサロン花園」のようにサロン名に「園」が入るケースだけを救済する。
+  // ⚠ サロンの語があるだけで早期 return しない。「ドッグサロンABCしつけ教室」のように
+  //    しつけ（＝対象業態）が明示されている複合屋号まで grooming にしてしまうため。
+  const EXPLICIT_DAYCARE = /保育園|幼稚園|ようちえん|ほいくえん|ヨウチエン|ホイクエン|デイケア|デイサービス|daycare/i;
+  const EXPLICIT_TRAINING = /しつけ|躾|訓練|トレーニング|training/i;
+  const salonOverridesEn = looksGrooming(n) && !EXPLICIT_DAYCARE.test(n) && !EXPLICIT_TRAINING.test(n);
   for (const rule of RULES) {
-    if (rule.patterns.some((re) => re.test(n))) {
+    // 「園」だけを根拠に daycare にする緩い判定は、サロン系の屋号では採らない
+    const patterns = rule.key === "daycare" && salonOverridesEn
+      ? rule.patterns.filter((re) => !String(re).includes("園/i"))
+      : rule.patterns;
+    if (patterns.some((re) => re.test(n))) {
       // 犬の推定分子に入るカテゴリ（保育園系・しつけ系）のうち「猫だけ」の施設は外す。
       // ⚠ 分子に寄与するカテゴリ**すべて**に適用すること。片方だけだと
       //    「猫のしつけ教室」が犬の分子に入る。
-      if (TARGET_CATEGORIES.includes(rule.key) && isCatOnly(n)) return "cat_only";
+      if (TARGET_CATEGORIES.includes(rule.key) && isNonDog(n)) return "non_dog";
       return rule.key;
     }
   }
@@ -275,6 +292,19 @@ const NAME_PATTERNS = [
 // ⚠ 人名の列を掴まないための除外。「事業所代表者氏名」は /事業所.*名/ に当たるため、
 // 除外しないと代表者名を屋号として分類してしまい（→ unknown）、施設が分子から消える。
 const NAME_EXCLUDE = [/氏名/, /代表者/, /責任者/, /担当者/, /管理者/];
+
+/**
+ * 「事業者（法人）の名称」を指す見出し。**施設の実体を表さない**ので、
+ * 名寄せの一致判定には使わない（分類の材料としては引き続き使う）。
+ * これを一致判定に混ぜると、同じ法人が同じ住所で出している別業態の店舗
+ * （「ABCトリミング」と「犬の保育園XYZ」）が法人名だけで1件に潰れる。
+ * ⚠ /事業者/ は「事業所」には当たらない（「者」と「所」は別字）。
+ */
+const OPERATOR_NAME_HEADINGS = [/事業者/, /法人/, /会社/, /申請者/, /設置者/, /団体/];
+const isOperatorName = (heading) => OPERATOR_NAME_HEADINGS.some((re) => re.test(heading));
+
+/** 「事業者（法人）の住所」を指す見出し。施設の所在地ではないので鍵にしない。 */
+const OPERATOR_ADDR_HEADINGS = [/事業者/, /法人/, /本社/, /本店/, /代表者/];
 
 /**
  * ヘッダ行を推定する。自治体ごとに列名も位置もばらつくので、
@@ -399,10 +429,19 @@ export function survey(files, { samples = 3 } = {}) {
     // 「所在地（市区町村）」「所在地（町名番地）」のように住所が複数列に分かれる登録簿が
     // あるため、**該当する列をすべて連結**する。1列だけ読むと、市区町村だけが鍵になって
     // その自治体の全事業所が1件に潰れる。
-    const addrIdxs = pickColumns(header, [
-      /事業所.*所在/, /施設.*所在/, /事業所.*住所/, /施設.*住所/,
+    // ⚠ 「事業者（本社）所在地」を鍵に混ぜないこと。ある業種の行では埋まっていて
+    //    別の業種の行では空、という登録簿があり、混ぜると同じ施設が別バケツに割れて
+    //    **二重計上**される。施設側の住所列が1つでもあるならそちらだけを使い、
+    //    施設側が存在しない登録簿（1事業者1事業所の様式）でのみ事業者住所に落ちる。
+    const addrIdxsAll = pickColumns(header, [
+      /事業所.*所在/, /施設.*所在/, /店舗.*所在/,
+      /事業所.*住所/, /施設.*住所/, /店舗.*住所/,
       /所在地/, /住所/,
     ]);
+    const addrIdxsFacility = addrIdxsAll.filter(
+      (i) => !OPERATOR_ADDR_HEADINGS.some((re) => re.test(header[i])),
+    );
+    const addrIdxs = addrIdxsFacility.length ? addrIdxsFacility : addrIdxsAll;
     const addrIdx = addrIdxs.length ? addrIdxs[0] : -1;
 
     if (nameIdx < 0) {
@@ -422,7 +461,11 @@ export function survey(files, { samples = 3 } = {}) {
       // 順位を捨てて集約すると、法人名（「犬の保育園株式会社」）が実際の店舗の
       // 屋号（「ABCトリミング」）を上書きしてしまう。
       const rowNamed = nameIdxs
-        .map((i, rank) => ({ name: (r[i] ?? "").trim(), rank }))
+        .map((i, rank) => ({
+          name: (r[i] ?? "").trim(),
+          rank,
+          operator: isOperatorName(header[i]),
+        }))
         .filter((x) => x.name);
       const rowNames = rowNamed.map((x) => x.name);
       // Excel の結合セルを CSV 化すると、業種ごとに「,保管,」のような**継続行**が出る。
@@ -462,14 +505,20 @@ export function survey(files, { samples = 3 } = {}) {
       // 同じ住所でも**別テナント**（屋号が全く違う）は別施設として数える。
       // 逆に、行ごとに埋まる列が違って呼称が揺れるケースは**別名を共有していれば**統合する。
       const norm = rowNames.map(normalize);
+      // 一致判定に使う別名は**施設名（屋号・事業所名）のみ**。法人名まで含めると、
+      // 同じ法人が同じ住所で出している別業態の店舗が1件に潰れる。
+      // 法人名しか無い行（施設名の列が空 or 存在しない登録簿）に限り、
+      // 代替として法人名を鍵にする（そうしないと行ごとに別施設として増殖する）。
+      const facilityNorm = rowNamed.filter((x) => !x.operator).map((x) => normalize(x.name));
+      const compat = facilityNorm.length ? facilityNorm : norm;
       const clusters = byName.get(bucket) ?? [];
       const hit = [];
       for (const c of clusters) {
-        if (norm.some((nm) => c.normNames.has(nm))) hit.push(c);
+        if (compat.some((nm) => c.compat.has(nm))) hit.push(c);
       }
       let entry;
       if (!hit.length) {
-        entry = { names: new Set(), normNames: new Set(), kinds: new Set(), ranked: [] };
+        entry = { names: new Set(), normNames: new Set(), compat: new Set(), kinds: new Set(), ranked: [] };
         clusters.push(entry);
         byName.set(bucket, clusters);
       } else {
@@ -478,6 +527,7 @@ export function survey(files, { samples = 3 } = {}) {
         for (const other of hit.slice(1)) {
           for (const v of other.names) entry.names.add(v);
           for (const v of other.normNames) entry.normNames.add(v);
+          for (const v of other.compat) entry.compat.add(v);
           for (const v of other.kinds) entry.kinds.add(v);
           entry.ranked.push(...other.ranked);
           clusters.splice(clusters.indexOf(other), 1);
@@ -488,6 +538,7 @@ export function survey(files, { samples = 3 } = {}) {
         entry.normNames.add(norm[i]);
         entry.ranked.push(x);
       });
+      for (const nm of compat) entry.compat.add(nm);
       for (const k of kinds) entry.kinds.add(k);
       lastEntry = entry;
     }
@@ -522,7 +573,7 @@ export function survey(files, { samples = 3 } = {}) {
     //      （「屋号=ABCトリミング / 法人名=犬の保育園株式会社」は grooming）。
     //   ② を後段に置くのは、同順位で複数の別名が並んだときに CSV の行順で
     //      結果が変わらないようにするため。
-    const order = [...RULES.map((r) => r.key), "cat_only"];
+    const order = [...RULES.map((r) => r.key), "non_dog"];
     const rank2 = (c) => { const i = order.indexOf(c); return i < 0 ? order.length : i; };
     const ranked = [...e.ranked]
       .map((x) => ({ ...x, c: classify(x.name) }))
