@@ -103,8 +103,13 @@ cc-sdd には**承認だけを行うコマンドがありません**。`/kiro-sp
 `--auto` なしでも、tasks 生成の内部呼び出しに `-y` が渡ります。生成後の人間向け確認が
 入らないため、`tasks.md` がレビューされないまま `/kiro-impl` に渡り得ます。
 
-**運用**: `/kiro-spec-quick` を使ったら、`/kiro-impl` の前に必ず `tasks.md` を自分で読む。
-レビューを確実に挟みたいときは `/kiro-spec-init` からの分割実行を使う。
+さらに `/kiro-spec-quick` の `allowed-tools` は `Read, Skill, Bash, Write, Glob, Agent` で
+`AskUserQuestion` を含まないため、対話モードが必要とする yes/no 確認をそもそも取得できません。
+**「対話モード」は実質機能しない**と考えてください。
+
+**運用**: `/kiro-spec-quick` を使ったら、`/kiro-impl` の前に必ず `requirements.md` /
+`design.md` / `tasks.md` を自分で読む。レビューを確実に挟みたいなら
+`/kiro-spec-init` からの分割実行を使う（こちらを推奨）。
 
 ### タスクは必ず `X.Y` の子タスクに割る
 
@@ -136,6 +141,26 @@ reviewer / feature validation の秘密情報スキャンは、説明文に「ca
 **運用**: このリポジトリの秘密情報に対する防衛線は、従来どおり
 **`.claude/hooks/guard.mjs`・`.gitignore`・人間のレビュー**。cc-sdd のスキャン結果が
 クリーンでも、それを根拠にしない（「セキュリティ（厳守）」は `CLAUDE.md` が正）。
+
+### このリポジトリでは `MANUAL_VERIFY_REQUIRED` が正常な結果
+
+`/kiro-validate-impl` は「ビルド成果物が実際に起動することを示す canonical な smoke コマンド」を
+要求し、見つからなければ `MANUAL_VERIFY_REQUIRED` を返します。mfmf には smoke / health check /
+ブラウザテストのコマンドが無く（`package.json` / `justfile` / `ci.yml` のいずれにも無い）、
+アプリの実起動には Supabase のセットアップが要るため、**`just check` が通っていても
+`MANUAL_VERIFY_REQUIRED` で止まります**。
+
+**運用**: これは失敗ではなく想定どおり。`just check`（lint / typecheck / build）が通っていれば、
+あとは `just dev` で該当画面を手で触って確認し、先に進んでよい。
+
+### `/kiro-discovery` が「既存 spec の拡張」と判定したら自分で書き写す
+
+Path A（既存 spec の守備範囲内）と判定された場合、discovery はそこで打ち切り、
+**判定内容をどこにも書き出しません**。後で `/kiro-spec-requirements <feature>` を実行しても
+渡るのは feature 名と古い spec だけなので、拡張したかった内容が反映されずに再生成され得ます。
+
+**運用**: Path A と言われたら、その場で `.kiro/specs/<feature>/requirements.md` に追記するか、
+少なくとも要望をメモに残してから次のコマンドに渡す。セッションを跨ぐと失われる。
 
 ### requirements を作り直したら design / tasks も作り直す
 
