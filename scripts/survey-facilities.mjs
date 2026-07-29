@@ -4,7 +4,7 @@
 // 第一種動物取扱業者登録簿（自治体が公開する CSV）を読み、
 // 事業所名から「業態」を推定して件数を集計する調査用スクリプト。
 //
-//   node scripts/survey-facilities.mjs <csv...> [--json] [--samples N]
+//   node scripts/survey-facilities.mjs <csv...> [--json] [--samples N] [--seed N]
 //   node scripts/survey-facilities.mjs data/*.csv --samples 5
 //
 // なぜ必要か:
@@ -91,6 +91,13 @@ const HOKAN_PATTERNS = [/保管/];
 // 法定の業種区分。列見出しだけで業種列と決めつけず、**中身がこれらを含むか**で検証する
 // （「事業者種別（法人/個人）」のような無関係な列を業種列と誤認しないため）。
 const STATUTORY_KINDS = [/販売/, /保管/, /貸出/, /訓練/, /展示/, /競り/, /譲受/];
+
+// 業種を1列ずつ並べ、該当する列に○を付ける様式の登録簿がある
+// （見出し「販売」「保管」「訓練」…）。この形は /業種/ 等の見出しに当たらないため、
+// **見出しそのものが法定業種名か**で見分ける。
+const KIND_HEADER = /^(販売|保管|貸出し?|訓練|展示|競りあっせん|競り斡旋|譲受飼養|譲受け?)$/;
+// ○×様式で「登録なし」を表す記号。空欄と同じ扱いにする。
+const NEGATIVE_MARK = /^([×✕✖ー－-]|なし|無し?|非|0)$/;
 
 // 犬の保育園の推定分子に寄与するカテゴリ。
 // しつけ・訓練も「保管」を持てば定期通園の預かり業態（market-analysis.md §18-6）。
@@ -376,6 +383,9 @@ function findHeader(rows) {
   const OTHER_COLUMN_PATTERNS = [
     [/所在地/, /住所/],
     [/業種/, /業の種類/, /業.*区分/, /種別/, /種類/],
+    // 法定業種を1列ずつ並べる様式（「販売」「保管」「訓練」…に○を付ける）もあるため、
+    // 業種名そのものの見出しもヘッダらしさの根拠にする。
+    [KIND_HEADER],
     [/登録番号/, /許可番号/, /番号/],
     [/登録年月日/, /有効期間/, /責任者/],
   ];
@@ -384,7 +394,11 @@ function findHeader(rows) {
     cells.some((c) => /\d{4}\s*年|\d{4}[/-]\d{1,2}|現在/.test(c));
 
   let relaxed = -1;
-  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+  // ⚠ 探索を先頭 N 行で打ち切らないこと。Excel を CSV に書き出した登録簿は
+  //    表題・注記・凡例が20行以上続くことがあり、打ち切るとその**ファイル丸ごと**
+  //    集計から消える。見つかるまで走査し、見つけた行番号は警告として報告する
+  //    （深い位置のヘッダは、本物のヘッダではない可能性を人が確認できるように）。
+  for (let i = 0; i < rows.length; i++) {
     const cells = rows[i].map((c) => c.trim());
     if (cells.filter((c) => c !== "").length < 2) continue;
     if (pickColumn(cells, NAME_PATTERNS, { exclude: NAME_EXCLUDE }) < 0) continue;
@@ -421,9 +435,41 @@ function pickColumn(header, patterns, { exclude = [] } = {}) {
   return -1;
 }
 
+// --- 抽出 ------------------------------------------------------------------
+
+/**
+ * seed から決まる擬似乱数（mulberry32）。
+ * Math.random を使わないのは、目視分類したサンプルを後から再現・検証するため。
+ */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * 層化抽出。母集団を k 個の区間に割り、各区間から1件ずつ無作為に引く。
+ * 全体を覆いつつ（等間隔の利点）、並びの周期に嵌まらない（無作為の利点）。
+ */
+export function sampleStratified(arr, k, seed) {
+  if (k <= 0) return [];
+  if (arr.length <= k) return [...arr];
+  const rand = mulberry32(seed);
+  const step = arr.length / k;
+  return Array.from({ length: k }, (_, i) => {
+    const lo = Math.floor(i * step);
+    const hi = Math.max(lo + 1, Math.min(arr.length, Math.floor((i + 1) * step)));
+    return arr[lo + Math.floor(rand() * (hi - lo))];
+  });
+}
+
 // --- 集計 ------------------------------------------------------------------
 
-export function survey(files, { samples = 3 } = {}) {
+export function survey(files, { samples = 3, seed = 1 } = {}) {
   /** バケツ（住所 or ファイル） -> 施設クラスタの配列。1クラスタ = 1事業所 */
   const byName = new Map();
   const perFile = [];
@@ -474,12 +520,34 @@ export function survey(files, { samples = 3 } = {}) {
       dataRows.some((r) => STATUTORY_KINDS.some((re) => re.test(normalize(r[i] ?? "")))),
     );
     const kindIdxs = validKindIdxs;
+    // 業種を1列ずつ並べて○を付ける様式（見出しが「販売」「保管」「訓練」…）。
+    // この形は上の見出しパターンに1つも当たらないため、拾わないとファイルごと
+    // 「業種列なし」になって、比率（＝推定の本体）が出せなくなる。
+    // ⚠ 2列以上あるときだけ採る。1列だけの一致は偶然（「販売」という名前の
+    //    別の列）の可能性があるため。
+    const kindMatrixIdxsRaw = header
+      .map((c, i) => (KIND_HEADER.test(normalize(c)) ? i : -1))
+      .filter((i) => i >= 0);
+    const kindMatrixIdxs = kindMatrixIdxsRaw.length >= 2 ? kindMatrixIdxsRaw : [];
+    /** その行に登録されている業種を、両様式（値型・○×型）から集める。 */
+    const kindsOf = (r) => [
+      ...kindIdxs.map((i) => normalize(r[i] ?? "")).filter(Boolean),
+      ...kindMatrixIdxs
+        .filter((i) => {
+          const v = normalize(r[i] ?? "");
+          return v && !NEGATIVE_MARK.test(v);
+        })
+        .map((i) => normalize(header[i])),
+    ];
+    const hasKindColumn = kindIdxs.length > 0 || kindMatrixIdxs.length > 0;
+    const kindColumnNames = [...kindIdxs, ...kindMatrixIdxs].map((i) => header[i]);
     // 結合セル由来の「継続行」に埋まっていてよい列。
     // 継続行は業種そのもの（と、業種ごとに振られる登録番号・登録年月日）だけが埋まり、
     // 他は空という形をしている。この形を要求しないと、集計行・注記行
     // （「,保管,10件」等）まで直前の施設の続きとして取り込んでしまう。
     const contAllowedIdxs = new Set([
       ...kindIdxs,
+      ...kindMatrixIdxs,
       ...pickColumns(header, [
         /登録番号/, /許可番号/, /番号/,
         /登録.*年月日/, /有効期間/, /登録日/, /更新/, /年月日/,
@@ -527,6 +595,7 @@ export function survey(files, { samples = 3 } = {}) {
     let unqualifiedAddrRows = 0;
     let namelessOtherRows = 0;
     let lastEntry = null;
+    let lastAddr = "";
     for (const r of dataRows) {
       // 候補列の値を**すべて**拾う。行によって埋まっている列が違うため、
       // 「その行で最初に埋まっていた値」を鍵にすると同じ店舗が割れる。
@@ -545,13 +614,22 @@ export function survey(files, { samples = 3 } = {}) {
       // 名前が空だからと捨てると、その施設の保管登録が丸ごと失われる。
       // 直前の施設に業種だけを足す。
       if (!rowNames.length) {
-        const contKinds = kindIdxs.map((i) => normalize(r[i] ?? "")).filter(Boolean);
+        const contKinds = kindsOf(r);
         // ⚠ 名前が空＝継続行、ではない。小計行・注記行（「,保管,10件」のように
         //    業種列に文字があり、別の列にも値が入る行）を取り込むと、直前の施設に
         //    **偽の保管**が付いて分母（hokan）と「意味のあるゼロ」が汚れる。
         //    継続行の形（業種・登録番号・年月日以外はすべて空）に合う行だけ足す。
+        // ただし**名前セルだけが結合**されている場合、住所は業種ごとの行に
+        // そのまま繰り返される（「,柏市中央1-1,保管」）。直前の施設と住所が
+        // 一致するなら、それは継続行の証拠であって注記行ではない。
+        const contAddr = normalize(
+          addrIdxs.map((i) => (r[i] ?? "").trim()).filter(Boolean).join(""),
+        );
+        const addrRepeated = Boolean(contAddr) && contAddr === lastAddr;
         const shapeOk = r.every(
-          (v, i) => !String(v ?? "").trim() || contAllowedIdxs.has(i),
+          (v, i) => !String(v ?? "").trim()
+            || contAllowedIdxs.has(i)
+            || (addrRepeated && addrIdxs.includes(i)),
         );
         if (lastEntry && contKinds.length && shapeOk) {
           n++;
@@ -563,7 +641,7 @@ export function survey(files, { samples = 3 } = {}) {
       }
       n++;
       // 業種の値は表記ゆれ（「保　管」等）があるので正規化してから保持する
-      const kinds = kindIdxs.map((i) => normalize(r[i] ?? "")).filter(Boolean);
+      const kinds = kindsOf(r);
       // 数えたいのは「事業所（店舗）」であって「登録（ライセンス）」ではない。
       //   - 同じ店舗が業種ごとに複数行  → まとめたい
       //   - 同名の別店舗（チェーン等）  → 分けたい
@@ -613,6 +691,9 @@ export function survey(files, { samples = 3 } = {}) {
         entry = {
           names: new Set(), normNames: new Set(),
           facilityNames: new Set(), operatorNames: new Set(),
+          // 目視補正のために、屋号だけでは特定できない事業所を人が調べられるよう
+          // 住所と出典ファイルを保持する（「株式会社XYZ」が複数店ある場合の識別）。
+          sites: new Set(), files: new Set(),
           kinds: new Set(), ranked: [],
         };
         clusters.push(entry);
@@ -625,6 +706,8 @@ export function survey(files, { samples = 3 } = {}) {
           for (const v of other.normNames) entry.normNames.add(v);
           for (const v of other.facilityNames) entry.facilityNames.add(v);
           for (const v of other.operatorNames) entry.operatorNames.add(v);
+          for (const v of other.sites) entry.sites.add(v);
+          for (const v of other.files) entry.files.add(v);
           for (const v of other.kinds) entry.kinds.add(v);
           entry.ranked.push(...other.ranked);
           clusters.splice(clusters.indexOf(other), 1);
@@ -637,7 +720,10 @@ export function survey(files, { samples = 3 } = {}) {
         entry.ranked.push(x);
       });
       for (const k of kinds) entry.kinds.add(k);
+      if (rawAddr) entry.sites.add(rawAddr);
+      entry.files.add(file);
       lastEntry = entry;
+      lastAddr = addr;
     }
     const idNote = addrIdx >= 0
       ? "所在地で名寄せ（屋号は別名として集約）"
@@ -655,13 +741,18 @@ export function survey(files, { samples = 3 } = {}) {
         + `（結合セルの継続行の形に合わない＝小計行・注記行の可能性。継続行なら`
         + `業種以外の列が埋まっていないはず）`
       : "";
+    // ヘッダが表の深い位置にあった場合は報告する（本物のヘッダか人が確認できるように）
+    const headerNote = h > 20
+      ? `⚠ ヘッダ行が ${h + 1} 行目（表題・注記が長い可能性。列の並びを確認すること）`
+      : "";
     filesEvaluated++;
-    if (kindIdxs.length > 0) filesWithKind++;
+    if (hasKindColumn) filesWithKind++;
     perFile.push({
       file,
       rows: n,
-      kindColumns: kindIdxs.map((i) => header[i]),
-      note: [kindIdxs.length === 0 ? "業種列なし（保管の判定は不可）" : `業種列=「${kindIdxs.map((i) => header[i]).join("」「")}」`, idNote, sitelessNote, unqualifiedNote, namelessNote]
+      kindColumns: kindColumnNames,
+      note: [!hasKindColumn ? "業種列なし（保管の判定は不可）" : `業種列=「${kindColumnNames.join("」「")}」`
+        + (kindMatrixIdxs.length ? "（業種ごとの○×様式）" : ""), headerNote, idNote, sitelessNote, unqualifiedNote, namelessNote]
         .filter(Boolean).join(" / "),
     });
   }
@@ -683,6 +774,8 @@ export function survey(files, { samples = 3 } = {}) {
       for (const v of anon.names) target.names.add(v);
       for (const v of anon.normNames) target.normNames.add(v);
       for (const v of anon.operatorNames) target.operatorNames.add(v);
+      for (const v of anon.sites) target.sites.add(v);
+      for (const v of anon.files) target.files.add(v);
       for (const v of anon.kinds) target.kinds.add(v);
       target.ranked.push(...anon.ranked);
       clusters.splice(clusters.indexOf(anon), 1);
@@ -707,7 +800,10 @@ export function survey(files, { samples = 3 } = {}) {
     let display = names[0] ?? "";
     const first = ranked.find((x) => x.c !== "unknown");
     if (first) { category = first.c; display = first.name; }
-    return { name: display, names, category, kinds: e.kinds };
+    return {
+      name: display, names, category, kinds: e.kinds,
+      sites: [...e.sites], files: [...e.files],
+    };
   });
   const counts = {};
   const examples = {};
@@ -738,7 +834,12 @@ export function survey(files, { samples = 3 } = {}) {
       if (e.category === "training") hokanTraining++;
       if (e.category === "unknown") {
         hokanUnknown++;
-        hokanUnknownAll.push(e.name);
+        // ⚠ 名前だけでは足りない。「株式会社XYZ」のような屋号は複数店が同名になり、
+        //    どの事業所を調べればよいか分からず目視分類が成立しない。
+        //    住所・出典ファイル・収集した別名を添えて、人が特定できるようにする。
+        hokanUnknownAll.push({
+          name: e.name, names: e.names, sites: e.sites, files: e.files,
+        });
       }
     }
   }
@@ -746,15 +847,12 @@ export function survey(files, { samples = 3 } = {}) {
   // ⚠ 母集団の**先頭から N 件**を取ってはいけない。自治体の登録簿は住所順・
   //    登録日順・区ごとに並んでいることが多く、先頭 N 件は特定の地域や時期に偏る。
   //    その偏ったサンプルで求めた補正率を全体に適用すると推定が歪む。
-  //    母集団全体から**等間隔**で拾う（系統抽出）。乱数を使わないのは、同じ CSV から
-  //    同じサンプルが再現でき、目視分類の結果を後から検証できるようにするため。
-  const pickEvenly = (arr, k) => {
-    if (k <= 0) return [];
-    if (arr.length <= k) return [...arr];
-    const step = arr.length / k;
-    return Array.from({ length: k }, (_, i) => arr[Math.floor(i * step)]);
-  };
-  const hokanUnknownExamples = pickEvenly(hokanUnknownAll, samples);
+  // ⚠ 等間隔（固定位相）でも足りない。並びに step と同じ周期があると、
+  //    毎回同じ位置＝同じ地域・同じ登録時期ばかりを引く。
+  //    母集団を N 個の区間に割り、**各区間の中から1件を無作為に**引く（層化抽出）。
+  //    乱数は seed から作るので、seed を控えれば同じサンプルを再現でき、
+  //    目視分類の結果を後から検証できる（`--seed` で引き直せる）。
+  const hokanUnknownExamples = sampleStratified(hokanUnknownAll, samples, seed);
 
   // 全国推定に使うのは hokanDaycare / hokan なので、信頼度は
   // 「全体の不明率」ではなく「保管の中の不明率」で測らないと誤認する。
@@ -782,6 +880,7 @@ export function survey(files, { samples = 3 } = {}) {
     hokanTarget,
     hokanUnknown,
     hokanUnknownExamples,
+    seed,
     hokanUnknownRatio,
     daycareRatioLow,
     daycareRatioHigh,
@@ -796,10 +895,16 @@ function main() {
   const asJson = argv.includes("--json");
   const sIdx = argv.indexOf("--samples");
   const samples = sIdx >= 0 ? Number(argv[sIdx + 1]) || 3 : 3;
-  const files = argv.filter((a, i) => !a.startsWith("--") && !(sIdx >= 0 && i === sIdx + 1));
+  const seedIdx = argv.indexOf("--seed");
+  const seed = seedIdx >= 0 ? Number(argv[seedIdx + 1]) || 1 : 1;
+  const files = argv.filter(
+    (a, i) => !a.startsWith("--")
+      && !(sIdx >= 0 && i === sIdx + 1)
+      && !(seedIdx >= 0 && i === seedIdx + 1),
+  );
 
   if (!files.length) {
-    console.error(`使い方: node scripts/survey-facilities.mjs <csv...> [--json] [--samples N]
+    console.error(`使い方: node scripts/survey-facilities.mjs <csv...> [--json] [--samples N] [--seed N]
 
 第一種動物取扱業者登録簿の CSV を渡すと、事業所名から業態を推定して集計します。
 登録簿は各自治体が公開しています（動愛法により知事に公開義務あり）。
@@ -810,7 +915,7 @@ Excel しか無い自治体は CSV に書き出してから渡してください
     process.exit(1);
   }
 
-  const r = survey(files, { samples });
+  const r = survey(files, { samples, seed });
   if (asJson) { console.log(JSON.stringify(r, null, 2)); return; }
 
   console.log("=== 読み込み ===");
@@ -838,7 +943,14 @@ Excel しか無い自治体は CSV に書き出してから渡してください
     // 目視補正は**この一覧**に対して行う。カテゴリ別の「例」は業種を問わず先頭から
     // 埋まるので、保管を持たない不明（販売など）が並び、補正の材料にならない。
     if (r.hokanUnknownExamples.length) {
-      console.log(`      例（目視補正はこの母集団に対して行う）: ${r.hokanUnknownExamples.join(" / ")}`);
+      console.log(`      目視補正の抽出（層化抽出 / seed=${r.seed}。--seed で引き直せる）:`);
+      for (const x of r.hokanUnknownExamples) {
+        // ⚠ 名前だけを並べない。同名の別店舗（「株式会社XYZ」等）が並ぶと
+        //    どれを調べるのか分からず、目視分類が成立しない。
+        const where = x.sites.length ? x.sites.join(" / ") : "住所不明";
+        const alias = x.names.length > 1 ? `［別名: ${x.names.join("・")}］` : "";
+        console.log(`        - ${x.name}${alias} @ ${where}  (${x.files.join(", ")})`);
+      }
     }
     console.log(`  ※「保管」にはホテル・トリミング・シッターも含まれるため、これは上限（天井）。`);
     console.log(`\n  対象業態の比率（全国推定に掛ける値）:`);
