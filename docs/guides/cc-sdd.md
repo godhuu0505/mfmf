@@ -80,6 +80,48 @@ mfmf では `README.md` / `CLAUDE.md` / `docs/reference/architecture.md` と
 - DB スキーマ変更を含む spec は、tasks に「ローカル `supabase db reset` での確認」を必ず入れる
   （main マージ = 本番適用のため。[deploy.md](./deploy.md#supabasedbマイグレーション) 参照）。
 
+## 既知の注意点（upstream 由来）
+
+`.claude/skills/kiro-*/` は cc-sdd が生成する vendored ファイルで、**手で書き換えても次の
+`npx cc-sdd@latest` で消えます**。そのため以下は修正せず、運用でカバーします
+（気になるものは [upstream](https://github.com/gotalab/cc-sdd/issues) に issue を立てる）。
+
+### `-y` は「早回し」ではなく「承認」の意味になる
+
+cc-sdd には**承認だけを行うコマンドがありません**。`/kiro-spec-requirements` は
+`spec.json` に `approvals.requirements.generated: true` を書くだけで `approved` は立てず、
+次の `/kiro-spec-design` は `approved: false` だと停止します。停止時に案内される回避策は
+`/kiro-spec-design <feature> -y` のみで、これが requirements を自動承認します
+（design → tasks 間も同じ構造）。
+
+**運用**: `-y` は「人間が読んで承認済み」の意思表示として使う。付ける前に必ず
+`.kiro/specs/<feature>/requirements.md`（design なら `design.md`）に目を通すこと。
+読まずに `-y` を付けるのは、このリポジトリのルール違反です。
+
+### `/kiro-spec-quick` の対話モードは tasks を無レビューで通す
+
+`--auto` なしでも、tasks 生成の内部呼び出しに `-y` が渡ります。生成後の人間向け確認が
+入らないため、`tasks.md` がレビューされないまま `/kiro-impl` に渡り得ます。
+
+**運用**: `/kiro-spec-quick` を使ったら、`/kiro-impl` の前に必ず `tasks.md` を自分で読む。
+レビューを確実に挟みたいときは `/kiro-spec-init` からの分割実行を使う。
+
+### タスクは必ず `X.Y` の子タスクに割る
+
+`tasks.md` のテンプレートは「Major task only」（`- [ ] 1. ...` 単体）の形も許容しますが、
+`/kiro-impl` の実行キューは `X.Y` 形式だけを実行単位とみなし、`X.` はグルーピング見出しとして
+読み飛ばします。単体の major task だけの計画は、自律モードで**何も実装されないまま完了扱い**に
+なり得ます。
+
+**運用**: `/kiro-spec-tasks` の出力に単体 major task があれば、`1.1` などの子タスクに割り直す。
+
+### `/kiro-spec-batch` は失敗した wave の下流を止めない
+
+依存 wave のいずれかが失敗しても次の wave に進むため、前提の spec が欠けたまま下流が生成され得ます。
+
+**運用**: mfmf の規模では `/kiro-spec-batch` は基本使わない。使う場合は wave ごとに
+`/kiro-spec-status` で結果を確認してから次に進む。
+
 ## 更新・再インストール
 
 ```bash

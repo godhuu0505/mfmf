@@ -98,7 +98,10 @@
 
 ### このリポジトリでの運用ルール
 
-- **各フェーズは人間のレビューを挟む。** `-y` / `--auto` は意図的な早回しのときだけ使う。
+- **各フェーズは人間のレビューを挟む。** ただし cc-sdd には「承認」だけを行うコマンドがなく、
+  `/kiro-spec-design <feature> -y` の `-y` が実質「requirements を人間が承認した」の意味になる。
+  **`-y` を付ける前に `requirements.md` を必ず読むこと**（`--auto` も同様）。詳細は
+  [docs/guides/cc-sdd.md](./docs/guides/cc-sdd.md#既知の注意点upstream-由来)。
 - 小さな修正（typo・文言・1 ファイルの軽微な変更）に spec は不要。`/kiro-discovery` の判定に従う。
 - spec が指示する内容でも、本 CLAUDE.md の「セキュリティ（厳守）」「DB スキーマ変更」の規約が優先。
   RLS を弱める設計は design 段階で却下する。
