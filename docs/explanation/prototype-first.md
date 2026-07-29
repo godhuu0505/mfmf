@@ -82,16 +82,27 @@ mfmf は PWA で、価値は「スマホで片手で、片手間に記録でき�
 
 ### 1-5. ドキュメントが実際に腐っていて、しかも実害がある
 
-調査中に、S1〜S5 完了済みなのに古いままの記述が **6 箇所**見つかった。
+調査中に、S1〜S5 完了済みなのに古いままの記述が **最終的に 13 箇所**見つかった。主なもの:
 
 | ファイル | 誤った記述 |
 | --- | --- |
-| `CLAUDE.md` | 「共有方針 (A): `household_id` は持たず `owner_id (= auth.uid())` ベースで RLS」 |
-| `AGENTS.md` | 同上 |
+| `CLAUDE.md` / `AGENTS.md` | 「共有方針 (A): `household_id` は持たず `owner_id (= auth.uid())` ベースで RLS」 |
 | `design-decisions.md` | 同上（§共有方針・§セキュリティ） |
-| `README.md` | 「**Google OAuth 一本化**（メール/パスワードログインは使えません）」 |
+| `README.md` / `local-supabase.md` | 「**Google OAuth 一本化**（メール/パスワードログインは使えません）」 |
 | `architecture.md` | 画面表に `/onboarding` `/invite/[token]` `/guest` `/signup` `/help` が無い。データモデル表に `households` / `household_members` / `guest_grants` / `household_invites` が無い |
 | `features.md` | households / ゲスト / 招待に一切言及なし |
+| `google-drive-setup.md` | 「メール/パスワード認証を**廃止**し Google 一本化」＋ Drive 保存を実装済みとして記述 |
+| `configuration.md` | 「Google Drive 連携（**必須**）」 |
+| `supabase/config.toml` | 「mfmf は Google ログイン**一本化**」（設定ファイル自身が Google 必須を宣言） |
+| `verify-backend.md` | 「共有する 1 アカウントを手動発行」。確認項目に世帯・RLS が無く、テナント分離が壊れていても全項目が緑になる状態 |
+| `identity-linking.md` | 「共用アカウント前提の mfmf にとって望ましい」 |
+| `vision-and-roadmap.md` | 実装済みの共有機能 5 行が凡例上「採用（未実装）」のまま |
+| `getting-started.md` | SQL Editor 手順が初期 migration で止まり、世帯テーブルと `create_own_household` が作られない |
+
+> **数え直しの経過そのものが、この課題の性質を表している。** 当初 6 → 7 → 8 → 12 → 13。
+> 増えた原因は、横断検索の検索語を**すでに見つけたフレーズ**から選んでいたこと、
+> および検索対象を**ドキュメントだけ**に絞っていたこと（13 件目は `supabase/config.toml`）。
+> **機械的な grep でも、検索語と検索対象を既知のものから選ぶ限り取りこぼす。**
 
 このうち **`CLAUDE.md` / `AGENTS.md` は毎セッション読み込まれる**ため、実害の質が違う。
 `AGENTS.md` は Copilot / Cursor / Codex も読む。想定される具体的な事故:
