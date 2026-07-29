@@ -32,6 +32,14 @@ function deny(reason) {
 // ANSI-C 引用 `$'...'` の中身を復元する。`\x2d` `\055` `\u002d` `\n` などを実際の文字に戻す。
 // エスケープの「形」を 1 つずつ潰すのではなく、この構文をまとめて解釈することで
 // `$'\x2d\x2dforce'` `$'\055\055force'` `--fo$'\x72'ce` をすべて同じ `--force` に落とす。
+// git のグローバルオプションのうち、**次のトークンを値として取る**もの（`git -h` の
+// `git [-C <path>] [-c <name>=<value>] ...`）。サブコマンドの位置を正しく求めるために要る。
+// `--git-dir=...` のように `=` を含む形は値を持たないものとして扱えるので、ここには要らない。
+const GIT_OPTS_WITH_VALUE = new Set([
+  "-C", "-c", "--git-dir", "--work-tree", "--namespace",
+  "--exec-path", "--config-env", "--super-prefix", "--attr-source",
+]);
+
 const ANSI_C_ESCAPE = /\\(x[0-9A-Fa-f]{1,2}|u[0-9A-Fa-f]{1,4}|[0-7]{1,3}|.)/g;
 const ANSI_C_SIMPLE = { n: "\n", t: "\t", r: "\r", a: "\x07", b: "\b", f: "\f", v: "\v", e: "\x1b" };
 function decodeAnsiCQuotes(token) {
@@ -64,13 +72,21 @@ function isForcedWorktreeRemoval(command) {
     // `--force` の曖昧でない省略形（--f 〜 --force）と、-f を含む短オプション束
     const isForce = (t) =>
       /^--f(?:o(?:r(?:c(?:e)?)?)?)?$/.test(t) || /^-[A-Za-z]*f[A-Za-z]*$/.test(t);
-    // `worktree remove` の並びを**最初の 1 つで打ち切らずに全部**探す。
-    // 最初の一致で止めると `git -C worktree worktree remove ... --force` を取り逃す
-    // （`-C` の値が worktree だと、そこで「次は remove ではない」と判断してしまう）。
-    for (let i = 0; i + 1 < rest.length; i++) {
-      if (rest[i] !== "worktree" || rest[i + 1] !== "remove") continue;
-      if (rest.slice(i + 2).some(isForce)) return true;
+    // **サブコマンドの位置を求める。** 引数の中を漁ると
+    // `git commit -m "... worktree remove --force ..."` のような
+    // 「その操作の話をしているだけ」のコマンドまで巻き込んで誤爆する。
+    // git のグローバルオプションを読み飛ばして、最初の非オプショントークンを取る。
+    let i = 0;
+    while (i < rest.length) {
+      const t = rest[i];
+      if (t === "--") { i++; break; }
+      if (!t.startsWith("-")) break;                       // ← ここがサブコマンド
+      if (t.includes("=")) { i += 1; continue; }            // --git-dir=... 形式
+      if (GIT_OPTS_WITH_VALUE.has(t)) { i += 2; continue; } // -C <path> / -c <k=v> など
+      i += 1;                                              // --no-pager 等の値なしオプション
     }
+    if (rest[i] !== "worktree" || rest[i + 1] !== "remove") continue;
+    if (rest.slice(i + 2).some(isForce)) return true;
   }
   return false;
 }

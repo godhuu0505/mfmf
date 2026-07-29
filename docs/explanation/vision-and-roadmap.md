@@ -242,7 +242,11 @@ RLS 作り替えを **n=2 のうちに**済ませるのが核。
 ## 7. 未決事項（次回以降に詰める）
 
 - **Google トークンの保管方式**：Supabase の provider token か、暗号化列＋Edge Function か。
-- **外部ゲストの RLS 設計**：`guest_grants` の期間/対象スコープをどう RLS に落とすか。
+- ~~**外部ゲストの RLS 設計**：`guest_grants` の期間/対象スコープをどう RLS に落とすか。~~
+  → **Phase 3.5 / S4 で決着**（`supabase/migrations/20260705000000_guest_grants.sql`）。
+  `has_guest_record_access(household_id, pet_id, record_date)` で対象ペットと期間を判定し、
+  `pets_select_guest` / `records_select_guest` / `records_insert_guest` に適用。
+  付与の管理は世帯 owner 限定（UC-G01・UC-G06）。
 - **Drive 原本の配信方式**：アプリ経由プロキシ（private 維持）の実装コストと SW 不変条件の両立。
 - **1匹を複数家族で共同管理**（`pet_families`）まで踏み込むか（スコープ肥大の懸念）。
 - **AI 機能**（月次要約など）を Claude API で入れるかどうか（コストと ¥0 方針の折り合い）。

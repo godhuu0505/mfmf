@@ -45,11 +45,19 @@
 
 ```bash
 # 1) 確認したいユーザーでログインしてアクセストークン（JWT）を得る
-curl -s "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
+#    パスワードは非表示入力で受け取り、JWT は表示せず変数へ直接入れる。
+#    （コマンドラインに書くと履歴に残り、jq の結果を表示するとセッションが端末に出る）
+read -r EMAIL
+read -rs PASSWORD          # ← -s でエコーしない
+JWT=$(curl -s "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
   -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"email":"<確認用ユーザー>","password":"<パスワード>"}' | jq -r .access_token
-# → 出力を $JWT に入れる（この値はセッションそのもの。共有・コミットしないこと）
+  --data-binary @<(jq -nc --arg e "$EMAIL" --arg p "$PASSWORD" '{email:$e,password:$p}') \
+  | jq -r .access_token)
+unset PASSWORD
+[ -n "$JWT" ] \
+  && echo "取得できました（長さ: ${#JWT}）" \
+  || echo "取得に失敗しました"   # ← JWT 自体は表示しない
 
 # 2) 絞り込みを一切掛けずに全件取りに行く
 curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/daycare_records?select=id,household_id" \
@@ -60,13 +68,18 @@ curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/daycare_records?select=id,household_i
 curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/daycare_records?id=eq.<別世帯の記録 id>" \
   -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
   -H "Authorization: Bearer $JWT"
+
+# 4) 済んだらセッションを手元から消す
+unset JWT
 ```
 
 **期待**: 2) は自分が所属する世帯の `household_id` だけ（複数世帯に属するならその集合だけ）。
 3) は `[]`。どちらかで他世帯の行が返れば **RLS が破れています**。
 
 > `$NEXT_PUBLIC_*` はブラウザに公開される前提の値なので curl に置いても構いませんが、
-> **JWT はセッションそのもの**です。ログや issue に貼らないこと。
+> **JWT はセッションそのもの**です。上の手順は**端末に出さない・履歴に残さない**形にしてあります
+> （パスワードは `read -rs` で非表示、JWT は変数へ直接代入して長さだけ表示）。
+> `jq -r .access_token` の結果をそのまま画面に出す・ログや issue に貼る、はしないこと。
 >
 > 恒久的な担保は CI の pgTAP（`supabase/tests/`）です。上の手順は
 > 「本番の実体が pgTAP と同じ状態か」を目視で 1 回確かめるためのもので、
