@@ -113,8 +113,11 @@ const DOG_PATTERNS = [/犬/, /いぬ/, /イヌ/, /ドッグ/, /dog/i, /わん/, 
 const OTHER_SPECIES_PATTERNS = [
   /猫/, /ねこ/, /ネコ/, /キャット/, /にゃん/, /ニャン/, /\bcats?\b/i,
   /うさぎ/, /ウサギ/, /兎/, /\brabbits?\b/i,
-  /馬/, /ホース/, /\bhorses?\b/i,
-  /鳥/, /インコ/, /\bbirds?\b/i,
+  // ⚠ 「馬」「鳥」の1文字で拾わない。地名に頻出するため、「群馬ペット保育園」
+  //    「鳥取ペット保育園」が犬以外と判定されて分子から消える（＝過小評価）。
+  //    **種を指す文脈**を伴う語だけに限定する（馬込・千鳥・飛鳥・白鳥も同様）。
+  /乗馬/, /馬術/, /愛馬/, /厩舎/, /ホース(クラブ|パーク|ランチ)/, /\bhorses?\b/i,
+  /小鳥/, /野鳥/, /愛鳥/, /文鳥/, /九官鳥/, /インコ/, /オウム/, /\bbirds?\b/i,
   /フェレット/, /ハムスター/, /爬虫/, /リクガメ/, /\breptiles?\b/i,
 ];
 
@@ -172,6 +175,17 @@ const PREFECTURES = [
   "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ];
 
+// 東京23特別区。**単独で住所の先頭に立てる「区」はこれだけ**である。
+// 政令指定都市の行政区（名古屋市港区など）は必ず市名が前に付くため、
+// 「港区…」で始まる住所は東京都港区と判断できる（＝全国で一意）。
+// これを認めないと、区ごと/業種ごとに CSV が分かれている登録簿で
+// 同じ施設がファイル名前空間に閉じ込められ、**二重計上**される。
+const TOKYO_WARDS = [
+  "千代田区", "中央区", "港区", "新宿区", "文京区", "台東区", "墨田区", "江東区",
+  "品川区", "目黒区", "大田区", "世田谷区", "渋谷区", "中野区", "杉並区", "豊島区",
+  "北区", "荒川区", "板橋区", "練馬区", "足立区", "葛飾区", "江戸川区",
+];
+
 function isQualifiedAddress(v) {
   const n = normalize(v);
   if (!n) return false;
@@ -180,7 +194,10 @@ function isQualifiedAddress(v) {
   //    **先頭が実在の都道府県名**か、**先頭付近で市/郡が閉じている**ことを要求する。
   if (PREFECTURES.some((pref) => n.startsWith(pref))) return true;
   // 「柏市…」「市原市…」は可。「市川1-1」（市が先頭）や「府中町…」は不可。
-  return /^.{1,5}[市郡]/.test(n);
+  if (/^.{1,5}[市郡]/.test(n)) return true;
+  // 「名古屋市港区…」は上の [市] で拾えている。ここで拾うのは市名の無い
+  // 「新宿区…」で、実在する特別区名で始まるものに限る（「区役所前1-1」等を弾く）。
+  return TOKYO_WARDS.some((ward) => n.startsWith(ward));
 }
 
 /**
@@ -507,18 +524,38 @@ export function survey(files, { samples = 3 } = {}) {
       const norm = rowNames.map(normalize);
       // 一致判定に使う別名は**施設名（屋号・事業所名）のみ**。法人名まで含めると、
       // 同じ法人が同じ住所で出している別業態の店舗が1件に潰れる。
-      // 法人名しか無い行（施設名の列が空 or 存在しない登録簿）に限り、
-      // 代替として法人名を鍵にする（そうしないと行ごとに別施設として増殖する）。
+      // ただし施設名が空の行（業種ごとに行が分かれ、屋号列がその行だけ空の登録簿）は
+      // 法人名しか手掛かりが無いので、**曖昧でないときに限り**法人名で寄せる。
       const facilityNorm = rowNamed.filter((x) => !x.operator).map((x) => normalize(x.name));
-      const compat = facilityNorm.length ? facilityNorm : norm;
+      const operatorNorm = rowNamed.filter((x) => x.operator).map((x) => normalize(x.name));
       const clusters = byName.get(bucket) ?? [];
-      const hit = [];
-      for (const c of clusters) {
-        if (compat.some((nm) => c.compat.has(nm))) hit.push(c);
+      let hit = [];
+      if (facilityNorm.length) {
+        for (const c of clusters) {
+          if (facilityNorm.some((nm) => c.facilityNames.has(nm))) hit.push(c);
+        }
+      } else {
+        // 施設名が無い行。同じ住所・同じ法人のクラスタを探す。
+        const byOperator = clusters.filter((c) =>
+          operatorNorm.some((nm) => c.operatorNames.has(nm)),
+        );
+        // 同じく施設名を持たないクラスタ（＝同じ性質の行）があればそこへ寄せる。
+        const anonymous = byOperator.filter((c) => c.facilityNames.size === 0);
+        if (anonymous.length) hit = anonymous;
+        // 施設名を持つクラスタが**1つに絞れる**ときだけ、その施設の行とみなす。
+        // ⚠ 複数あるときに先頭へ寄せてはいけない。「ABCトリミング」と
+        //    「犬の保育園XYZ」が同じ法人・同じ住所にある場合、どちらの登録か
+        //    判別できないため、行順で結果が変わる推測になる。
+        //    その場合は独立した1件として数える（＝不明として残す方が安全）。
+        else if (byOperator.length === 1) hit = byOperator;
       }
       let entry;
       if (!hit.length) {
-        entry = { names: new Set(), normNames: new Set(), compat: new Set(), kinds: new Set(), ranked: [] };
+        entry = {
+          names: new Set(), normNames: new Set(),
+          facilityNames: new Set(), operatorNames: new Set(),
+          kinds: new Set(), ranked: [],
+        };
         clusters.push(entry);
         byName.set(bucket, clusters);
       } else {
@@ -527,7 +564,8 @@ export function survey(files, { samples = 3 } = {}) {
         for (const other of hit.slice(1)) {
           for (const v of other.names) entry.names.add(v);
           for (const v of other.normNames) entry.normNames.add(v);
-          for (const v of other.compat) entry.compat.add(v);
+          for (const v of other.facilityNames) entry.facilityNames.add(v);
+          for (const v of other.operatorNames) entry.operatorNames.add(v);
           for (const v of other.kinds) entry.kinds.add(v);
           entry.ranked.push(...other.ranked);
           clusters.splice(clusters.indexOf(other), 1);
@@ -536,9 +574,9 @@ export function survey(files, { samples = 3 } = {}) {
       rowNamed.forEach((x, i) => {
         entry.names.add(x.name);
         entry.normNames.add(norm[i]);
+        (x.operator ? entry.operatorNames : entry.facilityNames).add(norm[i]);
         entry.ranked.push(x);
       });
-      for (const nm of compat) entry.compat.add(nm);
       for (const k of kinds) entry.kinds.add(k);
       lastEntry = entry;
     }
@@ -594,6 +632,11 @@ export function survey(files, { samples = 3 } = {}) {
   let hokanDaycare = 0;
   let hokanTraining = 0;
   let hokanUnknown = 0;
+  // 手作業で目視補正する対象は「不明」全体ではなく **保管を持つ不明**。
+  // examples.unknown は業種を問わず先頭から埋まるため、販売の不明が先に並ぶ
+  // 登録簿では hokanUnknown の中身が1件も入らないことがあり、それを分類しても
+  // daycareRatioLow の補正にならない（market-analysis.md §18-4 の手順が空振りする）。
+  const hokanUnknownExamples = [];
 
   for (const e of entries) {
     counts[e.category] = (counts[e.category] ?? 0) + 1;
@@ -606,7 +649,10 @@ export function survey(files, { samples = 3 } = {}) {
       // market-analysis.md §18-6 が「定期通園するしつけ教室はターゲットに含む」と
       // 定めているので、分子から落とすと過小評価になる。
       if (e.category === "training") hokanTraining++;
-      if (e.category === "unknown") hokanUnknown++;
+      if (e.category === "unknown") {
+        hokanUnknown++;
+        if (hokanUnknownExamples.length < samples) hokanUnknownExamples.push(e.name);
+      }
     }
   }
 
@@ -635,6 +681,7 @@ export function survey(files, { samples = 3 } = {}) {
     hokanTraining,
     hokanTarget,
     hokanUnknown,
+    hokanUnknownExamples,
     hokanUnknownRatio,
     daycareRatioLow,
     daycareRatioHigh,
@@ -688,6 +735,11 @@ Excel しか無い自治体は CSV に書き出してから渡してください
     console.log(`  うちしつけ・訓練系（保管あり）: ${r.hokanTraining}  ← 定期通園の預かり業態として分子に含む`);
     console.log(`  合計（推定の分子）          : ${r.hokanTarget}`);
     console.log(`  うち屋号から判別不可        : ${r.hokanUnknown}`);
+    // 目視補正は**この一覧**に対して行う。カテゴリ別の「例」は業種を問わず先頭から
+    // 埋まるので、保管を持たない不明（販売など）が並び、補正の材料にならない。
+    if (r.hokanUnknownExamples.length) {
+      console.log(`      例（目視補正はこの母集団に対して行う）: ${r.hokanUnknownExamples.join(" / ")}`);
+    }
     console.log(`  ※「保管」にはホテル・トリミング・シッターも含まれるため、これは上限（天井）。`);
     console.log(`\n  対象業態の比率（全国推定に掛ける値）:`);
     console.log(`    下限 ${pct(r.daycareRatioLow)}  … 不明を全部「対象業態でない」とみなす`);
