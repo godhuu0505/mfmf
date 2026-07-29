@@ -10,7 +10,10 @@
 
 ```bash
 # 1. .env.local に以下を設定（.env.local.example 参照）
-#    FEEDBACK_USER_EMAIL / FEEDBACK_USER_PASSWORD … 取得用アカウント（RLS 経由で読む）
+#    FEEDBACK_USER_EMAIL / FEEDBACK_USER_PASSWORD … 取得用アカウント（RLS 経由で読む）。
+#      ★ 対象世帯の owner か editor であること。スクリプトは Issue 作成後に feedback 行へ
+#        github_issue_number 等を書き戻すが、RLS の feedback_update_member が
+#        owner/editor を要求するため、viewer だと更新だけ失敗して二重登録の原因になる
 #    GITHUB_TOKEN … Issues 書き込み権の Fine-grained PAT
 #    GITHUB_FEEDBACK_REPO … 登録先 owner/repo（★ 必ず非公開リポジトリ）
 
