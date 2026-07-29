@@ -97,7 +97,7 @@ git switch -c proto/quick-record origin/main
 - ただし **プロトの世界から何かが出ていく直前**——
   ①`push` する / ②道 A で実装に育てる / ③挙動が怪しくて判断に迷う——
   のいずれかなら **`npm run lint` と `npm run typecheck` を通す**
-- `npm run build` はプロト段階では任意
+- `npm run build` はプロト段階では任意（ただし**道 A で畳んだ後は必須** → §4）
 
 > `tsc --noEmit` はプロジェクト全体を見るが、`next dev` が型を報告するのは
 > そのとき実際にコンパイルしたルートだけ。プロト以外の場所を巻き込んで壊していても
@@ -311,8 +311,16 @@ git diff --cached
 > このリポジトリは **main マージ＝本番リリース**なので、気づかず通すと
 > **認証不要の `/proto` ルートが本番に出る**。落とす操作は任意ではなく必須。
 >
-> `git diff --cached --stat` に `src/app/proto` と `middleware.ts` が
-> **残っていないこと**を目で確認してから §5 に進む。
+> 確認は `git diff --cached`（`--stat` ではなく中身）で、
+> **`/proto` の認証除外の hunk が残っていないこと**を見る。
+> ファイル単位で「`middleware.ts` が消えていること」を条件にしない ——
+> 採用した機能自体が middleware を変える（例: 新ルートを公開にする）ことは普通にあり、
+> ファイル単位の判定だとその実装変更まで落とすことになる。
+>
+> **畳んだあとに `npm run lint` / `npm run typecheck` / `npm run build` を通す。**
+> §2 のゲートは畳む「前」に走らせるものなので、`git mv`・hunk の取り消し・
+> 既存ルートの置き換えで壊れた import やルーティングは捕まえられない。
+> ここは UI / ルーティングの実装変更なので、リポジトリ規約どおり **build も必須**。
 
 > ⚠️ **`git rebase` を飛ばすと upstream の変更を巻き戻すコミットができる。**
 > プロトを切ったあとに `origin/main` が進んでいる場合、`reset --soft` は
