@@ -141,11 +141,27 @@ const SCHOOL_WORDS = [/学園/, /スクール/, /school/i, /専門学校/, /養�
 // 人材（トリマー・訓練士）の養成校を示す語。犬の語を含むので通常の判定では弾けない。
 const VOCATIONAL_WORDS = [/養成/, /専門学校/, /学院/, /トレーナー(養成|科)/, /訓練士/, /資格/];
 
+// 「犬の語 ＋（の）＋ 学校系」が**直結**している屋号は、人向けの養成校ではなく
+// 犬向けのスクール（例: ドッグスクール／犬のスクール）。
+// ⚠ 語間を空けないこと。「愛犬美容学園」（＝トリマー養成校）は 犬→美容→学園 と
+//    2文字挟むだけなので、距離を許すと養成校の判定が壊れる。
+const DOG_SCHOOL = /(犬|いぬ|イヌ|ドッグ|\bdog|わん|ワン|パピー|\bpupp)の?(スクール|school|学園|学校)/i;
+// 業態が明示されている語（サロン系の上書き判定と養成校判定の両方で使う）
+const EXPLICIT_DAYCARE = /保育園|幼稚園|ようちえん|ほいくえん|ヨウチエン|ホイクエン|デイケア|デイサービス|daycare/i;
+const EXPLICIT_TRAINING = /しつけ|躾|訓練|トレーニング|training/i;
+
 function isGroomingSchool(name) {
-  // 美容・サロン系 × 学校系 → トリマー養成校
+  // 「養成」「専門学校」「訓練士」等、**人材育成が明示**されていればそれが最優先。
+  const vocational = VOCATIONAL_WORDS.some((re) => re.test(name));
+  // ⚠ 美容系の語と学校系の語が同居しているだけでは養成校と断定できない。
+  //    「ドッグスクール＆トリミングサロン」「犬のしつけスクール＆美容室」のように、
+  //    犬向けのサービスが明示された複合屋号まで grooming に落として分子から消す。
+  //    人材育成の語が無く、犬向けスクール／しつけが明示されていれば養成校ではない。
+  if (!vocational && (DOG_SCHOOL.test(name) || EXPLICIT_TRAINING.test(name))) return false;
+  // 美容・サロン系 × 学校系 → トリマー養成校（例: 東京愛犬美容学園）
   if (GROOMING_WORDS.some((re) => re.test(name)) && SCHOOL_WORDS.some((re) => re.test(name))) return true;
   // 「ドッグトレーナー養成スクール」のように、人を育てる語 × 学校系 → 訓練士養成校
-  if (VOCATIONAL_WORDS.some((re) => re.test(name)) && SCHOOL_WORDS.some((re) => re.test(name))) return true;
+  if (vocational && SCHOOL_WORDS.some((re) => re.test(name))) return true;
   return false;
 }
 
@@ -211,7 +227,12 @@ function isQualifiedAddress(v) {
   //    **先頭が実在の都道府県名**か、**先頭付近で市/郡が閉じている**ことを要求する。
   if (PREFECTURES.some((pref) => n.startsWith(pref))) return true;
   // 「柏市…」「市原市…」は可。「市川1-1」（市が先頭）や「府中町…」は不可。
-  if (/^.{1,5}[市郡]/.test(n)) return true;
+  // ⚠ 文字数だけで区切らないこと。「かすみがうら市」「つくばみらい市」「いちき串木野市」
+  //    のような長い市名が弾かれ、業種ごとに CSV が分かれた登録簿で同じ施設が
+  //    ファイル名前空間に閉じ込められて**二重計上**される。
+  //    一方で長さだけ緩めると「中央3-1-1市民会館前」まで拾ってしまうので、
+  //    **市名に数字・記号は入らない**ことを使って、仮名/漢字だけの前置に限定する。
+  if (/^[ぁ-んァ-ヶ一-龯々ヵヶー]{1,8}[市郡]/.test(n)) return true;
   // 「名古屋市港区…」は上の [市] で拾えている。ここで拾うのは市名の無い
   // 「新宿区…」で、実在する特別区名で始まるものに限る（「区役所前1-1」等を弾く）。
   return TOKYO_WARDS.some((ward) => n.startsWith(ward));
@@ -242,8 +263,6 @@ export function classify(name) {
   // 「ドッグサロン花園」のようにサロン名に「園」が入るケースだけを救済する。
   // ⚠ サロンの語があるだけで早期 return しない。「ドッグサロンABCしつけ教室」のように
   //    しつけ（＝対象業態）が明示されている複合屋号まで grooming にしてしまうため。
-  const EXPLICIT_DAYCARE = /保育園|幼稚園|ようちえん|ほいくえん|ヨウチエン|ホイクエン|デイケア|デイサービス|daycare/i;
-  const EXPLICIT_TRAINING = /しつけ|躾|訓練|トレーニング|training/i;
   const salonOverridesEn = looksGrooming(n) && !EXPLICIT_DAYCARE.test(n) && !EXPLICIT_TRAINING.test(n);
   for (const rule of RULES) {
     // 「園」だけを根拠に daycare にする緩い判定は、サロン系の屋号では採らない
@@ -571,7 +590,10 @@ export function survey(files, { samples = 3 } = {}) {
       // 一致判定に使う別名は**施設名（屋号・事業所名）のみ**。法人名まで含めると、
       // 同じ法人が同じ住所で出している別業態の店舗が1件に潰れる。
       // ただし施設名が空の行（業種ごとに行が分かれ、屋号列がその行だけ空の登録簿）は
-      // 法人名しか手掛かりが無いので、**曖昧でないときに限り**法人名で寄せる。
+      // 法人名しか手掛かりが無いので、いったん**法人名だけのクラスタ**に溜め、
+      // 全行を読み終えてから施設へ寄せる（下の reconcile）。
+      // ⚠ ここで「法人名が一致する施設が1つだけならその場で寄せる」としてはいけない。
+      //    法人名だけの行が先に来るか後に来るかで結果が変わる（行順依存）。
       const facilityNorm = rowNamed.filter((x) => !x.operator).map((x) => normalize(x.name));
       const operatorNorm = rowNamed.filter((x) => x.operator).map((x) => normalize(x.name));
       const clusters = byName.get(bucket) ?? [];
@@ -581,19 +603,10 @@ export function survey(files, { samples = 3 } = {}) {
           if (facilityNorm.some((nm) => c.facilityNames.has(nm))) hit.push(c);
         }
       } else {
-        // 施設名が無い行。同じ住所・同じ法人のクラスタを探す。
-        const byOperator = clusters.filter((c) =>
-          operatorNorm.some((nm) => c.operatorNames.has(nm)),
+        // 施設名が無い行どうしは、同じ住所・同じ法人ならまとめる。
+        hit = clusters.filter(
+          (c) => c.facilityNames.size === 0 && operatorNorm.some((nm) => c.operatorNames.has(nm)),
         );
-        // 同じく施設名を持たないクラスタ（＝同じ性質の行）があればそこへ寄せる。
-        const anonymous = byOperator.filter((c) => c.facilityNames.size === 0);
-        if (anonymous.length) hit = anonymous;
-        // 施設名を持つクラスタが**1つに絞れる**ときだけ、その施設の行とみなす。
-        // ⚠ 複数あるときに先頭へ寄せてはいけない。「ABCトリミング」と
-        //    「犬の保育園XYZ」が同じ法人・同じ住所にある場合、どちらの登録か
-        //    判別できないため、行順で結果が変わる推測になる。
-        //    その場合は独立した1件として数える（＝不明として残す方が安全）。
-        else if (byOperator.length === 1) hit = byOperator;
       }
       let entry;
       if (!hit.length) {
@@ -651,6 +664,29 @@ export function survey(files, { samples = 3 } = {}) {
       note: [kindIdxs.length === 0 ? "業種列なし（保管の判定は不可）" : `業種列=「${kindIdxs.map((i) => header[i]).join("」「")}」`, idNote, sitelessNote, unqualifiedNote, namelessNote]
         .filter(Boolean).join(" / "),
     });
+  }
+
+  // --- 法人名だけの行を施設へ寄せる（全ファイルを読み終えてから行う） -----------
+  // 業種ごとに行が分かれる登録簿では、屋号列が空で法人名しか無い行が出る。
+  // これを行の出現順で寄せると「先に法人名だけの行が来るか」で結果が変わるため、
+  // **全行を読み終えてから**、同じ住所・同じ法人の施設が1つに絞れる場合だけ寄せる。
+  // ⚠ 2つ以上あるとき（同じ法人が同じ住所で複数業態を出しているとき）は寄せない。
+  //    どちらの登録か判別できず、寄せ先を選ぶと行順で結果が変わる推測になる。
+  for (const clusters of byName.values()) {
+    for (const anon of clusters.filter((c) => c.facilityNames.size === 0)) {
+      const named = clusters.filter(
+        (c) => c.facilityNames.size > 0
+          && [...anon.operatorNames].some((nm) => c.operatorNames.has(nm)),
+      );
+      if (named.length !== 1) continue;
+      const target = named[0];
+      for (const v of anon.names) target.names.add(v);
+      for (const v of anon.normNames) target.normNames.add(v);
+      for (const v of anon.operatorNames) target.operatorNames.add(v);
+      for (const v of anon.kinds) target.kinds.add(v);
+      target.ranked.push(...anon.ranked);
+      clusters.splice(clusters.indexOf(anon), 1);
+    }
   }
 
   // 1つの事業所に複数の呼称（法人名・屋号）が集まるので、
