@@ -78,7 +78,10 @@ const RULES = [
   {
     key: "shop",
     label: "販売・ショップ",
-    patterns: [/ペットショップ/, /ブリーダー/, /繁殖/, /販売/, /shop/i, /ペットプラザ/],
+    // ⚠ /shop/i を語中で当てない。「BISHOP PET CARE」が販売に化けて
+    //    hokanUnknown から抜け、推定の上限（daycareRatioHigh）を不当に狭める。
+    //    語頭で区切りつつ、区切りの無い「PETSHOP」も別パターンで拾う。
+    patterns: [/ペットショップ/, /ブリーダー/, /繁殖/, /販売/, /\bshop/i, /petshop/i, /ペットプラザ/],
   },
 ];
 
@@ -105,7 +108,16 @@ const ALL_CATEGORIES = () => [...RULES, ...EXTRA_CATEGORIES];
 // 猫側は厳密に（誤検知すると分子から落ちて過小評価になるため）。
 // 英単語は **語境界**で判定する。EDUCATION / CATCH のような語の内部に cat が入る屋号を
 // 猫扱いしてしまうため（この判定はスペースを残した文字列に対して行う）。
-const DOG_PATTERNS = [/犬/, /いぬ/, /イヌ/, /ドッグ/, /dog/i, /わん/, /ワン/, /パピー/, /puppy/i];
+// ⚠ この判定は isNonDog() の**打ち消し**に使う。誤検知すると
+//    「猫の保育園 犬山店」「うさぎの保育園 ワンダー店」が犬の分子に入るため、
+//    地名・一般語に紛れる形（犬山・犬吠 / ワンダー・ワンルーム）を除いてから当てる。
+//    一方で緩さも必要（「ペット保育園さくら」は種を書かない）ので、
+//    除外は**既知の紛れだけ**に留め、犬の語そのものは広く拾う。
+const DOG_PATTERNS = [
+  /犬(?!山|吠|伏|飼|鳴)/, /いぬ/, /イヌ/, /ドッグ/, /\bdog/i,
+  /わん/, /ワン(?!ダー|ダフル|ピース|タン|ルーム|コイン|オペ|ストップ|タッチ|ポイント|マン)/,
+  /パピー/, /\bpupp/i,
+];
 // 犬以外の動物が明示されている屋号。犬の語が無ければ推定分子から外す。
 // ⚠ 「犬の語が無い＝除外」にはしない。「ペット保育園さくら」のように種を書かない
 //    屋号が多く、そこまで要求すると取りこぼしで過小評価になる。
@@ -175,15 +187,20 @@ const PREFECTURES = [
   "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ];
 
-// 東京23特別区。**単独で住所の先頭に立てる「区」はこれだけ**である。
-// 政令指定都市の行政区（名古屋市港区など）は必ず市名が前に付くため、
-// 「港区…」で始まる住所は東京都港区と判断できる（＝全国で一意）。
-// これを認めないと、区ごと/業種ごとに CSV が分かれている登録簿で
-// 同じ施設がファイル名前空間に閉じ込められ、**二重計上**される。
+// 東京23特別区のうち、**区名だけで全国一意に定まるもの**。
+// 特別区は市名を伴わずに住所の先頭に立てるので、これを認めないと
+// 区ごと/業種ごとに CSV が分かれている登録簿で同じ施設がファイル名前空間に
+// 閉じ込められ、**二重計上**される。
+// ⚠ 政令指定都市の行政区と**同名のもの（中央区・港区・北区）は入れない**。
+//    自治体が自分の管内向けに市名を省いて「中央区1-1」と書く登録簿があり、
+//    千葉市中央区・大阪市港区・札幌市北区…と衝突して無関係な施設が
+//    1件に潰れる（＝過小計上）。この3区はファイル単位のままにする。
+//    中央区: 札幌/千葉/新潟/相模原/静岡/浜松/大阪/神戸/福岡/熊本
+//    港区: 名古屋/大阪 ／ 北区: 札幌/京都/大阪/堺/神戸/岡山/熊本
 const TOKYO_WARDS = [
-  "千代田区", "中央区", "港区", "新宿区", "文京区", "台東区", "墨田区", "江東区",
+  "千代田区", "新宿区", "文京区", "台東区", "墨田区", "江東区",
   "品川区", "目黒区", "大田区", "世田谷区", "渋谷区", "中野区", "杉並区", "豊島区",
-  "北区", "荒川区", "板橋区", "練馬区", "足立区", "葛飾区", "江戸川区",
+  "荒川区", "板橋区", "練馬区", "足立区", "葛飾区", "江戸川区",
 ];
 
 function isQualifiedAddress(v) {
@@ -438,6 +455,17 @@ export function survey(files, { samples = 3 } = {}) {
       dataRows.some((r) => STATUTORY_KINDS.some((re) => re.test(normalize(r[i] ?? "")))),
     );
     const kindIdxs = validKindIdxs;
+    // 結合セル由来の「継続行」に埋まっていてよい列。
+    // 継続行は業種そのもの（と、業種ごとに振られる登録番号・登録年月日）だけが埋まり、
+    // 他は空という形をしている。この形を要求しないと、集計行・注記行
+    // （「,保管,10件」等）まで直前の施設の続きとして取り込んでしまう。
+    const contAllowedIdxs = new Set([
+      ...kindIdxs,
+      ...pickColumns(header, [
+        /登録番号/, /許可番号/, /番号/,
+        /登録.*年月日/, /有効期間/, /登録日/, /更新/, /年月日/,
+      ]),
+    ]);
     // 名寄せの鍵は「屋号＋所在地」（＝店舗の実体）。登録番号は業種ごとに振られる
     // 自治体があり、鍵に使うと1店舗が業種の数だけ二重計上されるため使わない。
     // ⚠ 順序に意味がある。「事業者所在地」と「事業所所在地」が併存する場合、
@@ -450,15 +478,23 @@ export function survey(files, { samples = 3 } = {}) {
     //    別の業種の行では空、という登録簿があり、混ぜると同じ施設が別バケツに割れて
     //    **二重計上**される。施設側の住所列が1つでもあるならそちらだけを使い、
     //    施設側が存在しない登録簿（1事業者1事業所の様式）でのみ事業者住所に落ちる。
+    // ⚠ 「飼養施設所在地」も混ぜないこと。事業所とは**別の住所**（動物を飼育する
+    //    施設）であり、行によって空だったり事業所と違ったりするため、連結すると
+    //    同じ事業所が別バケツに割れる。/施設.*所在/ が拾ってしまうので明示的に外す。
     const addrIdxsAll = pickColumns(header, [
       /事業所.*所在/, /施設.*所在/, /店舗.*所在/,
       /事業所.*住所/, /施設.*住所/, /店舗.*住所/,
       /所在地/, /住所/,
     ]);
-    const addrIdxsFacility = addrIdxsAll.filter(
-      (i) => !OPERATOR_ADDR_HEADINGS.some((re) => re.test(header[i])),
-    );
-    const addrIdxs = addrIdxsFacility.length ? addrIdxsFacility : addrIdxsAll;
+    const isHousingAddr = (i) => /飼養|飼育|保管場所/.test(header[i]);
+    const isOperatorAddr = (i) => OPERATOR_ADDR_HEADINGS.some((re) => re.test(header[i]));
+    // ①事業所の住所 → ②飼養施設の住所 → ③事業者の住所、の順に**先に見つかった層だけ**を使う。
+    // 層を跨いで連結しないのが要点（意味の違う住所を1つの鍵に混ぜない）。
+    const addrIdxsOffice = addrIdxsAll.filter((i) => !isHousingAddr(i) && !isOperatorAddr(i));
+    const addrIdxsHousing = addrIdxsAll.filter((i) => !isOperatorAddr(i));
+    const addrIdxs = addrIdxsOffice.length
+      ? addrIdxsOffice
+      : (addrIdxsHousing.length ? addrIdxsHousing : addrIdxsAll);
     const addrIdx = addrIdxs.length ? addrIdxs[0] : -1;
 
     if (nameIdx < 0) {
@@ -470,6 +506,7 @@ export function survey(files, { samples = 3 } = {}) {
     let n = 0;
     let sitelessRows = 0;
     let unqualifiedAddrRows = 0;
+    let namelessOtherRows = 0;
     let lastEntry = null;
     for (const r of dataRows) {
       // 候補列の値を**すべて**拾う。行によって埋まっている列が違うため、
@@ -490,9 +527,18 @@ export function survey(files, { samples = 3 } = {}) {
       // 直前の施設に業種だけを足す。
       if (!rowNames.length) {
         const contKinds = kindIdxs.map((i) => normalize(r[i] ?? "")).filter(Boolean);
-        if (lastEntry && contKinds.length) {
+        // ⚠ 名前が空＝継続行、ではない。小計行・注記行（「,保管,10件」のように
+        //    業種列に文字があり、別の列にも値が入る行）を取り込むと、直前の施設に
+        //    **偽の保管**が付いて分母（hokan）と「意味のあるゼロ」が汚れる。
+        //    継続行の形（業種・登録番号・年月日以外はすべて空）に合う行だけ足す。
+        const shapeOk = r.every(
+          (v, i) => !String(v ?? "").trim() || contAllowedIdxs.has(i),
+        );
+        if (lastEntry && contKinds.length && shapeOk) {
           n++;
           for (const k of contKinds) lastEntry.kinds.add(k);
+        } else if (contKinds.length) {
+          namelessOtherRows++;
         }
         continue;
       }
@@ -591,13 +637,18 @@ export function survey(files, { samples = 3 } = {}) {
         + `（自治体をまたぐ衝突を避けるためファイル単位で分離。同一自治体を複数 CSV に`
         + `分けている場合は結合してから渡すこと）`
       : "";
+    const namelessNote = namelessOtherRows
+      ? `⚠ 事業所名が空で業種だけがある行 ${namelessOtherRows} 件を無視`
+        + `（結合セルの継続行の形に合わない＝小計行・注記行の可能性。継続行なら`
+        + `業種以外の列が埋まっていないはず）`
+      : "";
     filesEvaluated++;
     if (kindIdxs.length > 0) filesWithKind++;
     perFile.push({
       file,
       rows: n,
       kindColumns: kindIdxs.map((i) => header[i]),
-      note: [kindIdxs.length === 0 ? "業種列なし（保管の判定は不可）" : `業種列=「${kindIdxs.map((i) => header[i]).join("」「")}」`, idNote, sitelessNote, unqualifiedNote]
+      note: [kindIdxs.length === 0 ? "業種列なし（保管の判定は不可）" : `業種列=「${kindIdxs.map((i) => header[i]).join("」「")}」`, idNote, sitelessNote, unqualifiedNote, namelessNote]
         .filter(Boolean).join(" / "),
     });
   }
@@ -636,7 +687,7 @@ export function survey(files, { samples = 3 } = {}) {
   // examples.unknown は業種を問わず先頭から埋まるため、販売の不明が先に並ぶ
   // 登録簿では hokanUnknown の中身が1件も入らないことがあり、それを分類しても
   // daycareRatioLow の補正にならない（market-analysis.md §18-4 の手順が空振りする）。
-  const hokanUnknownExamples = [];
+  const hokanUnknownAll = [];
 
   for (const e of entries) {
     counts[e.category] = (counts[e.category] ?? 0) + 1;
@@ -651,10 +702,23 @@ export function survey(files, { samples = 3 } = {}) {
       if (e.category === "training") hokanTraining++;
       if (e.category === "unknown") {
         hokanUnknown++;
-        if (hokanUnknownExamples.length < samples) hokanUnknownExamples.push(e.name);
+        hokanUnknownAll.push(e.name);
       }
     }
   }
+
+  // ⚠ 母集団の**先頭から N 件**を取ってはいけない。自治体の登録簿は住所順・
+  //    登録日順・区ごとに並んでいることが多く、先頭 N 件は特定の地域や時期に偏る。
+  //    その偏ったサンプルで求めた補正率を全体に適用すると推定が歪む。
+  //    母集団全体から**等間隔**で拾う（系統抽出）。乱数を使わないのは、同じ CSV から
+  //    同じサンプルが再現でき、目視分類の結果を後から検証できるようにするため。
+  const pickEvenly = (arr, k) => {
+    if (k <= 0) return [];
+    if (arr.length <= k) return [...arr];
+    const step = arr.length / k;
+    return Array.from({ length: k }, (_, i) => arr[Math.floor(i * step)]);
+  };
+  const hokanUnknownExamples = pickEvenly(hokanUnknownAll, samples);
 
   // 全国推定に使うのは hokanDaycare / hokan なので、信頼度は
   // 「全体の不明率」ではなく「保管の中の不明率」で測らないと誤認する。
