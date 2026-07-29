@@ -52,8 +52,11 @@ function isForcedWorktreeRemoval(command) {
   // `x2d` になって一致しなくなる）。`$` は引用符が続くときだけ落とす
   // （`$FLAGS` のような変数参照は残す＝下記の限界）。
   const unquote = (t) => decodeAnsiCQuotes(t).replace(/\$(?=["'])/g, "").replace(/["'\\]/g, "");
+  // 行継続（バックスラッシュ + 改行）はシェルが 1 行に繋ぐので、**区切る前に**繋ぐ。
+  // 先に改行で割ると `--\<改行>force` が `--` と `force` に分かれて一致しなくなる。
+  const joined = command.replace(/\\\r?\n/g, "");
   // パイプ・リスト区切りでコマンド単位に割る
-  for (const segment of command.split(/[|;&\n]+/)) {
+  for (const segment of joined.split(/[|;&\n]+/)) {
     const tokens = segment.trim().split(/\s+/).filter(Boolean).map(unquote);
     const gitAt = tokens.findIndex((t) => t === "git" || t.endsWith("/git"));
     if (gitAt < 0) continue;

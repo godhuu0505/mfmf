@@ -309,7 +309,16 @@ git diff --cached src/app/layout.tsx src/app/manifest.ts \
 #    git restore --source=origin/main --staged --worktree <file>
 git rm -r --quiet --ignore-unmatch src/app/proto
 
-# ★ 3) 最終確認（--stat ではなく中身を見る）
+# ★ 3) 固定データと空の操作を「本物」に差し替える（★2 と ★4 の間。ここが本体）
+grep -rn "const .*= \[" src/app/<本来のルート>/     # 直書き配列が残っていないか
+grep -rn "console.log\|TODO\|onSubmit={() =>" src/app/<本来のルート>/
+#    - 固定配列 → Server Component で supabase から取得する
+#    - console.log / state 止まりのハンドラ → Server Action を呼ぶ
+#    - 認可を入れる（新規作成なら requireEditableHousehold()、
+#      更新/削除なら対象行の household で判定。CLAUDE.md の使い分けに従う）
+#    - 0 件・エラー・権限なし（viewer）の分岐を足す
+
+# ★ 4) 最終確認（--stat ではなく中身を見る）
 git diff --cached
 ```
 
@@ -329,7 +338,13 @@ git diff --cached
 > 素通りすることは §3 のとおり）。このリポジトリは **merge = 本番リリース**なので、
 > 戻し忘れは「本番からご意見フォームが消える」形で出る。しかも消えたのは
 > プロト都合の一時変更なので、レビューでも変更意図に見える。
-> **`git diff --cached` を目で見る ★3 が唯一の防波堤**。省略しない。
+> **`git diff --cached` を目で見る ★4 が唯一の防波堤**。省略しない。
+>
+> 🚨 **★3（固定データの差し替え）にも自動ゲートは無い。** 固定配列のまま本来のルートへ
+> 移しても `lint` / `typecheck` / `build` は通る —— **型が合っている偽データ**であり、
+> `console.log` 止まりのハンドラも静的には正しいコードだからだ。
+> つまり**「動いているように見えて、読みも書きもしない画面」が本番に出る**。
+> 道 A を選ぶなら ★3 を飛ばさない。飛ばす気があるなら最初から道 B（捨てて書き直す）にする。
 >
 > `--ignore-unmatch` が要る理由: プロトが `page.tsx` 1 枚だけだった場合、
 > 1) の `git mv` で追跡ファイルが無くなり `src/app/proto` 自体が消える。

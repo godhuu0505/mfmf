@@ -22,7 +22,7 @@
 | テーブルと RLS | Table Editor | `public.daycare_records` / `public.record_photos` / `public.feedback` が存在し、いずれも **RLS enabled**。 |
 | 認証ユーザー | Authentication > Users | ログインに使うユーザーが存在。**世帯メンバーはそれぞれ自分のアカウント**を持つ（招待で追加。`SIGNUP_ENABLED` が閉じている間は手動発行）。 |
 | 世帯とロール | Table Editor | `households` / `household_members` が存在し RLS enabled。確認したいユーザーの `household_members` 行と `role`（owner/editor/viewer）が意図どおり。 |
-| テナント分離 | （実体で判断） | **別世帯のユーザーで開いて相手の記録が見えないこと**を 1 回は確認する（自動での担保は CI の pgTAP `supabase/tests/`）。 |
+| テナント分離 | （下の §2-1 で確認） | 別世帯のユーザーの JWT で **API を直接叩いて**他世帯の行が返らないこと。**アプリ画面で見て確認しない**（理由は §2-1）。自動での担保は CI の pgTAP `supabase/tests/`。 |
 | Storage | Storage | `daycare-photos` バケットがあり **private**。署名付き URL（期限 1 時間）で配信。 |
 | スキーマ適用 | （実体で判断） | 上の実体が揃っていれば適用済み。未適用なら `supabase/migrations/` を SQL Editor で実行。 |
 | advisor | Advisors | RLS 未設定や危険な公開設定の警告が **0 件**。DDL 変更後は必ず確認。 |
@@ -32,6 +32,45 @@
 > 突き合わせて確認できる（[guides/deploy.md](./deploy.md)）。一方、過去に **SQL Editor で実行した分**
 > や初回 setup で手動適用した分は履歴に残らないため、移行期は実体（テーブル / ポリシー / バケット）と
 > 履歴の両面で判断する。ズレを直したいときは `supabase migration repair --status applied <version>` を使う。
+
+### 2-1. テナント分離は「アプリ画面で見て」確認してはいけない
+
+**アプリを別世帯のユーザーで開いても、RLS が壊れているかどうかは分かりません。**
+`src/app/page.tsx` は RLS の手前で `householdScopeFilter(householdId)` を掛けており
+（`src/lib/household.ts`）、**アプリ側が現在世帯で先に絞り込んでいます**。
+そのため、仮に本番のポリシーが全世帯を許してしまっていても、画面には自分の世帯の行しか
+出ません。**画面が正しく見えることは、API が守られていることの証拠になりません。**
+
+アプリの絞り込みを通らない経路で確かめます。
+
+```bash
+# 1) 確認したいユーザーでログインしてアクセストークン（JWT）を得る
+curl -s "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
+  -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<確認用ユーザー>","password":"<パスワード>"}' | jq -r .access_token
+# → 出力を $JWT に入れる（この値はセッションそのもの。共有・コミットしないこと）
+
+# 2) 絞り込みを一切掛けずに全件取りに行く
+curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/daycare_records?select=id,household_id" \
+  -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $JWT" | jq -r '.[].household_id' | sort -u
+
+# 3) 別世帯の既知の行を id 指定で狙い撃ちする（返らないこと ＝ 空配列）
+curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/daycare_records?id=eq.<別世帯の記録 id>" \
+  -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $JWT"
+```
+
+**期待**: 2) は自分が所属する世帯の `household_id` だけ（複数世帯に属するならその集合だけ）。
+3) は `[]`。どちらかで他世帯の行が返れば **RLS が破れています**。
+
+> `$NEXT_PUBLIC_*` はブラウザに公開される前提の値なので curl に置いても構いませんが、
+> **JWT はセッションそのもの**です。ログや issue に貼らないこと。
+>
+> 恒久的な担保は CI の pgTAP（`supabase/tests/`）です。上の手順は
+> 「本番の実体が pgTAP と同じ状態か」を目視で 1 回確かめるためのもので、
+> DDL やポリシーを変えた直後にだけ実施すれば十分です。
 
 ## 3. 接続のスモークテスト
 
