@@ -42,30 +42,70 @@ const GIT_OPTS_WITH_VALUE = new Set([
 
 const ANSI_C_ESCAPE = /\\(x[0-9A-Fa-f]{1,2}|u[0-9A-Fa-f]{1,4}|[0-7]{1,3}|.)/g;
 const ANSI_C_SIMPLE = { n: "\n", t: "\t", r: "\r", a: "\x07", b: "\b", f: "\f", v: "\v", e: "\x1b" };
-function decodeAnsiCQuotes(token) {
-  return token.replace(/\$'((?:[^'\\]|\\.)*)'/g, (_, body) =>
-    body.replace(ANSI_C_ESCAPE, (_m, esc) => {
-      if (esc[0] === "x" && esc.length > 1) return String.fromCharCode(parseInt(esc.slice(1), 16));
-      if (esc[0] === "u" && esc.length > 1) return String.fromCharCode(parseInt(esc.slice(1), 16));
-      if (/^[0-7]+$/.test(esc)) return String.fromCharCode(parseInt(esc, 8));
-      return ANSI_C_SIMPLE[esc] ?? esc;
-    }),
-  );
+function decodeAnsiC(body) {
+  return body.replace(ANSI_C_ESCAPE, (_m, esc) => {
+    if (esc[0] === "x" && esc.length > 1) return String.fromCharCode(parseInt(esc.slice(1), 16));
+    if (esc[0] === "u" && esc.length > 1) return String.fromCharCode(parseInt(esc.slice(1), 16));
+    if (/^[0-7]+$/.test(esc)) return String.fromCharCode(parseInt(esc, 8));
+    return ANSI_C_SIMPLE[esc] ?? esc;
+  });
+}
+
+// シェル文字列を「コマンドの区切り」と「単語」に分解する小さな字句解析器。
+// 文字列分割を継ぎ足す形（split → 引用符を剥がす）では、
+//   `git commit -m "docs: note; git worktree remove --force is unsafe"`
+// のように**引用符の中にある区切り文字**を境界と誤認してしまう。
+// 引用状態を持って 1 文字ずつ読むことで、区切り・引用符・エスケープ・
+// 行継続・ANSI-C 引用をまとめて正しく扱う。
+function lexSegments(command) {
+  const segments = [];
+  let words = [];
+  let word = "";
+  let hasWord = false;              // 空文字列の引数（"" など）も 1 語として扱うため
+  const endWord = () => { if (hasWord) { words.push(word); word = ""; hasWord = false; } };
+  const endSegment = () => { endWord(); if (words.length) segments.push(words); words = []; };
+
+  for (let i = 0; i < command.length; i++) {
+    const c = command[i];
+    if (c === "\\") {
+      const next = command[i + 1];
+      if (next === "\n") { i++; continue; }          // 行継続: 両方消える
+      if (next === undefined) continue;
+      word += next; hasWord = true; i++; continue;   // \x → リテラル x
+    }
+    if (c === "'") {                                  // 単引用: 中身はすべてリテラル
+      const end = command.indexOf("'", i + 1);
+      const body = end < 0 ? command.slice(i + 1) : command.slice(i + 1, end);
+      word += body; hasWord = true; i = end < 0 ? command.length : end; continue;
+    }
+    if (c === '"') {                                  // 双引用: \ だけ効く
+      let j = i + 1;
+      for (; j < command.length && command[j] !== '"'; j++) {
+        if (command[j] === "\\" && j + 1 < command.length) { j++; word += command[j]; }
+        else word += command[j];
+      }
+      hasWord = true; i = j; continue;
+    }
+    if (c === "$" && (command[i + 1] === "'" || command[i + 1] === '"')) {
+      const q = command[i + 1];
+      let j = i + 2, body = "";
+      for (; j < command.length && command[j] !== q; j++) {
+        if (command[j] === "\\" && j + 1 < command.length) { body += command[j] + command[j + 1]; j++; }
+        else body += command[j];
+      }
+      word += q === "'" ? decodeAnsiC(body) : body;   // $'...' は ANSI-C、$"..." は翻訳（中身はそのまま）
+      hasWord = true; i = j; continue;
+    }
+    if (c === ";" || c === "|" || c === "&" || c === "\n") { endSegment(); continue; }
+    if (c === " " || c === "\t" || c === "\r") { endWord(); continue; }
+    word += c; hasWord = true;
+  }
+  endSegment();
+  return segments;
 }
 
 function isForcedWorktreeRemoval(command) {
-  // 構文としての引用符・エスケープを外す。シェルは `"--force"` も `--fo"rce"` も
-  // `\-\-force` も `$'--force'` も `$'\x2d\x2dforce'` も、git には同じ `--force` として渡す。
-  // ANSI-C の中身は**バックスラッシュを落とす前に**復元する（順序を逆にすると `\x2d` が
-  // `x2d` になって一致しなくなる）。`$` は引用符が続くときだけ落とす
-  // （`$FLAGS` のような変数参照は残す＝下記の限界）。
-  const unquote = (t) => decodeAnsiCQuotes(t).replace(/\$(?=["'])/g, "").replace(/["'\\]/g, "");
-  // 行継続（バックスラッシュ + 改行）はシェルが 1 行に繋ぐので、**区切る前に**繋ぐ。
-  // 先に改行で割ると `--\<改行>force` が `--` と `force` に分かれて一致しなくなる。
-  const joined = command.replace(/\\\r?\n/g, "");
-  // パイプ・リスト区切りでコマンド単位に割る
-  for (const segment of joined.split(/[|;&\n]+/)) {
-    const tokens = segment.trim().split(/\s+/).filter(Boolean).map(unquote);
+  for (const tokens of lexSegments(command)) {
     const gitAt = tokens.findIndex((t) => t === "git" || t.endsWith("/git"));
     if (gitAt < 0) continue;
     const rest = tokens.slice(gitAt + 1);

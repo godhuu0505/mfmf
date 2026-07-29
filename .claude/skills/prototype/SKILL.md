@@ -321,7 +321,10 @@ grep -rn "console.log\|TODO\|onSubmit={() =>" src/app/<本来のルート>/
 # ★ 4) 最終確認（--stat ではなく中身を見る）
 git add -A                 # ★3 の編集は未ステージ。これが無いと下の確認もコミットも
                            #    「固定データのままの古い版」を見る/記録することになる
-git status --porcelain     # 未追跡・未ステージが残っていないこと（空になる）
+#    add できたかの確認は「未ステージ」と「未追跡」だけを見る。
+#    `git status --porcelain` はステージ済みの行も出すので、空にはならない。
+git diff --quiet || echo "⚠ 未ステージの変更が残っている"
+[ -z "$(git ls-files --others --exclude-standard)" ] || echo "⚠ 未追跡ファイルが残っている"
 git diff --cached
 ```
 

@@ -49,15 +49,14 @@
 #    （コマンドラインに書くと履歴に残り、jq の結果を表示するとセッションが端末に出る）
 read -r EMAIL
 read -rs PASSWORD          # ← -s でエコーしない
-JWT=$(curl -s "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
+JWT=$(curl -sS --fail-with-body \
+  "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
   -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
   -H "Content-Type: application/json" \
   --data-binary @<(jq -nc --arg e "$EMAIL" --arg p "$PASSWORD" '{email:$e,password:$p}') \
-  | jq -r .access_token)
+  | jq -er .access_token) || { echo "トークンを取得できませんでした。中止します。"; unset PASSWORD; return 2>/dev/null || exit 1; }
 unset PASSWORD
-[ -n "$JWT" ] \
-  && echo "取得できました（長さ: ${#JWT}）" \
-  || echo "取得に失敗しました"   # ← JWT 自体は表示しない
+echo "取得できました（長さ: ${#JWT}）"   # ← JWT 自体は表示しない
 
 # 2) 絞り込みを一切掛けずに全件取りに行く
 curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/daycare_records?select=id,household_id" \
@@ -75,6 +74,13 @@ unset JWT
 
 **期待**: 2) は自分が所属する世帯の `household_id` だけ（複数世帯に属するならその集合だけ）。
 3) は `[]`。どちらかで他世帯の行が返れば **RLS が破れています**。
+
+> ⚠️ **トークン取得の失敗を必ず止めること。** パスワード誤り・Email プロバイダ無効・
+> エンドポイントのエラーのとき、`jq -r .access_token` は文字列 `null` を返します。
+> それに気づかず進むと `Authorization: Bearer null` で問い合わせることになり、
+> **2) も 3) も空が返って「分離できている」ように見えます**。
+> 実際に確かめたのは「認証に失敗すると何も見えない」ことだけで、**RLS は一切検証していません**。
+> 上では `curl --fail-with-body` と `jq -er` で失敗時に中止するようにしています。
 
 > `$NEXT_PUBLIC_*` はブラウザに公開される前提の値なので curl に置いても構いませんが、
 > **JWT はセッションそのもの**です。上の手順は**端末に出さない・履歴に残さない**形にしてあります
