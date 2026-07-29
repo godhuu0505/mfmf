@@ -47,7 +47,21 @@ git switch -c proto/quick-record origin/main
   セーフエリアは既存のものを `import` で使う（ここが速さの源）
 - 型は既存の `src/types/database.ts`（`RecordWithPhotos` など）に合わせておくと、
   あとで「育てる」選択肢が残る
-- **`just check` は回さない。** `next dev` が動けばよい
+- **区切りごとにコミットする。** メッセージは雑でよい（`wip: proto` 等）。
+  道 A の `rebase`、道 B の切り離しは**どちらもコミット済みであることが前提**
+  （未コミットのまま `git switch` すると変更が実装ブランチへ持ち越される → §5 道 B）
+
+**検証ゲートの扱い**（リポジトリ規約との関係）:
+
+- 触っている最中は `just check` を回さない。`next dev` が動けばよい（速度優先）
+- ただし **プロトの世界から何かが出ていく直前**——
+  ①`push` する / ②道 A で実装に育てる / ③挙動が怪しくて判断に迷う——
+  のいずれかなら **`npm run lint` と `npm run typecheck` を通す**
+- `npm run build` はプロト段階では任意
+
+> `tsc --noEmit` はプロジェクト全体を見るが、`next dev` が型を報告するのは
+> そのとき実際にコンパイルしたルートだけ。プロト以外の場所を巻き込んで壊していても
+> dev では気づけないことがある。だから「出ていく直前」には通す。
 
 複数案を比べるときは**ブランチを増やさず**ルートを分ける:
 
@@ -110,32 +124,40 @@ HTTPS 経由（トンネル等）で当てる。プロト段階では通常そ�
 
 ```bash
 git worktree add ../mfmf-main origin/main
-cd ../mfmf-main && npm ci                    # ← これが無いと next: not found
-npm run dev -- -p 3001                       # :3000=proto, :3001=現行
-cd - && git worktree remove ../mfmf-main     # 済んだら消す
+ln -s "$PWD/.env.local" ../mfmf-main/.env.local   # ← 中身は読まない・出力しない
+cd ../mfmf-main && npm ci                         # ← これが無いと next: not found
+npm run dev -- -p 3001                            # :3000=proto, :3001=現行
+cd - && git worktree remove ../mfmf-main          # 済んだら消す
 ```
 
-### 4. 決定ログを書く（★ 順序に注意）
+`.env.local` も `node_modules` も gitignore されているので、新しい worktree には
+**どちらも存在しない**。`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` が
+無いと `src/lib/supabase/middleware.ts` がクライアントを組めず、:3001 は現行画面を描けない。
+**symlink で渡す**（`cat` などで中身を読み出さない。ガードフックにも抵触しない）。
 
-**`proto/` ブランチに決定ログを書いてはいけない。ブランチを消したら記録も消える。**
+### 4. 畳む（★ 決定ログより先。順序を逆にすると詰む）
 
+合意 or 却下が出たら、**まずブランチを畳んで、行き先のブランチを作る**。
+決定ログはその行き先に書く（§5）。
+
+> 逆順にすると: 先に `git switch -c claude/<topic>-<hash>` で実装ブランチを作って
+> 決定ログを書き、その後で道 A / 道 B を実行しようとすると、
+> どちらも `git switch -c` で**同じ名前のブランチを作ろうとして失敗する**。
+> 別名にすれば決定ログのコミットだけ別ブランチに取り残される。
+
+**前提: プロトの変更はコミット済みにしておく**（§2）。
+未コミットのまま `git switch` すると、競合しない変更は**そのまま持ち越される** ——
+固定データ・`/proto` ページ・`/proto` の認証除外が実装ブランチに紛れ込む。
+`git branch -D` が消すのは ref だけで、作業ツリーは消えない。
+
+```bash
+git status --porcelain     # ← 空であることを確認してから進む
 ```
-1. 合意 or 却下
-2. 決めたこと・却下した案とその理由をメモ
-3. git switch して実装ブランチ（or docs ブランチ）へ
-4. そこで docs/explanation/decisions.md に 1 行書いてコミット
-5. proto ブランチを削除
-```
-
-**却下したときこそ書く。** 実装 PR が発生しないので忘れやすいが、
-「なぜ却下したか」はコードから復元できない唯一の情報。
-1 行の docs だけの PR を作ってよい。
-
-### 5. 畳む
 
 **道 B: 捨てて書き直す（デフォルト）**
 
 ```bash
+git status --porcelain                          # 空であること
 git switch main
 git branch -D proto/quick-record
 git switch -c claude/<topic>-<hash> origin/main
@@ -166,6 +188,29 @@ git branch -D proto/quick-record
 
 迷ったら **B**。書き直しは思ったより速い。
 
+**却下した場合**（実装ブランチが発生しない）:
+
+```bash
+git status --porcelain                          # 空であること
+git switch main
+git branch -D proto/quick-record
+git switch -c claude/decision-<slug> origin/main   # docs だけのブランチ
+```
+
+### 5. 決定ログを書く
+
+§4 で作った行き先のブランチ（実装ブランチ、却下なら docs ブランチ）で
+`docs/explanation/decisions.md` に 1 行書いてコミットする。
+
+**`proto/` ブランチには絶対に書かない。** 消したら記録も消えるため、
+§4 で畳んでから書くこの順序になっている。
+畳む前に決定内容をチャットか手元にメモしておくこと（ブランチと一緒に消えるのは
+コードだけで、判断は消してはいけない）。
+
+**却下したときこそ書く。** 実装 PR が発生しないので忘れやすいが、
+「なぜ却下したか」はコードから復元できない唯一の情報。
+1 行の docs だけの PR を作ってよい。
+
 ## ブランチ規約
 
 | prefix | push | PR | CI | 寿命 |
@@ -191,9 +236,9 @@ git push origin --delete proto/quick-record
 トリガーは `pull_request` と `workflow_call` だけで、`proto/` に PR は作らないため。
 つまりリモートの `proto/` ブランチは lint / typecheck / build を一度も通っていない状態で残る。
 
-これは意図どおり（プロトに CI を回すのは無駄）だが、**そのブランチをそのまま
-実装に育てる（道 A）つもりなら、push 前にローカルで `just check` を通しておく**。
-捨てる前提（道 B）なら不要。
+これは意図どおり（捨てるブランチに CI を回すのは無駄）。
+ただし **push は「プロトの世界から出ていく」ことなので、§2 の検証ゲートが適用される** ——
+push 前に `npm run lint` と `npm run typecheck` を通す。`npm run build` は任意。
 
 ### 遠隔の相手に見せる
 
