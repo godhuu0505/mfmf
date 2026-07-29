@@ -152,12 +152,17 @@ HTTPS 経由（トンネル等）で当てる。プロト段階では通常そ�
 手元 PC で並べる場合の手順:
 
 ```bash
+git fetch origin main                             # ← worktree add は fetch しない
 git worktree add ../mfmf-main origin/main
 ln -s "$PWD/.env.local" ../mfmf-main/.env.local   # ← 中身は読まない・出力しない
 cd ../mfmf-main && npm ci                         # ← これが無いと next: not found
 npm run dev -- -p 3001                            # :3000=proto, :3001=現行
 cd - && git worktree remove ../mfmf-main          # 済んだら消す
 ```
+
+`git worktree add` は指定した commit-ish を checkout するだけで**リモートから fetch しない**。
+セッションをまたいだプロトではローカルの `origin/main` が古く、:3001 が
+「現行」と称して**古い画面**を出しかねないので、直前に `git fetch` する。
 
 `.env.local` も `node_modules` も gitignore されているので、新しい worktree には
 **どちらも存在しない**。`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` が
@@ -204,7 +209,22 @@ git rebase origin/main              # ★ 先に main へ追従させる（下�
 git reset --soft origin/main        # 履歴だけ畳む。作業ツリーは残る
 git switch -c claude/<topic>-<hash>
 git branch -D proto/quick-record
+
+# ★ ここでプロト専用の足場を必ず落とす（下記の理由）
+git rm -r --quiet src/app/proto                                   # プロト用ルート
+git restore --source=origin/main --staged --worktree \
+  src/lib/supabase/middleware.ts                                  # /proto の認証除外を戻す
+git diff --cached --stat                                          # 残るのは実装に使う差分だけ
 ```
+
+> 🔒 **`reset --soft` はプロトの足場も丸ごとステージする。**
+> `src/app/proto/<slug>/` の固定データページと、§3 で入れた
+> **`/proto` の認証除外**がそのまま実装 PR に乗る。
+> このリポジトリは **main マージ＝本番リリース**なので、気づかず通すと
+> **認証不要の `/proto` ルートが本番に出る**。落とす操作は任意ではなく必須。
+>
+> `git diff --cached --stat` に `src/app/proto` と `middleware.ts` が
+> **残っていないこと**を目で確認してから §5 に進む。
 
 > ⚠️ **`git rebase` を飛ばすと upstream の変更を巻き戻すコミットができる。**
 > プロトを切ったあとに `origin/main` が進んでいる場合、`reset --soft` は
@@ -277,6 +297,10 @@ LAN が使えない相手には**画面録画（iOS / Android 標準）を送る
 
 ## やらないこと
 
+- **`src/app/proto/` と `/proto` の認証除外を実装 PR に混ぜない。**
+  main マージ＝本番リリースなので、混ざると認証不要のルートが本番に出る。
+  道 A の最後で必ず落とし、PR を出す前に
+  `git diff origin/main --stat` にどちらも現れないことを確認する
 - `mocks/` のような静的 HTML 置き場を作らない（実装プロトの方が速く情報量も多い）
 - `proto/` に PR を作らない
 - プロトタイプ用の feature flag を常設しない（消し忘れが残骸を生む）
