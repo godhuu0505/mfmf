@@ -62,7 +62,11 @@ just setup-google    # CLIENT_ID/SECRET を対話入力 → 全箇所に投入 +
 **メール/パスワードだけで動かす場合**は上記は不要です。ローカルで自分のアカウントを
 作る手順:
 
-1. `.env.local` に `SIGNUP_ENABLED=true` を設定（本番では既定で閉じています）
+1. **`just up` / `just dev` を実行する前に**、`.env.local` に `SIGNUP_ENABLED=true` を設定
+   （本番では既定で閉じています）。
+   `docker-compose.yml` は `.env.local` を `env_file` で読むため、**起動後に編集しても
+   すでに動いているコンテナには反映されません**。あとから変えた場合は
+   `just down && just up`（`just dev` ならプロセスを再起動）
 2. `/signup` で登録する
 3. **確認メールは実際のメールボックスには届きません。** ローカルスタックは
    `enable_confirmations = true`（`supabase/config.toml`）で、メールは Mailpit が受け取ります。

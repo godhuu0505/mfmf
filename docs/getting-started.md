@@ -89,14 +89,18 @@ just down    # 停止
    - テーブル / RLS / Storage バケット `daycare-photos` が作られます。
    - 以降の追加 migration は CI/CD が自動適用するので、初回のみ手動で揃えれば OK
      （仕組みは [guides/deploy.md](./guides/deploy.md#supabasedbマイグレーション)）。
-3. **Google プロバイダを有効化**してログインを設定。本アプリは Google OAuth 一本化のため、
-   メール/パスワードでのログインは使えません。Google Cloud / Supabase の設定手順は
-   **[guides/google-drive-setup.md](./guides/google-drive-setup.md)** を参照。
+3. **ログイン方式を設定**（どちらか一方でよい）。
+   - **メール/パスワード**: Supabase ダッシュボードの Authentication → Providers で
+     Email を有効化。自分のアカウントを作るには `.env.local` に `SIGNUP_ENABLED=true` を
+     設定して `/signup` を開く（**アプリを起動する前に設定**。起動後に変えた場合は再起動が必要）。
+     本番では既定で閉じています。
+   - **Google**: Authentication → Providers で Google を有効化。Google Cloud / Supabase の
+     設定手順は **[guides/google-drive-setup.md](./guides/google-drive-setup.md)** を参照
+     （Drive 連携を使う場合はこちらが必要）。
 
-> ⚠️ 本アプリは **1 アカウント共用**の方針です。RLS が `owner_id = auth.uid()` ベースのため、
-> 別の Google アカウントでログインすると記録が共有されません。**夫婦で共有する 1 つの Google
-> アカウント**で 2 人とも使ってください
-> （理由は [design-decisions.md](./explanation/design-decisions.md#共有方針-a-1-アカウント共用)）。
+> 💡 記録は **世帯（household）** 単位で共有されます。家族は owner / editor / viewer の
+> 3 役で招待でき（`/settings`）、保育園やシッターは対象ペット・期間を限定した
+> **外部ゲスト**として招けます。別アカウントでも、同じ世帯に招待すれば記録を共有できます。
 
 ---
 

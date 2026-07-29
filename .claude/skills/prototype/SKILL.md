@@ -50,39 +50,41 @@ git switch -c proto/quick-record origin/main
 - **DB / Storage / migration は一切触らない。** 固定データを配列で直書きする
 - **`page.tsx` は Server Component のままにする。** データ取得を消して固定配列を
   直書きするだけでよい。操作が要る部分は**入れ子の `"use client"` コンポーネント**に切り出す
-- **表示専用のもの**は既存を `import` して使う（ここが速さの源）:
-  `PhotoGallery` / `SourceIcon` / `PageSkeleton` /
-  デザイントークン / ダークモード / セーフエリア
+- 既存コンポーネントの再利用が速さの源だが、**import する前に必ず実装を開いて
+  「送信・アップロード・遷移」が無いか確かめる**（→ 下記の判定）
 - **ヘッダーはプロト内に静的なものを置く**（`AppHeader` は import しない → 下記）
+- **固定データに実 ID を入れない。** `recordId` や `petId` を埋めると、
+  コンポーネントによっては実画面へのリンクが生える（例: `PhotoGallery`）
 
-> ⚠️ **`AppHeader` は表示専用ではない。**
-> `AccountMenu` を内包しており（`src/components/AppHeader.tsx:5,73`）、その中には
-> **`<form action="/auth/signout" method="post">`**（実セッションのログアウト）と
-> `/settings/account` `/feedback` への遷移がある。
-> リモート Supabase 構成で評価中にアカウントアイコンを触られると、
-> **本物のログアウトが起きる**か、固定データの世界から実データを触れる画面へ出てしまう。
+> 🔍 **import してよいかの判定（これを毎回やる）**
+> そのコンポーネントと**その子**に、次のどれかがあれば「表示専用」ではない:
 >
-> プロトでは `src/app/proto/<slug>/` に**静的ヘッダー**を置く。
-> `AppHeader` の外枠クラスをそのまま写せば見た目は保てる:
-> `safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur` ＋
-> 内側に `safe-px mx-auto flex max-w-2xl items-center justify-between py-3`。
-> ロゴとアイコンは `<span>` にして遷移させない。
+> 1. `createClient()` / `supabase.` — 直接読み書きする
+> 2. Server Action の呼び出し / `<form action=...>` — 送信する
+> 3. `<Link href=...>` / `router.push` — **実画面へ出ていく**
 >
-> 副次的な利点として、`page.tsx` を `"use client"` にしたい場合の詰まりも消える
-> （`AppHeader` は async な Server Component で `@/lib/supabase/server` →
-> `next/headers` に依存するため Client Component から import できない）。
+> 実際にこの判定を怠って 4 回間違えている（下表）。目視で「表示専用っぽい」は当てにならない。
+>
+> | コンポーネント | 実際の副作用 |
+> | --- | --- |
+> | `RecordForm` | `handleSubmit` が action を呼ぶ**前に** `PHOTO_BUCKET` へ実アップロード（`:124-133`） |
+> | `FeedbackWidget` | `layout.tsx` から**自動で載り**、実 `feedback` テーブルへ insert |
+> | `AppHeader` | `AccountMenu` 経由で `/auth/signout`（実ログアウト）と `/settings/account` へ |
+> | `PhotoGallery` | `recordId` があると `/records/<id>` への「記録を見る →」が出る（`:166-171`） |
+>
+> **安全に使える例**: `SourceIcon` / `PageSkeleton` / デザイントークン / ダークモード /
+> セーフエリア（いずれも上の 3 つを持たない）。
+> `PhotoGallery` も **`recordId` を渡さなければ**表示専用として使える。
 
-> ⚠️ **バックエンドを書き換えるコンポーネントをそのまま import しない。**
-> 代表例が `RecordForm` —— `handleSubmit` は渡された action を呼ぶ**前に**
-> ブラウザ側 Supabase クライアントを作り、`PHOTO_BUCKET` へ写真を実アップロードする
-> （`src/components/RecordForm.tsx:124-133`）。
-> **action を no-op にしても写真は本物の Storage に書き込まれる**。
-> リモート Supabase 構成なら本番相当のバケットが汚れ、ローカル構成なら
-> スマホから `127.0.0.1` に届かず送信自体が失敗する。どちらにせよプロトの前提を壊す。
->
-> 入力フォームをプロトで見たいときは、**見た目だけ複製した表示専用フォーム**を
-> `src/app/proto/<slug>/` 内に置き、`onSubmit` は `console.log` か state 更新に留める。
-> 同じ理由で、Server Action を呼ぶコンポーネントもそのままでは使わない。
+**代替の作り方**（上表に当たったとき）:
+
+- **ヘッダー** → `src/app/proto/<slug>/` に静的なものを置く。外枠クラスを写せば見た目は保てる:
+  `safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur` ＋ 内側に
+  `safe-px mx-auto flex max-w-2xl items-center justify-between py-3`。
+  ロゴとアイコンは `<span>` にして遷移させない
+  （`page.tsx` を `"use client"` にしたい場合の `next/headers` 問題も同時に消える）
+- **入力フォーム** → 見た目だけ複製し、`onSubmit` は `console.log` か state 更新に留める
+- **写真グリッド** → `PhotoGallery` に `recordId` を渡さない
 - 型は既存の `src/types/database.ts`（`RecordWithPhotos` など）に合わせておくと、
   あとで「育てる」選択肢が残る
 - **区切りごとにコミットする。** メッセージは雑でよい（`wip: proto` 等）。
