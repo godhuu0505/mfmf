@@ -6,14 +6,17 @@
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
 ![Supabase](https://img.shields.io/badge/Supabase-Free-3ECF8E)
 
-夫婦で 1 アカウントを共用し、保育園とおうち（両親）どちらのノートも同じ仕組みで記録します。
+家族で 1 つの世帯を共有し、保育園とおうち（両親）どちらのノートも同じ仕組みで記録します。
+世帯には owner / editor / viewer の 3 役で招待でき、保育園やシッターは対象ペット・期間を
+限定した外部ゲストとして招けます。
 フロントは **Next.js（App Router）/ Vercel**、バックエンド（認証・DB・画像）は **Supabase**。
 どちらも無料枠で完結します。
 
 ## クイックスタート
 
-本アプリは **Google OAuth 一本化**（メール/パスワードログインは使えません）。
-どのルートを選んでも、Google Cloud Console での OAuth クライアント発行が必須です。
+ログインは **Google OAuth** と **メール/パスワード**の 2 方式。
+Google ログイン（および Drive 連携）を使う場合は Google Cloud Console での
+OAuth クライアント発行が必要です。セルフ登録（`/signup`）は `SIGNUP_ENABLED=true` のときだけ開きます。
 
 ### A. リモート Supabase に繋ぐ（最短）
 

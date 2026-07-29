@@ -1,16 +1,18 @@
 # CLAUDE.md
 
 このファイルは Claude Code が **mfmf**（ペット保育園記録アプリ）で作業するための指針です。
-全体像は `README.md`、DB/RLS は `supabase/migrations/20260616130704_init.sql` を正とします。
+全体像は `README.md`、DB/RLS は `supabase/migrations/` 全体（連番 SQL）を正とします。
 ツール非依存の要点版は `AGENTS.md`、各種手順・仕様は `docs/`（索引は `docs/README.md`）にあります。
 
 ## プロジェクト概要
 
-夫婦で 1 アカウントを共用し、保育園の日々の記録（テキスト＋写真）を残す最小構成の PWA。
+家族で保育園の日々の記録（テキスト＋写真）を残す最小構成の PWA。
 
 - フロント/配信: **Next.js 15（App Router）+ React 19 + TypeScript（strict）+ Tailwind CSS v4** / Vercel Hobby
 - 認証/DB/画像: **Supabase（Free）**。認証は `@supabase/ssr`（Cookie ベースのセッション）
-- 共有方針 (A): `household_id` は持たず `owner_id (= auth.uid())` ベースで RLS
+- 共有方針: **世帯（`households` / `household_members`）ベースのマルチテナント**。
+  role は owner / editor / viewer、外部ゲストは `guest_grants`（対象ペット・期間限定）。
+  ヘルパーは `src/lib/household.ts`（`getCurrentHouseholdId` / `requireEditableHousehold` ほか）。
 
 ## よく使うコマンド
 
@@ -65,9 +67,12 @@
   （ガードフックがブロック）。設定例は `.env.local.example` を参照。
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` はブラウザ公開される前提の値。
   一方 **service_role key はクライアント・リポジトリに絶対に置かない**（このアプリでは使わない）。
-- **セキュリティの一次防衛線は Supabase の RLS**。`owner_id = auth.uid()` ポリシーに依存する。
+- **セキュリティの一次防衛線は Supabase の RLS**。判定は**世帯メンバーシップと role**
+  （`has_household_role` / `is_household_member`）＋ ゲストは `guest_grants` の対象/期間。
+  一部の経路で `owner_id = auth.uid()` が併存する（世帯未所属時のフォールバック等）。
   テーブル/ポリシーを変える migration を書くときは既存の RLS を弱めないこと。
-  Server Action でも `getUser()` による認可チェックを省略しない。
+  Server Action でも `getUser()` と `requireEditableHousehold()` による認可チェックを省略しない。
+  テナント分離は `supabase/tests/` の pgTAP が CI で守っている。
 - **Service Worker（`public/sw.js`）は Supabase の API レスポンスや署名付き写真 URL
   （private / 期限付き）をキャッシュしない**。キャッシュ戦略を変えるときはこの不変条件を守る。
 - 入力由来の値（ファイル名等）はサニタイズする（`buildStoragePath` 参照）。

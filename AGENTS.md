@@ -6,11 +6,12 @@ AI コーディングエージェント（Claude Code / Copilot / Cursor / Codex
 
 ## プロジェクト概要
 
-夫婦で 1 アカウントを共用し、保育園の日々の記録（テキスト＋写真）を残すミニマムな PWA。
+家族で保育園の日々の記録（テキスト＋写真）を残すミニマムな PWA。
 
 - フロント/配信: Next.js 15（App Router）+ React 19 + TypeScript(strict) + Tailwind CSS v4 / Vercel
 - 認証/DB/画像: Supabase（`@supabase/ssr`、Cookie ベースのセッション）
-- 共有方針: `household_id` は持たず `owner_id (= auth.uid())` ベースの RLS
+- 共有方針: 世帯（`households` / `household_members`）ベースのマルチテナント。
+  role は owner / editor / viewer、外部ゲストは `guest_grants`（対象ペット・期間限定）
 
 ## セットアップ・検証コマンド
 
@@ -41,7 +42,8 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 
 - **秘密情報をコミット / 出力しない。** `.env.local` 等の実 env ファイルは読まない・編集しない（ガードフックがブロック）。
 - **`service_role` キーをクライアント・リポジトリに置かない**（このアプリでは使わない）。
-- **既存の RLS（`owner_id = auth.uid()`）を弱めない。** Server Action の認可チェックを省略しない。
+- **既存の RLS（世帯メンバーシップ + role、ゲストは `guest_grants`）を弱めない。**
+  Server Action の認可チェック（`getUser()` / `requireEditableHousehold()`）を省略しない。
 - **Service Worker（`public/sw.js`）は Supabase の API レスポンスや署名付き写真 URL をキャッシュしない。**
 - `main` へ直接 push しない。強制 push（`--force`）禁止（ガードでブロック）。
 
