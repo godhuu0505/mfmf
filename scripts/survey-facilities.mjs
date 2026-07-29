@@ -142,7 +142,9 @@ const DOG_PATTERNS = [
 //    屋号が多く、そこまで要求すると取りこぼしで過小評価になる。
 //    **別の種が明示されている**ときだけ落とす。
 const OTHER_SPECIES_PATTERNS = [
-  /猫/, /ねこ/, /ネコ/, /キャット/, /にゃん/, /ニャン/, /\bcats?\b/i,
+  // ⚠ 「猫」も1文字では地名に当たる（浦安市猫実・猫魔・猫塚）。
+  //    「猫実ペット保育園」が犬以外と判定されて分子から消えるため既知の地名を外す。
+  /猫(?!実|魔|塚|又)/, /ねこ/, /ネコ/, /キャット/, /にゃん/, /ニャン/, /\bcats?\b/i,
   /うさぎ/, /ウサギ/, /兎/, /\brabbits?\b/i,
   // ⚠ 「馬」「鳥」の1文字で拾わない。地名に頻出するため、「群馬ペット保育園」
   //    「鳥取ペット保育園」が犬以外と判定されて分子から消える（＝過小評価）。
@@ -197,9 +199,21 @@ function isNonDog(name) {
 function normalize(v) {
   return String(v ?? "")
     .normalize("NFKC")
+    // ⚠ 英字は大小を畳む。分類は大小無視なのに鍵だけ区別すると、
+    //    「DOG SCHOOL ABC」と「Dog School ABC」が別施設として二重計上される。
+    .toLowerCase()
     .replace(/[\s\u3000]+/g, "")
     .replace(/[（）()「」【】]/g, "")
     .trim();
+}
+
+/**
+ * 住所の正規化。normalize に加えて**先頭の郵便番号**を落とす。
+ * 「〒277-0005 千葉県柏市…」を落とさないと都道府県から始まらないと判定され、
+ * 相対住所扱いでファイル単位に閉じ込められ、業種ごとに分かれた CSV で二重計上される。
+ */
+function normalizeAddress(v) {
+  return normalize(v).replace(/^〒?\d{3}-?\d{4}/, "");
 }
 
 /**
@@ -241,7 +255,7 @@ const TOKYO_WARDS = [
 const AMBIGUOUS_MUNICIPALITIES = ["府中市", "伊達市", "上川郡", "中川郡"];
 
 function isQualifiedAddress(v) {
-  const n = normalize(v);
+  const n = normalizeAddress(v);
   if (!n) return false;
   // ⚠ 文字が「含まれる」だけでは判定できない。
   //    「府中町1-1」は府を、「市川1-1」は市を含むが、どちらも全国で一意ではない。
@@ -368,7 +382,16 @@ const NAME_PATTERNS = [
 
 // ⚠ 人名の列を掴まないための除外。「事業所代表者氏名」は /事業所.*名/ に当たるため、
 // 除外しないと代表者名を屋号として分類してしまい（→ unknown）、施設が分子から消える。
-const NAME_EXCLUDE = [/氏名/, /代表者/, /責任者/, /担当者/, /管理者/];
+const NAME_EXCLUDE_RAW = [/氏名/, /代表者/, /責任者/, /担当者/, /管理者/];
+// ⚠ ただし法定様式の見出し「氏名又は名称」は**事業者そのもの**を指す列であり、
+//    これを弾くと名前列が1つも無くなって**そのファイルが丸ごとスキップ**される。
+//    屋号としては当てにならないが、事業所を unknown として残し保管を分母に
+//    入れるには十分。人名だけを指す見出し（事業所代表者氏名）は従来どおり弾く。
+const NAME_EXCLUDE = [
+  {
+    test: (h) => NAME_EXCLUDE_RAW.some((re) => re.test(h)) && !/名称|屋号/.test(h),
+  },
+];
 
 /**
  * 「事業者（法人）の名称」を指す見出し。**施設の実体を表さない**ので、
@@ -377,7 +400,7 @@ const NAME_EXCLUDE = [/氏名/, /代表者/, /責任者/, /担当者/, /管理�
  * （「ABCトリミング」と「犬の保育園XYZ」）が法人名だけで1件に潰れる。
  * ⚠ /事業者/ は「事業所」には当たらない（「者」と「所」は別字）。
  */
-const OPERATOR_NAME_HEADINGS = [/事業者/, /法人/, /会社/, /申請者/, /設置者/, /団体/];
+const OPERATOR_NAME_HEADINGS = [/事業者/, /法人/, /会社/, /申請者/, /設置者/, /団体/, /氏名/];
 const isOperatorName = (heading) => OPERATOR_NAME_HEADINGS.some((re) => re.test(heading));
 
 /** 「事業者（法人）の住所」を指す見出し。施設の所在地ではないので鍵にしない。 */
@@ -651,7 +674,8 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
     let namelessOtherRows = 0;
     let repeatedHeaderRows = 0;
     let lastEntry = null;
-    let lastAddr = "";
+    // 継続行の判定に使う「直前の（名前が入っていた）行」そのもの
+    let lastRow = null;
     // 見出し行が節・ページごとに繰り返される登録簿がある。
     // ⚠ ○×様式ではこれが致命的で、業種列に「保管」という**文字**が入っているため
     //    「保管に○が付いた事業所」として数えられ、名前列の見出し（「事業所の名称」）が
@@ -692,17 +716,16 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
         //    業種列に文字があり、別の列にも値が入る行）を取り込むと、直前の施設に
         //    **偽の保管**が付いて分母（hokan）と「意味のあるゼロ」が汚れる。
         //    継続行の形（業種・登録番号・年月日以外はすべて空）に合う行だけ足す。
-        // ただし**名前セルだけが結合**されている場合、住所は業種ごとの行に
-        // そのまま繰り返される（「,柏市中央1-1,保管」）。直前の施設と住所が
-        // 一致するなら、それは継続行の証拠であって注記行ではない。
-        const contAddr = normalize(
-          addrIdxs.map((i) => (r[i] ?? "").trim()).filter(Boolean).join(""),
-        );
-        const addrRepeated = Boolean(contAddr) && contAddr === lastAddr;
+        // ただし**名前セルだけが結合**されている場合、住所・責任者などの識別情報は
+        // 業種ごとの行にそのまま繰り返される（「,柏市中央1-1,山田,保管」）。
+        // **直前の施設行と同じ値**が入っているだけの列は継続行の証拠であって、
+        // 注記行の値ではない（小計の「10件」は直前の行と一致しない）。
+        const repeatsPrev = (i, v) =>
+          lastRow !== null && normalize(lastRow[i] ?? "") === normalize(v);
         const shapeOk = r.every(
           (v, i) => !String(v ?? "").trim()
             || contAllowedIdxs.has(i)
-            || (addrRepeated && addrIdxs.includes(i)),
+            || repeatsPrev(i, v),
         );
         if (lastEntry && contKinds.length && shapeOk) {
           n++;
@@ -722,12 +745,12 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
       // 1店舗が業種の数だけ二重計上される。したがって鍵は
       // **正規化した屋号 + 所在地**（＝店舗の実体）とし、登録番号は鍵に使わない。
       const rawAddr = addrIdxs.map((i) => (r[i] ?? "").trim()).filter(Boolean).join("");
-      const addr = normalize(rawAddr);
+      const addr = normalizeAddress(rawAddr);
       if (!addr) sitelessRows++;
       // 相対住所（「中央1-1」等）は自治体をまたぐと衝突するので、
       // その行だけファイル名で名前空間を切る。全国で一意な住所ならファイル横断で名寄せする
       // （自治体が業種ごとに別 CSV を出すケースを潰さないため）。
-      const qualified = addr ? isQualifiedAddress(rawAddr) : false;
+      const qualified = addr ? isQualifiedAddress(addr) : false;
       if (addr && !qualified) unqualifiedAddrRows++;
       // ⚠ 住所が空のときに `${file}|` のような truthy な鍵を作らないこと。
       //    作ると住所の無い行が**全部1件に統合**される。
@@ -796,7 +819,7 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
       if (rawAddr) entry.sites.add(rawAddr);
       entry.files.add(file);
       lastEntry = entry;
-      lastAddr = addr;
+      lastRow = r;
     }
     const idNote = addrIdx >= 0
       ? "所在地で名寄せ（屋号は別名として集約）"
@@ -872,9 +895,15 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
     const ranked = [...e.ranked]
       .map((x) => ({ ...x, c: classify(x.name) }))
       .sort((a, b) => a.rank - b.rank || rank2(a.c) - rank2(b.c));
+    // ⚠ 事業者名（法人名）で業態を決めない。「屋号=ABC / 法人名=犬の保育園株式会社」は、
+    //    法人が別業態の店舗も持ちうる以上、この事業所が保育園である証拠にならない。
+    //    施設名が unknown なら unknown のまま残す（上限側に効くので推定は歪まない）。
+    //    法人名しか無い登録簿でだけ、従来どおり法人名から分類する。
+    const facilityRanked = ranked.filter((x) => !x.operator);
+    const pool = facilityRanked.length ? facilityRanked : ranked;
     let category = "unknown";
-    let display = names[0] ?? "";
-    const first = ranked.find((x) => x.c !== "unknown");
+    let display = pool[0]?.name ?? names[0] ?? "";
+    const first = pool.find((x) => x.c !== "unknown");
     if (first) { category = first.c; display = first.name; }
     return {
       name: display, names, category, kinds: e.kinds,
