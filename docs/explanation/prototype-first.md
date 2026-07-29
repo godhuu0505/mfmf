@@ -137,8 +137,10 @@ mfmf は PWA で、価値は「スマホで片手で、片手間に記録でき�
 
 **却下理由 1: mfmf では実装プロトタイプの方が速い。**
 `src/app/gallery/page.tsx` は 99 行で、**約半分がデータ取得**。固定配列に差し替えれば 50 行前後で画面が立つ。
-`AppHeader` / `PhotoGallery` / `RecordForm` / デザイントークン / ダークモード / セーフエリア /
-フォーカスリングは**すべて `import` で手に入る**。
+`AppHeader` / `PhotoGallery` / `SourceIcon` / デザイントークン / ダークモード / セーフエリア /
+フォーカスリングといった**表示専用のものは `import` で手に入る**
+（`RecordForm` のようにバックエンドを書き換えるコンポーネントは対象外 —— 理由と代替は
+[`.claude/skills/prototype/SKILL.md`](../../.claude/skills/prototype/SKILL.md) §2）。
 同じ画面を静的 HTML で作ると markup と JS を書き起こすことになり、しかも**実装時に 100% 捨てる**。
 既存コンポーネントが十分に育った今のリポジトリでは、「モックの方が速い」という前提が成り立たない。
 

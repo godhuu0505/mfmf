@@ -48,10 +48,19 @@ git switch -c proto/quick-record origin/main
 `src/app/proto/<slug>/page.tsx` に置く。
 
 - **DB / Storage / migration は一切触らない。** 固定データを配列で直書きする
-- Server Component をやめて `"use client"` の静的配列でよい
+- **`page.tsx` は Server Component のままにする。** データ取得を消して固定配列を
+  直書きするだけでよい。操作が要る部分は**入れ子の `"use client"` コンポーネント**に切り出す
 - **表示専用のもの**は既存を `import` して使う（ここが速さの源）:
   `AppHeader` / `PhotoGallery` / `SourceIcon` / `PageSkeleton` /
   デザイントークン / ダークモード / セーフエリア
+
+> ⚠️ **`page.tsx` を `"use client"` にすると `AppHeader` が使えなくなる。**
+> `AppHeader` は async な Server Component で `@/lib/supabase/server` →
+> `next/headers` に依存しており、Client Component からは import できない
+> （Next.js がビルド時に弾く）。
+> 「固定データだから全部クライアントで」と考えると、この境界で詰まる。
+> **Server Component の `page.tsx` ＋ 入れ子の client コンポーネント**が正解。
+> どうしても全部クライアントにしたいなら、ヘッダーはプロト内の静的なものに差し替える。
 
 > ⚠️ **バックエンドを書き換えるコンポーネントをそのまま import しない。**
 > 代表例が `RecordForm` —— `handleSubmit` は渡された action を呼ぶ**前に**
@@ -133,8 +142,16 @@ just dev-lan
   登録自体をスキップする
 - オフライン挙動・SW キャッシュ
 
-standalone 表示まで見たい場合だけ、`npm run build && npm run start` を
-HTTPS 経由（トンネル等）で当てる。プロト段階では通常そこまでやらない。
+standalone 表示まで見たい場合は `npm run build && npm run start` を
+HTTPS 経由（トンネル等）で当てる。**ただしそれだけでは足りない** ——
+`src/app/manifest.ts:9` の `start_url` は `/` 固定なので、
+ホーム画面から起動すると**プロトではなく通常の（認証必須の）トップ**が開く。
+standalone にはアドレスバーが無いため、そこからプロトへ移動する手段も無い。
+見るなら `start_url` を一時的にプロトのパスへ向け、畳むときに戻す必要がある。
+
+つまり standalone 検証は「HTTPS を用意する」だけでは終わらず、
+manifest の一時改変とその復元まで込みになる。
+**プロト段階では通常ここまでやらない**（やるなら実装後に本番相当で確認するほうが確実）。
 
 #### 現行画面と並べる（worktree）— **手元ブラウザ用。スマホからは使えない**
 
@@ -192,6 +209,7 @@ git status --porcelain     # ← 空であることを確認してから進む
 
 ```bash
 git status --porcelain                          # 空であること
+git fetch origin main                           # ← 古い origin/main から書き始めない
 git switch main
 git branch -D proto/quick-record
 git switch -c claude/<topic>-<hash> origin/main
@@ -210,13 +228,24 @@ git reset --soft origin/main        # 履歴だけ畳む。作業ツリーは残
 git switch -c claude/<topic>-<hash>
 git branch -D proto/quick-record
 
-# ★ ここでプロト専用の足場を必ず落とす（下記の理由）
-git rm -r --quiet src/app/proto                                   # プロト用ルート
+# ★ 1) 育てたい UI を本来のルートへ移す（先にこれ。順序を逆にすると消える）
+mkdir -p src/app/<本来のルート>
+git mv src/app/proto/quick-record/page.tsx src/app/<本来のルート>/page.tsx
+#    プロト内に切り出した client コンポーネントがあれば同様に移す
+
+# ★ 2) 残ったプロト専用の足場を落とす
+git rm -r --quiet src/app/proto                                   # 空になったプロト用ルート
 git restore --source=origin/main --staged --worktree \
   src/lib/supabase/middleware.ts                                  # /proto の認証除外を戻す
-git diff --cached --stat                                          # 残るのは実装に使う差分だけ
+
+# ★ 3) 確認
+git diff --cached --stat        # src/app/proto と middleware.ts が無いこと
 ```
 
+> ⚠️ **順序が命。** 育てたい UI は `src/app/proto/<slug>/` の中にある。
+> 先に `git rm -r src/app/proto` すると、**残るのはプロト外の些末な変更だけ**になり、
+> 道 A が保存したかったもの（＝画面そのもの）が消える。必ず `git mv` が先。
+>
 > 🔒 **`reset --soft` はプロトの足場も丸ごとステージする。**
 > `src/app/proto/<slug>/` の固定データページと、§3 で入れた
 > **`/proto` の認証除外**がそのまま実装 PR に乗る。
@@ -241,6 +270,7 @@ git diff --cached --stat                                          # 残るのは
 
 ```bash
 git status --porcelain                          # 空であること
+git fetch origin main
 git switch main
 git branch -D proto/quick-record
 git switch -c claude/decision-<slug> origin/main   # docs だけのブランチ
@@ -280,6 +310,18 @@ git push -u origin proto/quick-record
 # PR は作らない。合意後にリモートも消す:
 git push origin --delete proto/quick-record
 ```
+
+**次のセッションで再開するとき**（§1 をやり直さない）:
+
+```bash
+git fetch origin proto/quick-record
+git switch -c proto/quick-record origin/proto/quick-record   # 保存した続きから
+```
+
+§1 の `git switch -c proto/quick-record origin/main` を再実行すると、
+**`origin/main` から作り直してしまい前回のプロトが消える**。
+そのまま進めると push が non-fast-forward で弾かれる（弾かれるのは幸運なほうで、
+その前に作業ツリー上のプロトを失っている）。再開時は必ず上のコマンドを使う。
 
 **push しても CI は走らない。** `.github/workflows/ci.yml` の
 トリガーは `pull_request` と `workflow_call` だけで、`proto/` に PR は作らないため。

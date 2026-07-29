@@ -12,14 +12,26 @@ dev:
 # mfmf is a PWA: one-handed use, safe areas and IME can only be judged on a device.
 dev-lan:
     @set -e; \
-    IP="$(hostname -I 2>/dev/null | awk '{print $1}')"; \
-    if [ -z "$IP" ]; then \
-        IP="$(ipconfig getifaddr en0 2>/dev/null || true)"; \
+    IPS="$(hostname -I 2>/dev/null || true)"; \
+    if [ -z "$IPS" ]; then \
+        IPS="$(ipconfig getifaddr en0 2>/dev/null || true)"; \
     fi; \
-    if [ -n "$IP" ]; then \
-        echo "[dev-lan] スマホから開く: http://$IP:3000"; \
-    else \
-        echo "[dev-lan] LAN IP を自動判定できませんでした。手元の IP を確認してください。"; \
+    echo "[dev-lan] 候補アドレス（スマホと同じネットワークのものを選ぶ）:"; \
+    FOUND=0; \
+    for ip in $IPS; do \
+        case "$ip" in \
+            *:*) continue ;; \
+        esac; \
+        case "$ip" in \
+            172.1[6-9].*|172.2[0-9].*|172.3[01].*) NOTE="  ← Docker の可能性" ;; \
+            10.*) NOTE="  ← VPN の可能性" ;; \
+            *) NOTE="" ;; \
+        esac; \
+        echo "  http://$ip:3000$NOTE"; \
+        FOUND=1; \
+    done; \
+    if [ "$FOUND" = "0" ]; then \
+        echo "  （自動判定できませんでした。手元の LAN IP を確認してください）"; \
     fi; \
     npm run dev -- -H 0.0.0.0
 
