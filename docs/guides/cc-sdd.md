@@ -115,12 +115,56 @@ cc-sdd には**承認だけを行うコマンドがありません**。`/kiro-sp
 
 **運用**: `/kiro-spec-tasks` の出力に単体 major task があれば、`1.1` などの子タスクに割り直す。
 
+### `/kiro-impl` は作業ツリーをクリーンにしてから走らせる
+
+`/kiro-impl` は開始時に `git status --porcelain` を「記録する」だけで、クリーンであることを
+要求しません。ステージ済みの無関係な変更があると、最初のタスクコミットに巻き込まれます
+（タスクコミットは `--only` パススペックを使わないため）。また、あるタスクが `BLOCK_TASK` で
+失敗した場合、その部分実装を revert せずに次のタスクへ進むため、以降のレビュー用 `git diff` が
+汚染され、未完成コードがコミットに残り得ます。
+
+**運用**: `/kiro-impl` の前に `git status` がクリーンであることを確認する。実行後も
+`git status` と `git log` で、意図しない変更が混ざっていないか必ず確認する。
+`_Blocked:_` が付いたタスクが出たら、そこで一度止めて手で作業ツリーを片付ける。
+
+### スキル内蔵の秘密情報スキャンは当てにしない
+
+reviewer / feature validation の秘密情報スキャンは、説明文に「case-insensitive」とありながら
+実際のコマンドに `-i` が付いていません（`reviewer-prompt.md:44`、`kiro-validate-impl/SKILL.md:98`）。
+`PASSWORD =` や `API_KEY =` のような大文字表記を取りこぼします。
+
+**運用**: このリポジトリの秘密情報に対する防衛線は、従来どおり
+**`.claude/hooks/guard.mjs`・`.gitignore`・人間のレビュー**。cc-sdd のスキャン結果が
+クリーンでも、それを根拠にしない（「セキュリティ（厳守）」は `CLAUDE.md` が正）。
+
+### requirements を作り直したら design / tasks も作り直す
+
+承認済み spec に対して `/kiro-spec-requirements` を再実行しても、`spec.json` の
+`design.approved` / `tasks.approved` は下がりません。`/kiro-impl` は tasks の承認しか見ないため、
+**書き換わった requirements に対して古い design / tasks のまま実装が走り得ます**。
+
+**運用**: requirements を作り直したら `/kiro-spec-design` → `/kiro-spec-tasks` まで通しで
+やり直す。
+
+### 完了判定は `tasks.md` を自分で見る
+
+`/kiro-validate-impl` は `[x]` のタスクだけを対象に選ぶため、未完了タスクが残っていても
+`GO` が出ることがあります。逆に `/kiro-spec-status` の進捗率は grouping header
+（`- [ ] 1.`）も母数に数えるため、実行対象がすべて終わっても 100% になりません。
+
+**運用**: どちらの出力も参考値として扱い、完了判定は `tasks.md` の `X.Y` タスクを直接見る。
+
 ### `/kiro-spec-batch` は失敗した wave の下流を止めない
 
 依存 wave のいずれかが失敗しても次の wave に進むため、前提の spec が欠けたまま下流が生成され得ます。
 
-**運用**: mfmf の規模では `/kiro-spec-batch` は基本使わない。使う場合は wave ごとに
-`/kiro-spec-status` で結果を確認してから次に進む。
+加えて `/kiro-spec-batch` は、requirements / design / tasks のすべてを生成サブエージェント自身が
+承認済みにする（人間のレビューが一切挟まらない）、下流 spec に上流の design を渡さない、
+整合性レビューが 3 巡しても収束しないまま finalize する、既存の `tasks.md` があるだけで
+「完了」とみなす、といった問題を抱えています。
+
+**運用**: mfmf の規模では `/kiro-spec-batch` は使わない。複数 spec が必要なら 1 本ずつ
+`/kiro-spec-init` から回す。
 
 ## 更新・再インストール
 
