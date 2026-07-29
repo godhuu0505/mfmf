@@ -149,9 +149,14 @@ reviewer / feature validation の秘密情報スキャンは、説明文に「ca
 実際のコマンドに `-i` が付いていません（`reviewer-prompt.md:44`、`kiro-validate-impl/SKILL.md:98`）。
 `PASSWORD =` や `API_KEY =` のような大文字表記を取りこぼします。
 
+しかも `grep -rn` はマッチした**行全体を出力に出す**ため、万一本物の credential が引っかかった
+場合、その値をレビュー出力（＝会話ログ）に晒します。**取りこぼす一方で、当たったときは漏らす**
+という二重の問題があります。
+
 **運用**: このリポジトリの秘密情報に対する防衛線は、従来どおり
 **`.claude/hooks/guard.mjs`・`.gitignore`・人間のレビュー**。cc-sdd のスキャン結果が
 クリーンでも、それを根拠にしない（「セキュリティ（厳守）」は `CLAUDE.md` が正）。
+スキャンが何かを検出したら、**その出力を貼り回さず**、まず値そのものを潰すこと。
 
 ### このリポジトリでは `MANUAL_VERIFY_REQUIRED` が正常な結果
 
@@ -170,8 +175,13 @@ Path A（既存 spec の守備範囲内）と判定された場合、discovery �
 **判定内容をどこにも書き出しません**。後で `/kiro-spec-requirements <feature>` を実行しても
 渡るのは feature 名と古い spec だけなので、拡張したかった内容が反映されずに再生成され得ます。
 
-**運用**: Path A と言われたら、その場で `.kiro/specs/<feature>/requirements.md` に追記するか、
-少なくとも要望をメモに残してから次のコマンドに渡す。セッションを跨ぐと失われる。
+加えて Path A の判定は、既存 spec の `spec.json`（メタデータのみ）を見た段階で下されます。
+`requirements.md` を読むのは Step 3 で、Path A はそこに到達しません。つまり
+**名前が似ているだけの spec が、実際には守備範囲外の作業の受け皿に選ばれ得ます**。
+
+**運用**: Path A と言われたら、まず**その spec の `requirements.md` を自分で読んで
+本当に守備範囲内か確かめる**。そのうえで、要望をその場で `requirements.md` に追記するか、
+少なくともメモに残してから次のコマンドに渡す。セッションを跨ぐと失われる。
 
 ### `/kiro-impl` は最終検証を自分で呼べない
 
@@ -197,14 +207,16 @@ Sync フロー（コア 3 ファイルが揃っている場合）は「更新を
 `/kiro-steering-custom` は**トピックと書きたい内容を最初の引数で渡しきる**。
 既存の custom steering を育てたいときは、コマンドを再実行せず**直接エディタで編集する**。
 
-### requirements を作り直したら design / tasks も作り直す
+### 上流を作り直したら下流も必ず作り直す
 
 承認済み spec に対して `/kiro-spec-requirements` を再実行しても、`spec.json` の
-`design.approved` / `tasks.approved` は下がりません。`/kiro-impl` は tasks の承認しか見ないため、
-**書き換わった requirements に対して古い design / tasks のまま実装が走り得ます**。
+`design.approved` / `tasks.approved` は下がりません。`/kiro-spec-design` の再実行も同様で、
+design 自身は `approved: false` に戻す一方 `tasks.approved` は放置します。`/kiro-impl` は
+**tasks の承認しか見ない**ため、書き換わった上流に対して古い design / tasks のまま実装が
+走り得ます。
 
-**運用**: requirements を作り直したら `/kiro-spec-design` → `/kiro-spec-tasks` まで通しで
-やり直す。
+**運用**: requirements を作り直したら `/kiro-spec-design` → `/kiro-spec-tasks` まで、
+design を作り直したら `/kiro-spec-tasks` まで、**必ず下流を通しでやり直す**。
 
 ### 完了判定は `tasks.md` を自分で見る
 
