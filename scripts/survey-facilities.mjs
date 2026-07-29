@@ -69,7 +69,7 @@ const RULES = [
   {
     key: "shop",
     label: "販売・ショップ",
-    patterns: [/ペットショップ/, /ペットショップ/, /ブリーダー/, /繁殖/, /販売/, /shop/i, /ペットプラザ/],
+    patterns: [/ペットショップ/, /ブリーダー/, /繁殖/, /販売/, /shop/i, /ペットプラザ/],
   },
 ];
 
@@ -165,6 +165,10 @@ export function survey(files, { samples = 3 } = {}) {
     const header = rows[h].map((c) => c.trim());
     const nameIdx = pickColumn(header, [/事業所.*名/, /施設.*名/, /名称/, /屋号/, /事業者.*名/]);
     const kindIdx = pickColumn(header, [/業種/, /登録.*種別/, /種別/]);
+    // 名寄せの鍵。同名の別店舗（チェーン・のれん分け）を1件に潰さないため、
+    // 登録番号 > 所在地 の順で識別子を探す。どちらも無ければ名前のみ（＝過小計上の恐れ）。
+    const idIdx = pickColumn(header, [/登録番号/, /登録.*番号/, /許可番号/]);
+    const addrIdx = pickColumn(header, [/所在地/, /住所/, /事業所.*所在/]);
 
     if (nameIdx < 0) {
       perFile.push({ file, rows: rows.length - h - 1, note: "⚠ 事業所名の列を特定できず（スキップ）" });
@@ -177,13 +181,24 @@ export function survey(files, { samples = 3 } = {}) {
       if (!name) continue;
       n++;
       const kind = kindIdx >= 0 ? (r[kindIdx] ?? "").trim() : "";
-      const key = `${file}::${name}`;
+      // 同一事業所は業種ごとに複数行あるのでまとめる。ただし別店舗は分ける。
+      const site = idIdx >= 0 ? (r[idIdx] ?? "").trim()
+        : addrIdx >= 0 ? (r[addrIdx] ?? "").trim()
+        : "";
+      const key = `${file}::${name}::${site}`;
       if (!byName.has(key)) {
         byName.set(key, { name, category: classify(name), kinds: new Set() });
       }
       if (kind) byName.get(key).kinds.add(kind);
     }
-    perFile.push({ file, rows: n, note: kindIdx < 0 ? "業種列なし（保管の判定は不可）" : "" });
+    const idNote = idIdx >= 0 ? "登録番号で名寄せ"
+      : addrIdx >= 0 ? "所在地で名寄せ"
+      : "⚠ 識別子が無く名前のみで名寄せ（同名の別店舗を1件に潰す＝過小計上）";
+    perFile.push({
+      file,
+      rows: n,
+      note: [kindIdx < 0 ? "業種列なし（保管の判定は不可）" : "", idNote].filter(Boolean).join(" / "),
+    });
   }
 
   const entries = [...byName.values()];
@@ -195,6 +210,7 @@ export function survey(files, { samples = 3 } = {}) {
   }
   let hokan = 0;
   let hokanDaycare = 0;
+  let hokanUnknown = 0;
 
   for (const e of entries) {
     counts[e.category] = (counts[e.category] ?? 0) + 1;
@@ -203,8 +219,17 @@ export function survey(files, { samples = 3 } = {}) {
     if (isHokan) {
       hokan++;
       if (e.category === "daycare") hokanDaycare++;
+      if (e.category === "unknown") hokanUnknown++;
     }
   }
+
+  // 全国推定に使うのは hokanDaycare / hokan なので、信頼度は
+  // 「全体の不明率」ではなく「保管の中の不明率」で測らないと誤認する。
+  // 例) 保管2件（うち不明1）＋ 販売8件 → 全体の不明率10% だが、分母の半分が不明。
+  const hokanUnknownRatio = hokan ? hokanUnknown / hokan : null;
+  // 不明を全部 daycare と仮定した場合の上限（＝推定のブレ幅）
+  const daycareRatioLow = hokan ? hokanDaycare / hokan : null;
+  const daycareRatioHigh = hokan ? (hokanDaycare + hokanUnknown) / hokan : null;
 
   return {
     files: perFile,
@@ -213,6 +238,10 @@ export function survey(files, { samples = 3 } = {}) {
     examples,
     hokan,
     hokanDaycare,
+    hokanUnknown,
+    hokanUnknownRatio,
+    daycareRatioLow,
+    daycareRatioHigh,
     unknownRatio: entries.length ? counts.unknown / entries.length : 0,
   };
 }
@@ -255,19 +284,32 @@ Excel しか無い自治体は CSV に書き出してから渡してください
     if (ex?.length) console.log(`      例: ${ex.join(" / ")}`);
   }
 
+  const pct = (x) => `${(x * 100).toFixed(1)}%`;
+
   if (r.hokan) {
-    console.log(`\n=== 業種「保管」で登録: ${r.hokan} 事業所 ===`);
+    console.log(`\n=== 業種「保管」で登録: ${r.hokan} 事業所（全国推定の分母） ===`);
     console.log(`  うち屋号が保育園・幼稚園系: ${r.hokanDaycare}`);
+    console.log(`  うち屋号から判別不可      : ${r.hokanUnknown}`);
     console.log(`  ※「保管」にはホテル・トリミング・シッターも含まれるため、これは上限（天井）。`);
+    console.log(`\n  保育園比率（全国推定に掛ける値）:`);
+    console.log(`    下限 ${pct(r.daycareRatioLow)}  … 不明を全部「保育園でない」とみなす`);
+    console.log(`    上限 ${pct(r.daycareRatioHigh)}  … 不明を全部「保育園」とみなす`);
+    console.log(`    → この幅がそのまま全国推定のブレ幅になる。`);
   } else {
     console.log(`\n※ 業種列が無いため「保管」の集計は不可。屋号ベースの推定のみ。`);
   }
 
   console.log(`\n=== 信頼度 ===`);
-  console.log(`  不明率: ${(r.unknownRatio * 100).toFixed(1)}%`);
+  console.log(`  全体の不明率: ${pct(r.unknownRatio)}`);
+  if (r.hokanUnknownRatio !== null) {
+    console.log(`  保管内の不明率: ${pct(r.hokanUnknownRatio)}  ← こちらが推定の信頼度`);
+    if (r.hokanUnknownRatio > 0.4) {
+      console.log(`  ⚠ 分母（保管）の4割超が判別不可。この比率で全国推定してはいけない。`);
+      console.log(`     保管の事業所を100件サンプリングして目視分類し、補正率を出すこと。`);
+    }
+  }
   if (r.unknownRatio > 0.4) {
-    console.log(`  ⚠ 不明率が高い。屋号に業態が出ない事業所が多く、推定の信頼度は低い。`);
-    console.log(`     サンプルを目視分類して補正率を出すこと。`);
+    console.log(`  ⚠ 全体の不明率も高い。屋号に業態が出ない事業所が多い。`);
   }
   console.log(`\n注: これは推定であって census ではない。docs/explanation/market-analysis.md §2 参照。`);
 }
