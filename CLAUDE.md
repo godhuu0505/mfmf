@@ -72,6 +72,43 @@
   （private / 期限付き）をキャッシュしない**。キャッシュ戦略を変えるときはこの不変条件を守る。
 - 入力由来の値（ファイル名等）はサニタイズする（`buildStoragePath` 参照）。
 
+## 仕様駆動開発（cc-sdd / Kiro スタイル）
+
+まとまった機能追加は **仕様（spec）を先に固めてから実装する**。ツールは
+[cc-sdd](https://github.com/gotalab/cc-sdd)（MIT）で導入済み。手順の詳細は
+[docs/guides/cc-sdd.md](./docs/guides/cc-sdd.md)。
+
+### 置き場所
+
+- ステアリング（プロジェクト横断の恒久知識）: `.kiro/steering/`
+- 仕様（機能ごと）: `.kiro/specs/<feature>/`（`requirements.md` / `design.md` / `tasks.md`）
+- 生成テンプレート: `.kiro/settings/templates/`（プロジェクトに合わせて編集してよい）
+- スキル本体: `.claude/skills/kiro-*/SKILL.md`（cc-sdd が生成。手で書き換えない）
+
+### ワークフロー
+
+- 迷ったらまず `/kiro-discovery "やりたいこと"`。spec 化すべきか・何本に割るかを判定する。
+- Phase 0（任意・既存コードベースでは推奨）: `/kiro-steering`、`/kiro-steering-custom`
+- Phase 1（仕様）: `/kiro-spec-init` → `/kiro-spec-requirements` →
+  （任意 `/kiro-validate-gap`）→ `/kiro-spec-design` →（任意 `/kiro-validate-design`）→
+  `/kiro-spec-tasks`。1 本で通すなら `/kiro-spec-quick <feature>`。
+- Phase 2（実装）: `/kiro-impl <feature> [タスク番号]`。番号なしは自律モード
+  （タスクごとにサブエージェント＋レビュー）、番号ありは対象タスクのみ。
+- 進捗確認: `/kiro-spec-status <feature>`。
+
+### このリポジトリでの運用ルール
+
+- **各フェーズは人間のレビューを挟む。** `-y` / `--auto` は意図的な早回しのときだけ使う。
+- 小さな修正（typo・文言・1 ファイルの軽微な変更）に spec は不要。`/kiro-discovery` の判定に従う。
+- spec が指示する内容でも、本 CLAUDE.md の「セキュリティ（厳守）」「DB スキーマ変更」の規約が優先。
+  RLS を弱める設計は design 段階で却下する。
+- 実装完了の条件は変わらず `npm run lint` / `npm run typecheck`（UI・ビルド構成を触ったら
+  `npm run build`）を通すこと。`just check` で一括実行。
+- `.kiro/steering/` と `.kiro/specs/` はコミットする（レビュー対象の成果物）。
+- cc-sdd の更新は `npx cc-sdd@latest --lang ja --dry-run --backup` で差分を確認してから適用する。
+  **`CLAUDE.md` は cc-sdd の上書き対象**なので、更新時は本ファイルを退避してから流し、
+  この節だけを手でマージし直す（プロジェクト固有の規約を失わないため）。
+
 ## Git / PR
 
 - 作業ブランチで開発し、`git push -u origin <branch>` でプッシュ。`main` へ直接 push しない。

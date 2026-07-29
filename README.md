@@ -89,6 +89,7 @@ just setup-google   # 初回のみ：Google OAuth 認証情報を対話投入
 | 動作確認 | [docs/guides/verify-backend.md](./docs/guides/verify-backend.md) |
 | 構成・データモデル・環境変数 | [docs/reference/](./docs/reference/architecture.md) |
 | 設計の「なぜ」 | [docs/explanation/design-decisions.md](./docs/explanation/design-decisions.md) |
+| 仕様駆動開発（cc-sdd） | [docs/guides/cc-sdd.md](./docs/guides/cc-sdd.md) |
 
 AI コーディングエージェント向けの作業指針は [AGENTS.md](./AGENTS.md) / [CLAUDE.md](./CLAUDE.md)。
 

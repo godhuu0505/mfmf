@@ -37,6 +37,20 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 - DB スキーマ変更は `supabase/migrations/` に新しいタイムスタンプ付き SQL を追加する（`supabase migration new <name>` で生成、既存の `20260616130704_init.sql` は編集しない）。main マージ時に `deploy-production.yml` の `migrate` ジョブが `supabase db push` で本番 Supabase に自動適用し、続けて Vercel Production にデプロイされる（merge = 本番リリース）。破壊的変更は PR 段階でローカル `supabase db reset` 確認まで済ませること。
 - パスエイリアスは `@/*` → `src/*`。
 
+## 仕様駆動開発（cc-sdd）
+
+まとまった機能追加は仕様を先に固める。Claude Code では `/kiro-*` スキルが使える
+（`.claude/skills/kiro-*/`）。成果物は `.kiro/steering/`（恒久知識）と
+`.kiro/specs/<feature>/`（requirements → design → tasks）に置き、コミットする。
+
+- 入口: `/kiro-discovery "やりたいこと"` → spec 化の要否と次の手順を判定
+- 仕様: `/kiro-spec-init` → `/kiro-spec-requirements` → `/kiro-spec-design` → `/kiro-spec-tasks`
+- 実装: `/kiro-impl <feature>` ／ 進捗: `/kiro-spec-status <feature>`
+
+各フェーズは人間のレビューを挟む。小さな修正に spec は不要。
+Claude Code 以外のエージェントは `.kiro/` 配下を読めば同じ仕様に沿って作業できる。
+手順の詳細は [docs/guides/cc-sdd.md](./docs/guides/cc-sdd.md)。
+
 ## やってはいけないこと（境界）
 
 - **秘密情報をコミット / 出力しない。** `.env.local` 等の実 env ファイルは読まない・編集しない（ガードフックがブロック）。
