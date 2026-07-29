@@ -76,6 +76,16 @@ if (tool === "Bash") {
   if (/\bgit\s+(reset\s+--hard\s+origin|clean\s+-[a-z]*f[a-z]*d|push\b.*:.*\bmain\b)/.test(cmd)) {
     deny("履歴を失う恐れのある git 操作はガードによりブロックされました。ユーザーに確認してください。");
   }
+  // worktree の強制削除。permissions.deny は前方一致なので
+  // `git worktree remove ../x --force`（パスが先）を取りこぼす。ここは語順非依存で見る。
+  if (/\bgit\s+worktree\s+remove\b[^|;&]*(\s--force\b|\s-[a-zA-Z]*f\b)/.test(cmd)) {
+    deny(
+      "git worktree の強制削除はガードによりブロックされました。" +
+        "--force は無視対象でない未コミットの変更ごと削除します。" +
+        "まず `git -C <worktree> status` で中身を確認し、--force なしで削除してください" +
+        "（gitignore 済みの node_modules / .next / env ファイルが残っていても --force は不要です）。",
+    );
+  }
 }
 
 process.exit(0);

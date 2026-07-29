@@ -232,9 +232,10 @@ cd - && git worktree remove ../mfmf-main          # 済んだら消す
 最後の `git worktree remove` は、`npm ci` / `npm run dev` が作った `node_modules` `.next` と
 上の `.env.local` symlink が残っていても **`--force` なしで成功する**（実測。exit 0）。
 3 つとも `.gitignore` 済みで `git status --porcelain` が空 ＝ git はこの worktree を
-clean と見なすため。**`--force` を足さないこと** —— `.claude/settings.json` で
-`git worktree remove --force` / `-f` は deny してある（無視対象でない編集中の変更ごと
-消し飛ばす操作なので、通したくない）。
+clean と見なすため。**`--force` を足さないこと** —— 無視対象でない編集中の変更ごと
+消し飛ばす操作なので、`.claude/hooks/guard.mjs` が**引数の順番によらず**ブロックする
+（`git worktree remove ../mfmf-main --force` のようにパスが先でも止まる。
+`permissions.deny` は前方一致なのでこの語順を取りこぼす）。
 
 ### 4. 畳む（★ 決定ログより先。順序を逆にすると詰む）
 
