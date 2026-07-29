@@ -381,14 +381,13 @@ export function survey(files, { samples = 3 } = {}) {
     let sitelessRows = 0;
     let unqualifiedAddrRows = 0;
     for (const r of rows.slice(h + 1)) {
-      let name = "";
-      for (const idx of nameIdxs) {
-        const v = (r[idx] ?? "").trim();
-        if (v) { name = v; break; }
-      }
-      if (!name) continue;
+      // 候補列の値を**すべて**拾う。行によって埋まっている列が違うため、
+      // 「その行で最初に埋まっていた値」を鍵にすると同じ店舗が割れる。
+      const rowNames = nameIdxs.map((i) => (r[i] ?? "").trim()).filter(Boolean);
+      if (!rowNames.length) continue;
       n++;
-      const kinds = kindIdxs.map((i) => (r[i] ?? "").trim()).filter(Boolean);
+      // 業種の値は表記ゆれ（「保　管」等）があるので正規化してから保持する
+      const kinds = kindIdxs.map((i) => normalize(r[i] ?? "")).filter(Boolean);
       // 数えたいのは「事業所（店舗）」であって「登録（ライセンス）」ではない。
       //   - 同じ店舗が業種ごとに複数行  → まとめたい
       //   - 同名の別店舗（チェーン等）  → 分けたい
@@ -404,16 +403,19 @@ export function survey(files, { samples = 3 } = {}) {
       const qualified = isQualifiedAddress(rawAddr);
       if (addr && !qualified) unqualifiedAddrRows++;
       const site = qualified ? addr : `${file}|${addr}`;
-      // 鍵にファイル名を含めない。自治体が業種ごとに別 CSV を出す／エクスポートが
-      // 重複する場合に、同じ店舗が入力ファイルの数だけ二重計上されるため。
-      const key = `${normalize(name)}::${site}`;
+      // 鍵は **所在地（店舗の実体）** を第一とする。屋号は行ごとに埋まったり埋まらなかったり
+      // するので鍵に使うと同じ店舗が割れる（保管の行は法人名、訓練の行は屋号…など）。
+      // 所在地が無いときだけ、やむを得ず屋号にフォールバックする。
+      const key = site ? `site::${site}` : `name::${file}|${normalize(rowNames[0])}`;
       if (!byName.has(key)) {
-        byName.set(key, { name, category: classify(name), kinds: new Set() });
+        byName.set(key, { names: new Set(), kinds: new Set() });
       }
-      for (const k of kinds) byName.get(key).kinds.add(k);
+      const entry = byName.get(key);
+      for (const nm of rowNames) entry.names.add(nm);
+      for (const k of kinds) entry.kinds.add(k);
     }
     const idNote = addrIdx >= 0
-      ? "屋号＋所在地で名寄せ"
+      ? "所在地で名寄せ（屋号は別名として集約）"
       : "⚠ 所在地列が無く屋号のみで名寄せ（同名の別店舗を1件に潰す＝過小計上）";
     const sitelessNote = sitelessRows
       ? `⚠ 所在地が空の行 ${sitelessRows} 件（同名なら潰れる＝過小計上）`
@@ -434,7 +436,18 @@ export function survey(files, { samples = 3 } = {}) {
     });
   }
 
-  const entries = [...byName.values()];
+  // 1つの事業所に複数の呼称（法人名・屋号）が集まるので、
+  // **業態が判別できる呼称**を優先して分類する（法人名だけ見て unknown にしない）。
+  const entries = [...byName.values()].map((e) => {
+    const names = [...e.names];
+    let category = "unknown";
+    let display = names[0] ?? "";
+    for (const nm of names) {
+      const c = classify(nm);
+      if (c !== "unknown") { category = c; display = nm; break; }
+    }
+    return { name: display, names, category, kinds: e.kinds };
+  });
   const counts = {};
   const examples = {};
   for (const rule of ALL_CATEGORIES()) {
@@ -449,7 +462,7 @@ export function survey(files, { samples = 3 } = {}) {
   for (const e of entries) {
     counts[e.category] = (counts[e.category] ?? 0) + 1;
     if (examples[e.category].length < samples) examples[e.category].push(e.name);
-    const isHokan = [...e.kinds].some((k) => HOKAN_PATTERNS.some((re) => re.test(k)));
+    const isHokan = [...e.kinds].some((k) => HOKAN_PATTERNS.some((re) => re.test(normalize(k))));
     if (isHokan) {
       hokan++;
       if (e.category === "daycare") hokanDaycare++;
