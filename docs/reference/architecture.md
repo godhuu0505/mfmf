@@ -1,5 +1,16 @@
 # アーキテクチャ・リファレンス
 
+> ⚠️ **画面表とデータモデル表は陳腐化しています（2026-07-29 時点）。ここを現状の正として読まないこと。**
+> 画面表に `/onboarding` `/invite/[token]` `/guest` `/signup` `/help` が無く、
+> データモデル表に `households` / `household_members` / `household_invites` / `guest_grants` が
+> ありません。この 2 つの表に従うと **Phase 3.5 以前のスキーマ**を前提にした実装・セットアップになります。
+>
+> **正はコード側**です —— 画面は [`src/app/`](../../src/app/)、
+> DB / RLS は [`supabase/migrations/`](../../supabase/migrations/)（31 本）。
+> 本書をどう畳むか（表を消してリンクに置き換える / 削除する）は未決 —
+> 経緯は [prototype-first.md](../explanation/prototype-first.md)、方針は
+> [decisions.md D16](../explanation/decisions.md)。
+
 mfmf の構成・画面・データモデルの事実をまとめた参照用ドキュメントです。
 設計の「なぜ」は [explanation/design-decisions.md](../explanation/design-decisions.md)、
 DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/) です。

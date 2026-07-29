@@ -31,8 +31,9 @@ function deny(reason) {
 // 本当の安全策は worktree の中身を消される前に確認すること（deny の文言で誘導している）。
 function isForcedWorktreeRemoval(command) {
   // 構文としての引用符・エスケープを外す。シェルは `"--force"` も `--fo"rce"` も
-  // `\-\-force` も、git には同じ `--force` として渡すため、これを外さないと素通りする。
-  const unquote = (t) => t.replace(/["'\\]/g, "");
+  // `\-\-force` も `$'--force'`（ANSI-C 引用）も、git には同じ `--force` として渡す。
+  // `$` は引用符が続くときだけ落とす（`$FLAGS` のような変数参照は残す＝下記の限界）。
+  const unquote = (t) => t.replace(/\$(?=["'])/g, "").replace(/["'\\]/g, "");
   // パイプ・リスト区切りでコマンド単位に割る
   for (const segment of command.split(/[|;&\n]+/)) {
     const tokens = segment.trim().split(/\s+/).filter(Boolean).map(unquote);

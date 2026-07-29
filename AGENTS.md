@@ -58,6 +58,7 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 
 - 全体像: [README.md](./README.md) ／ ドキュメント索引: [docs/README.md](./docs/README.md)
 - 構成・データモデル: [docs/reference/architecture.md](./docs/reference/architecture.md)
+  （⚠️ 画面表・データモデル表は陳腐化。正は `src/app/` と `supabase/migrations/`）
 - 設計の「なぜ」: [docs/explanation/design-decisions.md](./docs/explanation/design-decisions.md)
 - 決定ログ（却下した案と理由）: [docs/explanation/decisions.md](./docs/explanation/decisions.md)
 - DB / RLS の正: [supabase/migrations/](./supabase/migrations/)

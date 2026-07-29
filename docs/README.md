@@ -26,6 +26,8 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 ## リファレンス（reference/）
 
 - [reference/architecture.md](./reference/architecture.md) — 技術スタック・画面・データモデル・RLS・Storage。
+  ⚠️ **画面表とデータモデル表は陳腐化**（Phase 3.5 の世帯・ゲストが未反映）。正は
+  [`src/app/`](../src/app/) と [`supabase/migrations/`](../supabase/migrations/)。
 - [reference/features.md](./reference/features.md) — 現状の機能一覧（ユーザー視点）。
 - [reference/configuration.md](./reference/configuration.md) — 環境変数と npm スクリプトの一覧。
 
