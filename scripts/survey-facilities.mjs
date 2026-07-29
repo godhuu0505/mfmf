@@ -80,6 +80,22 @@ const RULES = [
 // 「保管」業種を表す表記の揺れ
 const HOKAN_PATTERNS = [/保管/];
 
+// classify() が返しうるが RULES に無い擬似カテゴリ（集計・表示用）
+const EXTRA_CATEGORIES = [
+  { key: "daycare_cat", label: "保育園（猫のみ・犬の推定から除外）" },
+  { key: "unknown", label: "不明（屋号から判別不可）" },
+];
+const ALL_CATEGORIES = () => [...RULES, ...EXTRA_CATEGORIES];
+
+// 犬/猫の判別。推定したいのは **犬の**保育園なので、「猫の保育園」を分子に入れない。
+const DOG_PATTERNS = [/犬/, /いぬ/, /イヌ/, /ドッグ/, /dog/i, /わん/, /ワン/, /パピー/, /puppy/i];
+const CAT_PATTERNS = [/猫/, /ねこ/, /ネコ/, /キャット/, /cat/i, /にゃん/, /ニャン/];
+
+/** 屋号が「猫だけ」を示すか（猫の語があり、犬の語が無い）。 */
+function isCatOnly(name) {
+  return CAT_PATTERNS.some((re) => re.test(name)) && !DOG_PATTERNS.some((re) => re.test(name));
+}
+
 /**
  * 名寄せ用の正規化。全角/半角スペース・記号の揺れで別店舗に割れるのを防ぐ。
  * 住所の「1-1」「１−１」「一丁目1番1号」等の完全な正規化までは踏み込まない
@@ -93,11 +109,21 @@ function normalize(v) {
     .trim();
 }
 
-/** 事業所名から業態を推定する。当たらなければ unknown。 */
+/**
+ * 事業所名から業態を推定する。当たらなければ unknown。
+ *
+ * 「ＤＯＧ ＳＣＨＯＯＬ」「ﾄﾘﾐﾝｸﾞ」のような全角英数・半角カナは日本の屋号に頻出するので、
+ * **正規化してから**判定する（していないと軒並み unknown に落ちて過小評価になる）。
+ */
 export function classify(name) {
-  if (!name) return "unknown";
+  const n = normalize(name);
+  if (!n) return "unknown";
   for (const rule of RULES) {
-    if (rule.patterns.some((re) => re.test(name))) return rule.key;
+    if (rule.patterns.some((re) => re.test(n))) {
+      // 保育園系のうち「猫だけ」の施設は、犬の保育園の推定分子から外す
+      if (rule.key === "daycare" && isCatOnly(n)) return "daycare_cat";
+      return rule.key;
+    }
   }
   return "unknown";
 }
@@ -231,7 +257,9 @@ export function survey(files, { samples = 3 } = {}) {
       const addr = addrIdx >= 0 ? normalize(r[addrIdx] ?? "") : "";
       const site = addr;
       if (!addr) sitelessRows++;
-      const key = `${file}::${normalize(name)}::${site}`;
+      // 鍵にファイル名を含めない。自治体が業種ごとに別 CSV を出す／エクスポートが
+      // 重複する場合に、同じ店舗が入力ファイルの数だけ二重計上されるため。
+      const key = `${normalize(name)}::${site}`;
       if (!byName.has(key)) {
         byName.set(key, { name, category: classify(name), kinds: new Set() });
       }
@@ -257,7 +285,7 @@ export function survey(files, { samples = 3 } = {}) {
   const entries = [...byName.values()];
   const counts = {};
   const examples = {};
-  for (const rule of [...RULES, { key: "unknown", label: "不明（屋号から判別不可）" }]) {
+  for (const rule of ALL_CATEGORIES()) {
     counts[rule.key] = 0;
     examples[rule.key] = [];
   }
@@ -330,7 +358,7 @@ Excel しか無い自治体は CSV に書き出してから渡してください
   for (const f of r.files) console.log(`  ${f.file}: ${f.rows} 行 ${f.note}`);
 
   console.log(`\n=== 事業所数（名寄せ後）: ${r.total} ===`);
-  const labelOf = Object.fromEntries([...RULES, { key: "unknown", label: "不明（屋号から判別不可）" }].map((x) => [x.key, x.label]));
+  const labelOf = Object.fromEntries(ALL_CATEGORIES().map((x) => [x.key, x.label]));
   const ordered = Object.entries(r.counts).sort((a, b) => b[1] - a[1]);
   for (const [key, n] of ordered) {
     if (!n) continue;
@@ -351,6 +379,12 @@ Excel しか無い自治体は CSV に書き出してから渡してください
     console.log(`    下限 ${pct(r.daycareRatioLow)}  … 不明を全部「保育園でない」とみなす`);
     console.log(`    上限 ${pct(r.daycareRatioHigh)}  … 不明を全部「保育園」とみなす`);
     console.log(`    → この幅がそのまま全国推定のブレ幅になる。`);
+    if (!r.allFilesHaveKind) {
+      console.log(`\n  ⚠ この比率は入力の一部だけから計算されている`);
+      console.log(`     （業種列を読めたのは ${r.filesWithKind}/${r.filesEvaluated} ファイル）。`);
+      console.log(`     残りのファイルの事業所は分母に入っていないため、そちらの業態構成が`);
+      console.log(`     違えば比率は偏る。全国推定に使う前に、全ファイルで業種列を読める状態にすること。`);
+    }
   } else if (r.allFilesHaveKind) {
     console.log(`\n=== 業種「保管」で登録: 0 事業所 ===`);
     console.log(`  全ファイルで業種列を読めており、保管の登録が1件も無い（＝意味のあるゼロ）。`);
