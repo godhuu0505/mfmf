@@ -202,8 +202,9 @@ manifest の一時改変・その復元・計測の無効化まで込みにな�
 ローカル Supabase 構成（`NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321`）では、
 スマホのブラウザはその URL を**スマホ自身**として解決するのでログインを完了できない。
 
-- **手元の PC で 2 タブ並べる** → `127.0.0.1` が本当にローカルを指すので問題なく動く。
-  レイアウト・配色・情報量の比較はこれで足りる
+- **手元の PC で 2 タブ並べる** → `127.0.0.1` が本当にローカルを指すので動く。
+  レイアウト・配色・情報量の比較はこれで足りる。
+  **ただし先に :3000 でログインを済ませておくこと**（下記）
 - **スマホで現行画面と並べたい** → リモート Supabase 構成（README クイックスタート A）が必要。
   そこまでするより、現行画面はスマホの既存 PWA / 本番 URL で見て、
   :3000 のプロトと見比べるほうが速い
@@ -223,6 +224,17 @@ cd - && git worktree remove ../mfmf-main          # 済んだら消す
 `git worktree add` は指定した commit-ish を checkout するだけで**リモートから fetch しない**。
 セッションをまたいだプロトではローカルの `origin/main` が古く、:3001 が
 「現行」と称して**古い画面**を出しかねないので、直前に `git fetch` する。
+
+> ⚠️ **:3001 で新規にログインしようとしない。先に :3000 でログインしておく。**
+> `LoginForm` は `redirectTo` を `window.location.origin` から作るので、:3001 から
+> Google ログインを始めると戻り先が `http://localhost:3001/auth/callback` になる。
+> `supabase/config.toml` の `additional_redirect_urls` は **:3000 の 4 つだけ**を
+> 許可しているため、この戻り先は弾かれる。
+>
+> **回避策は要らない。Cookie はポートで分離されない**（RFC 6265: Cookie のスコープは
+> ドメインとパスで、ポートは含まない）。:3000 でログインしていれば、同じブラウザの
+> :3001 にも同じセッション Cookie が送られ、**そのままログイン済みで開ける**。
+> config.toml に :3001 を足す必要はない（足すと本番と乖離した許可リストが残る）。
 
 `.env.local` も `node_modules` も gitignore されているので、新しい worktree には
 **どちらも存在しない**。`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` が

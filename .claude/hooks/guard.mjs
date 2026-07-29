@@ -78,7 +78,10 @@ if (tool === "Bash") {
   }
   // worktree の強制削除。permissions.deny は前方一致なので
   // `git worktree remove ../x --force`（パスが先）を取りこぼす。ここは語順非依存で見る。
-  if (/\bgit\s+worktree\s+remove\b[^|;&]*(\s--force\b|\s-[a-zA-Z]*f\b)/.test(cmd)) {
+  // `git` とサブコマンドの間にはグローバルオプションが入りうる（`-C <path>` / `--no-pager` /
+  // `--git-dir=<path>` 等）。`-C` のように値を取るものもあるので、その分も読み飛ばす。
+  const GIT_GLOBAL_OPT = /(?:-[A-Za-z]|--[\w-]+)(?:=[^\s]+)?\s+(?:[^\s-][^\s]*\s+)?/.source;
+  if (new RegExp(`\\bgit\\s+(?:${GIT_GLOBAL_OPT})*worktree\\s+remove\\b[^|;&]*(\\s--force\\b|\\s-[A-Za-z]*f\\b)`).test(cmd)) {
     deny(
       "git worktree の強制削除はガードによりブロックされました。" +
         "--force は無視対象でない未コミットの変更ごと削除します。" +

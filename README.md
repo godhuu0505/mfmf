@@ -73,6 +73,12 @@ just setup-google    # CLIENT_ID/SECRET を対話入力 → 全箇所に投入 +
    **`http://127.0.0.1:54324` を開いて確認リンクを踏んでください**
 4. `/login` からログイン
 
+> ⚠️ この構成でも **`/login` の「Google でログイン」ボタンは表示されます**が、Supabase 側で
+> Google プロバイダが無効（`supabase/config.toml` の `[auth.external.google] enabled = false`）
+> なので、押すと `/login?error=oauth` に戻ります。**メール/パスワードのフォームを使ってください。**
+> ボタンを出し分けていないのは、Google が使えるかどうかが Supabase 側の設定で決まり、
+> アプリからは判定できないためです（→ [docs/explanation/decisions.md](./docs/explanation/decisions.md) の未決事項）。
+
 詳細・トラブルシュートは **[docs/guides/local-supabase.md](./docs/guides/local-supabase.md)**。
 
 ### よく使う just コマンド
