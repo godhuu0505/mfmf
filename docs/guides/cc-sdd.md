@@ -162,6 +162,25 @@ Path A（既存 spec の守備範囲内）と判定された場合、discovery �
 **運用**: Path A と言われたら、その場で `.kiro/specs/<feature>/requirements.md` に追記するか、
 少なくとも要望をメモに残してから次のコマンドに渡す。セッションを跨ぐと失われる。
 
+### `/kiro-impl` は最終検証を自分で呼べない
+
+`kiro-impl` の `allowed-tools` に `Skill` が無いため、自律モードの Step 4 が要求する
+`/kiro-validate-impl {feature}` を呼び出せません（`kiro-spec-quick` は `Skill` を持つ）。
+GO / NO-GO ゲートが黙ってスキップされる可能性があります。
+
+**運用**: `/kiro-impl` が終わったら、**自分で `/kiro-validate-impl <feature>` を叩く**。
+ただし前述のとおり、このリポジトリでは結果が `MANUAL_VERIFY_REQUIRED` になる。
+
+### `/kiro-steering` の結果はファイルの差分で確認する
+
+Sync フロー（コア 3 ファイルが揃っている場合）は「更新を提案する」→「報告する」で終わっており、
+**受け入れた更新を書き戻す手順が明示されていません**。`.kiro/steering/*.md` が古いままでも
+「Steering Updated」と報告され得ます。また `/kiro-steering-custom` は `allowed-tools` に
+`AskUserQuestion` が無いため、トピックや文書化したい内容を対話で聞き出せません。
+
+**運用**: `/kiro-steering` の実行後は `git diff .kiro/steering/` で実際に反映されたか必ず確認する。
+`/kiro-steering-custom` は**トピックと書きたい内容を最初の引数で渡しきる**。
+
 ### requirements を作り直したら design / tasks も作り直す
 
 承認済み spec に対して `/kiro-spec-requirements` を再実行しても、`spec.json` の
