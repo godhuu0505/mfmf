@@ -46,7 +46,9 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 - **秘密情報をコミット / 出力しない。** `.env.local` 等の実 env ファイルは読まない・編集しない（ガードフックがブロック）。
 - **`service_role` キーをクライアント・リポジトリに置かない**（このアプリでは使わない）。
 - **既存の RLS（世帯メンバーシップ + role、ゲストは `guest_grants`）を弱めない。**
-  Server Action の認可チェック（`getUser()` / `requireEditableHousehold()`）を省略しない。
+  Server Action は冒頭で必ず `getUser()`。認可は**操作に応じて使い分ける**
+  （編集系は `requireEditableHousehold()`、owner 限定は `requireOwnerOf()`、
+  ゲストは `guest_grants` + RLS、`/onboarding` は世帯未所属で走るのが正常）。
 - **Service Worker（`public/sw.js`）は Supabase の API レスポンスや署名付き写真 URL をキャッシュしない。**
 - `main` へ直接 push しない。強制 push（`--force`）禁止（ガードでブロック）。
 

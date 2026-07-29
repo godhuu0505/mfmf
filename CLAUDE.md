@@ -78,8 +78,14 @@ UI のある新機能は、仕様を文章で固める前に **`proto/<slug>` �
   （`has_household_role` / `is_household_member`）＋ ゲストは `guest_grants` の対象/期間。
   一部の経路で `owner_id = auth.uid()` が併存する（世帯未所属時のフォールバック等）。
   テーブル/ポリシーを変える migration を書くときは既存の RLS を弱めないこと。
-  Server Action でも `getUser()` と `requireEditableHousehold()` による認可チェックを省略しない。
   テナント分離は `supabase/tests/` の pgTAP が CI で守っている。
+- **Server Action は冒頭で必ず `getUser()`。認可はそのうえで「操作に応じたもの」を使う**
+  （ひとつのヘルパーで代用しない）:
+  - 記録 / ペット等の編集: `requireEditableHousehold()`（`src/lib/household.ts`。viewer を弾く）
+  - owner 限定の世帯管理: `requireOwnerOf()`（`src/app/settings/actions.ts`）
+  - ゲストの書き込み: `guest_grants` + ゲスト RLS（対象ペット・期間で制限）
+  - `/onboarding`: **世帯未所属で走るのが正常**なので世帯チェックを課さない
+    （`create_own_household` が SECURITY DEFINER 側で所属ゼロを強制）
 - **Service Worker（`public/sw.js`）は Supabase の API レスポンスや署名付き写真 URL
   （private / 期限付き）をキャッシュしない**。キャッシュ戦略を変えるときはこの不変条件を守る。
 - 入力由来の値（ファイル名等）はサニタイズする（`buildStoragePath` 参照）。

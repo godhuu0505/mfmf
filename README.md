@@ -44,18 +44,24 @@ git clone https://github.com/godhuu0505/mfmf.git && cd mfmf
 npm install
 ```
 
-**初回 1 回だけ** Google Cloud Console で **OAuth クライアント**を発行します（約 5 分）。
-リダイレクト URI に `http://127.0.0.1:54321/auth/v1/callback` を登録（`localhost` ではなく
-`127.0.0.1`）。発行手順は [docs/guides/google-drive-setup.md](./docs/guides/google-drive-setup.md) 1 章。
-
-その後、コマンド 3 つで起動できます：
-
 ```bash
 just setup           # Supabase 起動 + .env.local 自動生成（URL/anon key/TOKEN_ENC_KEY）
-just setup-google    # CLIENT_ID/SECRET を対話入力 → 全箇所に投入 + Supabase 再起動
 just up              # docker compose で Next.js 起動（CI と同じ Node 22）
 # または just dev でホスト Node 起動
 ```
+
+**Google ログイン / Drive 連携を使う場合のみ**、追加で OAuth クライアントの発行が要ります
+（初回 1 回だけ・約 5 分）。リダイレクト URI に `http://127.0.0.1:54321/auth/v1/callback` を
+登録（`localhost` ではなく `127.0.0.1`）。発行手順は
+[docs/guides/google-drive-setup.md](./docs/guides/google-drive-setup.md) 1 章。
+
+```bash
+just setup-google    # CLIENT_ID/SECRET を対話入力 → 全箇所に投入 + Supabase 再起動
+```
+
+**メール/パスワードだけで動かす場合**は上記は不要です。ローカルで自分のアカウントを
+作るには `.env.local` に `SIGNUP_ENABLED=true` を設定して `/signup` を開放してください
+（本番では既定で閉じています）。
 
 詳細・トラブルシュートは **[docs/guides/local-supabase.md](./docs/guides/local-supabase.md)**。
 

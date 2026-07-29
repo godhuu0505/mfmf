@@ -234,13 +234,24 @@ git mv src/app/proto/quick-record/page.tsx src/app/<本来のルート>/page.tsx
 #    プロト内に切り出した client コンポーネントがあれば同様に移す
 
 # ★ 2) 残ったプロト専用の足場を落とす
-git rm -r --quiet src/app/proto                                   # 空になったプロト用ルート
+git rm -r --quiet --ignore-unmatch src/app/proto   # ← 空でもエラーにしない（下記）
 git restore --source=origin/main --staged --worktree \
-  src/lib/supabase/middleware.ts                                  # /proto の認証除外を戻す
+  src/lib/supabase/middleware.ts                   # /proto の認証除外を戻す
+git restore --source=origin/main --staged --worktree \
+  src/app/manifest.ts                              # start_url を一時変更した場合（§3）
 
 # ★ 3) 確認
-git diff --cached --stat        # src/app/proto と middleware.ts が無いこと
+git diff --cached --stat    # src/app/proto / middleware.ts / manifest.ts が無いこと
 ```
+
+> `--ignore-unmatch` が要る理由: プロトが `page.tsx` 1 枚だけだった場合、
+> 1) の `git mv` で追跡ファイルが無くなり `src/app/proto` 自体が消える。
+> そのまま `git rm` すると `pathspec ... did not match any files` で**止まる**。
+> 足場が残っている場合と空になった場合の**両方で通る**ようにしておく。
+>
+> `manifest.ts` が要る理由: §3 の standalone 検証で `start_url` をプロトのパスへ
+> 向けた場合、その変更も `reset --soft` でステージされる。戻し忘れると
+> **削除済みの `/proto/...` を start_url に持つ manifest が本番に出る**。
 
 > ⚠️ **順序が命。** 育てたい UI は `src/app/proto/<slug>/` の中にある。
 > 先に `git rm -r src/app/proto` すると、**残るのはプロト外の些末な変更だけ**になり、
@@ -263,6 +274,8 @@ git diff --cached --stat        # src/app/proto と middleware.ts が無いこ�
 > セッションをまたいだプロトでは特に起きやすい。先に rebase して同じ基準に揃える。
 >
 > rebase が競合して面倒なら、道 B（捨てて書き直す）に切り替えたほうが速い。
+> **ただし先に `git rebase --abort` する。** 競合で止まったままだと index に
+> 未解決エントリが残り、道 B の `git switch main` が拒否されて始められない。
 
 迷ったら **B**。書き直しは思ったより速い。
 
@@ -339,10 +352,11 @@ LAN が使えない相手には**画面録画（iOS / Android 標準）を送る
 
 ## やらないこと
 
-- **`src/app/proto/` と `/proto` の認証除外を実装 PR に混ぜない。**
-  main マージ＝本番リリースなので、混ざると認証不要のルートが本番に出る。
+- **プロト専用の変更を実装 PR に混ぜない。** main マージ＝本番リリースなので、
+  混ざると本番に出る。対象は `src/app/proto/`・`/proto` の認証除外
+  （`src/lib/supabase/middleware.ts`）・`start_url` の一時変更（`src/app/manifest.ts`）。
   道 A の最後で必ず落とし、PR を出す前に
-  `git diff origin/main --stat` にどちらも現れないことを確認する
+  `git diff origin/main --stat` にどれも現れないことを確認する
 - `mocks/` のような静的 HTML 置き場を作らない（実装プロトの方が速く情報量も多い）
 - `proto/` に PR を作らない
 - プロトタイプ用の feature flag を常設しない（消し忘れが残骸を生む）
