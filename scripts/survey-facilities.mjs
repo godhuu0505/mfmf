@@ -88,8 +88,12 @@ const EXTRA_CATEGORIES = [
 const ALL_CATEGORIES = () => [...RULES, ...EXTRA_CATEGORIES];
 
 // 犬/猫の判別。推定したいのは **犬の**保育園なので、「猫の保育園」を分子に入れない。
+// 犬側はゆるく（誤検知しても「猫のみ」判定を避けるだけなので安全側）、
+// 猫側は厳密に（誤検知すると分子から落ちて過小評価になるため）。
+// 英単語は **語境界**で判定する。EDUCATION / CATCH のような語の内部に cat が入る屋号を
+// 猫扱いしてしまうため（この判定はスペースを残した文字列に対して行う）。
 const DOG_PATTERNS = [/犬/, /いぬ/, /イヌ/, /ドッグ/, /dog/i, /わん/, /ワン/, /パピー/, /puppy/i];
-const CAT_PATTERNS = [/猫/, /ねこ/, /ネコ/, /キャット/, /cat/i, /にゃん/, /ニャン/];
+const CAT_PATTERNS = [/猫/, /ねこ/, /ネコ/, /キャット/, /にゃん/, /ニャン/, /\bcats?\b/i];
 
 /** 屋号が「猫だけ」を示すか（猫の語があり、犬の語が無い）。 */
 function isCatOnly(name) {
@@ -110,13 +114,24 @@ function normalize(v) {
 }
 
 /**
+ * 分類用の正規化。全角→半角は行うが **スペースは1つに詰めるだけで消さない**。
+ * 消すと "CATCH PET SCHOOL" が "CATCHPETSCHOOL" になり、英単語の語境界判定が壊れる。
+ */
+function normalizeForMatch(v) {
+  return String(v ?? "")
+    .normalize("NFKC")
+    .replace(/[\s\u3000]+/g, " ")
+    .trim();
+}
+
+/**
  * 事業所名から業態を推定する。当たらなければ unknown。
  *
  * 「ＤＯＧ ＳＣＨＯＯＬ」「ﾄﾘﾐﾝｸﾞ」のような全角英数・半角カナは日本の屋号に頻出するので、
  * **正規化してから**判定する（していないと軒並み unknown に落ちて過小評価になる）。
  */
 export function classify(name) {
-  const n = normalize(name);
+  const n = normalizeForMatch(name);
   if (!n) return "unknown";
   for (const rule of RULES) {
     if (rule.patterns.some((re) => re.test(n))) {
@@ -174,7 +189,15 @@ function parseCsv(text) {
 }
 
 // 事業所名の列を表す表記の揺れ。ヘッダ判定にも列選択にも同じものを使う。
-const NAME_PATTERNS = [/事業所.*名/, /施設.*名/, /名称/, /屋号/, /事業者.*名/];
+// ⚠ 順序に意味がある（pickColumn は最初に当たったものを採る）。
+// 「法人名称」と「屋号」が併存する登録簿で、汎用の /名称/ を先に置くと
+// **法人名を掴んで屋号を取り逃す**（＝その施設が unknown に落ちて分子から消える）。
+// 施設固有の見出しを先に、法人・汎用の見出しを後に置く。
+const NAME_PATTERNS = [
+  /屋号/,
+  /事業所.*名/, /施設.*名/, /店舗.*名/,
+  /名称/, /事業者.*名/, /法人.*名/,
+];
 
 /**
  * ヘッダ行を推定する。自治体ごとに列名も位置もばらつくので、
@@ -216,6 +239,9 @@ export function survey(files, { samples = 3 } = {}) {
   // 断定できない（残りは判定されていない）ので、全ファイルが持つかを見る。
   let filesWithKind = 0;
   let filesEvaluated = 0;
+  // 事業所名の列を特定できずスキップしたファイル。中身に保管があっても集計されないので、
+  // 「全ファイルを評価した」と言ってはいけない。
+  let filesSkipped = 0;
 
   for (const file of files) {
     const rows = parseCsv(decode(readFileSync(file)));
@@ -230,13 +256,22 @@ export function survey(files, { samples = 3 } = {}) {
     const kindIdx = pickColumn(
       header,
       [/業種/, /業の種類/, /業.*区分/, /登録.*種別/, /種別/, /種類/],
-      { exclude: [/動物/, /品種/, /犬種/, /哺乳|鳥類|爬虫/] },
+      // 除外は**動物の種類**を指す見出しに限る。/動物/ で丸ごと弾くと、
+      // 法定の「動物取扱業種別」まで落ちて、そのファイルが集計から消える。
+      { exclude: [/動物種別/, /取扱動物/, /動物の種類/, /品種/, /犬種/, /哺乳|鳥類|爬虫/] },
     );
     // 名寄せの鍵は「屋号＋所在地」（＝店舗の実体）。登録番号は業種ごとに振られる
     // 自治体があり、鍵に使うと1店舗が業種の数だけ二重計上されるため使わない。
-    const addrIdx = pickColumn(header, [/所在地/, /住所/, /事業所.*所在/]);
+    // ⚠ 順序に意味がある。「事業者所在地」と「事業所所在地」が併存する場合、
+    // 汎用の /所在地/ を先に置くと**事業者（本社）の住所**を掴み、
+    // 同じ屋号の別店舗が1件に潰れる。施設固有の見出しを先に。
+    const addrIdx = pickColumn(header, [
+      /事業所.*所在/, /施設.*所在/, /事業所.*住所/, /施設.*住所/,
+      /所在地/, /住所/,
+    ]);
 
     if (nameIdx < 0) {
+      filesSkipped++;
       perFile.push({ file, rows: rows.length - h - 1, note: "⚠ 事業所名の列を特定できず（スキップ）" });
       continue;
     }
@@ -316,7 +351,9 @@ export function survey(files, { samples = 3 } = {}) {
     files: perFile,
     filesWithKind,
     filesEvaluated,
-    allFilesHaveKind: filesEvaluated > 0 && filesWithKind === filesEvaluated,
+    filesSkipped,
+    allFilesHaveKind:
+      filesEvaluated > 0 && filesWithKind === filesEvaluated && filesSkipped === 0,
     total: entries.length,
     counts,
     examples,
@@ -381,7 +418,8 @@ Excel しか無い自治体は CSV に書き出してから渡してください
     console.log(`    → この幅がそのまま全国推定のブレ幅になる。`);
     if (!r.allFilesHaveKind) {
       console.log(`\n  ⚠ この比率は入力の一部だけから計算されている`);
-      console.log(`     （業種列を読めたのは ${r.filesWithKind}/${r.filesEvaluated} ファイル）。`);
+      console.log(`     （業種列を読めたのは ${r.filesWithKind}/${r.filesEvaluated} ファイル`
+        + `${r.filesSkipped ? `、さらに ${r.filesSkipped} ファイルは列を特定できずスキップ` : ""}）。`);
       console.log(`     残りのファイルの事業所は分母に入っていないため、そちらの業態構成が`);
       console.log(`     違えば比率は偏る。全国推定に使う前に、全ファイルで業種列を読める状態にすること。`);
     }
@@ -391,7 +429,8 @@ Excel しか無い自治体は CSV に書き出してから渡してください
     console.log(`  該当自治体に保管業態が無いのか、業種の表記が想定と違うのかを確認すること。`);
   } else if (r.filesWithKind > 0) {
     console.log(`\n=== 業種「保管」で登録: 0 事業所（⚠ 部分的な結果） ===`);
-    console.log(`  業種列を読めたのは ${r.filesWithKind}/${r.filesEvaluated} ファイルだけ。`);
+    console.log(`  業種列を読めたのは ${r.filesWithKind}/${r.filesEvaluated} ファイルだけ`
+      + `${r.filesSkipped ? `、さらに ${r.filesSkipped} ファイルはスキップ` : ""}。`);
     console.log(`  残りは保管かどうか判定できていないため、このゼロは「保管が無い」ことを意味しない。`);
     console.log(`  業種列のあるファイルだけで集計し直すか、列名を確認すること。`);
   } else {
