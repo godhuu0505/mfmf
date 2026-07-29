@@ -125,7 +125,7 @@ mfmf で現在使える機能を、ユーザー視点でまとめた参照用ド
 
 | 機能 | 概要 |
 | --- | --- |
-| RLS 強制 | すべてのテーブルで `owner_id = auth.uid()` ベースのポリシー |
+| RLS 強制 | 世帯メンバーシップと role（`has_household_role` / `is_household_member`）で判定。外部ゲストは `guest_grants` の対象ペット・期間で制限。一部経路で `owner_id = auth.uid()` が併存（世帯未所属時のフォールバック等） |
 | Server Action 認可 | 各 Server Action 冒頭で `supabase.auth.getUser()` を確認 |
 | middleware セッション更新 | `src/middleware.ts` で全リクエストのセッションを更新 |
 | Storage バケット非公開 | プライベートバケット + 都度の signed URL |

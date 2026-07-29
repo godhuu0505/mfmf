@@ -37,7 +37,7 @@ Google ログインと写真の Drive 保存に使う。設定手順は
 
 | 変数 | 用途 |
 | --- | --- |
-| `FEEDBACK_USER_EMAIL` / `FEEDBACK_USER_PASSWORD` | 夫婦共用ログイン（RLS 経由で `feedback` を取得） |
+| `FEEDBACK_USER_EMAIL` / `FEEDBACK_USER_PASSWORD` | フィードバック取得用アカウントの認証情報（RLS 経由で `feedback` を読む） |
 | `GITHUB_TOKEN` | Issues 書き込み権の Fine-grained PAT |
 | `GITHUB_FEEDBACK_REPO` | 登録先 `owner/repo`（★ 必ず非公開リポジトリ） |
 

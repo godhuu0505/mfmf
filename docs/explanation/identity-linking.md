@@ -7,7 +7,7 @@ Issue [#117](https://github.com/godhuu0505/mfmf/issues/117) §4 / [#35](https://
 
 ## 論点
 
-mfmf は「夫婦で 1 アカウントを共用」する前提で、認証は Google OAuth と
+mfmf は**世帯（household）単位で共有し、各自が自分のアカウントで参加する**前提で、認証は Google OAuth と
 email/password（S5 で追加、`drive.file` 非依存の外部ゲスト向け D3）の 2 系統がある。
 同じメールアドレスの人が両方でログインしたとき、**1 つのユーザーに統合されるのか、
 別々のユーザーになるのか**を把握しておかないと、「片方で入ると自分の記録が見えない」
