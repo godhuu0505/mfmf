@@ -321,7 +321,7 @@ function pickColumn(header, patterns, { exclude = [] } = {}) {
 // --- 集計 ------------------------------------------------------------------
 
 export function survey(files, { samples = 3 } = {}) {
-  /** 事業所名 -> { kinds:Set, category } で名寄せする（同一事業所が業種ごとに複数行ある） */
+  /** バケツ（住所 or ファイル） -> 施設クラスタの配列。1クラスタ = 1事業所 */
   const byName = new Map();
   const perFile = [];
   // 「業種列が無い」と「業種列はあるが保管が0件」は意味が違うので区別する。
@@ -366,10 +366,14 @@ export function survey(files, { samples = 3 } = {}) {
     // ⚠ 順序に意味がある。「事業者所在地」と「事業所所在地」が併存する場合、
     // 汎用の /所在地/ を先に置くと**事業者（本社）の住所**を掴み、
     // 同じ屋号の別店舗が1件に潰れる。施設固有の見出しを先に。
-    const addrIdx = pickColumn(header, [
+    // 「所在地（市区町村）」「所在地（町名番地）」のように住所が複数列に分かれる登録簿が
+    // あるため、**該当する列をすべて連結**する。1列だけ読むと、市区町村だけが鍵になって
+    // その自治体の全事業所が1件に潰れる。
+    const addrIdxs = pickColumns(header, [
       /事業所.*所在/, /施設.*所在/, /事業所.*住所/, /施設.*住所/,
       /所在地/, /住所/,
     ]);
+    const addrIdx = addrIdxs.length ? addrIdxs[0] : -1;
 
     if (nameIdx < 0) {
       filesSkipped++;
@@ -394,24 +398,44 @@ export function survey(files, { samples = 3 } = {}) {
       // 登録番号は**業種ごとに別番号**が振られる自治体があり、それを鍵にすると
       // 1店舗が業種の数だけ二重計上される。したがって鍵は
       // **正規化した屋号 + 所在地**（＝店舗の実体）とし、登録番号は鍵に使わない。
-      const rawAddr = addrIdx >= 0 ? (r[addrIdx] ?? "") : "";
+      const rawAddr = addrIdxs.map((i) => (r[i] ?? "").trim()).filter(Boolean).join("");
       const addr = normalize(rawAddr);
       if (!addr) sitelessRows++;
       // 相対住所（「中央1-1」等）は自治体をまたぐと衝突するので、
       // その行だけファイル名で名前空間を切る。全国で一意な住所ならファイル横断で名寄せする
       // （自治体が業種ごとに別 CSV を出すケースを潰さないため）。
-      const qualified = isQualifiedAddress(rawAddr);
+      const qualified = addr ? isQualifiedAddress(rawAddr) : false;
       if (addr && !qualified) unqualifiedAddrRows++;
-      const site = qualified ? addr : `${file}|${addr}`;
-      // 鍵は **所在地（店舗の実体）** を第一とする。屋号は行ごとに埋まったり埋まらなかったり
-      // するので鍵に使うと同じ店舗が割れる（保管の行は法人名、訓練の行は屋号…など）。
-      // 所在地が無いときだけ、やむを得ず屋号にフォールバックする。
-      const key = site ? `site::${site}` : `name::${file}|${normalize(rowNames[0])}`;
-      if (!byName.has(key)) {
-        byName.set(key, { names: new Set(), kinds: new Set() });
+      // ⚠ 住所が空のときに `${file}|` のような truthy な鍵を作らないこと。
+      //    作ると住所の無い行が**全部1件に統合**される。
+      const bucket = addr
+        ? (qualified ? `site::${addr}` : `site::${file}|${addr}`)
+        : `noaddr::${file}`;
+
+      // 同じ住所でも**別テナント**（屋号が全く違う）は別施設として数える。
+      // 逆に、行ごとに埋まる列が違って呼称が揺れるケースは**別名を共有していれば**統合する。
+      const norm = rowNames.map(normalize);
+      const clusters = byName.get(bucket) ?? [];
+      const hit = [];
+      for (const c of clusters) {
+        if (norm.some((nm) => c.normNames.has(nm))) hit.push(c);
       }
-      const entry = byName.get(key);
-      for (const nm of rowNames) entry.names.add(nm);
+      let entry;
+      if (!hit.length) {
+        entry = { names: new Set(), normNames: new Set(), kinds: new Set() };
+        clusters.push(entry);
+        byName.set(bucket, clusters);
+      } else {
+        // 複数クラスタに跨って一致したら1つに畳む（推移的に同一施設とみなす）
+        entry = hit[0];
+        for (const other of hit.slice(1)) {
+          for (const v of other.names) entry.names.add(v);
+          for (const v of other.normNames) entry.normNames.add(v);
+          for (const v of other.kinds) entry.kinds.add(v);
+          clusters.splice(clusters.indexOf(other), 1);
+        }
+      }
+      rowNames.forEach((nm, i) => { entry.names.add(nm); entry.normNames.add(norm[i]); });
       for (const k of kinds) entry.kinds.add(k);
     }
     const idNote = addrIdx >= 0
@@ -438,13 +462,17 @@ export function survey(files, { samples = 3 } = {}) {
 
   // 1つの事業所に複数の呼称（法人名・屋号）が集まるので、
   // **業態が判別できる呼称**を優先して分類する（法人名だけ見て unknown にしない）。
-  const entries = [...byName.values()].map((e) => {
+  const entries = [...byName.values()].flat().map((e) => {
     const names = [...e.names];
+    // ⚠ 最初に非 unknown になった別名で決めない。CSV の行順で結果が変わってしまう。
+    //    別名を**すべて**分類し、RULES の宣言順（保育園 → しつけ → …）で選ぶ。
+    const classified = names.map((nm) => ({ nm, c: classify(nm) }));
     let category = "unknown";
     let display = names[0] ?? "";
-    for (const nm of names) {
-      const c = classify(nm);
-      if (c !== "unknown") { category = c; display = nm; break; }
+    const order = [...RULES.map((r) => r.key), "cat_only"];
+    for (const key of order) {
+      const found = classified.find((x) => x.c === key);
+      if (found) { category = key; display = found.nm; break; }
     }
     return { name: display, names, category, kinds: e.kinds };
   });
