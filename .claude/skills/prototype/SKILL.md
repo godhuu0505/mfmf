@@ -30,6 +30,7 @@ Claude Artifact などで 3 案を 1 枚に並べて捨てる方が速い。
 ### 1. main から `proto/<slug>` を切る
 
 ```bash
+git status --porcelain     # ← 空であることを確認（下記の理由）
 git fetch origin main
 git switch -c proto/quick-record origin/main
 ```
@@ -37,14 +38,32 @@ git switch -c proto/quick-record origin/main
 **必ず `main` から切る。** 実装途中の feature ブランチから切ると、
 未完成の変更が混ざって判断がぶれる。
 
+> ⚠️ **`switch -c` は作業ツリーの変更を持ち越す。** 分岐点が `origin/main` でも、
+> 競合しない未コミット変更は**そのまま新ブランチに付いてくる**（`git switch` の仕様）。
+> 作業中の feature ブランチから始めると、未完成の変更がプロトに混ざって
+> 「main から切った」という前提が崩れる。汚れていれば先に commit か `git stash`。
+
 ### 2. 実コードで画面を作る
 
 `src/app/proto/<slug>/page.tsx` に置く。
 
-- **DB / migration は一切触らない。** 固定データを配列で直書きする
+- **DB / Storage / migration は一切触らない。** 固定データを配列で直書きする
 - Server Component をやめて `"use client"` の静的配列でよい
-- `AppHeader` / `PhotoGallery` / `RecordForm` / トークン / ダークモード /
-  セーフエリアは既存のものを `import` で使う（ここが速さの源）
+- **表示専用のもの**は既存を `import` して使う（ここが速さの源）:
+  `AppHeader` / `PhotoGallery` / `SourceIcon` / `PageSkeleton` /
+  デザイントークン / ダークモード / セーフエリア
+
+> ⚠️ **バックエンドを書き換えるコンポーネントをそのまま import しない。**
+> 代表例が `RecordForm` —— `handleSubmit` は渡された action を呼ぶ**前に**
+> ブラウザ側 Supabase クライアントを作り、`PHOTO_BUCKET` へ写真を実アップロードする
+> （`src/components/RecordForm.tsx:124-133`）。
+> **action を no-op にしても写真は本物の Storage に書き込まれる**。
+> リモート Supabase 構成なら本番相当のバケットが汚れ、ローカル構成なら
+> スマホから `127.0.0.1` に届かず送信自体が失敗する。どちらにせよプロトの前提を壊す。
+>
+> 入力フォームをプロトで見たいときは、**見た目だけ複製した表示専用フォーム**を
+> `src/app/proto/<slug>/` 内に置き、`onSubmit` は `console.log` か state 更新に留める。
+> 同じ理由で、Server Action を呼ぶコンポーネントもそのままでは使わない。
 - 型は既存の `src/types/database.ts`（`RecordWithPhotos` など）に合わせておくと、
   あとで「育てる」選択肢が残る
 - **区切りごとにコミットする。** メッセージは雑でよい（`wip: proto` 等）。
@@ -117,10 +136,20 @@ just dev-lan
 standalone 表示まで見たい場合だけ、`npm run build && npm run start` を
 HTTPS 経由（トンネル等）で当てる。プロト段階では通常そこまでやらない。
 
-#### 現行画面と並べる（worktree）
+#### 現行画面と並べる（worktree）— **手元ブラウザ用。スマホからは使えない**
 
-`node_modules` は gitignore されていて新しい worktree には存在しないので、
-**依存のインストールが要る**:
+:3001 が出すのは**現行の画面**なので、`/proto` の認証除外は効かず認証が要る。
+ローカル Supabase 構成（`NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321`）では、
+スマホのブラウザはその URL を**スマホ自身**として解決するのでログインを完了できない。
+
+- **手元の PC で 2 タブ並べる** → `127.0.0.1` が本当にローカルを指すので問題なく動く。
+  レイアウト・配色・情報量の比較はこれで足りる
+- **スマホで現行画面と並べたい** → リモート Supabase 構成（README クイックスタート A）が必要。
+  そこまでするより、現行画面はスマホの既存 PWA / 本番 URL で見て、
+  :3000 のプロトと見比べるほうが速い
+
+
+手元 PC で並べる場合の手順:
 
 ```bash
 git worktree add ../mfmf-main origin/main
