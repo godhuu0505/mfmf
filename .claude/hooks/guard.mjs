@@ -21,6 +21,26 @@ function deny(reason) {
   process.exit(0);
 }
 
+// `git ... worktree remove ...` に force 相当のオプションが付いているか。
+// 正規表現 1 本ではなくトークン列で判定する（省略形・語順・グローバルオプションに強い）。
+function isForcedWorktreeRemoval(command) {
+  // パイプ・リスト区切りでコマンド単位に割る
+  for (const segment of command.split(/[|;&\n]+/)) {
+    const tokens = segment.trim().split(/\s+/).filter(Boolean);
+    const gitAt = tokens.findIndex((t) => t === "git" || t.endsWith("/git"));
+    if (gitAt < 0) continue;
+    const rest = tokens.slice(gitAt + 1);
+    // サブコマンドは `worktree remove` の順で現れる必要がある（間のグローバルオプションは問わない）
+    const wt = rest.indexOf("worktree");
+    if (wt < 0 || rest[wt + 1] !== "remove") continue;
+    // `--force` の曖昧でない省略形（--f 〜 --force）と、-f を含む短オプション束
+    const isForce = (t) =>
+      /^--f(?:o(?:r(?:c(?:e)?)?)?)?$/.test(t) || /^-[A-Za-z]*f[A-Za-z]*$/.test(t);
+    if (rest.slice(wt + 2).some(isForce)) return true;
+  }
+  return false;
+}
+
 let input = {};
 try {
   input = JSON.parse(readFileSync(0, "utf8") || "{}");
@@ -76,12 +96,12 @@ if (tool === "Bash") {
   if (/\bgit\s+(reset\s+--hard\s+origin|clean\s+-[a-z]*f[a-z]*d|push\b.*:.*\bmain\b)/.test(cmd)) {
     deny("履歴を失う恐れのある git 操作はガードによりブロックされました。ユーザーに確認してください。");
   }
-  // worktree の強制削除。permissions.deny は前方一致なので
-  // `git worktree remove ../x --force`（パスが先）を取りこぼす。ここは語順非依存で見る。
-  // `git` とサブコマンドの間にはグローバルオプションが入りうる（`-C <path>` / `--no-pager` /
-  // `--git-dir=<path>` 等）。`-C` のように値を取るものもあるので、その分も読み飛ばす。
-  const GIT_GLOBAL_OPT = /(?:-[A-Za-z]|--[\w-]+)(?:=[^\s]+)?\s+(?:[^\s-][^\s]*\s+)?/.source;
-  if (new RegExp(`\\bgit\\s+(?:${GIT_GLOBAL_OPT})*worktree\\s+remove\\b[^|;&]*(\\s--force\\b|\\s-[A-Za-z]*f\\b)`).test(cmd)) {
+  // worktree の強制削除。1 本の正規表現で書こうとして 3 回取りこぼした
+  // （①パスが先 ②git -C 等のグローバルオプション ③--for のような省略形）ので、
+  // 「コマンド全体に当てる正規表現」をやめてトークン列として見る。
+  // git は曖昧でない限り長オプションの省略を受け付けるため、--f/--fo/--for/--forc も --force。
+  // 逆に --no-force は「強制しない」なので通す。
+  if (isForcedWorktreeRemoval(cmd)) {
     deny(
       "git worktree の強制削除はガードによりブロックされました。" +
         "--force は無視対象でない未コミットの変更ごと削除します。" +

@@ -84,10 +84,14 @@ just down    # 停止
      supabase link --project-ref <PROJECT_REF>
      supabase db push
      ```
-   - **代替**: `supabase/migrations/` を**タイムスタンプ順に**（`20260616130704_init.sql` 〜 `20260616130713_grants.sql` まで）
-     SQL Editor で実行。
+   - **代替**: `supabase/migrations/` の SQL を**すべて・タイムスタンプ順に** SQL Editor で実行。
+     **一部だけ適用しない**（`20260616130704_init.sql` から最新まで全部）。
+     世帯まわりは後半の migration で入るため、初期分だけだと下の「世帯で共有」が動きません
+     —— `households` / `household_members` は `20260630130000_households.sql`、
+     `/onboarding` が呼ぶ `create_own_household` は `20260704120000_household_provisioning.sql` が初出で、
+     欠けると新規ユーザーが世帯を作れずセットアップを完了できません。
    - テーブル / RLS / Storage バケット `daycare-photos` が作られます。
-   - 以降の追加 migration は CI/CD が自動適用するので、初回のみ手動で揃えれば OK
+   - **これ以降**に追加される migration は CI/CD が自動適用するので、初回だけ手動で揃えれば OK
      （仕組みは [guides/deploy.md](./guides/deploy.md#supabasedbマイグレーション)）。
 3. **ログイン方式を設定**（どちらか一方でよい）。
    - **メール/パスワード**: Supabase ダッシュボードの Authentication → Providers で
