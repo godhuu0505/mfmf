@@ -29,6 +29,12 @@
 
 import { readFileSync } from "node:fs";
 
+// 「犬の語 ＋（の）＋ 学校系」が**直結**している屋号は、人向けの養成校ではなく
+// 犬向けのスクール（例: ドッグスクール／犬のスクール／犬の学校）。
+// ⚠ 語間を空けないこと。「愛犬美容学園」「愛犬美容専門学校」（＝トリマー養成校）は
+//    犬→美容→学園/学校 と語が挟まるだけなので、距離を許すと養成校の判定が壊れる。
+const DOG_SCHOOL = /(犬|いぬ|イヌ|ドッグ|\bdog|わん|ワン|パピー|\bpupp)の?(スクール|school|学園|学校)/i;
+
 // --- 業態の推定ルール ------------------------------------------------------
 // 上から順に評価し、最初に当たったものを採用する（優先順位が意味を持つ）。
 // 「保育園」系を最優先にするのは、"○○ドッグホテル＆幼稚園" のような複合屋号で
@@ -48,6 +54,9 @@ const RULES = [
       // （いずれもトリマー養成校）が保育園に化けて分子を膨らませるため、
       // 犬・パピー・しつけ等の文脈を要求する。
       /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy|しつけ|obedience)[^、]{0,8}(スクール|school|学園)/i,
+      // 「犬の学校ABC」「ドッグ学校」。上の緩い形に「学校」を足すと「愛犬美容専門学校」
+      // まで拾ってしまうため、**直結している形だけ**を別に見る（isGroomingSchool と同じ判定）。
+      DOG_SCHOOL,
       /デイケア/, /デイサービス/, /daycare/i, /day\s*care/i,
       // 「園」は犬・ドッグ等の**直後**に来る場合のみ拾う（「犬の○○園」の形）。
       // 距離を空けると「ドッグサロン花園」の「ドッグ…花園」まで拾ってしまう。
@@ -148,11 +157,6 @@ const SCHOOL_WORDS = [/学園/, /スクール/, /school/i, /専門学校/, /養�
 // 人材（トリマー・訓練士）の養成校を示す語。犬の語を含むので通常の判定では弾けない。
 const VOCATIONAL_WORDS = [/養成/, /専門学校/, /学院/, /トレーナー(養成|科)/, /訓練士/, /資格/];
 
-// 「犬の語 ＋（の）＋ 学校系」が**直結**している屋号は、人向けの養成校ではなく
-// 犬向けのスクール（例: ドッグスクール／犬のスクール）。
-// ⚠ 語間を空けないこと。「愛犬美容学園」（＝トリマー養成校）は 犬→美容→学園 と
-//    2文字挟むだけなので、距離を許すと養成校の判定が壊れる。
-const DOG_SCHOOL = /(犬|いぬ|イヌ|ドッグ|\bdog|わん|ワン|パピー|\bpupp)の?(スクール|school|学園|学校)/i;
 // 業態が明示されている語（サロン系の上書き判定と養成校判定の両方で使う）
 const EXPLICIT_DAYCARE = /保育園|幼稚園|ようちえん|ほいくえん|ヨウチエン|ホイクエン|デイケア|デイサービス|daycare/i;
 const EXPLICIT_TRAINING = /しつけ|躾|訓練|トレーニング|training/i;
@@ -392,6 +396,13 @@ function findHeader(rows) {
   // 日付らしいセルを含む行はタイトル行とみなす（「2026年7月」等）
   const looksDated = (cells) =>
     cells.some((c) => /\d{4}\s*年|\d{4}[/-]\d{1,2}|現在/.test(c));
+  // ⚠ 「名前列があり、他の既知列も1つある」だけでは足りない。
+  //    「第一種動物取扱業事業所名簿, 所在地 柏市」のように、表題と管轄を2セルに分けた
+  //    前書きは この条件を満たしてしまう。採用すると本物のヘッダが1件の「事業所」として
+  //    数えられ、業種列も選ばれずファイルが集計不能になる。
+  //    見出しではなく**表題**に見えるセル（名簿・一覧・台帳…、または異様に長い）は弾く。
+  const looksTitleCell = (c) =>
+    /名簿|一覧|台帳|リスト|登録簿|について|現在/.test(c) || c.length > 20;
 
   let relaxed = -1;
   // ⚠ 探索を先頭 N 行で打ち切らないこと。Excel を CSV に書き出した登録簿は
@@ -401,7 +412,10 @@ function findHeader(rows) {
   for (let i = 0; i < rows.length; i++) {
     const cells = rows[i].map((c) => c.trim());
     if (cells.filter((c) => c !== "").length < 2) continue;
-    if (pickColumn(cells, NAME_PATTERNS, { exclude: NAME_EXCLUDE }) < 0) continue;
+    const ni = pickColumn(cells, NAME_PATTERNS, { exclude: NAME_EXCLUDE });
+    if (ni < 0) continue;
+    // 名前列に当たったセル自体が表題なら、この行はヘッダではない
+    if (looksTitleCell(cells[ni])) continue;
     const others = OTHER_COLUMN_PATTERNS.filter(
       (group) => pickColumn(cells, group) >= 0,
     ).length;
@@ -452,19 +466,28 @@ function mulberry32(seed) {
 }
 
 /**
- * 層化抽出。母集団を k 個の区間に割り、各区間から1件ずつ無作為に引く。
- * 全体を覆いつつ（等間隔の利点）、並びの周期に嵌まらない（無作為の利点）。
+ * 単純無作為抽出（非復元）。全要素の抽出確率が等しい。
+ *
+ * ⚠ 層化（母集団を k 区間に割って各区間から1件）にはしない。
+ *   母集団が k で割り切れないと区間の大きさが揃わず（例: 150件を100区間 →
+ *   1件の区間が50・2件の区間が50）、小さい区間の要素が2倍選ばれやすくなる。
+ *   market-analysis.md §18-4 は抽出した標本の比率を**重みなしで**そのまま
+ *   補正率に使うので、抽出確率が揃っていないとその補正率が偏る。
+ *   等間隔（固定位相）も並びの周期に嵌まるため使わない。
+ *   seed から乱数を作るので、seed を控えれば同じ標本を再現できる。
  */
-export function sampleStratified(arr, k, seed) {
+export function sampleRandom(arr, k, seed) {
   if (k <= 0) return [];
   if (arr.length <= k) return [...arr];
   const rand = mulberry32(seed);
-  const step = arr.length / k;
-  return Array.from({ length: k }, (_, i) => {
-    const lo = Math.floor(i * step);
-    const hi = Math.max(lo + 1, Math.min(arr.length, Math.floor((i + 1) * step)));
-    return arr[lo + Math.floor(rand() * (hi - lo))];
-  });
+  const idx = arr.map((_, i) => i);
+  // 部分 Fisher-Yates（先頭 k 個だけを確定させる）
+  for (let i = 0; i < k; i++) {
+    const j = i + Math.floor(rand() * (idx.length - i));
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+  }
+  // 出力順は母集団の並び順に戻す（目視で追いやすいように）
+  return idx.slice(0, k).sort((a, b) => a - b).map((i) => arr[i]);
 }
 
 // --- 集計 ------------------------------------------------------------------
@@ -484,7 +507,14 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
 
   for (const file of files) {
     const rows = parseCsv(decode(readFileSync(file)));
-    if (!rows.length) { perFile.push({ file, rows: 0, note: "空ファイル" }); continue; }
+    // ⚠ 空ファイルを「評価済み」にも「スキップ」にも数えないと、残りのファイルだけで
+    //    allFilesHaveKind が true になり、保管0件を「意味のあるゼロ」と報告してしまう。
+    //    書き出しに失敗した CSV が混じっていても気づけないので、スキップとして数える。
+    if (!rows.length || rows.every((r) => r.every((c) => !String(c ?? "").trim()))) {
+      filesSkipped++;
+      perFile.push({ file, rows: 0, note: "⚠ 空ファイル（スキップ）" });
+      continue;
+    }
 
     const h = findHeader(rows);
     if (h < 0) {
@@ -594,9 +624,27 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
     let sitelessRows = 0;
     let unqualifiedAddrRows = 0;
     let namelessOtherRows = 0;
+    let repeatedHeaderRows = 0;
     let lastEntry = null;
     let lastAddr = "";
+    // 見出し行が節・ページごとに繰り返される登録簿がある。
+    // ⚠ ○×様式ではこれが致命的で、業種列に「保管」という**文字**が入っているため
+    //    「保管に○が付いた事業所」として数えられ、名前列の見出し（「事業所の名称」）が
+    //    幽霊の事業所になる。分母 hokan が実数より増えて比率が歪む。
+    const headerKey = header.map(normalize);
+    const isRepeatedHeader = (r) => {
+      let matched = 0;
+      for (let i = 0; i < headerKey.length; i++) {
+        const v = normalize(r[i] ?? "");
+        if (!v) continue;
+        if (v !== headerKey[i]) return false;
+        matched++;
+      }
+      // 1セル一致は偶然（「保管」だけの継続行など）があり得るので2セル以上を要求する
+      return matched >= 2;
+    };
     for (const r of dataRows) {
+      if (isRepeatedHeader(r)) { repeatedHeaderRows++; continue; }
       // 候補列の値を**すべて**拾う。行によって埋まっている列が違うため、
       // 「その行で最初に埋まっていた値」を鍵にすると同じ店舗が割れる。
       // 列の優先順位（屋号 > 事業所名 > … > 法人名）を**保持したまま**拾う。
@@ -736,6 +784,9 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
         + `（自治体をまたぐ衝突を避けるためファイル単位で分離。同一自治体を複数 CSV に`
         + `分けている場合は結合してから渡すこと）`
       : "";
+    const repeatedHeaderNote = repeatedHeaderRows
+      ? `見出し行の繰り返し ${repeatedHeaderRows} 件を除外`
+      : "";
     const namelessNote = namelessOtherRows
       ? `⚠ 事業所名が空で業種だけがある行 ${namelessOtherRows} 件を無視`
         + `（結合セルの継続行の形に合わない＝小計行・注記行の可能性。継続行なら`
@@ -752,7 +803,7 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
       rows: n,
       kindColumns: kindColumnNames,
       note: [!hasKindColumn ? "業種列なし（保管の判定は不可）" : `業種列=「${kindColumnNames.join("」「")}」`
-        + (kindMatrixIdxs.length ? "（業種ごとの○×様式）" : ""), headerNote, idNote, sitelessNote, unqualifiedNote, namelessNote]
+        + (kindMatrixIdxs.length ? "（業種ごとの○×様式）" : ""), headerNote, idNote, sitelessNote, unqualifiedNote, namelessNote, repeatedHeaderNote]
         .filter(Boolean).join(" / "),
     });
   }
@@ -849,10 +900,10 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
   //    その偏ったサンプルで求めた補正率を全体に適用すると推定が歪む。
   // ⚠ 等間隔（固定位相）でも足りない。並びに step と同じ周期があると、
   //    毎回同じ位置＝同じ地域・同じ登録時期ばかりを引く。
-  //    母集団を N 個の区間に割り、**各区間の中から1件を無作為に**引く（層化抽出）。
+  //    **全件が等しい確率で選ばれる**単純無作為抽出にする（sampleRandom の注記参照）。
   //    乱数は seed から作るので、seed を控えれば同じサンプルを再現でき、
   //    目視分類の結果を後から検証できる（`--seed` で引き直せる）。
-  const hokanUnknownExamples = sampleStratified(hokanUnknownAll, samples, seed);
+  const hokanUnknownExamples = sampleRandom(hokanUnknownAll, samples, seed);
 
   // 全国推定に使うのは hokanDaycare / hokan なので、信頼度は
   // 「全体の不明率」ではなく「保管の中の不明率」で測らないと誤認する。
@@ -943,7 +994,7 @@ Excel しか無い自治体は CSV に書き出してから渡してください
     // 目視補正は**この一覧**に対して行う。カテゴリ別の「例」は業種を問わず先頭から
     // 埋まるので、保管を持たない不明（販売など）が並び、補正の材料にならない。
     if (r.hokanUnknownExamples.length) {
-      console.log(`      目視補正の抽出（層化抽出 / seed=${r.seed}。--seed で引き直せる）:`);
+      console.log(`      目視補正の抽出（無作為抽出 / seed=${r.seed}。--seed で引き直せる）:`);
       for (const x of r.hokanUnknownExamples) {
         // ⚠ 名前だけを並べない。同名の別店舗（「株式会社XYZ」等）が並ぶと
         //    どれを調べるのか分からず、目視分類が成立しない。
