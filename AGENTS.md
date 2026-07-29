@@ -47,8 +47,10 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 - **`service_role` キーをクライアント・リポジトリに置かない**（このアプリでは使わない）。
 - **既存の RLS（世帯メンバーシップ + role、ゲストは `guest_grants`）を弱めない。**
   Server Action は冒頭で必ず `getUser()`。認可は**操作に応じて使い分ける**
-  （編集系は `requireEditableHousehold()`、owner 限定は `requireOwnerOf()`、
-  ゲストは `guest_grants` + RLS、`/onboarding` は世帯未所属で走るのが正常）。
+  （新規作成は現在世帯基準の `requireEditableHousehold()`、更新/削除は**対象行の世帯**を見る
+  `requireEditableRecordHousehold()` / `requireEditablePetHousehold()`、
+  owner 限定は `requireOwnerOf()`、ゲストは `guest_grants` + RLS、
+  `/onboarding` は世帯未所属で走るのが正常）。詳細は CLAUDE.md。
 - **Service Worker（`public/sw.js`）は Supabase の API レスポンスや署名付き写真 URL をキャッシュしない。**
 - `main` へ直接 push しない。強制 push（`--force`）禁止（ガードでブロック）。
 

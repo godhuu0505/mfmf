@@ -251,23 +251,31 @@ git mv src/app/proto/quick-record/page.tsx src/app/<本来のルート>/page.tsx
 #    複数案を作った場合は「採用した案」を移す（a/page.tsx など）。
 #    比較用の入口 page.tsx（リンクとメモだけ）は移さず捨てる。
 #    プロト内に切り出した client コンポーネントも忘れず移す。
+#    既存ルートの刷新で移動先に page.tsx がある場合は `fatal: destination exists` で
+#    止まるので、置き換えるつもりなら `git mv -f`（差分は次のコミットで確認できる）。
 
-# ★ 2) プロト用に触った「実アプリ側」のファイルを全部 origin/main に戻す
-git restore --source=origin/main --staged --worktree \
-  src/lib/supabase/middleware.ts \
-  src/app/layout.tsx \
-  src/app/manifest.ts
+# ★ 2) プロト都合で触った「実アプリ側」の変更だけを取り消す
+git diff --cached src/app/layout.tsx src/app/manifest.ts \
+  src/lib/supabase/middleware.ts        # ← まず中身を見る
+#    プロト都合の hunk だけを戻す（下記）。ファイル全体を戻してよいのは
+#    「採用した機能がそのファイルを一切変更しない」と確認できたときだけ:
+#    git restore --source=origin/main --staged --worktree <file>
 git rm -r --quiet --ignore-unmatch src/app/proto
 
-# ★ 3) 最終確認
-git diff --cached --stat    # 実装に必要と説明できるファイルだけが残っているか
+# ★ 3) 最終確認（--stat ではなく中身を見る）
+git diff --cached
 ```
 
 > 🧹 **掃除の規則（ファイル名を覚えるのではなく、これを守る）**
-> **`src/app/proto/` の外で触った実アプリのファイルは、プロト都合なら全部戻す。**
-> `git diff --cached --stat` を見て、**実装に必要だと一言で説明できないファイルは戻す**。
-> §3 で触りうるのは典型的に上の 3 つ（`/proto` の認証除外・`FeedbackWidget` の無効化・
-> `start_url` の一時変更）だが、**列挙を覚えるのではなく差分を見て判断する**こと。
+> **`src/app/proto/` の外の変更は、1 つずつ「実装に必要か / プロト都合か」を見て判断する。**
+> プロト都合なら取り消す。§3 で触りうるのは典型的に
+> `/proto` の認証除外・`FeedbackWidget` の無効化・`start_url` の一時変更。
+>
+> ⚠️ **ファイル全体を `git restore` で戻さない。**
+> ナビ構造の刷新など、**採用した機能自体が `layout.tsx` を変更する**ことは普通にある
+> （§1 が明示的に対象にしているケース）。全体を戻すと、その実装変更まで消える。
+> しかも消えたファイルは `git diff --cached --stat` に現れないので、
+> **`--stat` では気づけない**。最終確認は `--stat` ではなく差分の中身を見ること。
 >
 > `--ignore-unmatch` が要る理由: プロトが `page.tsx` 1 枚だけだった場合、
 > 1) の `git mv` で追跡ファイルが無くなり `src/app/proto` 自体が消える。
@@ -374,8 +382,8 @@ LAN が使えない相手には**画面録画（iOS / Android 標準）を送る
 
 - **プロト専用の変更を実装 PR に混ぜない。** main マージ＝本番リリースなので、
   混ざると本番に出る（認証不要の `/proto`・壊れた `start_url`・フィードバック導線の欠落）。
-  道 A の最後で必ず落とし、PR を出す前に `git diff origin/main --stat` を見て
-  **実装に必要だと一言で説明できないファイルが無い**ことを確認する
+  道 A の最後で必ず落とし、PR を出す前に `git diff origin/main` を（`--stat` ではなく
+  中身を）見て、**実装に必要だと一言で説明できない変更が無い**ことを確認する
 - `mocks/` のような静的 HTML 置き場を作らない（実装プロトの方が速く情報量も多い）
 - `proto/` に PR を作らない
 - プロトタイプ用の feature flag を常設しない（消し忘れが残骸を生む）

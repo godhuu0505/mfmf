@@ -81,7 +81,13 @@ UI のある新機能は、仕様を文章で固める前に **`proto/<slug>` �
   テナント分離は `supabase/tests/` の pgTAP が CI で守っている。
 - **Server Action は冒頭で必ず `getUser()`。認可はそのうえで「操作に応じたもの」を使う**
   （ひとつのヘルパーで代用しない）:
-  - 記録 / ペット等の編集: `requireEditableHousehold()`（`src/lib/household.ts`。viewer を弾く）
+  - **新規作成**（現在世帯に作る）: `requireEditableHousehold()`（`src/lib/household.ts`）。
+    Cookie で選択中の世帯のメンバーシップを解決し viewer を弾く
+  - **更新 / 削除**（対象リソースの世帯で判定）: `requireEditableRecordHousehold()`
+    （`src/app/records/actions.ts`）/ `requireEditablePetHousehold()`（`src/app/pets/actions.ts`）。
+    **現在世帯ではなく対象行の `household_id` を見る**。複数世帯に属するユーザーが
+    別タブで世帯を切り替えていると、現在世帯基準では正当な編集を弾く / 誤った世帯で
+    事前認可してしまうため、ここを取り違えない
   - owner 限定の世帯管理: `requireOwnerOf()`（`src/app/settings/actions.ts`）
   - ゲストの書き込み: `guest_grants` + ゲスト RLS（対象ペット・期間で制限）
   - `/onboarding`: **世帯未所属で走るのが正常**なので世帯チェックを課さない
