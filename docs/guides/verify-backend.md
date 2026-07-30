@@ -22,9 +22,9 @@
 | テーブルと RLS | Table Editor | `public.daycare_records` / `public.record_photos` / `public.feedback` が存在し、いずれも **RLS enabled**。 |
 | 認証ユーザー | Authentication > Users | ログインに使うユーザーが存在。**世帯メンバーはそれぞれ自分のアカウント**を持つ（招待で追加。`SIGNUP_ENABLED` が閉じている間は手動発行）。 |
 | 世帯とロール | Table Editor | `households` / `household_members` が存在し RLS enabled。確認したいユーザーの `household_members` 行と `role`（owner/editor/viewer）が意図どおり。 |
-| テナント分離・ロール境界 | **CI（pgTAP）** | 挙動は `supabase/tests/` が PR ごとに検証済み。**本番に対して手で試さない**（理由と内訳は §2-1）。ここで見るのは上下の行（RLS enabled / role / advisor）まで。 |
+| テナント分離・ロール境界 | **CI（pgTAP）＋ SQL Editor** | **挙動**は `supabase/tests/` が PR ごとに検証済み。**本番では挙動を試さず、`pg_policies` でポリシー定義が一致しているかを読む**（→ §2-1）。 |
 | Storage | Storage | `daycare-photos` バケットがあり **private**。署名付き URL（期限 1 時間）で配信。 |
-| スキーマ適用 | （実体で判断） | 上の実体が揃っていれば適用済み。未適用なら `supabase/migrations/` を SQL Editor で実行。 |
+| スキーマ適用 | （実体で判断） | 上の実体が揃っていれば適用済み。未適用なら **`supabase db push`**（CLI）で適用する。SQL Editor で流した場合は履歴が残らないので `supabase migration repair --status applied <version>` を忘れないこと（下の ⚠️）。 |
 | advisor | Advisors | RLS 未設定や危険な公開設定の警告が **0 件**。DDL 変更後は必ず確認。 |
 
 > ⚠️ **Database > Migrations の履歴**。CI/CD の `migrate` ジョブが `supabase db push` で適用した
@@ -33,7 +33,7 @@
 > や初回 setup で手動適用した分は履歴に残らないため、移行期は実体（テーブル / ポリシー / バケット）と
 > 履歴の両面で判断する。ズレを直したいときは `supabase migration repair --status applied <version>` を使う。
 
-### 2-1. RLS の挙動は pgTAP が担保する（手で確かめようとしない）
+### 2-1. 挙動は pgTAP に任せ、本番では「定義」を読む
 
 **テナント分離とロール境界の検証は、書くと壊れます。** このリポジトリでは実際に
 「確認したのに何も検証できていない」手順を 2 度作りました。
@@ -56,10 +56,43 @@
 | 招待・世帯作成・削除・Storage・タグの各境界 | `household_invites_test.sql` ほか |
 
 これらは **PR ごとに CI で走ります**（`.github/workflows/ci.yml` の
-`RLS tenant isolation (pgTAP)`）。**手元で本番に対して同じことを試す必要はありません。**
+`RLS tenant isolation (pgTAP)`）。**挙動を手元で本番に対して試す必要はありません。**
 
-**本番で確認するのは「ポリシーが適用されているか」まで**にとどめます。挙動そのものは
-pgTAP に任せ、ここでは実体だけを見ます（上の表の「テーブルと RLS」「世帯とロール」「advisor」）。
+### 本番で確認すること —— ポリシーの「定義」を読む（read-only）
+
+**pgTAP はローカルの使い捨てスタックに対して走ります**（`.github/workflows/ci.yml` の
+`supabase start` → `supabase test db`）。つまり検証しているのは
+**「migration どおりに作れば正しく守られる」**ことです。
+本番の migration 適用漏れ・手で書き換えたポリシー・失敗したデプロイは、**これでは分かりません**。
+
+そこで本番側は、SQL Editor で**ポリシーの定義そのものを読みます**。read-only で、
+アプリの資格情報を使わず、**write を一切しません**。
+
+```sql
+-- 本番の Supabase ダッシュボード > SQL Editor で実行（SELECT のみ）
+select tablename, policyname, cmd, qual, with_check
+from pg_policies
+where schemaname = 'public'
+order by tablename, policyname;
+```
+
+**確認するのは 3 点**です。
+
+1. **世帯ヘルパーを経由しているか** —— `qual` / `with_check` に
+   `has_household_role` / `is_household_member` / `has_guest_record_access` が現れること。
+   `true` だけのポリシーや、`household_id` を見ていない条件があれば**そこが穴**
+2. **`daycare_records` / `record_photos` / `pets` / `feedback` / `households` /
+   `household_members` / `guest_grants` に select / insert / update / delete が揃っているか** ——
+   欠けている `cmd` があれば、その操作は「ポリシー無し」＝ RLS 有効なら全拒否、
+   無効なら全許可になる（後者は下の RLS enabled の行で気づける）
+3. **`supabase/migrations/` の内容と一致するか** —— 差異があれば適用漏れか手動変更。
+   `supabase migration list` で履歴のズレも確認できる（[deploy.md](./deploy.md)）
+
+> これは**挙動ではなく定義**の確認です。挙動は pgTAP が担保しているので、
+> ここでは「本番に載っている定義が、pgTAP が検証した定義と同じか」だけを見ます。
+> 定義が一致していて pgTAP が緑なら、本番の挙動も同じと言えます。
+
+あわせて上の表の「テーブルと RLS」（RLS enabled）「世帯とロール」「advisor」も確認します。
 
 > ⚠️ **本番データに対して write を試さないこと。** 「viewer で書けないことを確かめる」形の
 > 手動テストは、RLS が壊れていた場合に**本番へ書き込んでしまいます**。

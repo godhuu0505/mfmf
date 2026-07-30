@@ -304,9 +304,19 @@ git mv src/app/proto/quick-record/page.tsx src/app/<本来のルート>/page.tsx
 # ★ 2) プロト都合で触った「実アプリ側」の変更だけを取り消す
 git diff --cached src/app/layout.tsx src/app/manifest.ts \
   src/lib/supabase/middleware.ts        # ← まず中身を見る
-#    プロト都合の hunk だけを戻す（下記）。ファイル全体を戻してよいのは
-#    「採用した機能がそのファイルを一切変更しない」と確認できたときだけ:
-#    git restore --source=origin/main --staged --worktree <file>
+
+#  2a) hunk 単位で戻す（既定。採用した機能も同じファイルを触っている場合はこれ）
+#      -p が hunk ごとに y/n を訊く。プロト都合の hunk だけ y、実装の hunk は n。
+git restore -p --source=origin/main --staged --worktree \
+  src/app/layout.tsx src/app/manifest.ts src/lib/supabase/middleware.ts
+
+#  2b) ファイル全体を戻す（そのファイルに実装側の変更が「一切ない」と 2) で確認できたときだけ）
+#      git restore --source=origin/main --staged --worktree <file>
+
+#  2c) 戻ったことを確認する。ここが空でなければまだプロト都合の変更が残っている
+git diff --cached src/lib/supabase/middleware.ts | grep -n 'proto' || echo "OK: /proto の認証除外は残っていない"
+git diff --cached src/app/layout.tsx | grep -n 'FeedbackWidget' || echo "OK: FeedbackWidget は戻っている"
+
 git rm -r --quiet --ignore-unmatch src/app/proto
 
 # ★ 3) 固定データと空の操作を「本物」に差し替える（★2 と ★4 の間。ここが本体）

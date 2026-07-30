@@ -91,13 +91,45 @@ just down    # 停止
      `/onboarding` が呼ぶ `create_own_household` は `20260704120000_household_provisioning.sql` が初出で、
      欠けると新規ユーザーが世帯を作れずセットアップを完了できません。
    - テーブル / RLS / Storage バケット `daycare-photos` が作られます。
-   - **これ以降**に追加される migration は CI/CD が自動適用するので、初回だけ手動で揃えれば OK
+   - **これ以降**に追加される migration は CI/CD が自動適用します
      （仕組みは [guides/deploy.md](./guides/deploy.md#supabasedbマイグレーション)）。
+   - ⚠️ **SQL Editor で適用した場合は、適用済みとして記録する必要があります。**
+     SQL Editor の実行は `supabase_migrations.schema_migrations` に履歴を残さないため、
+     次の CI/CD の `supabase db push` が**初期 migration を未適用と判断して再実行し、
+     既存オブジェクトで失敗します**。適用した各バージョンについて実行してください:
+     ```bash
+     supabase link --project-ref <PROJECT_REF>
+     supabase migration repair --status applied <version>   # 例: 20260616130704
+     ```
+     この手間を避けたいなら **CLI（`supabase db push`）で適用する**のが確実です
+     （履歴が自動で記録されます）。
 3. **ログイン方式を設定**（どちらか一方でよい）。
-   - **メール/パスワード**: Supabase ダッシュボードの Authentication → Providers で
-     Email を有効化。自分のアカウントを作るには `.env.local` に `SIGNUP_ENABLED=true` を
-     設定して `/signup` を開く（**アプリを起動する前に設定**。起動後に変えた場合は再起動が必要）。
-     本番では既定で閉じています。
+   - **メール/パスワード**: Authentication → Providers で Email を有効化。
+     さらに **Authentication → URL Configuration** に以下を登録します（**必須**）。
+     アプリは確認メールとパスワード再設定の戻り先を `window.location.origin` から作るため
+     （`src/app/signup/SignupForm.tsx` / `src/app/forgot-password/page.tsx`）、
+     許可されていない戻り先は弾かれ、**確認リンクを踏んでもセッションにならず、
+     再設定リンクは `/reset-password` に届きません**。
+     - **Site URL**: 本番 URL（例 `https://<YOUR_APP_DOMAIN>`）
+     - **Redirect URLs**:
+       ```
+       https://<YOUR_APP_DOMAIN>/auth/callback
+       https://<YOUR_APP_DOMAIN>/auth/callback?next=/reset-password
+       http://localhost:3000/auth/callback
+       http://localhost:3000/auth/callback?next=/reset-password
+       ```
+       （Vercel のプレビュー URL も使うならそれも追加）
+
+     自分のアカウントを作るには `.env.local` に `SIGNUP_ENABLED=true` を設定して
+     `/signup` を開く（**アプリを起動する前に設定**。起動後に変えた場合は再起動が必要）。
+
+     🔒 **アカウントを作り終えたら、Supabase 側の signup も閉じてください。**
+     `SIGNUP_ENABLED` が閉じるのは**アプリの UI/導線だけ**で、Supabase Auth の
+     signup API は開いたままです（`src/lib/signup.ts` の注記のとおり）。
+     そのままだと**誰でも直接アカウントを作れます**。
+     Authentication → Providers → Email の **Allow new users to sign up** を **off** に
+     （ローカルは `supabase/config.toml` の `[auth.email] enable_signup`）。
+     以降メンバーを増やすときは `/settings` からの**招待**を使います。
    - **Google**: Authentication → Providers で Google を有効化。Google Cloud / Supabase の
      設定手順は **[guides/google-drive-setup.md](./guides/google-drive-setup.md)** を参照
      （Drive 連携を使う場合はこちらが必要）。

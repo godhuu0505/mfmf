@@ -102,17 +102,59 @@ function lexSegments(command) {
       endSegment(); continue;
     }
     if (c === " " || c === "\t" || c === "\r") { endWord(); continue; }
+    // リダイレクト（`<` `>` `>>` `2>` `2>&1` など）は**引数ではない**。
+    // シェルは `git</dev/null worktree ...` を「git を実行し stdin を差し替える」と読む。
+    // 演算子と**その対象**をまとめて捨てる（対象を語として残すと、それが引数の位置に
+    // 入り込んでサブコマンドの判定がずれる）。
+    if (c === "<" || c === ">") {
+      endWord();
+      // 直前の語が fd 番号だけ（`2` など）ならリダイレクト指定なので引数ではない
+      if (words.length && /^\d+$/.test(words[words.length - 1])) words.pop();
+      let j = i + 1;
+      if (command[j] === ">" || command[j] === "<") j++;        // >> / <<
+      if (command[j] === "&") j++;                              // 2>&1 の &
+      while (j < command.length && /[ \t]/.test(command[j])) j++;  // 演算子と対象の間の空白
+      // 対象（ファイル名 / fd）を読み捨てる
+      while (j < command.length && !/[ \t\r\n;|&()<>]/.test(command[j])) j++;
+      i = j - 1;
+      continue;
+    }
     word += c; hasWord = true;
   }
   endSegment();
   return segments;
 }
 
+// コマンドの「実行ファイル位置」を求める。先頭の環境変数代入（`FOO=bar git ...`）と
+// ラッパー（`env` / `sudo` / `command` / `time` / `nohup` / `xargs`）を読み飛ばす。
+// 全トークンから `git` を探すと `echo git worktree remove --force` のように
+// **git を実行していないコマンド**まで巻き込んで誤爆する。
+const WRAPPERS = new Set(["env", "sudo", "command", "time", "nohup", "nice", "stdbuf", "xargs", "doas"]);
+const basenameOf = (t) => (t.includes("/") ? t.slice(t.lastIndexOf("/") + 1) : t);
+
+// git の**引数が始まる位置**を返す（見つからなければ -1）。
+// 先頭の環境変数代入とラッパーを読み飛ばし、実行ファイルが git のときだけ位置を返す。
+function gitArgsIndex(tokens) {
+  let sawWrapper = false;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(t)) continue;            // VAR=value
+    if (basenameOf(t) === "git") return i + 1;
+    if (WRAPPERS.has(basenameOf(t))) { sawWrapper = true; continue; }
+    // ラッパーを見たあとは、その設定（`sudo -u me` の `-u` と `me` など）を読み飛ばす。
+    // ラッパー無しで git 以外が来たら、それは git を実行していないので対象外
+    // （`echo git worktree remove --force` を誤爆させない）。
+    if (sawWrapper) continue;
+    return -1;
+  }
+  return -1;
+}
+
 function isForcedWorktreeRemoval(command) {
   for (const tokens of lexSegments(command)) {
-    const gitAt = tokens.findIndex((t) => t === "git" || t.endsWith("/git"));
-    if (gitAt < 0) continue;
-    const rest = tokens.slice(gitAt + 1);
+    const argsAt = gitArgsIndex(tokens);
+    if (argsAt < 0) continue;
+    const rest = tokens.slice(argsAt);
     // `--force` の曖昧でない省略形（--f 〜 --force）と、-f を含む短オプション束
     const isForce = (t) =>
       /^--f(?:o(?:r(?:c(?:e)?)?)?)?$/.test(t) || /^-[A-Za-z]*f[A-Za-z]*$/.test(t);
