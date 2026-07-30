@@ -22,6 +22,7 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [guides/verify-backend.md](./guides/verify-backend.md) — デプロイ済みアプリと Supabase バックエンドの動作確認。
 - [guides/feedback-to-issues.md](./guides/feedback-to-issues.md) — ご意見・不具合フォームの内容を非公開リポへ Issue 化する運用。
 - [guides/sentry.md](./guides/sentry.md) — Sentry でエラーモニタリング / Web Vitals の p75 を有効化する（任意）。
+- [guides/field-research-kit.md](./guides/field-research-kit.md) — 事業のペイン仮説を実測に変えるための調査手順（質問票・記録シート・撤退基準）。
 
 ## リファレンス（reference/）
 
