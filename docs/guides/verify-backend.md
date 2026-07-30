@@ -22,7 +22,7 @@
 | テーブルと RLS | Table Editor | `public.daycare_records` / `public.record_photos` / `public.feedback` が存在し、いずれも **RLS enabled**。 |
 | 認証ユーザー | Authentication > Users | ログインに使うユーザーが存在。**世帯メンバーはそれぞれ自分のアカウント**を持つ（招待で追加。`SIGNUP_ENABLED` が閉じている間は手動発行）。 |
 | 世帯とロール | Table Editor | `households` / `household_members` が存在し RLS enabled。確認したいユーザーの `household_members` 行と `role`（owner/editor/viewer）が意図どおり。 |
-| テナント分離 | （下の §2-1 で確認） | 別世帯のユーザーの JWT で **API を直接叩いて**他世帯の行が返らないこと。**アプリ画面で見て確認しない**（理由は §2-1）。自動での担保は CI の pgTAP `supabase/tests/`。 |
+| テナント分離・ロール境界 | **CI（pgTAP）** | 挙動は `supabase/tests/` が PR ごとに検証済み。**本番に対して手で試さない**（理由と内訳は §2-1）。ここで見るのは上下の行（RLS enabled / role / advisor）まで。 |
 | Storage | Storage | `daycare-photos` バケットがあり **private**。署名付き URL（期限 1 時間）で配信。 |
 | スキーマ適用 | （実体で判断） | 上の実体が揃っていれば適用済み。未適用なら `supabase/migrations/` を SQL Editor で実行。 |
 | advisor | Advisors | RLS 未設定や危険な公開設定の警告が **0 件**。DDL 変更後は必ず確認。 |
@@ -33,63 +33,39 @@
 > や初回 setup で手動適用した分は履歴に残らないため、移行期は実体（テーブル / ポリシー / バケット）と
 > 履歴の両面で判断する。ズレを直したいときは `supabase migration repair --status applied <version>` を使う。
 
-### 2-1. テナント分離は「アプリ画面で見て」確認してはいけない
+### 2-1. RLS の挙動は pgTAP が担保する（手で確かめようとしない）
 
-**アプリを別世帯のユーザーで開いても、RLS が壊れているかどうかは分かりません。**
-`src/app/page.tsx` は RLS の手前で `householdScopeFilter(householdId)` を掛けており
-（`src/lib/household.ts`）、**アプリ側が現在世帯で先に絞り込んでいます**。
-そのため、仮に本番のポリシーが全世帯を許してしまっていても、画面には自分の世帯の行しか
-出ません。**画面が正しく見えることは、API が守られていることの証拠になりません。**
+**テナント分離とロール境界の検証は、書くと壊れます。** このリポジトリでは実際に
+「確認したのに何も検証できていない」手順を 2 度作りました。
 
-アプリの絞り込みを通らない経路で確かめます。
+- アプリ画面で別世帯のユーザーを開いて確認する → `src/app/page.tsx` が RLS の**手前**で
+  `householdScopeFilter(householdId)` を掛けている（`src/lib/household.ts`）。
+  本番のポリシーが全世帯を許していても、画面には自分の世帯の行しか出ない
+- JWT を取って API を直接叩く → 認証に失敗すると `Bearer null` で問い合わせることになり、
+  **空が返って「分離できている」ように見える**。加えて本番の資格情報を手元で扱う必要が出る
 
-```bash
-# 1) 確認したいユーザーでログインしてアクセストークン（JWT）を得る
-#    パスワードは非表示入力で受け取り、JWT は表示せず変数へ直接入れる。
-#    （コマンドラインに書くと履歴に残り、jq の結果を表示するとセッションが端末に出る）
-read -r EMAIL
-read -rs PASSWORD          # ← -s でエコーしない
-JWT=$(curl -sS --fail-with-body \
-  "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
-  -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
-  -H "Content-Type: application/json" \
-  --data-binary @<(jq -nc --arg e "$EMAIL" --arg p "$PASSWORD" '{email:$e,password:$p}') \
-  | jq -er .access_token) || { echo "トークンを取得できませんでした。中止します。"; unset PASSWORD; return 2>/dev/null || exit 1; }
-unset PASSWORD
-echo "取得できました（長さ: ${#JWT}）"   # ← JWT 自体は表示しない
+**恒久的な担保は CI の pgTAP（`supabase/tests/`）です。** 8 ファイル・**159 アサーション**
+（`results_eq` 68 / `throws_ok` 49 / `lives_ok` 20 / `is_empty` 12 / `ok` 10）で、
+手動確認より広く深く検証しています。
 
-# 2) 絞り込みを一切掛けずに全件取りに行く
-curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/daycare_records?select=id,household_id" \
-  -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
-  -H "Authorization: Bearer $JWT" | jq -r '.[].household_id' | sort -u
+| 検証されていること | ファイル |
+| --- | --- |
+| 他世帯の record / pet / photo / feedback が select 不可、update も no-op | `household_rls_test.sql` |
+| viewer は update / delete できず insert は throw（UC-A01） | `household_rbac_test.sql` |
+| ゲストは対象ペット・期間の外を見られない | `guest_grants_test.sql` |
+| 招待・世帯作成・削除・Storage・タグの各境界 | `household_invites_test.sql` ほか |
 
-# 3) 別世帯の既知の行を id 指定で狙い撃ちする（返らないこと ＝ 空配列）
-curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/daycare_records?id=eq.<別世帯の記録 id>" \
-  -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
-  -H "Authorization: Bearer $JWT"
+これらは **PR ごとに CI で走ります**（`.github/workflows/ci.yml` の
+`RLS tenant isolation (pgTAP)`）。**手元で本番に対して同じことを試す必要はありません。**
 
-# 4) 済んだらセッションを手元から消す
-unset JWT
-```
+**本番で確認するのは「ポリシーが適用されているか」まで**にとどめます。挙動そのものは
+pgTAP に任せ、ここでは実体だけを見ます（上の表の「テーブルと RLS」「世帯とロール」「advisor」）。
 
-**期待**: 2) は自分が所属する世帯の `household_id` だけ（複数世帯に属するならその集合だけ）。
-3) は `[]`。どちらかで他世帯の行が返れば **RLS が破れています**。
+> ⚠️ **本番データに対して write を試さないこと。** 「viewer で書けないことを確かめる」形の
+> 手動テストは、RLS が壊れていた場合に**本番へ書き込んでしまいます**。
+> 壊れているかどうかを確かめる操作が、壊れていたときに被害を出す形になっています。
+> 同じことは pgTAP がローカルの使い捨て DB で安全に検証済みです。
 
-> ⚠️ **トークン取得の失敗を必ず止めること。** パスワード誤り・Email プロバイダ無効・
-> エンドポイントのエラーのとき、`jq -r .access_token` は文字列 `null` を返します。
-> それに気づかず進むと `Authorization: Bearer null` で問い合わせることになり、
-> **2) も 3) も空が返って「分離できている」ように見えます**。
-> 実際に確かめたのは「認証に失敗すると何も見えない」ことだけで、**RLS は一切検証していません**。
-> 上では `curl --fail-with-body` と `jq -er` で失敗時に中止するようにしています。
-
-> `$NEXT_PUBLIC_*` はブラウザに公開される前提の値なので curl に置いても構いませんが、
-> **JWT はセッションそのもの**です。上の手順は**端末に出さない・履歴に残さない**形にしてあります
-> （パスワードは `read -rs` で非表示、JWT は変数へ直接代入して長さだけ表示）。
-> `jq -r .access_token` の結果をそのまま画面に出す・ログや issue に貼る、はしないこと。
->
-> 恒久的な担保は CI の pgTAP（`supabase/tests/`）です。上の手順は
-> 「本番の実体が pgTAP と同じ状態か」を目視で 1 回確かめるためのもので、
-> DDL やポリシーを変えた直後にだけ実施すれば十分です。
 
 ## 3. 接続のスモークテスト
 

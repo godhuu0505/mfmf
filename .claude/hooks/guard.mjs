@@ -96,7 +96,11 @@ function lexSegments(command) {
       word += q === "'" ? decodeAnsiC(body) : body;   // $'...' は ANSI-C、$"..." は翻訳（中身はそのまま）
       hasWord = true; i = j; continue;
     }
-    if (c === ";" || c === "|" || c === "&" || c === "\n") { endSegment(); continue; }
+    // 区切り文字。`(` `)` はサブシェル境界なので、これも区切りとして扱う
+    // （扱わないと `(git worktree remove ../x --force)` が `(git` と `--force)` になり一致しない）。
+    if (c === ";" || c === "|" || c === "&" || c === "\n" || c === "(" || c === ")") {
+      endSegment(); continue;
+    }
     if (c === " " || c === "\t" || c === "\r") { endWord(); continue; }
     word += c; hasWord = true;
   }
