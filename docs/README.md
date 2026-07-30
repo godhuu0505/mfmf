@@ -37,6 +37,7 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [explanation/business-strategy.md](./explanation/business-strategy.md) — 事業戦略（ユーザー獲得・収益モデル・法規制ゲート・デバイス構想）。
 - [explanation/market-analysis.md](./explanation/market-analysis.md) — 日本市場のマーケティング分析（3C・5F・SWOT・バリューチェーン・KSF・自己批判）。
 - [explanation/strategy-zero-based.md](./explanation/strategy-zero-based.md) — アプリを前提にしないゼロベース再検討（事業形態の選択・KSF の再特定・90日の検証設計）。
+- [explanation/pet-market-research.md](./explanation/pet-market-research.md) — ペット市場の分解・再統合と、飼い主／ブリーダー／ペット自身のペイン仮説18本（出典つき）。
 
 ---
 
