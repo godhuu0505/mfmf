@@ -158,6 +158,12 @@ function lexSegments(command, { envSplit = false } = {}) {
 // ラッパーごとの「値を取るオプション」。ここまで持つのは、ラッパーの**引数を読み飛ばす**のと
 // 「ラッパーが実行する本体」を見分けるのを区別するため。区別しないと
 // `env echo git worktree remove --force` の `echo` を飛ばして `git` を本体と誤認する。
+// コマンドの前に置ける予約語。`for` / `case` は次に来るのが変数名 / 値なので入れない。
+const SHELL_KEYWORDS = new Set([
+  "!", "{", "}", "if", "then", "elif", "else", "fi",
+  "while", "until", "do", "done",
+]);
+
 const WRAPPER_OPTS_WITH_VALUE = {
   sudo: new Set(["-u", "-g", "-p", "-C", "-h", "-r", "-t", "-U"]),
   doas: new Set(["-u", "-C"]),
@@ -186,20 +192,27 @@ function gitArgs(tokenList) {
   while (i < tokens.length) {
     const t = tokens[i];
     if (isAssignment(t)) { i++; continue; }                 // VAR=value
-    // `!` は bash の否定演算子で、**コマンドの前置詞**（`! git worktree remove --force` は
-    // 実行される）。語として残すと「git ではない実行ファイル」に見えて対象外になる。
-    // 引用した `'!'` は bash では演算子にならないが、その形は実在しないコマンド名として
-    // 失敗するだけなので、区別せず前置詞として扱う（拒否側に倒す）。
-    if (t === "!") { i++; continue; }
+    // シェルの**予約語**はコマンドの前置詞なので読み飛ばす。語として残すと
+    // 「git ではない実行ファイル」に見えて対象外になる。
+    //   `! git worktree remove --force`        否定演算子
+    //   `{ git worktree remove --force; }`     ブレースグループ（`{` は予約語）
+    //   `if git ... ; then`, `while git ...`   複合コマンドの前置詞
+    // 引用した `'!'` や `'{'` は bash では予約語にならないが、その形は実在しない
+    // コマンド名として失敗するだけなので、区別せず前置詞として扱う（拒否側に倒す）。
+    if (SHELL_KEYWORDS.has(t)) { i++; continue; }
     const base = basenameOf(t);
     if (base === "git") return tokens.slice(i + 1);
     const opts = WRAPPER_OPTS_WITH_VALUE[base];
     if (!opts) return null; // git でもラッパーでもない ＝ git を実行していない
     // ラッパー自身のオプションを読み飛ばす。次に来る非オプションが「本体」で、
-    // それを次の周回で改めて判定する（git なら採用、そうでなければ -1）。
+    // それを次の周回で改めて判定する（git なら採用、そうでなければ対象外）。
     i++;
     while (i < tokens.length && tokens[i].startsWith("-") && tokens[i] !== "-") {
       if (tokens[i] === "--") { i++; break; }
+      // `command -v` / `-V` は**実行せず名前を表示するだけ**（bash の `help command`）。
+      // 後続の語は「調べたい名前」で引数ではないので、git を実行しているとは見なさない。
+      // これを区別しないと `command -v git worktree remove --force` を誤って拒否する。
+      if (base === "command" && /^-[a-zA-Z]*[vV]/.test(tokens[i])) return null;
       const opt = tokens[i];
       const eq = opt.indexOf("=");
       const name = eq < 0 ? opt : opt.slice(0, eq);

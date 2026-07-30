@@ -70,7 +70,11 @@
 
 ```sql
 -- 本番の Supabase ダッシュボード > SQL Editor で実行（SELECT のみ）
-select schemaname, tablename, policyname, cmd, qual, with_check
+select schemaname, tablename, policyname,
+       cmd,
+       permissive,        -- ← 'PERMISSIVE' であること（RESTRICTIVE は AND 結合になる）
+       roles,             -- ← {authenticated} 等。誰に適用されるか
+       qual, with_check
 from pg_policies
 where schemaname in ('public', 'storage')   -- ← 写真のポリシーは storage.objects にある
 order by schemaname, tablename, policyname;
@@ -83,9 +87,22 @@ order by schemaname, tablename, policyname;
 > `daycare-photos` は private なので配信は署名付き URL 経由ですが、**署名の発行自体に
 > select の RLS が必要**なため、ここが緩むと他世帯のユーザーが署名を取れるようになります。
 
-**確認するのは 4 点**です。
+**確認するのは 5 点**です。
 
-1. **世帯データのテーブルが世帯ヘルパーを経由しているか** —— `qual` / `with_check` に
+1. **`permissive` と `roles`** —— 名前・`cmd`・述語がすべて一致していても、
+   この 2 列が違うと**適用のされ方が変わります**。
+   - `permissive` が `RESTRICTIVE` に作り直されていると、PostgreSQL は
+     **OR ではなく AND** で結合します。同じ述語でも他のポリシーと掛け算になり、
+     正当な世帯アクセスが**拒否される**（穴が開くのではなく機能が壊れる方向）
+   - `roles` が変わっていると、意図した相手にポリシーが適用されません
+     （全許可にはなりません —— 他に許可が無ければ拒否です）
+
+   **期待値は `permissive = 'PERMISSIVE'` / `roles = {public}` です。**
+   本リポジトリの migration は `TO` 句を書いておらず（128 本の `create policy` すべて）、
+   判定は述語の `auth.uid()` 側で行っています。したがって `{authenticated}` ではなく
+   **`{public}` が正常**です —— ここを「`public` は危ない」と読み替えて `TO` を足すと、
+   ポリシーの適用対象が狭まって正当なアクセスが落ちます
+2. **世帯データのテーブルが世帯ヘルパーを経由しているか** —— `qual` / `with_check` に
    `has_household_role` / `is_household_member` / `has_guest_access` /
    `has_guest_record_access` のいずれかが現れること。
    `true` だけのポリシーや、`household_id` を見ていない条件があれば**そこが穴**。
@@ -97,7 +114,7 @@ order by schemaname, tablename, policyname;
    —— とくに `google_credentials` は Google の OAuth トークンなので、
    ここを世帯ヘルパーに「直す」と**世帯メンバーが互いの refresh token を読めます**。
    `*_own` という名前と `auth.uid() = owner_id` の組み合わせが出たら、それが正常です
-2. **`cmd` の欠落を「適用漏れ」と決めつけないこと** —— 欠けている `cmd` は、
+3. **`cmd` の欠落を「適用漏れ」と決めつけないこと** —— 欠けている `cmd` は、
    その操作が「ポリシー無し」＝ RLS 有効なら全拒否になることを意味します。
    これは**多くの場合、意図した最小権限**です。実際に migration どおりの状態でも:
 
@@ -109,9 +126,9 @@ order by schemaname, tablename, policyname;
 
    🚨 **足りないように見えるからといってポリシーを追加しないこと。** 上の 3 つに
    insert / update を足すと、RPC と招待フローを迂回する経路を自分で開けることになります。
-   期待する `cmd` の集合は `supabase/migrations/` が正で、次の 4 点目で突き合わせます。
+   期待する `cmd` の集合は `supabase/migrations/` が正で、5 点目で突き合わせます。
    **RLS が無効になっていれば全許可**になりますが、それは下の表の「RLS enabled」で気づけます
-3. **`storage.objects` に `daycare_photos_*` の 5 本が揃っているか** —— 2 系統です。
+4. **`storage.objects` に `daycare_photos_*` の 5 本が揃っているか** —— 2 系統です。
    `_household`（新パス規約 `{household_id}/...` 用: select / insert / delete）と
    `_shared_owner`（旧パス `{owner_id}/...` を「その記録の世帯のメンバー」に開く分:
    select / delete）。`qual` に `is_household_member` / `has_household_role` と
@@ -124,14 +141,14 @@ order by schemaname, tablename, policyname;
    > （旧パスの読み取りは `_shared_owner` が世帯単位で引き継いだ）。
    > **1 本のポリシーの有無を数えるときは、それを作った migration だけでなく
    > 後続の drop まで追うこと** —— この節は一度「8 本」と書いて間違えました
-4. **`supabase/migrations/` の内容と一致するか** —— 差異があれば適用漏れか手動変更。
+5. **`supabase/migrations/` の内容と一致するか** —— 差異があれば適用漏れか手動変更。
    `supabase migration list` で履歴のズレも確認できる（[deploy.md](./deploy.md)）
 
 **さらに、ヘルパー関数の中身も比べます。** `pg_policies` に出るのは
 `has_household_role(...)` という**呼び出しだけ**で、関数の**本体**は含まれません。
 これらは `SECURITY DEFINER`（呼び出し元の権限を無視して実行）で、
 メンバーシップ・ロール・対象ペット・期間の判定は**本体の中**にあります。
-つまり **`has_household_role` が `return true` に書き換えられていても、上の 4 点は全部通ります** ——
+つまり **`has_household_role` が `return true` に書き換えられていても、上の 5 点は全部通ります** ——
 そしてその 1 行で全世帯が露出します。
 
 ```sql
