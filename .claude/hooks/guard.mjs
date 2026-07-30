@@ -29,6 +29,13 @@ function deny(reason) {
 // （`git worktree remove "$WT" $FLAGS` など）は原理的に見抜けない。
 // 「うっかり」を止めるための層であり、意図的な回避に対する境界ではない。
 // 本当の安全策は worktree の中身を消される前に確認すること（deny の文言で誘導している）。
+//
+// ⚠️ **ラッパーの表（WRAPPER_OPTS_WITH_VALUE / WRAPPER_POSITIONALS）も本質的に不完全。**
+// 「別のコマンドを実行するコマンド」は無数にあり（env / sudo / exec / timeout / flock /
+// chroot / setarch / taskset / ionice / setsid / xargs / nohup / nice / stdbuf / time ...）、
+// レビューのたびに新しいものが出てきた。列挙で塞ぐ以上、常に「まだ挙げていないもの」が残る。
+// 上と同じで、これは事故を減らす層であって網ではない。
+// **最終的な保証は `.claude/settings.json` の allow list に無いこと**（＝承認プロンプトが出る）。
 // ANSI-C 引用 `$'...'` の中身を復元する。`\x2d` `\055` `\u002d` `\n` などを実際の文字に戻す。
 // エスケープの「形」を 1 つずつ潰すのではなく、この構文をまとめて解釈することで
 // `$'\x2d\x2dforce'` `$'\055\055force'` `--fo$'\x72'ce` をすべて同じ `--force` に落とす。
@@ -164,11 +171,29 @@ function lexSegments(command, { envSplit = false } = {}) {
       let dashed = false;
       if (command[j] === "-") { dashed = true; j++; }
       while (j < command.length && /[ \t]/.test(command[j])) j++;
+      // 区切り語は**シェルの 1 語**として読む。引用符の中の空白は語の一部
+      // （`cat <<'END WORD'` の区切りは `END WORD`）。空白で打ち切ると `END` だけを
+      // 区切りと誤認し、本文が終わらず**後続の実コマンドまで本文として飲み込む**。
       let delim = "";
-      while (j < command.length && !/[\s;|&()<>]/.test(command[j])) {
+      while (j < command.length) {
         const ch = command[j];
-        if (ch === "'" || ch === '"') { j++; continue; }        // 引用符は区切り語の一部ではない
+        if (ch === "'") {
+          const e = command.indexOf("'", j + 1);
+          delim += e < 0 ? command.slice(j + 1) : command.slice(j + 1, e);
+          j = e < 0 ? command.length : e + 1;
+          continue;
+        }
+        if (ch === '"') {
+          let k = j + 1;
+          for (; k < command.length && command[k] !== '"'; k++) {
+            if (command[k] === "\\" && k + 1 < command.length) delim += command[++k];
+            else delim += command[k];
+          }
+          j = k + 1;
+          continue;
+        }
         if (ch === "\\") { j++; if (j < command.length) delim += command[j++]; continue; }
+        if (/[\s;|&()<>]/.test(ch)) break;
         delim += ch; j++;
       }
       endWord();
@@ -222,6 +247,24 @@ const WRAPPER_OPTS_WITH_VALUE = {
   // `exec git ...` はシェル自身を git に置き換えて**実行する**（bash の `help exec`）。
   // `-a name` だけ値を取り、`-c` / `-l` は取らない。
   exec: new Set(["-a"]),
+  // `timeout [OPTION] DURATION COMMAND ...`（`timeout --help`）
+  timeout: new Set(["-s", "--signal", "-k", "--kill-after"]),
+  flock: new Set(["-w", "--wait", "--timeout", "-E", "--conflict-exit-code"]),
+  chroot: new Set(["--userspec", "--groups"]),
+  setarch: new Set([]),
+  taskset: new Set(["-p", "--pid"]),
+  ionice: new Set(["-c", "--class", "-n", "--classdata", "-p", "--pid"]),
+  setsid: new Set([]),
+};
+
+// オプションの**あと**に位置引数を取ってからコマンドを実行するラッパー。
+// この表も本質的に不完全（下のヘッダコメントの但し書きと同じ）。
+const WRAPPER_POSITIONALS = {
+  timeout: 1,   // DURATION
+  flock: 1,     // file | directory | fd
+  chroot: 1,    // NEWROOT
+  setarch: 1,   // arch
+  taskset: 1,   // mask
 };
 // 文字列を分割して実行するオプション（GNU env の `-S` / `--split-string`）。
 // 値を単に読み飛ばすと、その中にある本体（git ...）を見落とす。
@@ -294,6 +337,10 @@ function gitArgs(tokenList) {
     }
     if (tokens[i] === "-") i++;                             // env の `-`
     while (i < tokens.length && isAssignment(tokens[i])) i++; // env NAME=VALUE...
+    // オプションのあとに**位置引数**を取るラッパーがある。
+    // `timeout 5 git ...` の `5`、`flock /tmp/lock git ...` の `/tmp/lock` など。
+    // ここを飛ばさないと、その位置引数を「実行ファイル」と誤認して対象外にしてしまう。
+    for (let k = 0; k < (WRAPPER_POSITIONALS[base] ?? 0) && i < tokens.length; k++) i++;
   }
   return null;
 }
