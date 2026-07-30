@@ -6,11 +6,12 @@ AI コーディングエージェント（Claude Code / Copilot / Cursor / Codex
 
 ## プロジェクト概要
 
-夫婦で 1 アカウントを共用し、保育園の日々の記録（テキスト＋写真）を残すミニマムな PWA。
+家族で保育園の日々の記録（テキスト＋写真）を残すミニマムな PWA。
 
 - フロント/配信: Next.js 15（App Router）+ React 19 + TypeScript(strict) + Tailwind CSS v4 / Vercel
 - 認証/DB/画像: Supabase（`@supabase/ssr`、Cookie ベースのセッション）
-- 共有方針: `household_id` は持たず `owner_id (= auth.uid())` ベースの RLS
+- 共有方針: 世帯（`households` / `household_members`）ベースのマルチテナント。
+  role は owner / editor / viewer、外部ゲストは `guest_grants`（対象ペット・期間限定）
 
 ## セットアップ・検証コマンド
 
@@ -36,18 +37,25 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 - Server Action 冒頭で `supabase.auth.getUser()` を確認し、未ログインは `redirect("/login")`。
 - DB スキーマ変更は `supabase/migrations/` に新しいタイムスタンプ付き SQL を追加する（`supabase migration new <name>` で生成、既存の `20260616130704_init.sql` は編集しない）。main マージ時に `deploy-production.yml` の `migrate` ジョブが `supabase db push` で本番 Supabase に自動適用し、続けて Vercel Production にデプロイされる（merge = 本番リリース）。破壊的変更は PR 段階でローカル `supabase db reset` 確認まで済ませること。
 - パスエイリアスは `@/*` → `src/*`。
+- UI のある新機能は、仕様を文章で固める前に `proto/<slug>` 使い捨てブランチの実コードで画面を作り、
+  実機で触って合意する（手順は `.claude/skills/prototype/SKILL.md`）。結論は
+  [docs/explanation/decisions.md](./docs/explanation/decisions.md) に 1 行残す。
 
 ## やってはいけないこと（境界）
 
 - **秘密情報をコミット / 出力しない。** `.env.local` 等の実 env ファイルは読まない・編集しない（ガードフックがブロック）。
 - **`service_role` キーをクライアント・リポジトリに置かない**（このアプリでは使わない）。
-- **既存の RLS（`owner_id = auth.uid()`）を弱めない。** Server Action の認可チェックを省略しない。
+- **既存の RLS（世帯メンバーシップ + role、ゲストは `guest_grants`）を弱めない。**
+  Server Action は冒頭で必ず `getUser()`。認可は**操作に応じて使い分ける**（ひとつのヘルパーで
+  代用しない）。**対応表は持たない** —— 正は `src/lib/household.ts` と各 `actions.ts`。
+  取り違えやすい点だけ: **更新/削除は「現在世帯」ではなく「対象行の `household_id`」で判定する。**
+  `/onboarding` は世帯未所属で走るのが正常。詳細は CLAUDE.md。
 - **Service Worker（`public/sw.js`）は Supabase の API レスポンスや署名付き写真 URL をキャッシュしない。**
 - `main` へ直接 push しない。強制 push（`--force`）禁止（ガードでブロック）。
 
 ## ドキュメント地図
 
 - 全体像: [README.md](./README.md) ／ ドキュメント索引: [docs/README.md](./docs/README.md)
-- 構成・データモデル: [docs/reference/architecture.md](./docs/reference/architecture.md)
-- 設計の「なぜ」: [docs/explanation/design-decisions.md](./docs/explanation/design-decisions.md)
+- 構成の地図: [docs/reference/architecture.md](./docs/reference/architecture.md)
+- 決定ログ（却下した案と理由）: [docs/explanation/decisions.md](./docs/explanation/decisions.md)
 - DB / RLS の正: [supabase/migrations/](./supabase/migrations/)

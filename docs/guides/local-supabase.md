@@ -60,11 +60,15 @@ just setup
 > NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase status の anon key>
 > ```
 
-## 4. Google ログインを設定
+## 4. Google ログインを設定（任意）
 
-本アプリは **Google OAuth 一本化**で、メール/パスワードログインの UI はありません。
-Google Cloud Console での OAuth クライアント発行（手動・約 5 分）→ 認証情報を投入する
-流れになります。
+ログインは **Google OAuth** と **メール/パスワード**の 2 方式があります。
+**メール/パスワードだけで動かすならこの章は不要です**（手順は
+[../../README.md](../../README.md) のクイックスタート B を参照。ローカルでは
+確認メールが Mailpit `http://127.0.0.1:54324` に届くので、そこで確認リンクを踏みます）。
+
+Google ログイン / Drive 連携を使う場合は、Google Cloud Console での
+OAuth クライアント発行（手動・約 5 分）→ 認証情報を投入する流れになります。
 
 ### 4-1. Google Cloud Console で OAuth クライアントを発行
 
@@ -87,8 +91,10 @@ just setup-google
 
 手動でやる場合は [google-drive-setup.md 2B](./google-drive-setup.md#2b-ローカル-supabasesupabase-start-の場合) を参照。
 
-> ⚠️ 夫婦共用方針：RLS が `owner_id = auth.uid()` のため、別の Google アカウントで
-> ログインすると記録が共有されません。**1 つの Google アカウント**で 2 人とも使ってください。
+> 💡 記録は**世帯（household）単位**で共有されます。別アカウントで使う場合は、
+> `/settings` から **editor / viewer** で招待してください（owner は招待では選べず、
+> 参加後に既存 owner が昇格させます）
+> （招待されていないアカウントでは記録は見えません）。
 
 ## 5. アプリ起動
 
@@ -126,7 +132,7 @@ supabase stop   # Supabase スタックを停止（データは保持）
 | `just setup` が `Failed to read ANON_KEY` | `supabase start` 完了前。`supabase status` で起動を確認してから再実行 |
 | 起動時に `NEXT_PUBLIC_SUPABASE_URL` 関連でエラー | `.env.local` 未設定 / 値が空。`just setup` 実行か、`.env.local.example` を元に設定し再起動 |
 | Google ログインができない | `supabase/config.toml` の `[auth.external.google]` 設定漏れ、`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` 未設定、または Google Cloud 側のリダイレクト URI に `http://127.0.0.1:54321/auth/v1/callback` が登録されていない可能性 |
-| 一覧は出るが他人のデータが見える / 見えない | RLS が `owner_id = auth.uid()` 前提。マイグレーション未適用の可能性 |
+| 一覧は出るが他の世帯のデータが見える / 自分の記録が見えない | RLS は**世帯メンバーシップ**（`has_household_role` / `is_household_member`）で判定。マイグレーション未適用か、そのアカウントが世帯に招待されていない可能性 |
 | 写真が表示されない | Storage バケット `daycare-photos`（private）未作成、または署名付き URL の期限切れ |
 | `just up` で SSR が Supabase に届かない | `docker-compose.yml` の `environment.SUPABASE_INTERNAL_URL` と `extra_hosts` を確認 |
 | Service Worker のキャッシュが残る | SW は本番ビルドのみ登録。`just dev` / `just up` では無効。挙動確認は `npm run build && npm run start` |

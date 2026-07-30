@@ -1,16 +1,18 @@
 # CLAUDE.md
 
 このファイルは Claude Code が **mfmf**（ペット保育園記録アプリ）で作業するための指針です。
-全体像は `README.md`、DB/RLS は `supabase/migrations/20260616130704_init.sql` を正とします。
+全体像は `README.md`、DB/RLS は `supabase/migrations/` 全体（連番 SQL）を正とします。
 ツール非依存の要点版は `AGENTS.md`、各種手順・仕様は `docs/`（索引は `docs/README.md`）にあります。
 
 ## プロジェクト概要
 
-夫婦で 1 アカウントを共用し、保育園の日々の記録（テキスト＋写真）を残す最小構成の PWA。
+家族で保育園の日々の記録（テキスト＋写真）を残す最小構成の PWA。
 
 - フロント/配信: **Next.js 15（App Router）+ React 19 + TypeScript（strict）+ Tailwind CSS v4** / Vercel Hobby
 - 認証/DB/画像: **Supabase（Free）**。認証は `@supabase/ssr`（Cookie ベースのセッション）
-- 共有方針 (A): `household_id` は持たず `owner_id (= auth.uid())` ベースで RLS
+- 共有方針: **世帯（`households` / `household_members`）ベースのマルチテナント**。
+  role は owner / editor / viewer、外部ゲストは `guest_grants`（対象ペット・期間限定）。
+  ヘルパーは `src/lib/household.ts`（`getCurrentHouseholdId` / `requireEditableHousehold` ほか）。
 
 ## よく使うコマンド
 
@@ -50,8 +52,11 @@
   には画像本体を渡さず、アップロード済みのオブジェクトパスだけを送って `record_photos` に登録する
   （Vercel の Function ボディ上限 4.5MB を超えないため）。新規作成時は `record_id` をクライアントで
   生成し、パス規約と DB 行の id を一致させる。
-- Storage オブジェクトパス規約: `{household_id}/{record_id}/{filename}`（household 未所属時と
-  既存オブジェクトは `{owner_id}/{record_id}/{filename}` を併存。生成/検証は `src/lib/storagePath.ts`）。
+- Storage オブジェクトパス規約: `{household_id}/{record_id}/{filename}`。生成/検証は
+  `src/lib/storagePath.ts`。**新規アップロードはこの形だけが通る** —— 旧規約
+  `{owner_id}/{record_id}/{filename}` への insert ポリシーは削除済みで
+  （`20260704000000_rbac_switch_and_management.sql`）、既存オブジェクトの
+  **読取/削除のみ**が世帯メンバーに開かれている（`daycare_photos_*_shared_owner`）。
 - 画面: `/login`（Google OAuth + email/password）, `/signup`（`SIGNUP_ENABLED=true` で開放）,
   `/forgot-password`, `/reset-password`, `/`（一覧）, `/records/new`, `/records/[id]`（`?edit=1` で編集）,
   `/calendar`, `/gallery`, `/pets`, `/weight`, `/settings`, `/share/[token]`,
@@ -59,15 +64,33 @@
   `/guest`・`/guest/records/new`（外部ゲストの閲覧/記入 UC-G02/G03）,
   `/feedback`, `/offline`, `/auth/*`。`/shares`・`/share/[token]` は匿名共有廃止（D4）の終了案内。
 
+## 新機能の画面を検討するとき
+
+UI のある新機能は、仕様を文章で固める前に **`proto/<slug>` 使い捨てブランチの実コード**で
+画面を作り、実機で触って合意する。手順は **`prototype` skill**（`.claude/skills/prototype/`）。
+バックエンドのみの変更・小改修・バグ修正では使わない。
+採用/却下の結論は [docs/explanation/decisions.md](./docs/explanation/decisions.md) に 1 行残す。
+
 ## セキュリティ（厳守）
 
 - **秘密情報をコミット/出力しない。** `.env.local` 等の実 env ファイルは読まない・編集しない
   （ガードフックがブロック）。設定例は `.env.local.example` を参照。
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` はブラウザ公開される前提の値。
   一方 **service_role key はクライアント・リポジトリに絶対に置かない**（このアプリでは使わない）。
-- **セキュリティの一次防衛線は Supabase の RLS**。`owner_id = auth.uid()` ポリシーに依存する。
+- **セキュリティの一次防衛線は Supabase の RLS**。判定は**世帯メンバーシップと role**
+  （`has_household_role` / `is_household_member`）＋ ゲストは `guest_grants` の対象/期間。
+  一部の経路で `owner_id = auth.uid()` が併存する（世帯未所属時のフォールバック等）。
   テーブル/ポリシーを変える migration を書くときは既存の RLS を弱めないこと。
-  Server Action でも `getUser()` による認可チェックを省略しない。
+  テナント分離は `supabase/tests/` の pgTAP が CI で守っている。
+- **Server Action は冒頭で必ず `getUser()`。認可はそのうえで「操作に応じたもの」を使う**
+  （ひとつのヘルパーで代用しない）。**どのヘルパーがどの操作用かは
+  [`src/lib/household.ts`](src/lib/household.ts) と各 `actions.ts` を読むこと** ——
+  ここに対応表を持つとコードと二重管理になり、実際にこの表は 2 度間違えた（D16）。
+  取り違えやすい 1 点だけ書いておく: **更新 / 削除は「現在世帯」ではなく「対象行の
+  `household_id`」で判定する。** 複数世帯に属するユーザーが別タブで世帯を切り替えていると、
+  現在世帯基準では正当な編集を弾く / 誤った世帯で事前認可してしまう。
+  なお `/onboarding` は**世帯未所属で走るのが正常**なので世帯チェックを課さない
+  （`create_own_household` が SECURITY DEFINER 側で所属ゼロを強制）。
 - **Service Worker（`public/sw.js`）は Supabase の API レスポンスや署名付き写真 URL
   （private / 期限付き）をキャッシュしない**。キャッシュ戦略を変えるときはこの不変条件を守る。
 - 入力由来の値（ファイル名等）はサニタイズする（`buildStoragePath` 参照）。

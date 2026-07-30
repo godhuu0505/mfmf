@@ -8,6 +8,33 @@ default:
 dev:
     npm run dev
 
+# Dev server bound to the LAN, for checking prototypes on a real phone.
+# mfmf is a PWA: one-handed use, safe areas and IME can only be judged on a device.
+dev-lan:
+    @set -e; \
+    IPS="$(hostname -I 2>/dev/null || true)"; \
+    if [ -z "$IPS" ]; then \
+        IPS="$(ipconfig getifaddr en0 2>/dev/null || true)"; \
+    fi; \
+    echo "[dev-lan] 候補アドレス（スマホと同じネットワークのものを選ぶ）:"; \
+    FOUND=0; \
+    for ip in $IPS; do \
+        case "$ip" in \
+            *:*) continue ;; \
+        esac; \
+        case "$ip" in \
+            172.1[6-9].*|172.2[0-9].*|172.3[01].*) NOTE="  ← Docker の可能性" ;; \
+            10.*) NOTE="  ← VPN の可能性" ;; \
+            *) NOTE="" ;; \
+        esac; \
+        echo "  http://$ip:3000$NOTE"; \
+        FOUND=1; \
+    done; \
+    if [ "$FOUND" = "0" ]; then \
+        echo "  （自動判定できませんでした。手元の LAN IP を確認してください）"; \
+    fi; \
+    npm run dev -- -H 0.0.0.0
+
 # CI gate: lint -> typecheck -> build
 check:
     npm run lint
@@ -51,7 +78,9 @@ setup:
     sed -i.bak -E "s#^TOKEN_ENC_KEY=.*#TOKEN_ENC_KEY=$TOKEN_ENC_KEY#" .env.local; \
     rm -f .env.local.bak; \
     echo "[setup] Done."; \
-    echo "[setup] Next: 'just setup-google' で Google OAuth を設定 → 'just up' (or 'just dev')"
+    echo "[setup] Next: 'just up' (or 'just dev') で起動できます。"; \
+    echo "[setup]       Google ログイン / Drive 連携を使う場合のみ 'just setup-google' を実行。"; \
+    echo "[setup]       メール/パスワードだけなら .env.local に SIGNUP_ENABLED=true で /signup を開放。"
 
 # Configure Google OAuth interactively. Run after Google Cloud OAuth client is created.
 # Writes secrets to supabase/.env and .env.local, enables [auth.external.google], restarts Supabase.

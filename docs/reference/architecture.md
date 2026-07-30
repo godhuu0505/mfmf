@@ -1,8 +1,17 @@
 # アーキテクチャ・リファレンス
 
-mfmf の構成・画面・データモデルの事実をまとめた参照用ドキュメントです。
-設計の「なぜ」は [explanation/design-decisions.md](../explanation/design-decisions.md)、
-DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/) です。
+構成の**地図**です。**現状の仕様（画面一覧・データモデル・RLS）はここには書きません** ——
+コードから復元できるものは腐るため（[decisions.md D16](../explanation/decisions.md)）。
+それらを知りたいときは下表の「正」を読むか、AI にコードを読ませてください。
+
+| 知りたいこと | 正 |
+| --- | --- |
+| 画面の一覧・ルーティング | [`src/app/`](../../src/app/)（ディレクトリがそのままパス） |
+| テーブル・列・RLS・Storage ポリシー | [`supabase/migrations/`](../../supabase/migrations/)（連番 SQL） |
+| DB の型 | [`src/types/database.ts`](../../src/types/database.ts) |
+| 認可ヘルパーの使い分け | [`CLAUDE.md`](../../CLAUDE.md) セキュリティ節 ／ [`src/lib/household.ts`](../../src/lib/household.ts) |
+| ユーザー視点の機能一覧 | アプリ内 `/help`（[`src/app/help/page.tsx`](../../src/app/help/page.tsx)） |
+| 設計の「なぜ」・却下した案 | [explanation/decisions.md](../explanation/decisions.md) |
 
 ## 技術スタック
 
@@ -11,7 +20,8 @@ DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/) です�
 | フロント / 配信 | Next.js 15（App Router）+ React 19 + TypeScript(strict) + Tailwind CSS v4 / Vercel Hobby | ¥0 |
 | 認証 + DB + 画像ストレージ | Supabase（Free） | ¥0 |
 
-認証は `@supabase/ssr`（Cookie ベースのセッション）。
+認証は `@supabase/ssr`（Cookie ベースのセッション）。バージョンの正は
+[`package.json`](../../package.json)。
 
 ## デプロイ構成
 
@@ -23,58 +33,8 @@ DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/) です�
 > Supabase は画面そのものをホストしません（Edge Functions は未使用）。
 > 利用者が開くのは **Vercel の URL** で、その裏で Supabase の DB / 認証 / Storage が動きます。
 
-## 画面
-
-| パス | 内容 |
-| --- | --- |
-| `/login` | メール + パスワードでログイン |
-| `/` | 記録一覧（日付降順、サムネ + 抜粋、記録元で絞り込み） |
-| `/records/new` | 新規作成 |
-| `/records/[id]` | 詳細 / `?edit=1` で編集 |
-| `/weight` | 体重の推移グラフ |
-| `/calendar` | 月カレンダーで記録を俯瞰（`?ym=YYYY-MM` で月送り） |
-| `/gallery` | すべての写真を新しい順に表示・ライトボックスで拡大 |
-| `/pets` | ペットの追加・編集・削除 |
-| `/shares` | 匿名共有リンク廃止（D4/UC-S01）の終了案内。共有は招待へ誘導（要ログイン） |
-| `/share/[token]` | 匿名共有リンク廃止の終了案内（**認証不要**・DB 参照なし・旧リンクの受け皿） |
-| `/settings` | プロフィール / アカウント設定 |
-| `/offline` | オフラインフォールバック（PWA） |
-
-加えて、全画面の右下に「ご意見・不具合」フローティングボタンを常設（`FeedbackWidget`）。
-
-## データモデル
-
-`auth.users`（Supabase 標準）に加えて以下のテーブル。詳細は
-`supabase/migrations/20260616130704_init.sql` / `20260616130705_record_metadata.sql` /
-`20260616130706_feedback.sql` / `20260616130708_profiles.sql` / `20260616130709_pets.sql` /
-`20260616130710_tags.sql` / `20260616130711_google_credentials.sql` /
-`20260616130712_share_links.sql` / `20260616130713_grants.sql`。
-
-| テーブル | 役割 | 主な列 |
-| --- | --- | --- |
-| `daycare_records` | 日々の記録 | `owner_id`, `record_date`, `source`(daycare/home), `author`, `weight_kg`, `pet_id`, `body`, タイムスタンプ |
-| `record_photos` | 記録に紐づく写真 | `record_id`, `storage_path` |
-| `tags` | 自由タグ（世帯で共有する辞書） | `owner_id`(作成者), `household_id`, `name`（オーナー内で一意） |
-| `record_tags` | 記録 ↔ タグ の多対多 | `record_id`, `tag_id`, `owner_id` |
-| `feedback` | ご意見・不具合フォームの送信内容 | `owner_id`, `kind`, `body`, 任意項目, `context`(自動収集), `github_issue_url` ほか |
-| `profiles` | ユーザーのプロフィール / 設定 | `owner_id`(unique), `display_name`, `default_author`, タイムスタンプ |
-| `pets` | 飼っているペット（多頭飼い対応の素地） | `owner_id`, `name`, `species`, `birthday`, タイムスタンプ |
-
-> `share_links`（匿名共有リンク）は Phase 3.5 S4 で機能廃止し、フォローアップ（#117）で
-> テーブル・`get_shared_view` 関数を物理削除した（`20260705030000_drop_share_links.sql`）。
-> 閲覧共有は viewer 招待またはゲスト招待（`guest_grants`）へ一本化。
-
-## 認可・RLS・Storage
-
-- RLS が**セキュリティの一次防衛線**。`owner_id = auth.uid()` ポリシーに加え、Phase 3.5 で
-  household メンバーシップ判定（`has_household_role` / `is_household_member`）を**併存**追加
-  （業務テーブル・`tags` / `record_tags`・Storage。移行期は両経路が有効）。
-- Storage バケット `daycare-photos` は **private**。配信は署名付き URL（期限 1 時間）。
-- オブジェクトパス規約: `{household_id}/{record_id}/{filename}`（生成 / 検証は
-  `src/lib/storagePath.ts`）。household 未所属時と既存オブジェクトは旧規約
-  `{owner_id}/{record_id}/{filename}` のまま（世帯メンバー読取/削除ポリシーを併存）。
-- 写真はクライアントから Storage へ直接アップロードし、Server Action にはパスだけを渡す
-  （Vercel Function ボディ上限 4.5MB を超えないため）。
+手順は [guides/deploy.md](../guides/deploy.md)、方針の背景は
+[decisions.md D22](../explanation/decisions.md)。
 
 ## ソースの地図
 
@@ -83,8 +43,10 @@ DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/) です�
 | `src/app/` | App Router のページ・Server Action（`records/actions.ts` ほか） |
 | `src/components/` | クライアントコンポーネント（`RecordForm`, `FeedbackWidget` ほか） |
 | `src/lib/supabase/` | Supabase クライアント（`client` / `server` / `middleware`） |
+| `src/lib/household.ts` | 世帯の解決と認可ヘルパー |
 | `src/lib/` | 画像リサイズ・パス生成・写真取得などのユーティリティ |
 | `src/types/database.ts` | DB 型定義 |
 | `supabase/migrations/` | スキーマ・RLS・Storage ポリシー（連番 SQL） |
+| `supabase/tests/` | pgTAP。テナント分離を CI で守っている |
 | `public/sw.js` | Service Worker（PWA） |
 | `scripts/` | アイコン生成・フィードバック Issue 化 |

@@ -7,7 +7,7 @@ Issue [#117](https://github.com/godhuu0505/mfmf/issues/117) §4 / [#35](https://
 
 ## 論点
 
-mfmf は「夫婦で 1 アカウントを共用」する前提で、認証は Google OAuth と
+mfmf は**世帯（household）単位で共有し、各自が自分のアカウントで参加する**前提で、認証は Google OAuth と
 email/password（S5 で追加、`drive.file` 非依存の外部ゲスト向け D3）の 2 系統がある。
 同じメールアドレスの人が両方でログインしたとき、**1 つのユーザーに統合されるのか、
 別々のユーザーになるのか**を把握しておかないと、「片方で入ると自分の記録が見えない」
@@ -37,7 +37,11 @@ Supabase Auth は **同一メールアドレスのアイデンティティを自
 - OAuth（Google）が返すメールは検証済み。email/password 側は
   `enable_confirmations = true`（`supabase/config.toml` [auth.email]）でメール確認必須。
   → **両系統とも「検証済みメール」になるため、同一メールなら自動リンクで 1 アカウントに
-  統合される**。これは共用アカウント前提の mfmf にとって望ましい挙動。
+  統合される**。これは **1 人が複数のログイン方法を使っても同じ人物のままでいられる**という
+  意味で望ましい挙動（Google で入っても email/password で入っても、世帯メンバーシップも
+  記録も同じものが見える）。**アカウントを他人と共用するという話ではない** ——
+  世帯の共有は §上の前提のとおり `households` / `household_members` が担い、
+  各自が自分のアカウントで参加する。
 - 手動リンク（`linkIdentity()` / `unlinkIdentity()`）は使わない。
   `enable_manual_linking = false`（`config.toml` [auth]）のまま。自動リンクだけで
   同一メールの統合は成立し、手動リンク API を開けると攻撃面が増えるため閉じておく。
