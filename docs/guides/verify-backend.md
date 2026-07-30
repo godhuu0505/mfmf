@@ -23,7 +23,7 @@
 | 認証ユーザー | Authentication > Users | ログインに使うユーザーが存在。**世帯メンバーはそれぞれ自分のアカウント**を持つ（招待で追加。`SIGNUP_ENABLED` が閉じている間は手動発行）。 |
 | 世帯とロール | Table Editor | `households` / `household_members` が存在し RLS enabled。確認したいユーザーの `household_members` 行と `role`（owner/editor/viewer）が意図どおり。 |
 | テナント分離・ロール境界 | **CI（pgTAP）＋ SQL Editor** | **挙動**は `supabase/tests/` が PR ごとに検証済み。**本番では挙動を試さず、`pg_policies` でポリシー定義が一致しているかを読む**（→ §2-1）。 |
-| Storage | Storage | `daycare-photos` バケットがあり **private**。署名付き URL（期限 1 時間）で配信。 |
+| Storage | Storage ＋ **SQL Editor** | `daycare-photos` バケットがあり **private**。署名付き URL（期限 1 時間）で配信。**バケットの存在だけでは不十分**で、`storage.objects` のポリシーも読む（→ §2-1）。 |
 | スキーマ適用 | （実体で判断） | 上の実体が揃っていれば適用済み。未適用なら **`supabase db push`**（CLI）で適用する。SQL Editor で流した場合は履歴が残らないので `supabase migration repair --status applied <version>` を忘れないこと（下の ⚠️）。 |
 | advisor | Advisors | RLS 未設定や危険な公開設定の警告が **0 件**。DDL 変更後は必ず確認。 |
 
@@ -70,13 +70,20 @@
 
 ```sql
 -- 本番の Supabase ダッシュボード > SQL Editor で実行（SELECT のみ）
-select tablename, policyname, cmd, qual, with_check
+select schemaname, tablename, policyname, cmd, qual, with_check
 from pg_policies
-where schemaname = 'public'
-order by tablename, policyname;
+where schemaname in ('public', 'storage')   -- ← 写真のポリシーは storage.objects にある
+order by schemaname, tablename, policyname;
 ```
 
-**確認するのは 3 点**です。
+> ⚠️ **`schemaname = 'public'` だけで絞らないこと。** 写真の実体を守っているのは
+> **`storage.objects` のポリシー**（`20260703120000_storage_household_paths.sql`）で、
+> これは `storage` スキーマにあります。`public` だけ見ると、**バケットのポリシーが
+> 消えていても・手で緩められていても、この手順は「本番は pgTAP と一致」と結論します**。
+> `daycare-photos` は private なので配信は署名付き URL 経由ですが、**署名の発行自体に
+> select の RLS が必要**なため、ここが緩むと他世帯のユーザーが署名を取れるようになります。
+
+**確認するのは 4 点**です。
 
 1. **世帯ヘルパーを経由しているか** —— `qual` / `with_check` に
    `has_household_role` / `is_household_member` / `has_guest_access` /
@@ -86,7 +93,14 @@ order by tablename, policyname;
    `household_members` / `guest_grants` に select / insert / update / delete が揃っているか** ——
    欠けている `cmd` があれば、その操作は「ポリシー無し」＝ RLS 有効なら全拒否、
    無効なら全許可になる（後者は下の RLS enabled の行で気づける）
-3. **`supabase/migrations/` の内容と一致するか** —— 差異があれば適用漏れか手動変更。
+3. **`storage.objects` に `daycare_photos_*` の 8 本が揃っているか** —— 3 系統あります。
+   `_own`（旧パス規約 `{owner_id}/...` 用: select / insert / delete）、
+   `_household`（新パス規約 `{household_id}/...` 用: select / insert / delete）、
+   `_shared_owner`（旧パスを世帯メンバーに開く分: select / delete）。
+   `qual` に `is_household_member` / `has_household_role` と
+   `public.try_cast_uuid(...)`（パス先頭セグメントの安全なキャスト）が現れること。
+   **`bucket_id = 'daycare-photos'` の条件が消えていれば、他バケットまで巻き込みます**
+4. **`supabase/migrations/` の内容と一致するか** —— 差異があれば適用漏れか手動変更。
    `supabase migration list` で履歴のズレも確認できる（[deploy.md](./deploy.md)）
 
 **さらに、ヘルパー関数の中身も比べます。** `pg_policies` に出るのは

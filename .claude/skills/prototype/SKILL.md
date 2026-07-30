@@ -225,6 +225,15 @@ cd - && git worktree remove ../mfmf-main          # 済んだら消す
 セッションをまたいだプロトではローカルの `origin/main` が古く、:3001 が
 「現行」と称して**古い画面**を出しかねないので、直前に `git fetch` する。
 
+> ⚠️ **上の 1 行だけが承認済みで、`git worktree add` の他の形は毎回プロンプトが出る。**
+> `.claude/settings.json` の allow は `Bash(git worktree add ../mfmf-main origin/main)` の
+> **完全一致**で、`:*`（前方一致）にしていない。理由は **`-B <branch>`** —— これは
+> 「create **or reset** a branch」で、既にあるブランチを指定 commit へ**巻き戻す**。
+> `git worktree add -B proto/foo ../wt main` は `proto/foo` のコミットを捨てる
+> （実測: git 自身が `resetting branch 'proto/foo'; was at <sha>` と出し、元のコミットは
+> どこからも到達できなくなった）。`:*` で許すとこれが**無確認で通る**。
+> パスやブランチを変えたいときは、プロンプトで内容を確認してから実行すればよい。
+
 > ⚠️ **:3001 で新規にログインしようとしない。先に :3000 でログインしておく。**
 > `LoginForm` は `redirectTo` を `window.location.origin` から作るので、:3001 から
 > Google ログインを始めると戻り先が `http://localhost:3001/auth/callback` になる。

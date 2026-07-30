@@ -163,7 +163,7 @@ function gitArgs(tokenList) {
     const base = basenameOf(t);
     if (base === "git") return tokens.slice(i + 1);
     const opts = WRAPPER_OPTS_WITH_VALUE[base];
-    if (!opts) return -1;   // git でもラッパーでもない ＝ git を実行していない
+    if (!opts) return null; // git でもラッパーでもない ＝ git を実行していない
     // ラッパー自身のオプションを読み飛ばす。次に来る非オプションが「本体」で、
     // それを次の周回で改めて判定する（git なら採用、そうでなければ -1）。
     i++;
@@ -174,10 +174,17 @@ function gitArgs(tokenList) {
       const name = eq < 0 ? opt : opt.slice(0, eq);
       // `env -S '...'` / `--split-string=...` は**文字列を分割して実行**する。
       // 値を読み飛ばすと本体（git）を見失うので、中身を語に割ってその場に差し込む。
+      //
+      // 空白で split してはいけない。env は payload の中の引用符も外すので、
+      // `env -S 'git worktree remove ../v "--force"'` は git に**本物の** `--force` を渡す。
+      // 空白 split だと `"--force"` のまま残り、判定を素通りする。
+      // 同じ字句解析器を通して引用符・エスケープを解いた語にする。
+      // なお env -S は `;` `|` をシェル演算子として解釈せず、ただの引数として渡す。
+      // ここでは最初のセグメントだけを採る（演算子より後ろは git の引数にならない）。
       if (SPLIT_STRING_OPTS.has(name)) {
         const payload = eq >= 0 ? opt.slice(eq + 1) : tokens[i + 1];
         const consumed = eq >= 0 ? 1 : 2;
-        const inner = String(payload ?? "").trim().split(/\s+/).filter(Boolean);
+        const inner = lexSegments(String(payload ?? ""))[0] ?? [];
         tokens = [...tokens.slice(0, i), ...inner, ...tokens.slice(i + consumed)];
         continue;   // 差し込んだ先頭から改めて読む
       }
