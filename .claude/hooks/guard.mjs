@@ -118,11 +118,21 @@ function lexSegments(command, { envSplit = false } = {}) {
       const body = end < 0 ? command.slice(i + 1) : command.slice(i + 1, end);
       word += body; hasWord = true; i = end < 0 ? command.length : end; continue;
     }
-    if (c === '"') {                                  // 双引用: \ だけ効く
+    // 双引用符の中で `\` が特別なのは **`$` ` " \ と改行の前だけ**（bash のマニュアル）。
+    // それ以外は**バックスラッシュがそのまま残る**（実測: `"--for\ce"` は `--for\ce`）。
+    // 一方 `\` ＋ 改行は行継続として**両方消える**（実測: `"--for\<改行>ce"` は `--force`）。
+    // 以前は「次の 1 文字を literal にする」だけだったので、
+    //   - `"--for\<改行>ce"` … 改行が語に入り `--force` にならず**素通り**
+    //   - `"--for\ce"`      … `\` を落として `--force` になり**過剰ブロック**
+    // の両方向に間違えていた。
+    if (c === '"') {
       let j = i + 1;
       for (; j < command.length && command[j] !== '"'; j++) {
-        if (command[j] === "\\" && j + 1 < command.length) { j++; word += command[j]; }
-        else word += command[j];
+        if (command[j] !== "\\" || j + 1 >= command.length) { word += command[j]; continue; }
+        const nxt = command[j + 1];
+        if (nxt === "\n") { j++; continue; }                        // 行継続: 両方消える
+        if (nxt === "$" || nxt === "`" || nxt === '"' || nxt === "\\") { word += nxt; j++; continue; }
+        word += "\\";                                               // それ以外は `\` が残る
       }
       hasWord = true; i = j; continue;
     }
@@ -266,6 +276,20 @@ const WRAPPER_POSITIONALS = {
   setarch: 1,   // arch
   taskset: 1,   // mask
 };
+
+// 「コマンド**文字列**をシェルに渡して実行する」オプション。
+// `flock /tmp/l -c 'git worktree remove --force'` や `bash -c '...'` は
+// 中身がそのままシェルで走るので、**文字列を取り出して再帰的に解析する**。
+// 値として読み飛ばすと中身を一度も見ないことになる（`env -S` と同じ型の穴）。
+const COMMAND_STRING_OPTS = {
+  flock: new Set(["-c", "--command"]),
+  sh: new Set(["-c"]),
+  bash: new Set(["-c"]),
+  dash: new Set(["-c"]),
+  zsh: new Set(["-c"]),
+  ksh: new Set(["-c"]),
+  su: new Set(["-c", "--command"]),
+};
 // 文字列を分割して実行するオプション（GNU env の `-S` / `--split-string`）。
 // 値を単に読み飛ばすと、その中にある本体（git ...）を見落とす。
 const SPLIT_STRING_OPTS = new Set(["-S", "--split-string"]);
@@ -277,7 +301,8 @@ const isAssignment = (t) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(t);
 // ラッパーが実行する本体が git のときだけ返す。
 // `env -S` の展開でトークン列が書き換わるため、**位置ではなく配列そのものを返す**
 // （位置を返すと、呼び出し側が展開前の配列を切ってしまう）。
-function gitArgs(tokenList) {
+// shellPayloads: `-c` などで渡されたコマンド**文字列**をここに積む（呼び出し側が再帰解析する）。
+function gitArgs(tokenList, shellPayloads = []) {
   let tokens = tokenList;
   let i = 0;
   while (i < tokens.length) {
@@ -293,6 +318,19 @@ function gitArgs(tokenList) {
     if (SHELL_KEYWORDS.has(t)) { i++; continue; }
     const base = basenameOf(t);
     if (base === "git") return tokens.slice(i + 1);
+    // `-c 'コマンド文字列'` を取る形（`bash -c` / `sh -c` / `flock -c` / `su -c`）。
+    // 中身はシェルで走るので、値として飛ばさずに取り出して呼び出し側へ渡す。
+    const cmdOpts = COMMAND_STRING_OPTS[base];
+    if (cmdOpts) {
+      for (let j = i + 1; j < tokens.length; j++) {
+        const o = tokens[j];
+        const eq = o.indexOf("=");
+        if (cmdOpts.has(eq < 0 ? o : o.slice(0, eq))) {
+          shellPayloads.push(eq >= 0 ? o.slice(eq + 1) : (tokens[j + 1] ?? ""));
+          return null;   // シェルが走るのであって git が直接走るわけではない
+        }
+      }
+    }
     const opts = WRAPPER_OPTS_WITH_VALUE[base];
     if (!opts) return null; // git でもラッパーでもない ＝ git を実行していない
     // ラッパー自身のオプションを読み飛ばす。次に来る非オプションが「本体」で、
@@ -345,9 +383,10 @@ function gitArgs(tokenList) {
   return null;
 }
 
-function isForcedWorktreeRemoval(command) {
+function isForcedWorktreeRemoval(command, depth = 0) {
+  const shellPayloads = [];
   for (const tokens of lexSegments(command)) {
-    const rest = gitArgs(tokens);
+    const rest = gitArgs(tokens, shellPayloads);
     if (!rest) continue;
     // `--force` の曖昧でない省略形（--f 〜 --force）と、-f を含む短オプション束
     const isForce = (t) =>
@@ -367,6 +406,14 @@ function isForcedWorktreeRemoval(command) {
     }
     if (rest[i] !== "worktree" || rest[i + 1] !== "remove") continue;
     if (rest.slice(i + 2).some(isForce)) return true;
+  }
+  // `bash -c '...'` / `flock -c '...'` などで渡された文字列は、そのままシェルで走る。
+  // 同じ判定を中身へ再帰する（`bash -c "bash -c '...'"` のような入れ子も追える）。
+  // 深さは常識的な範囲で打ち切る（無限再帰の保険）。
+  if (depth < 4) {
+    for (const payload of shellPayloads) {
+      if (payload && isForcedWorktreeRemoval(payload, depth + 1)) return true;
+    }
   }
   return false;
 }
