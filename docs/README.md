@@ -25,16 +25,12 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 
 ## リファレンス（reference/）
 
-- [reference/architecture.md](./reference/architecture.md) — 技術スタック・画面・データモデル・RLS・Storage。
-  ⚠️ **画面表とデータモデル表は陳腐化**（Phase 3.5 の世帯・ゲストが未反映）。正は
-  [`src/app/`](../src/app/) と [`supabase/migrations/`](../supabase/migrations/)。
-- [reference/features.md](./reference/features.md) — 現状の機能一覧（ユーザー視点）。
+- [reference/architecture.md](./reference/architecture.md) — 構成の地図（技術スタック・デプロイ構成・ソースの地図）と「正はどこか」の対応表。
 - [reference/configuration.md](./reference/configuration.md) — 環境変数と npm スクリプトの一覧。
 
 ## 解説（explanation/）
 
 - [explanation/decisions.md](./explanation/decisions.md) — 設計決定ログ（D ログ）。**却下した案とその理由**を 1 行で残す唯一の場所。
-- [explanation/design-decisions.md](./explanation/design-decisions.md) — 共有方針・スコープ・PWA・セキュリティ・デプロイ方針の「なぜ」。
 - [explanation/prototype-first.md](./explanation/prototype-first.md) — 新機能の画面を使い捨てブランチのプロトタイプで決める理由（静的モックを却下した経緯）。
 - [explanation/vision-and-roadmap.md](./explanation/vision-and-roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
 - [explanation/phase-3-5-use-cases.md](./explanation/phase-3-5-use-cases.md) — Phase 3.5（家族・権限・サインアップ・共有）のユースケース・バックログ（受け入れ条件・決定ログ・未決事項）。

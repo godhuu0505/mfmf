@@ -5,7 +5,13 @@
 却下した案を残します。
 
 手順そのものは `.claude/skills/prototype/SKILL.md` が正です（本書は「なぜ」だけを扱います）。
-関連: [design-decisions.md](./design-decisions.md) / [decisions.md](./decisions.md)
+関連: [decisions.md](./decisions.md)
+
+> ⚠️ 本書が「陳腐化していた」「二重管理だった」と挙げているファイルのうち、
+> `design-decisions.md`（→ `decisions.md` の D18〜D23 へ統合）と
+> `docs/reference/features.md`（→ アプリ内 `/help` へ一本化）は**この PR で削除済み**です。
+> `architecture.md` の画面表・データモデル表も削除し、「正はどこか」の対応表に置き換えました。
+> 以下の記述は**当時の観測**として残しています（D16 を自分の成果物にも適用した結果）。
 
 ---
 
@@ -87,7 +93,7 @@ mfmf は PWA で、価値は「スマホで片手で、片手間に記録でき�
 | ファイル | 誤った記述 |
 | --- | --- |
 | `CLAUDE.md` / `AGENTS.md` | 「共有方針 (A): `household_id` は持たず `owner_id (= auth.uid())` ベースで RLS」 |
-| `design-decisions.md` | 同上（§共有方針・§セキュリティ） |
+| `design-decisions.md` | 同上（§共有方針・§セキュリティ）→ **削除済み**（`decisions.md` へ統合） |
 | `README.md` / `local-supabase.md` | 「**Google OAuth 一本化**（メール/パスワードログインは使えません）」 |
 | `architecture.md` | 画面表に `/onboarding` `/invite/[token]` `/guest` `/signup` `/help` が無い。データモデル表に `households` / `household_members` / `guest_grants` / `household_invites` が無い |
 | `features.md` | households / ゲスト / 招待に一切言及なし |
@@ -120,8 +126,8 @@ mfmf は PWA で、価値は「スマホで片手で、片手間に記録でき�
 | 事実 | 置き場所 A | 置き場所 B | 結果 |
 | --- | --- | --- | --- |
 | 画面一覧 | `CLAUDE.md`（正確だった） | `architecture.md`（5 画面欠落） | 片方が腐った |
-| 機能一覧 | `docs/reference/features.md` | アプリ内 `/help`（`src/app/help/page.tsx`, 233 行） | 片方が腐った |
-| データモデル | `architecture.md` の表 | `supabase/migrations/`（31 本） | 片方が腐った |
+| 機能一覧 | `docs/reference/features.md` → **削除済み** | アプリ内 `/help`（`src/app/help/page.tsx`, 233 行）に一本化 | 片方が腐った |
+| データモデル | `architecture.md` の表 → **削除済み** | `supabase/migrations/`（31 本）に一本化 | 片方が腐った |
 
 **二重管理されているものは、必ずどちらかが腐る。** 例外なくそうなっていた。
 ここにモックという 4 つ目の UI 記述を足せば、腐敗候補が 1 つ増えるだけになる。
@@ -206,7 +212,7 @@ or reducing bugs"* と結論している。marmelab は「現在日時を表示�
 | ドキュメント | commit 数 | 最終更新 | 状態 |
 | --- | --- | --- | --- |
 | `phase-3-5-use-cases.md`（決定ログを含む） | 16 | 2026-07-05 | **正確** |
-| `design-decisions.md` | 4 | 2026-06-30 | 陳腐化 |
+| `design-decisions.md` | 4 | 2026-06-30 | 陳腐化 → 削除 |
 | `AGENTS.md` | — | 2026-06-30 | 陳腐化 |
 
 **腐った側は、全部「誰も読まないもの」だった。**

@@ -5,7 +5,7 @@ mfmf を「夫婦2人の最小記録アプリ」から、**ペットのケアに
 スキーマ・RLS は採用が決まった時点で個別ドキュメント／migration に落とします。
 
 - 現状の「何が」あるかは [reference/architecture.md](../reference/architecture.md)
-- 現状の「なぜ」は [design-decisions.md](./design-decisions.md)
+- 現状の「なぜ」は [decisions.md](./decisions.md)
 - DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/)
 
 > ⚠️ 本書は将来構想を含みます。ここに書かれた機能の多くは **未実装** です。実装状況は各表の「状態」列を参照。
@@ -27,7 +27,7 @@ mfmf を「夫婦2人の最小記録アプリ」から、**ペットのケアに
 > **ペットのケアに関わる人が、適切な権限でつながり、記録・写真・予定・健康情報を一か所で扱える。
 > その裏側でバラバラな Google サービスを一元的に束ねる、無料運用のハブ。**
 
-「芯」として **引き継ぐ不変条件**（[design-decisions.md](./design-decisions.md) 参照）:
+「芯」として **引き継ぐ不変条件**（[decisions.md](./decisions.md) 参照）:
 
 - セキュリティの一次防衛線は **RLS**（multi-tenant 化後も維持）
 - Service Worker は **private・期限付き URL をキャッシュしない**

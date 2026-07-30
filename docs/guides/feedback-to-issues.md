@@ -4,7 +4,7 @@
 `feedback` テーブル（非公開・RLS 保護）にのみ保存します。GitHub Issue 化が必要になったら、
 個人情報・秘匿情報をマスクしたうえで **非公開(private)リポジトリ宛て**に転記するスクリプトを
 手元で実行します（`scripts/feedback-to-issues.mjs`）。背景は
-[explanation/design-decisions.md](../explanation/design-decisions.md#フィードバックを-github-に送らない理由) を参照。
+[explanation/decisions.md](../explanation/decisions.md) の D21 を参照。
 
 ## 手順
 

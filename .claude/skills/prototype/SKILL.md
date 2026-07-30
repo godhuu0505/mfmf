@@ -254,10 +254,14 @@ cd - && git worktree remove ../mfmf-main          # 済んだら消す
 上の `.env.local` symlink が残っていても **`--force` なしで成功する**（実測。exit 0）。
 3 つとも `.gitignore` 済みで `git status --porcelain` が空 ＝ git はこの worktree を
 clean と見なすため。**`--force` を足さないこと** —— 無視対象でない編集中の変更ごと
-消し飛ばす操作なので、`.claude/hooks/guard.mjs` がブロックする。
-判定はコマンド文字列をトークン列に分解して行うので、**語順・`git -C` 等のグローバル
-オプション・`--for` のような省略形のいずれでも止まる**（`--no-force` は通す）。
-`permissions.deny` は前方一致なのでこれらを取りこぼす。
+消し飛ばす操作だから。`.claude/settings.json` の `deny` に入れてあるので正規形は拒否され、
+語順を変えるなどして deny の前方一致を外れた形も、`allow` に無い以上**必ず承認プロンプトが出る**
+（無確認で消えることはない）。プロンプトが出たら、まず `git -C ../mfmf-<slug> status` で
+中身を確認すること。
+
+> かつてここを `guard.mjs` のコマンド解析でも止めていたが、抜け道が収束せず取り下げた
+> （[decisions.md D17](../../../docs/explanation/decisions.md)）。**フックに
+> 「危険なコマンドの形」を足さないこと。**
 
 ### 4. 畳む（★ 決定ログより先。順序を逆にすると詰む）
 

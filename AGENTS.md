@@ -46,19 +46,16 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 - **秘密情報をコミット / 出力しない。** `.env.local` 等の実 env ファイルは読まない・編集しない（ガードフックがブロック）。
 - **`service_role` キーをクライアント・リポジトリに置かない**（このアプリでは使わない）。
 - **既存の RLS（世帯メンバーシップ + role、ゲストは `guest_grants`）を弱めない。**
-  Server Action は冒頭で必ず `getUser()`。認可は**操作に応じて使い分ける**
-  （新規作成は現在世帯基準の `requireEditableHousehold()`、更新/削除は**対象行の世帯**を見る
-  `requireEditableRecordHousehold()` / `requireEditablePetHousehold()`、
-  owner 限定は `requireOwnerOf()`、ゲストは `guest_grants` + RLS、
-  `/onboarding` は世帯未所属で走るのが正常）。詳細は CLAUDE.md。
+  Server Action は冒頭で必ず `getUser()`。認可は**操作に応じて使い分ける**（ひとつのヘルパーで
+  代用しない）。**対応表は持たない** —— 正は `src/lib/household.ts` と各 `actions.ts`。
+  取り違えやすい点だけ: **更新/削除は「現在世帯」ではなく「対象行の `household_id`」で判定する。**
+  `/onboarding` は世帯未所属で走るのが正常。詳細は CLAUDE.md。
 - **Service Worker（`public/sw.js`）は Supabase の API レスポンスや署名付き写真 URL をキャッシュしない。**
 - `main` へ直接 push しない。強制 push（`--force`）禁止（ガードでブロック）。
 
 ## ドキュメント地図
 
 - 全体像: [README.md](./README.md) ／ ドキュメント索引: [docs/README.md](./docs/README.md)
-- 構成・データモデル: [docs/reference/architecture.md](./docs/reference/architecture.md)
-  （⚠️ 画面表・データモデル表は陳腐化。正は `src/app/` と `supabase/migrations/`）
-- 設計の「なぜ」: [docs/explanation/design-decisions.md](./docs/explanation/design-decisions.md)
+- 構成の地図: [docs/reference/architecture.md](./docs/reference/architecture.md)
 - 決定ログ（却下した案と理由）: [docs/explanation/decisions.md](./docs/explanation/decisions.md)
 - DB / RLS の正: [supabase/migrations/](./supabase/migrations/)

@@ -32,7 +32,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://<PROJECT_REF>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon または publishable key>
 ```
 
-> anon キーはクライアントに露出する前提の公開鍵です（[なぜ公開してよいか](./explanation/design-decisions.md#セキュリティ)）。
+> anon キーはクライアントに露出する前提の公開鍵です（RLS で守っているため公開してよい。`service_role` キーは別物で、絶対に置かないこと）。
 > `service_role` キーは絶対に置かないでください。
 
 ## 3. 開発サーバーを起動
@@ -153,4 +153,4 @@ just down    # 停止
 
 - うまく動かない → [guides/local-supabase.md#トラブルシュート](./guides/local-supabase.md#トラブルシュート)
 - 構成や仕様を知りたい → [reference/architecture.md](./reference/architecture.md)
-- なぜこの構成なのか → [explanation/design-decisions.md](./explanation/design-decisions.md)
+- なぜこの構成なのか → [explanation/decisions.md](./explanation/decisions.md)

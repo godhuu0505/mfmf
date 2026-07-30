@@ -7,7 +7,7 @@ Phase 3.5（エピック [#91](https://github.com/godhuu0505/mfmf/issues/91)）�
 落とすときの元ネタにします。
 
 - 現状の「何が」あるかは [reference/architecture.md](../reference/architecture.md)
-- 設計の「なぜ」は [design-decisions.md](./design-decisions.md)
+- 設計の「なぜ」は [decisions.md](./decisions.md)
 - フェーズ俯瞰・機能カタログは [vision-and-roadmap.md](./vision-and-roadmap.md)
 - DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/)
 
