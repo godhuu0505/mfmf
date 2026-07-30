@@ -28,6 +28,7 @@
 // =============================================================
 
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 // 「犬の語 ＋（の）＋ 学校系」が**直結**している屋号は、人向けの養成校ではなく
 // 犬向けのスクール（例: ドッグスクール／犬のスクール／犬の学校）。
@@ -110,6 +111,9 @@ const KIND_HEADER = /^(販売|保管|貸出し?|訓練|展示|競りあっせん
 //    `FALSE` は空でないため、拾わないと**登録していない業種**まで分母に入る
 //    （「販売=TRUE, 保管=FALSE」の行が保管の分母に入り、実数ゼロが非ゼロに化ける）。
 const NEGATIVE_MARK = /^([×✕✖ー－-]|なし|無し?|非|不可|0|false|no|n)$/i;
+// ○×様式の列だと判断するための、肯定・否定を合わせたマーカーの一覧。
+// 「販売」という見出しの**自由記述**列を業種列と誤認しないために使う。
+const MARKER_VALUE = /^([○◯〇●◎✓✔]|有り?|あり|可|登録|1|true|yes|y|[×✕✖ー－-]|なし|無し?|非|不可|0|false|no|n)$/i;
 
 // 犬の保育園の推定分子に寄与するカテゴリ。
 // しつけ・訓練も「保管」を持てば定期通園の預かり業態（market-analysis.md §18-6）。
@@ -404,7 +408,12 @@ const OPERATOR_NAME_HEADINGS = [/事業者/, /法人/, /会社/, /申請者/, /�
 const isOperatorName = (heading) => OPERATOR_NAME_HEADINGS.some((re) => re.test(heading));
 
 /** 「事業者（法人）の住所」を指す見出し。施設の所在地ではないので鍵にしない。 */
-const OPERATOR_ADDR_HEADINGS = [/事業者/, /法人/, /本社/, /本店/, /代表者/];
+// ⚠ 名前側（OPERATOR_NAME_HEADINGS）と揃えること。「申請者住所」「設置者住所」を
+//    取り落とすと事業所の住所と連結され、その列が空・伏字・行ごとに違う登録簿で
+//    同じ施設が別バケツに割れて二重計上される。
+const OPERATOR_ADDR_HEADINGS = [
+  /事業者/, /法人/, /会社/, /申請者/, /設置者/, /団体/, /本社/, /本店/, /代表者/,
+];
 
 /**
  * ヘッダ行を推定する。自治体ごとに列名も位置もばらつくので、
@@ -601,7 +610,23 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
     const kindMatrixIdxsRaw = header
       .map((c, i) => (KIND_HEADER.test(normalize(c)) ? i : -1))
       .filter((i) => i >= 0);
-    const kindMatrixIdxs = kindMatrixIdxsRaw.length >= 2 ? kindMatrixIdxsRaw : [];
+    // ⚠ 「2列以上あること」で判定してはいけない。業種で絞り込んだ抜粋
+    //    （「事業所名,所在地,保管」の1列だけ）が捨てられ、集計不能になる。
+    //    代わりに**中身がマーカー（○×・TRUE/FALSE 等）か**で検証する。
+    //    「販売」という名前の自由記述列を業種列と誤認しないための判定でもある。
+    //    表記ゆれ（「○（H30）」等）を許すため、非空セルの8割以上がマーカーなら採る。
+    const looksMarkerColumn = (i) => {
+      const vals = dataRows
+        .map((r) => normalize(r[i] ?? ""))
+        // ⚠ 繰り返されたヘッダ行の値（見出しと同じ文字列）は母数から外す。
+        //    入れると「保管」という語がマーカー以外として数えられ、
+        //    行数の少ない登録簿では割合が閾値を割って業種列ごと捨ててしまう。
+        .filter((v) => v && v !== normalize(header[i]));
+      if (!vals.length) return false;
+      const hit = vals.filter((v) => MARKER_VALUE.test(v)).length;
+      return hit / vals.length >= 0.8;
+    };
+    const kindMatrixIdxs = kindMatrixIdxsRaw.filter(looksMarkerColumn);
     /** その行に登録されている業種を、両様式（値型・○×型）から集める。 */
     const kindsOf = (r) => [
       ...kindIdxs.map((i) => normalize(r[i] ?? "")).filter(Boolean),
@@ -998,10 +1023,25 @@ export function survey(files, { samples = 3, seed = 1 } = {}) {
 function main() {
   const argv = process.argv.slice(2);
   const asJson = argv.includes("--json");
-  const sIdx = argv.indexOf("--samples");
-  const samples = sIdx >= 0 ? Number(argv[sIdx + 1]) || 3 : 3;
-  const seedIdx = argv.indexOf("--seed");
-  const seed = seedIdx >= 0 ? Number(argv[seedIdx + 1]) || 1 : 1;
+  // ⚠ 数値オプションの値を検証せずに次の引数を消費してはいけない。
+  //    `--samples data/kashiwa.csv` のような打ち間違いで、既定値に落ちたうえ
+  //    **その CSV が入力から静かに消える**（残りのファイルだけで集計が成功し、
+  //    全件読んだように見える）。数値でなければ即座に失敗させる。
+  const numOption = (flag, fallback) => {
+    const idx = argv.indexOf(flag);
+    if (idx < 0) return { idx, value: fallback };
+    const raw = argv[idx + 1];
+    if (raw === undefined || !/^\d+$/.test(raw) || Number(raw) < 1) {
+      console.error(
+        `エラー: ${flag} には1以上の整数を指定してください`
+        + `（受け取った値: ${raw === undefined ? "なし" : raw}）`,
+      );
+      process.exit(1);
+    }
+    return { idx, value: Number(raw) };
+  };
+  const { idx: sIdx, value: samples } = numOption("--samples", 3);
+  const { idx: seedIdx, value: seed } = numOption("--seed", 1);
   const files = argv.filter(
     (a, i) => !a.startsWith("--")
       && !(sIdx >= 0 && i === sIdx + 1)
@@ -1098,4 +1138,7 @@ Excel しか無い自治体は CSV に書き出してから渡してください
   console.log(`\n注: これは推定であって census ではない。docs/explanation/market-analysis.md §2 参照。`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+// ⚠ `file://${process.argv[1]}` と比較しないこと。Windows では argv[1] が
+//    `C:\repo\scripts\...` で import.meta.url は `file:///C:/repo/...` なので
+//    一致せず、main() が呼ばれないまま黙って終了する。
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
