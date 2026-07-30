@@ -41,13 +41,20 @@ const GIT_OPTS_WITH_VALUE = new Set([
 ]);
 
 const ANSI_C_ESCAPE = /\\(x[0-9A-Fa-f]{1,2}|u[0-9A-Fa-f]{1,4}|[0-7]{1,3}|.)/g;
-const ANSI_C_SIMPLE = { n: "\n", t: "\t", r: "\r", a: "\x07", b: "\b", f: "\f", v: "\v", e: "\x1b" };
+const ANSI_C_SIMPLE = { n: "\n", t: "\t", r: "\r", a: "\x07", b: "\b", f: "\f", v: "\v", e: "\x1b", E: "\x1b" };
+// bash が `$'...'` で**認識する**のはこの集合だけ（上の表 ＋ 下の 4 つ ＋ \nnn / \xHH / \uHHHH）。
+// **認識しないエスケープは、バックスラッシュごとそのまま残る** —— `$'\_'` は `\_` の 2 文字。
+// ここを `esc` だけ返す形にしていると `\` が消え、`env -S` の `\_`（空白扱い）を
+// 見落とす（`env -S $'git\_worktree\_remove\_../v\_--force'` が素通りしていた）。
+const ANSI_C_LITERAL = new Set(["\\", "'", '"', "?"]);
 function decodeAnsiC(body) {
   return body.replace(ANSI_C_ESCAPE, (_m, esc) => {
     if (esc[0] === "x" && esc.length > 1) return String.fromCharCode(parseInt(esc.slice(1), 16));
     if (esc[0] === "u" && esc.length > 1) return String.fromCharCode(parseInt(esc.slice(1), 16));
     if (/^[0-7]+$/.test(esc)) return String.fromCharCode(parseInt(esc, 8));
-    return ANSI_C_SIMPLE[esc] ?? esc;
+    if (esc in ANSI_C_SIMPLE) return ANSI_C_SIMPLE[esc];
+    if (ANSI_C_LITERAL.has(esc)) return esc;
+    return "\\" + esc;                    // 認識しないものは bash と同じく `\` を残す
   });
 }
 
@@ -57,7 +64,13 @@ function decodeAnsiC(body) {
 // のように**引用符の中にある区切り文字**を境界と誤認してしまう。
 // 引用状態を持って 1 文字ずつ読むことで、区切り・引用符・エスケープ・
 // 行継続・ANSI-C 引用をまとめて正しく扱う。
-function lexSegments(command) {
+// envSplit: `env -S` の payload を割るモード。env は payload を**引数に割るだけ**で、
+// `;` `|` `&` `(` `)` `<` `>` をシェル演算子として解釈しない（全部ただの文字）。
+// 一方で**改行は引数の区切り**として扱い、`\_` も空白として扱う。
+// このモードを持たずに通常モードで割ると、
+//   env -S $'git worktree remove ../v\n--force'
+// の改行をコマンド境界と誤認して `--force` を落としてしまう。
+function lexSegments(command, { envSplit = false } = {}) {
   const segments = [];
   let words = [];
   let word = "";
@@ -78,6 +91,8 @@ function lexSegments(command) {
     const c = command[i];
     if (c === "\\") {
       const next = command[i + 1];
+      // env -S の `\_` は空白（＝引数の区切り）。GNU env の独自エスケープ。
+      if (envSplit && next === "_") { endWord(); i++; continue; }
       if (next === "\n") { i++; continue; }          // 行継続: 両方消える
       if (next === undefined) continue;
       word += next; hasWord = true; i++; continue;   // \x → リテラル x
@@ -107,15 +122,16 @@ function lexSegments(command) {
     }
     // 区切り文字。`(` `)` はサブシェル境界なので、これも区切りとして扱う
     // （扱わないと `(git worktree remove ../x --force)` が `(git` と `--force)` になり一致しない）。
-    if (c === ";" || c === "|" || c === "&" || c === "\n" || c === "(" || c === ")") {
+    if (!envSplit && (c === ";" || c === "|" || c === "&" || c === "\n" || c === "(" || c === ")")) {
       endSegment(); continue;
     }
-    if (c === " " || c === "\t" || c === "\r") { endWord(); continue; }
+    // envSplit では改行も「引数の区切り」（env は payload を argv に割るだけ）
+    if (c === " " || c === "\t" || c === "\r" || (envSplit && c === "\n")) { endWord(); continue; }
     // リダイレクト（`<` `>` `>>` `2>` `2>&1` など）は**引数ではない**。
     // シェルは `git</dev/null worktree ...` を「git を実行し stdin を差し替える」と読む。
     // 演算子と**その対象**をまとめて捨てる（対象を語として残すと、それが引数の位置に
     // 入り込んでサブコマンドの判定がずれる）。
-    if (c === "<" || c === ">") {
+    if (!envSplit && (c === "<" || c === ">")) {
       endWord();
       // 直前の語が fd 番号だけ（`2` など）ならリダイレクト指定なので引数ではない
       if (words.length && /^\d+$/.test(words[words.length - 1])) words.pop();
@@ -170,6 +186,11 @@ function gitArgs(tokenList) {
   while (i < tokens.length) {
     const t = tokens[i];
     if (isAssignment(t)) { i++; continue; }                 // VAR=value
+    // `!` は bash の否定演算子で、**コマンドの前置詞**（`! git worktree remove --force` は
+    // 実行される）。語として残すと「git ではない実行ファイル」に見えて対象外になる。
+    // 引用した `'!'` は bash では演算子にならないが、その形は実在しないコマンド名として
+    // 失敗するだけなので、区別せず前置詞として扱う（拒否側に倒す）。
+    if (t === "!") { i++; continue; }
     const base = basenameOf(t);
     if (base === "git") return tokens.slice(i + 1);
     const opts = WRAPPER_OPTS_WITH_VALUE[base];
@@ -188,9 +209,10 @@ function gitArgs(tokenList) {
       // 空白で split してはいけない。env は payload の中の引用符も外すので、
       // `env -S 'git worktree remove ../v "--force"'` は git に**本物の** `--force` を渡す。
       // 空白 split だと `"--force"` のまま残り、判定を素通りする。
-      // 同じ字句解析器を通して引用符・エスケープを解いた語にする。
-      // なお env -S は `;` `|` をシェル演算子として解釈せず、ただの引数として渡す。
-      // ここでは最初のセグメントだけを採る（演算子より後ろは git の引数にならない）。
+      // 同じ字句解析器を **envSplit モード**で通す。env は payload を argv に割るだけで
+      // `;` `|` を演算子として解釈せず、一方で**改行は引数の区切り**として扱うため
+      // （`env -S $'git worktree remove ../v\n--force'` は本物の `--force` を渡す）。
+      // 通常モードで割って最初のセグメントだけ採ると、この改行で `--force` を落とす。
       //
       // 3 つの書き方すべてを受ける。`-S val` / `--split-string=val` / **`-Sval`**
       // （短オプションに値がくっついた形。GNU env はこれを受け付ける ——
@@ -201,7 +223,7 @@ function gitArgs(tokenList) {
       if (attachedS || (base === "env" && SPLIT_STRING_OPTS.has(name))) {
         const payload = attachedS ? opt.slice(2) : eq >= 0 ? opt.slice(eq + 1) : tokens[i + 1];
         const consumed = attachedS || eq >= 0 ? 1 : 2;
-        const inner = lexSegments(String(payload ?? ""))[0] ?? [];
+        const inner = lexSegments(String(payload ?? ""), { envSplit: true }).flat();
         tokens = [...tokens.slice(0, i), ...inner, ...tokens.slice(i + consumed)];
         continue;   // 差し込んだ先頭から改めて読む
       }

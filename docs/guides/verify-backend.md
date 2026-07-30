@@ -85,10 +85,18 @@ order by schemaname, tablename, policyname;
 
 **確認するのは 4 点**です。
 
-1. **世帯ヘルパーを経由しているか** —— `qual` / `with_check` に
+1. **世帯データのテーブルが世帯ヘルパーを経由しているか** —— `qual` / `with_check` に
    `has_household_role` / `is_household_member` / `has_guest_access` /
    `has_guest_record_access` のいずれかが現れること。
-   `true` だけのポリシーや、`household_id` を見ていない条件があれば**そこが穴**
+   `true` だけのポリシーや、`household_id` を見ていない条件があれば**そこが穴**。
+
+   ⚠️ **ただし「世帯ヘルパーが無い＝穴」ではありません。** `profiles` と
+   `google_credentials` は**ユーザー単位**のテーブルで、`household_id` を持たず、
+   正しい述語は `auth.uid() = owner_id` です（`20260616130708_profiles.sql` /
+   `20260616130711_google_credentials.sql`）。この 2 つは**世帯で共有してはいけない**
+   —— とくに `google_credentials` は Google の OAuth トークンなので、
+   ここを世帯ヘルパーに「直す」と**世帯メンバーが互いの refresh token を読めます**。
+   `*_own` という名前と `auth.uid() = owner_id` の組み合わせが出たら、それが正常です
 2. **`cmd` の欠落を「適用漏れ」と決めつけないこと** —— 欠けている `cmd` は、
    その操作が「ポリシー無し」＝ RLS 有効なら全拒否になることを意味します。
    これは**多くの場合、意図した最小権限**です。実際に migration どおりの状態でも:
@@ -179,6 +187,7 @@ editor は自分の世帯の行を正当に update できるので、`owner_id` 
 select c.relname          as table_name,
        t.tgname           as trigger_name,
        t.tgenabled        as enabled,      -- 'O' = 有効。'D' なら**無効化されている**
+       pg_get_triggerdef(t.oid)  as trigger_def,   -- ← before/after と insert/update/delete
        p.proname          as function_name,
        pg_get_functiondef(p.oid) as definition
 from pg_trigger t
@@ -190,13 +199,19 @@ where n.nspname = 'public'
 order by c.relname, t.tgname;
 ```
 
-確認するのは **3 点**です。
+確認するのは **4 点**です。
 
 1. **上の表の 5 つの付け先すべてに行があるか**（`forbid_owner_change` が 4 テーブル、
    `enforce_last_owner` が `household_members`）
 2. **`enabled` が `'O'` か** —— `alter table ... disable trigger` は**ポリシーも関数定義も
    一切変えずに**不変条件だけを外せます。定義を読むだけでは気づけないのはここです
-3. **`definition` が migration と一致するか**（`forbid_owner_change` は
+3. **`trigger_def` の発火条件が一致しているか** —— **名前と関数が合っていても、
+   発火するイベントが違えば守っていません**。`forbid_owner_change` は
+   `before update`、`enforce_last_owner` は `before update or delete` です。
+   たとえば前者が `before insert` に、後者が `before update` だけに作り直されていると、
+   表示される名前・`enabled`・関数本体はすべて一致したまま、
+   **`owner_id` の書き換えや「最後の owner の削除」が通ります**
+4. **`definition` が migration と一致するか**（`forbid_owner_change` は
    `20260704020000_member_exit_and_h10.sql`、`enforce_last_owner` は
    `20260705040000_household_delete.sql` が最新）
 
