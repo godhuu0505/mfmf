@@ -88,9 +88,37 @@ order by tablename, policyname;
 3. **`supabase/migrations/` の内容と一致するか** —— 差異があれば適用漏れか手動変更。
    `supabase migration list` で履歴のズレも確認できる（[deploy.md](./deploy.md)）
 
+**さらに、ヘルパー関数の中身も比べます。** `pg_policies` に出るのは
+`has_household_role(...)` という**呼び出しだけ**で、関数の**本体**は含まれません。
+これらは `SECURITY DEFINER`（呼び出し元の権限を無視して実行）で、
+メンバーシップ・ロール・対象ペット・期間の判定は**本体の中**にあります。
+つまり **`has_household_role` が `return true` に書き換えられていても、上の 3 点は全部通ります** ——
+そしてその 1 行で全世帯が露出します。
+
+```sql
+-- ヘルパーの定義と属性（SECURITY DEFINER / search_path）を確認する
+select p.proname,
+       p.prosecdef                     as security_definer,   -- true であること
+       p.proconfig                     as settings,           -- search_path が固定されていること
+       pg_get_functiondef(p.oid)       as definition
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in ('has_household_role', 'is_household_member',
+                    'has_guest_record_access', 'create_own_household')
+order by p.proname;
+```
+
+`definition` を `supabase/migrations/` の該当 SQL と見比べ、`security_definer` が `true`、
+`settings` に **`search_path=`（空に固定）**が入っていることを確認します。
+本リポジトリのヘルパーは `security definer` ＋ `set search_path = ''` で、参照は全て完全修飾名
+（`20260630140000_household_rls_helper.sql`）。この固定が外れていると、関数内の名前解決を
+差し替えられる余地が生まれます。
+
 > これは**挙動ではなく定義**の確認です。挙動は pgTAP が担保しているので、
 > ここでは「本番に載っている定義が、pgTAP が検証した定義と同じか」だけを見ます。
-> 定義が一致していて pgTAP が緑なら、本番の挙動も同じと言えます。
+> **ポリシーとヘルパー本体の両方**が一致していて pgTAP が緑なら、本番の挙動も同じと言えます。
+> 片方だけでは足りません —— ポリシーが正しく見えてもヘルパーが嘘をついていれば素通りします。
 
 あわせて上の表の「テーブルと RLS」（RLS enabled）「世帯とロール」「advisor」も確認します。
 

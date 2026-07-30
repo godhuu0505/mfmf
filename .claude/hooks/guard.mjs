@@ -129,23 +129,47 @@ function lexSegments(command) {
 // ラッパー（`env` / `sudo` / `command` / `time` / `nohup` / `xargs`）を読み飛ばす。
 // 全トークンから `git` を探すと `echo git worktree remove --force` のように
 // **git を実行していないコマンド**まで巻き込んで誤爆する。
-const WRAPPERS = new Set(["env", "sudo", "command", "time", "nohup", "nice", "stdbuf", "xargs", "doas"]);
+// ラッパーごとの「値を取るオプション」。ここまで持つのは、ラッパーの**引数を読み飛ばす**のと
+// 「ラッパーが実行する本体」を見分けるのを区別するため。区別しないと
+// `env echo git worktree remove --force` の `echo` を飛ばして `git` を本体と誤認する。
+const WRAPPER_OPTS_WITH_VALUE = {
+  sudo: new Set(["-u", "-g", "-p", "-C", "-h", "-r", "-t", "-U"]),
+  doas: new Set(["-u", "-C"]),
+  env: new Set(["-u", "--unset", "-S", "--split-string", "-C", "--chdir"]),
+  nice: new Set(["-n"]),
+  xargs: new Set(["-n", "-P", "-I", "-d", "-a", "-E", "-L", "-s"]),
+  stdbuf: new Set(["-i", "-o", "-e"]),
+  time: new Set(["-f", "-o"]),
+  nohup: new Set(),
+  command: new Set(),
+};
 const basenameOf = (t) => (t.includes("/") ? t.slice(t.lastIndexOf("/") + 1) : t);
+const isAssignment = (t) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(t);
 
 // git の**引数が始まる位置**を返す（見つからなければ -1）。
-// 先頭の環境変数代入とラッパーを読み飛ばし、実行ファイルが git のときだけ位置を返す。
+// 環境変数代入とラッパー（とそのオプション）を読み飛ばし、
+// **ラッパーが実行する本体が git のときだけ**位置を返す。
 function gitArgsIndex(tokens) {
-  let sawWrapper = false;
-  for (let i = 0; i < tokens.length; i++) {
+  let i = 0;
+  while (i < tokens.length) {
     const t = tokens[i];
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(t)) continue;            // VAR=value
-    if (basenameOf(t) === "git") return i + 1;
-    if (WRAPPERS.has(basenameOf(t))) { sawWrapper = true; continue; }
-    // ラッパーを見たあとは、その設定（`sudo -u me` の `-u` と `me` など）を読み飛ばす。
-    // ラッパー無しで git 以外が来たら、それは git を実行していないので対象外
-    // （`echo git worktree remove --force` を誤爆させない）。
-    if (sawWrapper) continue;
-    return -1;
+    if (isAssignment(t)) { i++; continue; }                 // VAR=value
+    const base = basenameOf(t);
+    if (base === "git") return i + 1;
+    const opts = WRAPPER_OPTS_WITH_VALUE[base];
+    if (!opts) return -1;   // git でもラッパーでもない ＝ git を実行していない
+    // ラッパー自身のオプションを読み飛ばす。次に来る非オプションが「本体」で、
+    // それを次の周回で改めて判定する（git なら採用、そうでなければ -1）。
+    i++;
+    while (i < tokens.length && tokens[i].startsWith("-") && tokens[i] !== "-") {
+      if (tokens[i] === "--") { i++; break; }
+      const inlineValue = tokens[i].includes("=");
+      const takesValue = opts.has(tokens[i]);
+      i++;
+      if (takesValue && !inlineValue) i++;                  // `-u me` の `me`
+    }
+    if (tokens[i] === "-") i++;                             // env の `-`
+    while (i < tokens.length && isAssignment(tokens[i])) i++; // env NAME=VALUE...
   }
   return -1;
 }

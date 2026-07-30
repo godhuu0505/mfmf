@@ -7,7 +7,7 @@
 ![Supabase](https://img.shields.io/badge/Supabase-Free-3ECF8E)
 
 家族で 1 つの世帯を共有し、保育園とおうち（両親）どちらのノートも同じ仕組みで記録します。
-世帯には owner / editor / viewer の 3 役で招待でき、保育園やシッターは対象ペット・期間を
+世帯には **editor / viewer** で招待でき（owner は参加後に既存 owner が昇格させる）、保育園やシッターは対象ペット・期間を
 限定した外部ゲストとして招けます。
 フロントは **Next.js（App Router）/ Vercel**、バックエンド（認証・DB・画像）は **Supabase**。
 どちらも無料枠で完結します。

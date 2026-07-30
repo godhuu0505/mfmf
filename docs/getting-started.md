@@ -129,14 +129,23 @@ just down    # 停止
      そのままだと**誰でも直接アカウントを作れます**。
      Authentication → Providers → Email の **Allow new users to sign up** を **off** に
      （ローカルは `supabase/config.toml` の `[auth.email] enable_signup`）。
-     以降メンバーを増やすときは `/settings` からの**招待**を使います。
+
+     ⚠️ **閉じる前に、招待したい相手のアカウントを用意しておくこと。**
+     `/settings` の招待は `household_invites` の行を作るだけで、**Auth ユーザーは作りません**。
+     `/invite/[token]` は未ログインだと `/login` に飛ばすので
+     （`src/app/invite/[token]/page.tsx:27`）、アカウントの無い相手は
+     signup を閉じた状態では**受諾できません**。取れる形は次のどちらかです。
+     - **Authentication → Users → Add user** で相手のアカウントを先に作る（招待メールを送れる）
+     - メンバーを追加するときだけ一時的に signup を開け、受諾後にまた閉じる
    - **Google**: Authentication → Providers で Google を有効化。Google Cloud / Supabase の
      設定手順は **[guides/google-drive-setup.md](./guides/google-drive-setup.md)** を参照
      （Drive 連携を使う場合はこちらが必要）。
 
-> 💡 記録は **世帯（household）** 単位で共有されます。家族は owner / editor / viewer の
-> 3 役で招待でき（`/settings`）、保育園やシッターは対象ペット・期間を限定した
-> **外部ゲスト**として招けます。別アカウントでも、同じ世帯に招待すれば記録を共有できます。
+> 💡 記録は **世帯（household）** 単位で共有されます。家族は `/settings` から
+> **editor（編集可）/ viewer（閲覧のみ）**で招待できます。**招待で owner は選べません** ——
+> owner にするのは参加後に既存 owner が昇格させる形です（`updateMemberRole`）。
+> 保育園やシッターは対象ペット・期間を限定した **外部ゲスト**として招けます。
+> 別アカウントでも、同じ世帯に招待すれば記録を共有できます。
 
 ---
 
