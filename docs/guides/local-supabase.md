@@ -92,7 +92,8 @@ just setup-google
 手動でやる場合は [google-drive-setup.md 2B](./google-drive-setup.md#2b-ローカル-supabasesupabase-start-の場合) を参照。
 
 > 💡 記録は**世帯（household）単位**で共有されます。別アカウントで使う場合は、
-> `/settings` から owner / editor / viewer のいずれかで招待してください
+> `/settings` から **editor / viewer** で招待してください（owner は招待では選べず、
+> 参加後に既存 owner が昇格させます）
 > （招待されていないアカウントでは記録は見えません）。
 
 ## 5. アプリ起動

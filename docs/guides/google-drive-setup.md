@@ -210,7 +210,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 同じメールアドレスで両方を使った場合の挙動（1 ユーザーに統合されるのか別ユーザーになるのか）は
 [../explanation/identity-linking.md](../explanation/identity-linking.md) にまとめてあります。
 **別アドレスのアカウントは別ユーザー**になるので、記録を共有したい相手は
-`/settings` から世帯へ招待してください（owner / editor / viewer）。
+`/settings` から世帯へ招待してください（**editor / viewer**。owner は招待では選べず、
+参加後に既存 owner が昇格させます）。
 
 ---
 

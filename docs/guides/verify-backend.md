@@ -79,7 +79,8 @@ order by tablename, policyname;
 **確認するのは 3 点**です。
 
 1. **世帯ヘルパーを経由しているか** —— `qual` / `with_check` に
-   `has_household_role` / `is_household_member` / `has_guest_record_access` が現れること。
+   `has_household_role` / `is_household_member` / `has_guest_access` /
+   `has_guest_record_access` のいずれかが現れること。
    `true` だけのポリシーや、`household_id` を見ていない条件があれば**そこが穴**
 2. **`daycare_records` / `record_photos` / `pets` / `feedback` / `households` /
    `household_members` / `guest_grants` に select / insert / update / delete が揃っているか** ——
@@ -96,21 +97,30 @@ order by tablename, policyname;
 そしてその 1 行で全世帯が露出します。
 
 ```sql
--- ヘルパーの定義と属性（SECURITY DEFINER / search_path）を確認する
+-- SECURITY DEFINER の関数を「列挙して」確認する（名前を書き並べない）
 select p.proname,
-       p.prosecdef                     as security_definer,   -- true であること
-       p.proconfig                     as settings,           -- search_path が固定されていること
-       pg_get_functiondef(p.oid)       as definition
+       p.proconfig               as settings,     -- search_path が空に固定されていること
+       pg_get_functiondef(p.oid) as definition
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
-  and p.proname in ('has_household_role', 'is_household_member',
-                    'has_guest_record_access', 'create_own_household')
+  and p.prosecdef                                -- ← SECURITY DEFINER のものを全部
 order by p.proname;
 ```
 
-`definition` を `supabase/migrations/` の該当 SQL と見比べ、`security_definer` が `true`、
-`settings` に **`search_path=`（空に固定）**が入っていることを確認します。
+**関数名を列挙する形にしないこと。** 実際に `prosecdef` で引くと、RLS から呼ばれる
+`has_household_role` / `is_household_member` / `has_guest_access` / `has_guest_record_access`
+のほか、RPC 側の `accept_household_invite` / `create_own_household` / `delete_own_household` /
+`get_household_members` / `get_household_guests`、トリガの `enforce_last_owner` まで出ます。
+**手で名前を並べると、増えたぶんが確認対象から漏れます**（この手順は実際に
+`has_guest_access` を落としていました）。`prosecdef` で引けば漏れません。
+
+出てきた各関数の `definition` を `supabase/migrations/` の該当 SQL と見比べ、
+`settings` に **`search_path=`（空に固定）**が入っていることを確認します
+（`prosecdef` で絞っているので、出てきたものはすべて SECURITY DEFINER です）。
+**RLS の述語から呼ばれる 4 つ**（`has_household_role` / `is_household_member` /
+`has_guest_access` / `has_guest_record_access`）は特に重要で、ここが緩むと
+ポリシー式が正しく見えたまま全世帯が露出します。
 本リポジトリのヘルパーは `security definer` ＋ `set search_path = ''` で、参照は全て完全修飾名
 （`20260630140000_household_rls_helper.sql`）。この固定が外れていると、関数内の名前解決を
 差し替えられる余地が生まれます。

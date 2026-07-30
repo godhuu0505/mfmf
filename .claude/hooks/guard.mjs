@@ -143,19 +143,25 @@ const WRAPPER_OPTS_WITH_VALUE = {
   nohup: new Set(),
   command: new Set(),
 };
+// 文字列を分割して実行するオプション（GNU env の `-S` / `--split-string`）。
+// 値を単に読み飛ばすと、その中にある本体（git ...）を見落とす。
+const SPLIT_STRING_OPTS = new Set(["-S", "--split-string"]);
 const basenameOf = (t) => (t.includes("/") ? t.slice(t.lastIndexOf("/") + 1) : t);
 const isAssignment = (t) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(t);
 
-// git の**引数が始まる位置**を返す（見つからなければ -1）。
+// **git の引数リスト**を返す（git を実行していなければ null）。
 // 環境変数代入とラッパー（とそのオプション）を読み飛ばし、
-// **ラッパーが実行する本体が git のときだけ**位置を返す。
-function gitArgsIndex(tokens) {
+// ラッパーが実行する本体が git のときだけ返す。
+// `env -S` の展開でトークン列が書き換わるため、**位置ではなく配列そのものを返す**
+// （位置を返すと、呼び出し側が展開前の配列を切ってしまう）。
+function gitArgs(tokenList) {
+  let tokens = tokenList;
   let i = 0;
   while (i < tokens.length) {
     const t = tokens[i];
     if (isAssignment(t)) { i++; continue; }                 // VAR=value
     const base = basenameOf(t);
-    if (base === "git") return i + 1;
+    if (base === "git") return tokens.slice(i + 1);
     const opts = WRAPPER_OPTS_WITH_VALUE[base];
     if (!opts) return -1;   // git でもラッパーでもない ＝ git を実行していない
     // ラッパー自身のオプションを読み飛ばす。次に来る非オプションが「本体」で、
@@ -163,22 +169,32 @@ function gitArgsIndex(tokens) {
     i++;
     while (i < tokens.length && tokens[i].startsWith("-") && tokens[i] !== "-") {
       if (tokens[i] === "--") { i++; break; }
-      const inlineValue = tokens[i].includes("=");
-      const takesValue = opts.has(tokens[i]);
+      const opt = tokens[i];
+      const eq = opt.indexOf("=");
+      const name = eq < 0 ? opt : opt.slice(0, eq);
+      // `env -S '...'` / `--split-string=...` は**文字列を分割して実行**する。
+      // 値を読み飛ばすと本体（git）を見失うので、中身を語に割ってその場に差し込む。
+      if (SPLIT_STRING_OPTS.has(name)) {
+        const payload = eq >= 0 ? opt.slice(eq + 1) : tokens[i + 1];
+        const consumed = eq >= 0 ? 1 : 2;
+        const inner = String(payload ?? "").trim().split(/\s+/).filter(Boolean);
+        tokens = [...tokens.slice(0, i), ...inner, ...tokens.slice(i + consumed)];
+        continue;   // 差し込んだ先頭から改めて読む
+      }
+      const takesValue = opts.has(name);
       i++;
-      if (takesValue && !inlineValue) i++;                  // `-u me` の `me`
+      if (takesValue && eq < 0) i++;                        // `-u me` の `me`
     }
     if (tokens[i] === "-") i++;                             // env の `-`
     while (i < tokens.length && isAssignment(tokens[i])) i++; // env NAME=VALUE...
   }
-  return -1;
+  return null;
 }
 
 function isForcedWorktreeRemoval(command) {
   for (const tokens of lexSegments(command)) {
-    const argsAt = gitArgsIndex(tokens);
-    if (argsAt < 0) continue;
-    const rest = tokens.slice(argsAt);
+    const rest = gitArgs(tokens);
+    if (!rest) continue;
     // `--force` の曖昧でない省略形（--f 〜 --force）と、-f を含む短オプション束
     const isForce = (t) =>
       /^--f(?:o(?:r(?:c(?:e)?)?)?)?$/.test(t) || /^-[A-Za-z]*f[A-Za-z]*$/.test(t);
