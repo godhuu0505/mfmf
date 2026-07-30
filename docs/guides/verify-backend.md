@@ -19,9 +19,9 @@
 | 確認項目 | どこで | 期待状態 |
 | --- | --- | --- |
 | プロジェクト稼働 | トップ | Status が **ACTIVE / Healthy**。Free は無アクセスで一時停止することがあり、その場合は Restore / Resume。 |
-| テーブルと RLS | Table Editor | `public.daycare_records` / `public.record_photos` / `public.feedback` が存在し、いずれも **RLS enabled**。 |
+| テーブルと RLS | **SQL Editor** | `public` の**全テーブル**で `relrowsecurity` が true（→ §2-0）。Table Editor で数枚だけ見る形にしない。 |
 | 認証ユーザー | Authentication > Users | ログインに使うユーザーが存在。**世帯メンバーはそれぞれ自分のアカウント**を持つ（招待で追加。`SIGNUP_ENABLED` が閉じている間は手動発行）。 |
-| 世帯とロール | Table Editor | `households` / `household_members` が存在し RLS enabled。確認したいユーザーの `household_members` 行と `role`（owner/editor/viewer）が意図どおり。 |
+| 世帯とロール | Table Editor | 確認したいユーザーの `household_members` 行と `role`（owner/editor/viewer）が意図どおり。 |
 | テナント分離・ロール境界 | **CI（pgTAP）＋ SQL Editor** | **挙動**は `supabase/tests/` が PR ごとに検証済み。**本番では挙動を試さず、`pg_policies` でポリシー定義が一致しているかを読む**（→ §2-1）。 |
 | Storage | Storage ＋ **SQL Editor** | `daycare-photos` バケットがあり **private**。署名付き URL（期限 1 時間）で配信。**バケットの存在だけでは不十分**で、`storage.objects` のポリシーも読む（→ §2-1）。 |
 | スキーマ適用 | （実体で判断） | 上の実体が揃っていれば適用済み。未適用なら **`supabase db push`**（CLI）で適用する。SQL Editor で流した場合は履歴が残らないので `supabase migration repair --status applied <version>` を忘れないこと（下の ⚠️）。 |
@@ -32,6 +32,38 @@
 > 突き合わせて確認できる（[guides/deploy.md](./deploy.md)）。一方、過去に **SQL Editor で実行した分**
 > や初回 setup で手動適用した分は履歴に残らないため、移行期は実体（テーブル / ポリシー / バケット）と
 > 履歴の両面で判断する。ズレを直したいときは `supabase migration repair --status applied <version>` を使う。
+
+### 2-0. まず「RLS が有効か」を全テーブルで見る（ポリシーを読む前に）
+
+**ポリシーの確認より先にこれをやります。** `pg_policies` は
+**RLS が無効になっていてもポリシーを表示し続ける**ので、
+「ポリシーは migration と一致していた」だけでは何も言えません。
+`relrowsecurity` が false なら、**そのテーブルはポリシーの有無に関わらず全公開**です。
+
+```sql
+-- public のテーブルを全部出す（名前を書き並べない）
+select c.relname            as table_name,
+       c.relrowsecurity     as rls_enabled,     -- ← false が 1 つでもあれば、そこが穴
+       c.relforcerowsecurity as rls_forced,
+       count(p.polname)     as policies
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+left join pg_policy p on p.polrelid = c.oid
+where n.nspname = 'public' and c.relkind = 'r'
+group by c.relname, c.relrowsecurity, c.relforcerowsecurity
+order by c.relrowsecurity, c.relname;
+```
+
+🚨 **Table Editor で数枚だけ開く形にしないこと。** この節はもともと
+`daycare_records` / `record_photos` / `feedback` / `households` / `household_members` の
+**5 つだけ**を挙げていて、`pets` / `tags` / `record_tags` / `profiles` /
+`google_credentials` / `household_invites` / `guest_grants` が対象外でした。
+`profiles` と `google_credentials` は**ユーザー単位の秘匿データ（Google の OAuth トークンを含む）**
+なので、ここで RLS が落ちていれば全ユーザー分が読めます。
+`relkind = 'r'` で引けば、テーブルが増えても勝手に対象に入ります。
+
+`storage.objects` は Supabase 側で RLS が有効な前提ですが、同じクエリの
+`nspname` を `'storage'` にして確認できます。
 
 ### 2-1. 挙動は pgTAP に任せ、本番では「定義」を読む
 
@@ -127,7 +159,8 @@ order by schemaname, tablename, policyname;
    🚨 **足りないように見えるからといってポリシーを追加しないこと。** 上の 3 つに
    insert / update を足すと、RPC と招待フローを迂回する経路を自分で開けることになります。
    期待する `cmd` の集合は `supabase/migrations/` が正で、5 点目で突き合わせます。
-   **RLS が無効になっていれば全許可**になりますが、それは下の表の「RLS enabled」で気づけます
+   **RLS が無効になっていれば全許可**になりますが、それは §2-0 の `relrowsecurity` で気づけます
+   （このクエリでは分かりません —— `pg_policies` は RLS が無効でもポリシーを表示します）
 4. **`storage.objects` に `daycare_photos_*` の 5 本が揃っているか** —— 2 系統です。
    `_household`（新パス規約 `{household_id}/...` 用: select / insert / delete）と
    `_shared_owner`（旧パス `{owner_id}/...` を「その記録の世帯のメンバー」に開く分:
@@ -255,7 +288,9 @@ order by c.relname, t.tgname;
 > **ポリシーとヘルパー本体の両方**が一致していて pgTAP が緑なら、本番の挙動も同じと言えます。
 > 片方だけでは足りません —— ポリシーが正しく見えてもヘルパーが嘘をついていれば素通りします。
 
-あわせて上の表の「テーブルと RLS」（RLS enabled）「世帯とロール」「advisor」も確認します。
+あわせて **§2-0（全テーブルの `relrowsecurity`）**と、上の表の「世帯とロール」「advisor」も確認します。
+**§2-0 を飛ばすと、ここまでの確認が全部通っても意味がありません** ——
+RLS が無効なテーブルでは、正しいポリシーが並んでいても全公開だからです。
 
 > ⚠️ **本番データに対して write を試さないこと。** 「viewer で書けないことを確かめる」形の
 > 手動テストは、RLS が壊れていた場合に**本番へ書き込んでしまいます**。

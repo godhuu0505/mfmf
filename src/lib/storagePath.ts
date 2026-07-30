@@ -1,6 +1,6 @@
 // Storage オブジェクトパスの生成・検証ユーティリティ（クライアント/サーバー共用）。
-// 規約: {scope_id}/{record_id}/{uuid}-{sanitized_filename}
-//   scope_id は所属 household_id（Phase 3.5 手順8 以降の新規アップロード）。
+// 規約: {household_id}/{record_id}/{uuid}-{sanitized_filename}
+//   （Phase 3.5 手順8 以降の新規アップロード。旧オブジェクトは owner_id 先頭のまま残る）
 //
 // ⚠️ 旧規約（owner_id 先頭）への**アップロードはもう通らない**。
 // daycare_photos_insert_own は 20260704000000_rbac_switch_and_management.sql で
@@ -17,13 +17,14 @@ export function sanitizeFileName(fileName: string): string {
 }
 
 // アップロード先パスを生成する（衝突回避に uuid を付与）。
-// scopeId には household_id（未所属時は owner_id）を渡す。
+// **必ず household_id を渡すこと。** owner_id を渡したパスは insert ポリシーが無いので
+// Storage RLS で落ちる（上の ⚠️）。「未所属時は owner_id」という旧い呼び方はもう成立しない。
 export function buildStoragePath(
-  scopeId: string,
+  householdId: string,
   recordId: string,
   fileName: string,
 ): string {
-  return `${scopeId}/${recordId}/${crypto.randomUUID()}-${sanitizeFileName(fileName)}`;
+  return `${householdId}/${recordId}/${crypto.randomUUID()}-${sanitizeFileName(fileName)}`;
 }
 
 // クライアント由来のパスが当該 scope_id / record_id 配下かを検証する（防御的サニタイズ）。

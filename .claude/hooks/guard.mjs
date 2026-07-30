@@ -79,6 +79,11 @@ function lexSegments(command, { envSplit = false } = {}) {
   // エスケープも効く（`git >"/tmp/a b" worktree ...`）。だから対象をその場で
   // 読み飛ばすのではなく、**通常の語として読み切ってから捨てる**。
   let dropNextWord = false;
+  // ヒアドキュメント（`cat <<EOF` … `EOF`）の**本文はコマンドではない**。
+  // 素通りさせると本文の各行を新しいセグメントとして解析してしまい、
+  // 「手順書を cat で表示するだけ」のコマンドを誤って拒否する。
+  // 区切り語を覚えておき、行末に達した時点で本文を終端まで読み飛ばす。
+  const pendingHeredocs = [];
   const endWord = () => {
     if (!hasWord) return;
     if (dropNextWord) dropNextWord = false;   // リダイレクト対象 → 引数にしない
@@ -93,6 +98,10 @@ function lexSegments(command, { envSplit = false } = {}) {
       const next = command[i + 1];
       // env -S の `\_` は空白（＝引数の区切り）。GNU env の独自エスケープ。
       if (envSplit && next === "_") { endWord(); i++; continue; }
+      // env -S の `\c` は**そこで文字列を打ち切る**（実測: `env -S 'echo aaa\cbbb'` は
+      // `aaa` だけを出力する）。以降を literal として繋げると
+      // `--force\cignored` が `--forcecignored` になり判定を素通りする。
+      if (envSplit && next === "c") { endWord(); i = command.length; break; }
       if (next === "\n") { i++; continue; }          // 行継続: 両方消える
       if (next === undefined) continue;
       word += next; hasWord = true; i++; continue;   // \x → リテラル x
@@ -122,6 +131,23 @@ function lexSegments(command, { envSplit = false } = {}) {
     }
     // 区切り文字。`(` `)` はサブシェル境界なので、これも区切りとして扱う
     // （扱わないと `(git worktree remove ../x --force)` が `(git` と `--force)` になり一致しない）。
+    // 行末に達したら、直前の行で宣言されたヒアドキュメントの本文を終端まで捨てる。
+    if (!envSplit && c === "\n" && pendingHeredocs.length) {
+      endSegment();
+      let j = i + 1;
+      while (pendingHeredocs.length) {
+        const { delim, dashed } = pendingHeredocs.shift();
+        for (;;) {
+          const nl = command.indexOf("\n", j);
+          const raw = command.slice(j, nl < 0 ? command.length : nl);
+          j = nl < 0 ? command.length : nl + 1;
+          // `<<-` は行頭のタブを剥がして比較する
+          if ((dashed ? raw.replace(/^\t+/, "") : raw) === delim || nl < 0) break;
+        }
+      }
+      i = j - 1;
+      continue;
+    }
     if (!envSplit && (c === ";" || c === "|" || c === "&" || c === "\n" || c === "(" || c === ")")) {
       endSegment(); continue;
     }
@@ -131,6 +157,25 @@ function lexSegments(command, { envSplit = false } = {}) {
     // シェルは `git</dev/null worktree ...` を「git を実行し stdin を差し替える」と読む。
     // 演算子と**その対象**をまとめて捨てる（対象を語として残すと、それが引数の位置に
     // 入り込んでサブコマンドの判定がずれる）。
+    // ヒアドキュメント `<<EOF` / `<<-EOF` / `<<'EOF'`。区切り語を控えて本文は後で捨てる。
+    // ヒアストリング `<<<word` は本文を持たないので、通常のリダイレクト対象として捨てる。
+    if (!envSplit && c === "<" && command[i + 1] === "<" && command[i + 2] !== "<") {
+      let j = i + 2;
+      let dashed = false;
+      if (command[j] === "-") { dashed = true; j++; }
+      while (j < command.length && /[ \t]/.test(command[j])) j++;
+      let delim = "";
+      while (j < command.length && !/[\s;|&()<>]/.test(command[j])) {
+        const ch = command[j];
+        if (ch === "'" || ch === '"') { j++; continue; }        // 引用符は区切り語の一部ではない
+        if (ch === "\\") { j++; if (j < command.length) delim += command[j++]; continue; }
+        delim += ch; j++;
+      }
+      endWord();
+      pendingHeredocs.push({ delim, dashed });
+      i = j - 1;
+      continue;
+    }
     if (!envSplit && (c === "<" || c === ">")) {
       endWord();
       // 直前の語が fd 番号だけ（`2` など）ならリダイレクト指定なので引数ではない
