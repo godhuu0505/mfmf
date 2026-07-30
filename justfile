@@ -8,8 +8,13 @@ default:
 dev:
     npm run dev
 
-# Dev server bound to the LAN, for checking prototypes on a real phone.
+# Dev server bound to the LAN, for checking the real app on a phone.
 # mfmf is a PWA: one-handed use, safe areas and IME can only be judged on a device.
+#
+# NOTE: prototypes are NOT checked this way anymore (D24). They are self-contained
+# static HTML published to a Claude Artifact. Use this for the real app — existing
+# screens, or when a change must be seen running against real data.
+# PWA standalone / offline behaviour needs HTTPS, so use a Vercel Preview for that.
 dev-lan:
     @set -e; \
     IPS="$(hostname -I 2>/dev/null || true)"; \

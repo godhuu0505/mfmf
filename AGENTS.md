@@ -37,8 +37,10 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 - Server Action 冒頭で `supabase.auth.getUser()` を確認し、未ログインは `redirect("/login")`。
 - DB スキーマ変更は `supabase/migrations/` に新しいタイムスタンプ付き SQL を追加する（`supabase migration new <name>` で生成、既存の `20260616130704_init.sql` は編集しない）。main マージ時に `deploy-production.yml` の `migrate` ジョブが `supabase db push` で本番 Supabase に自動適用し、続けて Vercel Production にデプロイされる（merge = 本番リリース）。破壊的変更は PR 段階でローカル `supabase db reset` 確認まで済ませること。
 - パスエイリアスは `@/*` → `src/*`。
-- UI のある新機能は、仕様を文章で固める前に `proto/<slug>` 使い捨てブランチの実コードで画面を作り、
-  実機で触って合意する（手順は `.claude/skills/prototype/SKILL.md`）。結論は
+- UI のある新機能は、仕様を文章で固める前に **静的 HTML/CSS/JS のプロトタイプ**を `proto/<slug>/` に作り、
+  **Claude Artifact に publish してスマホで触って**合意する（D24。**実コードでプロトを作らない** ——
+  実 Storage への書き込み等が起きた実績がある）。手順は `.claude/skills/prototype/SKILL.md`。
+  合意時に受け入れ条件を洗い出し E2E テストにする（D25）。結論は
   [docs/explanation/decisions.md](./docs/explanation/decisions.md) に 1 行残す。
 
 ## やってはいけないこと（境界）
