@@ -7,6 +7,11 @@ mfmf を「夫婦2人の記録アプリ」から **個人事業として収益�
 > ⚠️ 本書は**仮説**を多く含みます。数字は市場調査ベースの試算であり、実測値ではありません。
 > 「検証方法」列があるものは、実施して数字を差し替えてください。
 
+> 🔴 **本書は「mfmf というアプリがある」ことを前提に組み立てています。**
+> 前提を外してゼロから組み直した検討が [strategy-zero-based.md](./strategy-zero-based.md) にあり、
+> そこでは**入口（§7 のロードマップの順序）が変わります**（掲載・送客が S6 → S1）。
+> 収益構造・法務ゲート・§6 の認可設計は本書が引き続き正です。**どちらで進めるかは未決**。
+
 - 現状の機能は [reference/features.md](../reference/features.md)
 - 技術構成は [reference/architecture.md](../reference/architecture.md)
 - 権限モデル（本戦略の土台）は [phase-3-5-use-cases.md](./phase-3-5-use-cases.md)
