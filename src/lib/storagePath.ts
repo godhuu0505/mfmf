@@ -1,9 +1,15 @@
 // Storage オブジェクトパスの生成・検証ユーティリティ（クライアント/サーバー共用）。
 // 規約: {scope_id}/{record_id}/{uuid}-{sanitized_filename}
 //   scope_id は所属 household_id（Phase 3.5 手順8 以降の新規アップロード）。
-//   household 未所属時と既存オブジェクトは旧規約どおり owner_id が先頭に入る。
-// 先頭セグメントが household_id / owner_id のどちらであっても Storage RLS が
-// メンバーシップ判定する前提（20260703120000_storage_household_paths.sql）。
+//
+// ⚠️ 旧規約（owner_id 先頭）への**アップロードはもう通らない**。
+// daycare_photos_insert_own は 20260704000000_rbac_switch_and_management.sql で
+// drop されており、生きている insert ポリシーは household パス用の
+// daycare_photos_insert_household だけ（20260703170000_rbac_roles.sql）。
+// 既存オブジェクトは daycare_photos_{select,delete}_shared_owner で
+// 「その記録の世帯のメンバー」に読取/削除のみ開かれている。
+// したがって scopeId に owner_id を渡す経路が残っていれば、それは insert が
+// RLS で落ちる（未所属ユーザーは /onboarding で世帯作成へ回されるため通常は到達しない）。
 
 // 入力由来のファイル名をサニタイズする。
 export function sanitizeFileName(fileName: string): string {

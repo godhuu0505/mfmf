@@ -62,8 +62,17 @@ function lexSegments(command) {
   let words = [];
   let word = "";
   let hasWord = false;              // 空文字列の引数（"" など）も 1 語として扱うため
-  const endWord = () => { if (hasWord) { words.push(word); word = ""; hasWord = false; } };
-  const endSegment = () => { endWord(); if (words.length) segments.push(words); words = []; };
+  // リダイレクトの**対象**を捨てるためのフラグ。対象はファイル名なので引用符も
+  // エスケープも効く（`git >"/tmp/a b" worktree ...`）。だから対象をその場で
+  // 読み飛ばすのではなく、**通常の語として読み切ってから捨てる**。
+  let dropNextWord = false;
+  const endWord = () => {
+    if (!hasWord) return;
+    if (dropNextWord) dropNextWord = false;   // リダイレクト対象 → 引数にしない
+    else words.push(word);
+    word = ""; hasWord = false;
+  };
+  const endSegment = () => { endWord(); dropNextWord = false; if (words.length) segments.push(words); words = []; };
 
   for (let i = 0; i < command.length; i++) {
     const c = command[i];
@@ -113,9 +122,10 @@ function lexSegments(command) {
       let j = i + 1;
       if (command[j] === ">" || command[j] === "<") j++;        // >> / <<
       if (command[j] === "&") j++;                              // 2>&1 の &
-      while (j < command.length && /[ \t]/.test(command[j])) j++;  // 演算子と対象の間の空白
-      // 対象（ファイル名 / fd）を読み捨てる
-      while (j < command.length && !/[ \t\r\n;|&()<>]/.test(command[j])) j++;
+      // 対象（ファイル名 / fd）は**次の 1 語**として読ませて捨てる。
+      // ここで空白まで読み飛ばす形にすると `>"/tmp/a b"` の引用符内の空白で
+      // 打ち切られ、残った `b"` が引数の位置に入ってサブコマンドの判定がずれる。
+      dropNextWord = true;
       i = j - 1;
       continue;
     }
@@ -181,9 +191,16 @@ function gitArgs(tokenList) {
       // 同じ字句解析器を通して引用符・エスケープを解いた語にする。
       // なお env -S は `;` `|` をシェル演算子として解釈せず、ただの引数として渡す。
       // ここでは最初のセグメントだけを採る（演算子より後ろは git の引数にならない）。
-      if (SPLIT_STRING_OPTS.has(name)) {
-        const payload = eq >= 0 ? opt.slice(eq + 1) : tokens[i + 1];
-        const consumed = eq >= 0 ? 1 : 2;
+      //
+      // 3 つの書き方すべてを受ける。`-S val` / `--split-string=val` / **`-Sval`**
+      // （短オプションに値がくっついた形。GNU env はこれを受け付ける ——
+      // `env -S'git worktree remove --force'` が実際に動くことを実測した）。
+      // `env` に限定するのは、`sudo -S` が「パスワードを標準入力から読む」で
+      // 値を取らない別物のため。
+      const attachedS = base === "env" && eq < 0 && /^-S./.test(opt);
+      if (attachedS || (base === "env" && SPLIT_STRING_OPTS.has(name))) {
+        const payload = attachedS ? opt.slice(2) : eq >= 0 ? opt.slice(eq + 1) : tokens[i + 1];
+        const consumed = attachedS || eq >= 0 ? 1 : 2;
         const inner = lexSegments(String(payload ?? ""))[0] ?? [];
         tokens = [...tokens.slice(0, i), ...inner, ...tokens.slice(i + consumed)];
         continue;   // 差し込んだ先頭から改めて読む

@@ -52,8 +52,11 @@
   には画像本体を渡さず、アップロード済みのオブジェクトパスだけを送って `record_photos` に登録する
   （Vercel の Function ボディ上限 4.5MB を超えないため）。新規作成時は `record_id` をクライアントで
   生成し、パス規約と DB 行の id を一致させる。
-- Storage オブジェクトパス規約: `{household_id}/{record_id}/{filename}`（household 未所属時と
-  既存オブジェクトは `{owner_id}/{record_id}/{filename}` を併存。生成/検証は `src/lib/storagePath.ts`）。
+- Storage オブジェクトパス規約: `{household_id}/{record_id}/{filename}`。生成/検証は
+  `src/lib/storagePath.ts`。**新規アップロードはこの形だけが通る** —— 旧規約
+  `{owner_id}/{record_id}/{filename}` への insert ポリシーは削除済みで
+  （`20260704000000_rbac_switch_and_management.sql`）、既存オブジェクトの
+  **読取/削除のみ**が世帯メンバーに開かれている（`daycare_photos_*_shared_owner`）。
 - 画面: `/login`（Google OAuth + email/password）, `/signup`（`SIGNUP_ENABLED=true` で開放）,
   `/forgot-password`, `/reset-password`, `/`（一覧）, `/records/new`, `/records/[id]`（`?edit=1` で編集）,
   `/calendar`, `/gallery`, `/pets`, `/weight`, `/settings`, `/share/[token]`,

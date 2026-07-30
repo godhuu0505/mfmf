@@ -89,17 +89,33 @@ order by schemaname, tablename, policyname;
    `has_household_role` / `is_household_member` / `has_guest_access` /
    `has_guest_record_access` のいずれかが現れること。
    `true` だけのポリシーや、`household_id` を見ていない条件があれば**そこが穴**
-2. **`daycare_records` / `record_photos` / `pets` / `feedback` / `households` /
-   `household_members` / `guest_grants` に select / insert / update / delete が揃っているか** ——
-   欠けている `cmd` があれば、その操作は「ポリシー無し」＝ RLS 有効なら全拒否、
-   無効なら全許可になる（後者は下の RLS enabled の行で気づける）
-3. **`storage.objects` に `daycare_photos_*` の 8 本が揃っているか** —— 3 系統あります。
-   `_own`（旧パス規約 `{owner_id}/...` 用: select / insert / delete）、
-   `_household`（新パス規約 `{household_id}/...` 用: select / insert / delete）、
-   `_shared_owner`（旧パスを世帯メンバーに開く分: select / delete）。
-   `qual` に `is_household_member` / `has_household_role` と
+2. **`cmd` の欠落を「適用漏れ」と決めつけないこと** —— 欠けている `cmd` は、
+   その操作が「ポリシー無し」＝ RLS 有効なら全拒否になることを意味します。
+   これは**多くの場合、意図した最小権限**です。実際に migration どおりの状態でも:
+
+   | テーブル | 無い `cmd` | 理由 |
+   | --- | --- | --- |
+   | `record_photos` / `record_tags` | **update 無し** | 写真・タグ付けは付け外しのみ（差し替えは delete + insert） |
+   | `households` | **insert / delete 無し** | 作成・削除は RPC（`create_own_household` / `delete_own_household`）が担う |
+   | `household_members` | **insert 無し** | メンバー追加は招待フロー（`accept_household_invite`）だけを経路にしている |
+
+   🚨 **足りないように見えるからといってポリシーを追加しないこと。** 上の 3 つに
+   insert / update を足すと、RPC と招待フローを迂回する経路を自分で開けることになります。
+   期待する `cmd` の集合は `supabase/migrations/` が正で、次の 4 点目で突き合わせます。
+   **RLS が無効になっていれば全許可**になりますが、それは下の表の「RLS enabled」で気づけます
+3. **`storage.objects` に `daycare_photos_*` の 5 本が揃っているか** —— 2 系統です。
+   `_household`（新パス規約 `{household_id}/...` 用: select / insert / delete）と
+   `_shared_owner`（旧パス `{owner_id}/...` を「その記録の世帯のメンバー」に開く分:
+   select / delete）。`qual` に `is_household_member` / `has_household_role` と
    `public.try_cast_uuid(...)`（パス先頭セグメントの安全なキャスト）が現れること。
    **`bucket_id = 'daycare-photos'` の条件が消えていれば、他バケットまで巻き込みます**
+
+   > `_own`（`daycare_photos_{select,insert,delete}_own`）は**もう存在しません**。
+   > `20260704000000_rbac_switch_and_management.sql` と
+   > `20260704020000_member_exit_and_h10.sql` で drop されています
+   > （旧パスの読み取りは `_shared_owner` が世帯単位で引き継いだ）。
+   > **1 本のポリシーの有無を数えるときは、それを作った migration だけでなく
+   > 後続の drop まで追うこと** —— この節は一度「8 本」と書いて間違えました
 4. **`supabase/migrations/` の内容と一致するか** —— 差異があれば適用漏れか手動変更。
    `supabase migration list` で履歴のズレも確認できる（[deploy.md](./deploy.md)）
 
@@ -107,7 +123,7 @@ order by schemaname, tablename, policyname;
 `has_household_role(...)` という**呼び出しだけ**で、関数の**本体**は含まれません。
 これらは `SECURITY DEFINER`（呼び出し元の権限を無視して実行）で、
 メンバーシップ・ロール・対象ペット・期間の判定は**本体の中**にあります。
-つまり **`has_household_role` が `return true` に書き換えられていても、上の 3 点は全部通ります** ——
+つまり **`has_household_role` が `return true` に書き換えられていても、上の 4 点は全部通ります** ——
 そしてその 1 行で全世帯が露出します。
 
 ```sql
@@ -138,6 +154,56 @@ order by p.proname;
 本リポジトリのヘルパーは `security definer` ＋ `set search_path = ''` で、参照は全て完全修飾名
 （`20260630140000_household_rls_helper.sql`）。この固定が外れていると、関数内の名前解決を
 差し替えられる余地が生まれます。
+
+### そして、トリガも確認します（`prosecdef` では出てこない）
+
+**RLS で表現できない不変条件が 2 つあり、どちらもトリガが担っています。**
+ポリシーもヘルパーも一致していて、なおここだけ壊れている状態があり得ます。
+
+| 何を守っているか | 関数 | 付いている先 |
+| --- | --- | --- |
+| **`owner_id` の書き換え禁止**（記入者の偽装防止） | `forbid_owner_change()` | `daycare_records` / `pets` / `tags` / `feedback` の update |
+| **世帯の最後の owner を失わせない** | `enforce_last_owner()` | `household_members` の update / delete |
+
+`forbid_owner_change()` が RLS で代替できない理由は `20260704020000_member_exit_and_h10.sql`
+に書かれています —— **update の `USING` / `WITH CHECK` は「更新後の行が条件を満たすか」しか見ず、
+`owner_id` が別の値に**差し替えられた**ことは判定できない**ためです。
+editor は自分の世帯の行を正当に update できるので、`owner_id` だけを他人の id に
+書き換える操作はポリシー上は通ってしまいます。
+
+**この関数は `SECURITY DEFINER` ではありません**（トリガは定義元テーブルの文脈で走るため
+不要）。つまり**上の `prosecdef` の列挙には出てきません**。ここも別に見る必要があります。
+
+```sql
+-- トリガの「付いていること」と「有効であること」を確認する（名前を書き並べない）
+select c.relname          as table_name,
+       t.tgname           as trigger_name,
+       t.tgenabled        as enabled,      -- 'O' = 有効。'D' なら**無効化されている**
+       p.proname          as function_name,
+       pg_get_functiondef(p.oid) as definition
+from pg_trigger t
+join pg_class c     on c.oid = t.tgrelid
+join pg_namespace n on n.oid = c.relnamespace
+join pg_proc p      on p.oid = t.tgfoid
+where n.nspname = 'public'
+  and not t.tgisinternal          -- ← 外部キー等の内部トリガを除く
+order by c.relname, t.tgname;
+```
+
+確認するのは **3 点**です。
+
+1. **上の表の 5 つの付け先すべてに行があるか**（`forbid_owner_change` が 4 テーブル、
+   `enforce_last_owner` が `household_members`）
+2. **`enabled` が `'O'` か** —— `alter table ... disable trigger` は**ポリシーも関数定義も
+   一切変えずに**不変条件だけを外せます。定義を読むだけでは気づけないのはここです
+3. **`definition` が migration と一致するか**（`forbid_owner_change` は
+   `20260704020000_member_exit_and_h10.sql`、`enforce_last_owner` は
+   `20260705040000_household_delete.sql` が最新）
+
+> `share_links` にも同じトリガが付いていましたが、`20260705030000_drop_share_links.sql` の
+> `drop table ... cascade` でテーブルごと消えています（D4 の匿名共有廃止）。
+> **`cascade` はトリガも一緒に落とすので、migration の `create trigger` を数えると 5 件に
+> 見えますが、生きているのは 4 件です。** 上のクエリで実際に引けば取り違えません。
 
 > これは**挙動ではなく定義**の確認です。挙動は pgTAP が担保しているので、
 > ここでは「本番に載っている定義が、pgTAP が検証した定義と同じか」だけを見ます。
