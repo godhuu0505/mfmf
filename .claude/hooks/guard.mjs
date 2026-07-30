@@ -174,6 +174,9 @@ const WRAPPER_OPTS_WITH_VALUE = {
   time: new Set(["-f", "-o"]),
   nohup: new Set(),
   command: new Set(),
+  // `exec git ...` はシェル自身を git に置き換えて**実行する**（bash の `help exec`）。
+  // `-a name` だけ値を取り、`-c` / `-l` は取らない。
+  exec: new Set(["-a"]),
 };
 // 文字列を分割して実行するオプション（GNU env の `-S` / `--split-string`）。
 // 値を単に読み飛ばすと、その中にある本体（git ...）を見落とす。
@@ -286,13 +289,23 @@ try {
 const tool = input.tool_name || "";
 const ti = input.tool_input || {};
 
-// 読み取り可: .env.local.example（プレースホルダのみ）。保護: 実際の env / 鍵ファイル。
-const SECRET_FILE = /(^|\/)\.env($|\.local$|\.[^/]*\.local$|\.production$|\.development$|\.test$)|\.pem$|(^|\/)id_(rsa|ed25519)$|\.p12$|\.key$/;
+// 読み取り可: .env.local.example などのテンプレート（プレースホルダのみ）。
+// 保護: 実際の env / 鍵ファイル。
+//
+// **env は「守る名前を並べる」形にしない。** 以前は
+//   .env / .env.local / .env.*.local / .env.production / .env.development / .env.test
+// を列挙していたが、`.env.staging` `.env.preview` `.env.prod` は素通りしていた（実測）。
+// 環境名は無数にあるので、列挙する限り必ず漏れる。
+// **原則拒否にして、通すのはテンプレートだけ**という向きに反転する。
+const ENV_FILE = /(^|\/)\.env(\.|$)/;
+const ENV_TEMPLATE = /(^|\/)\.env(\.[^/]*)?\.(example|sample|template|dist)$/;
+const KEY_FILE = /\.pem$|(^|\/)id_(rsa|ed25519)$|\.p12$|\.key$/;
+const isSecretFile = (p) => (ENV_FILE.test(p) && !ENV_TEMPLATE.test(p)) || KEY_FILE.test(p);
 
 // ファイル系ツールでの機密ファイルアクセスを拒否
 if (["Read", "Edit", "Write", "NotebookEdit"].includes(tool)) {
   const p = ti.file_path || ti.notebook_path || "";
-  if (p && SECRET_FILE.test(p)) {
+  if (p && isSecretFile(p)) {
     deny(
       `機密ファイル（${p}）へのアクセスはガードによりブロックされました。` +
         `Supabase の URL / anon key は public ですが、service_role key やセッションは秘匿してください。` +

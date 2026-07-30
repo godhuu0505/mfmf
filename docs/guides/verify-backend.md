@@ -145,42 +145,53 @@ order by schemaname, tablename, policyname;
    `supabase migration list` で履歴のズレも確認できる（[deploy.md](./deploy.md)）
 
 **さらに、ヘルパー関数の中身も比べます。** `pg_policies` に出るのは
-`has_household_role(...)` という**呼び出しだけ**で、関数の**本体**は含まれません。
-これらは `SECURITY DEFINER`（呼び出し元の権限を無視して実行）で、
-メンバーシップ・ロール・対象ペット・期間の判定は**本体の中**にあります。
+`has_household_role(...)` / `try_cast_uuid(...)` という**呼び出しだけ**で、
+関数の**本体**は含まれません。メンバーシップ・ロール・対象ペット・期間の判定も、
+Storage パスの先頭セグメントの解決も、すべて**本体の中**にあります。
 つまり **`has_household_role` が `return true` に書き換えられていても、上の 5 点は全部通ります** ——
 そしてその 1 行で全世帯が露出します。
 
 ```sql
--- SECURITY DEFINER の関数を「列挙して」確認する（名前を書き並べない）
+-- public の関数を「全部」出して確認する（名前でも属性でも絞らない）
 select p.proname,
+       p.prosecdef               as security_definer,
        p.proconfig               as settings,     -- search_path が空に固定されていること
        pg_get_functiondef(p.oid) as definition
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
-  and p.prosecdef                                -- ← SECURITY DEFINER のものを全部
-order by p.proname;
+order by p.prosecdef desc, p.proname;
 ```
 
-**関数名を列挙する形にしないこと。** 実際に `prosecdef` で引くと、RLS から呼ばれる
-`has_household_role` / `is_household_member` / `has_guest_access` / `has_guest_record_access`
-のほか、RPC 側の `accept_household_invite` / `create_own_household` / `delete_own_household` /
-`get_household_members` / `get_household_guests`、トリガの `enforce_last_owner` まで出ます。
-**手で名前を並べると、増えたぶんが確認対象から漏れます**（この手順は実際に
-`has_guest_access` を落としていました）。`prosecdef` で引けば漏れません。
+🚨 **`prosecdef` で絞らないこと。** この手順は 2 度、絞り込みで対象を落としています。
+
+1. 最初は `proname in (...)` で **4 つを手で並べて**いて、RLS 述語から呼ばれる
+   `has_guest_access` が漏れていました
+2. 次に `p.prosecdef` で絞ったところ、**`SECURITY INVOKER` のヘルパーが漏れました** ——
+   `public.try_cast_uuid` は `20260703120000_storage_household_paths.sql:55` で
+   invoker として定義され、**`storage.objects` の 5 本すべてから直接呼ばれています**。
+   本体が固定の UUID を返すように書き換えられると、**どのパスの先頭セグメントも
+   その世帯として解決される** —— つまりその世帯のメンバーが**無関係な写真を
+   select / 署名発行できる**のに、ポリシー側の確認は全部通ります
+
+絞り込みの条件を考えた時点で「その条件から外れるもの」が生まれます。**全部出すのが唯一
+漏れない形**です。実際に引くと **13 個**（`SECURITY DEFINER` 10 個 ＋ invoker 3 個）出ます。
+
+| 種類 | 関数 | なぜ重要か |
+| --- | --- | --- |
+| **RLS 述語から呼ばれる（definer）** | `has_household_role` / `is_household_member` / `has_guest_access` / `has_guest_record_access` | ここが `return true` になると**ポリシー式が正しく見えたまま全世帯が露出** |
+| **ポリシーから呼ばれる（invoker）** | `try_cast_uuid` | 固定 UUID を返すと**全パスが同じ世帯に解決される**（上記2） |
+| RPC（definer） | `accept_household_invite` / `create_own_household` / `delete_own_household` / `get_household_members` / `get_household_guests` | 招待・世帯作成/削除の経路そのもの |
+| トリガ（definer / invoker） | `enforce_last_owner` / `forbid_owner_change` | RLS で表現できない不変条件（→ 次節） |
 
 出てきた各関数の `definition` を `supabase/migrations/` の該当 SQL と見比べ、
-`settings` に **`search_path=`（空に固定）**が入っていることを確認します
-（`prosecdef` で絞っているので、出てきたものはすべて SECURITY DEFINER です）。
-**RLS の述語から呼ばれる 4 つ**（`has_household_role` / `is_household_member` /
-`has_guest_access` / `has_guest_record_access`）は特に重要で、ここが緩むと
-ポリシー式が正しく見えたまま全世帯が露出します。
-本リポジトリのヘルパーは `security definer` ＋ `set search_path = ''` で、参照は全て完全修飾名
+`settings` に **`search_path=`（空に固定）**が入っていることを確認します。
+本リポジトリのヘルパーは `set search_path = ''` で参照は全て完全修飾名
 （`20260630140000_household_rls_helper.sql`）。この固定が外れていると、関数内の名前解決を
-差し替えられる余地が生まれます。
+差し替えられる余地が生まれます。`security_definer` 列が `true` のものは
+**呼び出し元の権限を無視して実行される**ので、本体の判定がそのまま境界になります。
 
-### そして、トリガも確認します（`prosecdef` では出てこない）
+### そして、トリガの「付き方」も確認します（関数一覧だけでは分からない）
 
 **RLS で表現できない不変条件が 2 つあり、どちらもトリガが担っています。**
 ポリシーもヘルパーも一致していて、なおここだけ壊れている状態があり得ます。
@@ -196,8 +207,10 @@ order by p.proname;
 editor は自分の世帯の行を正当に update できるので、`owner_id` だけを他人の id に
 書き換える操作はポリシー上は通ってしまいます。
 
-**この関数は `SECURITY DEFINER` ではありません**（トリガは定義元テーブルの文脈で走るため
-不要）。つまり**上の `prosecdef` の列挙には出てきません**。ここも別に見る必要があります。
+**関数の一覧に出てくるだけでは足りません。** 上のクエリは `public` の関数を全部出すので
+`forbid_owner_change` の**本体**は確認できますが、それが**どのテーブルの何の操作に
+付いているか**、そして**有効かどうか**は出てきません。トリガが外されていれば、
+関数は正しいまま不変条件だけが消えます。
 
 ```sql
 -- トリガの「付いていること」と「有効であること」を確認する（名前を書き並べない）
