@@ -57,6 +57,7 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 
 ## ドキュメント地図
 
+- **判断基準（Mission / Vision / Values）**: [docs/explanation/principles.md](./docs/explanation/principles.md)
 - 全体像: [README.md](./README.md) ／ ドキュメント索引: [docs/README.md](./docs/README.md)
 - 構成の地図: [docs/reference/architecture.md](./docs/reference/architecture.md)
 - 決定ログ（却下した案と理由）: [docs/explanation/decisions.md](./docs/explanation/decisions.md)

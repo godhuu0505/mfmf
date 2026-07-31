@@ -30,9 +30,10 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 
 ## 解説（explanation/）
 
+- [explanation/principles.md](./explanation/principles.md) — **Mission / Vision / Values**。個別の決定を導く判断基準（V1〜V7）と、その根拠になった実例。
 - [explanation/decisions.md](./explanation/decisions.md) — 設計決定ログ（D ログ）。**却下した案とその理由**を 1 行で残す唯一の場所。
 - [explanation/prototype-first.md](./explanation/prototype-first.md) — 新機能の画面を静的プロトタイプ＋Artifact で決める理由（2026-07-30 に実コード案から方針転換した経緯と実測データ）。
-- [explanation/vision-and-roadmap.md](./explanation/vision-and-roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
+- [explanation/roadmap.md](./explanation/roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
 - [explanation/phase-3-5-use-cases.md](./explanation/phase-3-5-use-cases.md) — Phase 3.5（家族・権限・サインアップ・共有）のユースケース・バックログ（受け入れ条件・決定ログ・未決事項）。
 
 ---

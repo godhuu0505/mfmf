@@ -20,7 +20,7 @@
 ### 1-1. 画面の形を決める場所が、フローのどこにも無い
 
 現行フローは
-`vision-and-roadmap.md`（機能カタログ）→ `phase-N-use-cases.md`（UC-xx ＋受け入れ条件＋D 決定ログ）
+`roadmap.md`（機能カタログ）→ `phase-N-use-cases.md`（UC-xx ＋受け入れ条件＋D 決定ログ）
 → GitHub Issue → PR → main マージ＝本番リリース。
 
 **この鎖に UI/UX の成果物が 1 つも無い。** 数えるとはっきりする:
@@ -40,7 +40,7 @@
 
 ### 1-2. 実際に「🟡 のまま止まる」現象が起きている
 
-`vision-and-roadmap.md` §5 の機能カタログは 🟢 採用 25 件に対し **🟡 検討中が 11 件**。
+`roadmap.md` §5 の機能カタログは 🟢 採用 25 件に対し **🟡 検討中が 11 件**。
 その 11 件を並べると、**10 件が「UI の形が決まらないと進めない」もの**だと分かる。
 
 ```
@@ -102,7 +102,7 @@ mfmf は PWA で、価値は「スマホで片手で、片手間に記録でき�
 | `supabase/config.toml` | 「mfmf は Google ログイン**一本化**」（設定ファイル自身が Google 必須を宣言） |
 | `verify-backend.md` | 「共有する 1 アカウントを手動発行」。確認項目に世帯・RLS が無く、テナント分離が壊れていても全項目が緑になる状態 |
 | `identity-linking.md` | 「共用アカウント前提の mfmf にとって望ましい」 |
-| `vision-and-roadmap.md` | 実装済みの共有機能 5 行が凡例上「採用（未実装）」のまま |
+| `roadmap.md` | 実装済みの共有機能 5 行が凡例上「採用（未実装）」のまま |
 | `getting-started.md` | SQL Editor 手順が初期 migration で止まり、世帯テーブルと `create_own_household` が作られない |
 
 > **数え直しの経過そのものが、この課題の性質を表している。** 当初 6 → 7 → 8 → 12 → 13。
