@@ -36,6 +36,10 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [explanation/roadmap.md](./explanation/roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
 - [explanation/phase-3-5-use-cases.md](./explanation/phase-3-5-use-cases.md) — Phase 3.5（家族・権限・サインアップ・共有）のユースケース・バックログ（受け入れ条件・決定ログ・未決事項）。
 
+## アーカイブ（archive/）
+
+- [archive/](./archive/) — 役目を終えたプロトタイプとスペック。**現状の仕様ではなく**、合意した時点のスナップショット（[D27](./explanation/decisions.md)）。現役のプロトタイプは [`proto/`](../proto/)。
+
 ---
 
 - プロジェクト全体像は [../README.md](../README.md)。
