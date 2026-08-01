@@ -113,6 +113,7 @@ just setup-google   # 初回のみ：Google OAuth 認証情報を対話投入
 | デプロイ・リリース | [docs/guides/deploy.md](./docs/guides/deploy.md) |
 | 動作確認 | [docs/guides/verify-backend.md](./docs/guides/verify-backend.md) |
 | 構成の地図・環境変数 | [docs/reference/](./docs/reference/architecture.md) |
+| 判断基準（Mission / Vision / Values） | [docs/explanation/principles.md](./docs/explanation/principles.md) |
 | 決定ログ（却下した案と理由） | [docs/explanation/decisions.md](./docs/explanation/decisions.md) |
 
 AI コーディングエージェント向けの作業指針は [AGENTS.md](./AGENTS.md) / [CLAUDE.md](./CLAUDE.md)。

@@ -66,10 +66,16 @@
 
 ## 新機能の画面を検討するとき
 
-UI のある新機能は、仕様を文章で固める前に **`proto/<slug>` 使い捨てブランチの実コード**で
-画面を作り、実機で触って合意する。手順は **`prototype` skill**（`.claude/skills/prototype/`）。
-バックエンドのみの変更・小改修・バグ修正では使わない。
-採用/却下の結論は [docs/explanation/decisions.md](./docs/explanation/decisions.md) に 1 行残す。
+UI のある新機能は、仕様を文章で固める前に **自己完結した静的 HTML/CSS/JS のプロトタイプ**を
+`proto/<slug>/` に作り、**Claude Artifact に publish してスマホで触って合意**する（D24）。
+CSS は Tailwind CLI に `@source` でその HTML を渡して生成し、本番と同じトークン・
+ダークモード・セーフエリアを使う。手順は **`prototype` skill**（`.claude/skills/prototype/`）。
+
+- **実コードでプロトを作らないこと。** 実 Storage への書き込み・実テーブルへの insert・
+  実セッションのログアウトが起きた実績がある（旧 D15 を D24 で上書き）
+- 合意時に受け入れ条件を洗い出し、**E2E テスト**にする（D25）
+- バックエンドのみの変更・既存画面の小改修・バグ修正では使わない
+- 採用/却下の結論は [docs/explanation/decisions.md](./docs/explanation/decisions.md) に 1 行残す
 
 ## セキュリティ（厳守）
 

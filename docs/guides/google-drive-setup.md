@@ -218,7 +218,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ## このあとの実装（参考）
 
 > 以下は Drive 連携内のローカルな実装ステップ。全体ロードマップの Phase 番号
-> （`docs/explanation/vision-and-roadmap.md` §6）とは無関係。
+> （`docs/explanation/roadmap.md` §6）とは無関係。
 
 - **ステップ 2**: クライアントから Drive へ直接アップロード、`record_photos` を Drive ファイル ID 化。
 - **ステップ 3**: 画像プロキシ `/api/photo/[fileId]` + CDN キャッシュで表示。
