@@ -75,7 +75,7 @@ D9〜D14 は原典を参照。
 > | **D25** の E2E | **基盤導入済み（PR-B）。** Playwright + `tests/e2e/quick-record.spec.ts`（UC-Q01〜Q05）が CI の e2e ジョブで走る。以後の新機能はプロト合意時の受け入れ条件を UC 単位でここに足す |
 > | **D26** の生成 CI | 未実装。**Playwright は導入済み**なので、画面スクリーンショット生成はこの基盤に乗せる。別々に設計しないこと |
 > | **D27** の移動 CI | 未実装。置き場所（[`proto/`](../../proto/) と [`docs/archive/`](../archive/)）は作ってあるので、当面は手で移動する |
-> | **D31** の VRT | **最小 1 枚導入済み（/login、`tests/e2e/vrt.spec.ts`）。** ベースラインは Linux + Noto CJK + CI と同一 chromium ビルドで生成してコミット。網羅（主要画面 × ライト/ダーク）は System 整備のフェーズで広げる |
+> | **D31** の VRT | **認証不要の 2 画面 × ライト/ダーク（計 4 枚）導入済み**（/login・/forgot-password、`tests/e2e/vrt.spec.ts`）。ベースラインは Linux + Noto CJK + CI と同一 chromium ビルドで生成してコミット。**認証後の画面は日付・記録の mask 設計が要るため D26 のスクリーンショット生成 CI と併せて設計する**（別々に作らない） |
 
 ## 未決事項
 

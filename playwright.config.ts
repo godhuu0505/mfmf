@@ -10,6 +10,9 @@ export default defineConfig({
   testDir: "./tests/e2e",
   globalSetup: "./tests/e2e/global-setup.ts",
   timeout: 30_000,
+  // 全 spec が同じ E2E ユーザーを共有し「一覧の先頭」を検証するため直列で回す
+  // （並列にすると別ファイルの記録作成が先頭カードのアサーションと競合する）
+  workers: 1,
   // 記録アプリはスマホ前提（片手・セーフエリア）なのでモバイル画面で回す
   projects: [{ name: "mobile-chromium", use: { ...devices["Pixel 7"] } }],
   expect: {
