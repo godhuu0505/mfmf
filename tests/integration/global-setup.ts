@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { Client as PgClient } from "pg";
+import { assertLocalSupabase } from "../localGuard";
 import {
   ANON_KEY,
   DB_URL,
@@ -164,6 +165,8 @@ export default async function globalSetup() {
       "NEXT_PUBLIC_SUPABASE_ANON_KEY が未設定です（`npx supabase start` 後にローカル値を export してから実行）",
     );
   }
+  // .env.local が本番を指したまま実行しても、本物へは 1 リクエストも送らせない
+  assertLocalSupabase(SUPABASE_URL_, DB_URL);
 
   const db = new PgClient({ connectionString: DB_URL });
   await db.connect();
