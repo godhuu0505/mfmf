@@ -1,5 +1,16 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Request } from "@playwright/test";
 import { login } from "./helpers";
+
+// リクエスト本文のバイト数。Blob ボディは postDataBuffer で取れない
+// （Playwright の制約で null になる）ため、content-length ヘッダで測る。
+async function bodyBytes(req: Request): Promise<number> {
+  const buf = req.postDataBuffer();
+  if (buf) return buf.length;
+  const headers = await req
+    .allHeaders()
+    .catch(() => ({}) as Record<string, string>);
+  return Number(headers["content-length"] ?? 0);
+}
 
 // 写真つき記録（System 層でしか捕まらない 2 点を 1 本で担保する）:
 // 1. ブラウザでの縮小・JPEG 再圧縮（imageResize.ts。createImageBitmap / canvas.toBlob
@@ -64,13 +75,9 @@ test("UC-P01: 長辺 1600px を超える写真が縮小されて記録に付き�
   // 保存時のネットワークを記録し、「どの経路で画像が運ばれたか」を確かめる。
   // 画面遷移が通るだけでは、Server Action 経由のアップロードへ退行しても
   // 緑のままになる（Vercel の本文 4.5MB 制限で本番だけ壊れる退行）。
-  const requests: { url: string; method: string; bodyBytes: number }[] = [];
+  const captured: Request[] = [];
   page.on("request", (req) => {
-    requests.push({
-      url: req.url(),
-      method: req.method(),
-      bodyBytes: req.postDataBuffer()?.length ?? 0,
-    });
+    captured.push(req);
   });
 
   // 保存 = Storage へ直接アップロード → メタデータだけ Server Action → 詳細へ
@@ -78,19 +85,19 @@ test("UC-P01: 長辺 1600px を超える写真が縮小されて記録に付き�
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/, { timeout: 30_000 });
 
   // 1. ブラウザから Storage API への直接アップロードが実際に起きている
-  const storageUploads = requests.filter(
-    (r) => r.method === "POST" && r.url.includes("/storage/v1/object/"),
+  const storageUploads = captured.filter(
+    (r) => r.method() === "POST" && r.url().includes("/storage/v1/object/"),
   );
   expect(storageUploads.length).toBeGreaterThan(0);
-  expect(storageUploads[0].bodyBytes).toBeGreaterThan(100_000); // 画像本体が載っている
+  expect(await bodyBytes(storageUploads[0])).toBeGreaterThan(100_000); // 画像本体が載っている
 
   // 2. Server Action（同一オリジンへの POST）の本文はメタデータだけで、画像は載っていない
-  const actionPosts = requests.filter(
-    (r) => r.method === "POST" && !r.url.includes("/storage/v1/"),
+  const actionPosts = captured.filter(
+    (r) => r.method() === "POST" && !r.url().includes("/storage/v1/"),
   );
   expect(actionPosts.length).toBeGreaterThan(0);
   for (const post of actionPosts) {
-    expect(post.bodyBytes).toBeLessThan(50_000);
+    expect(await bodyBytes(post)).toBeLessThan(50_000);
   }
 
   // 詳細ページで署名付き URL の写真が実際に表示され、長辺が 1600px 以下になっている
