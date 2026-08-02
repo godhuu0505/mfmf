@@ -465,6 +465,9 @@
       background-color: color-mix(in oklab, var(--surface) 80%, transparent);
     }
   }
+  .p-1\.5 {
+    padding: calc(var(--spacing) * 1.5);
+  }
   .p-3 {
     padding: calc(var(--spacing) * 3);
   }
@@ -1054,13 +1057,19 @@ body {
 
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-bold text-foreground">クイック記録</h2>
-      <p id="sheetDate" class="text-sm text-muted-foreground"></p>
+      <div class="flex items-center gap-2">
+        <p id="sheetDate" class="text-sm text-muted-foreground"></p>
+        <button id="sheetCloseBtn" aria-label="閉じる"
+          class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
     </div>
 
     <!-- 元（source）の切り替え -->
     <div class="mb-3 flex items-center gap-1.5" role="radiogroup" aria-label="どこでのできごと">
-      <button data-source="home" class="source-btn rounded-full bg-amber-100 px-4 py-2 text-sm font-medium text-amber-900 ring-2 ring-amber-400">おうち</button>
-      <button data-source="daycare" class="source-btn rounded-full bg-sky-100 px-4 py-2 text-sm font-medium text-sky-900 ring-0">保育園</button>
+      <button data-source="home" role="radio" aria-checked="true" class="source-btn rounded-full bg-amber-100 px-4 py-2 text-sm font-medium text-amber-900 ring-2 ring-amber-400">おうち</button>
+      <button data-source="daycare" role="radio" aria-checked="false" class="source-btn rounded-full bg-sky-100 px-4 py-2 text-sm font-medium text-sky-900 ring-0">保育園</button>
     </div>
 
     <!-- 案 B ではこの入力が先頭に来て自動フォーカスされる -->
@@ -1251,12 +1260,15 @@ function closeSheet() {
   $("sheet").classList.add("translate-y-full");
   $("backdrop").classList.add("opacity-0", "pointer-events-none");
   $("noteInput").blur();
+  // モーダルを閉じたらフォーカスを開いた場所（FAB）へ戻す
+  $("fab").focus({ preventScroll: true });
 }
 
 function setSource(src) {
   source = src;
   document.querySelectorAll(".source-btn").forEach((b) => {
     const on = b.dataset.source === source;
+    b.setAttribute("aria-checked", String(on)); // 選択状態を支援技術へ通知
     b.classList.toggle("ring-2", on);
     b.classList.toggle("ring-0", !on);
     b.classList.toggle("ring-amber-400", on && b.dataset.source === "home");
@@ -1275,6 +1287,10 @@ function resetSheet() {
 // ====== イベント ======
 $("fab").onclick = openSheet;
 $("backdrop").onclick = closeSheet;
+$("sheetCloseBtn").onclick = closeSheet;
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("sheet").inert) closeSheet();
+});
 
 $("noteOpenBtn").onclick = () => {
   $("noteRow").classList.remove("hidden");
