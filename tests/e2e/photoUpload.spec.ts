@@ -17,7 +17,8 @@ test("UC-P01: 長辺 1600px を超える写真が縮小されて記録に付き�
     .fill("E2E: 写真つき記録（3000x2000 を投入）");
 
   // 3000x2000 の画像をブラウザ内で生成して file input に投入する。
-  // 単色だと縮小に失敗していても見分けが付きにくいのでグラデーションを描く。
+  // ノイズを乗せて JPEG が十分な大きさになるようにする（グラデーションだけだと
+  // 圧縮されすぎて「Server Action の本文に画像が入っていない」判定が曖昧になる）。
   await page.evaluate(async () => {
     const canvas = document.createElement("canvas");
     canvas.width = 3000;
@@ -29,6 +30,14 @@ test("UC-P01: 長辺 1600px を超える写真が縮小されて記録に付き�
     grad.addColorStop(1, "#0ea5e9");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 3000, 2000);
+    const noise = ctx.getImageData(0, 0, 3000, 2000);
+    for (let i = 0; i < noise.data.length; i += 4) {
+      const n = (Math.random() - 0.5) * 80;
+      noise.data[i] += n;
+      noise.data[i + 1] += n;
+      noise.data[i + 2] += n;
+    }
+    ctx.putImageData(noise, 0, 0);
     const blob: Blob = await new Promise((resolve, reject) =>
       canvas.toBlob(
         (b) => (b ? resolve(b) : reject(new Error("toBlob 失敗"))),
@@ -52,9 +61,37 @@ test("UC-P01: 長辺 1600px を超える写真が縮小されて記録に付き�
   // 縮小がスキップされていたら System 層の担保対象（imageResize）が働いていない
   await expect(page.getByText(/スキップしました/)).not.toBeVisible();
 
+  // 保存時のネットワークを記録し、「どの経路で画像が運ばれたか」を確かめる。
+  // 画面遷移が通るだけでは、Server Action 経由のアップロードへ退行しても
+  // 緑のままになる（Vercel の本文 4.5MB 制限で本番だけ壊れる退行）。
+  const requests: { url: string; method: string; bodyBytes: number }[] = [];
+  page.on("request", (req) => {
+    requests.push({
+      url: req.url(),
+      method: req.method(),
+      bodyBytes: req.postDataBuffer()?.length ?? 0,
+    });
+  });
+
   // 保存 = Storage へ直接アップロード → メタデータだけ Server Action → 詳細へ
   await page.getByRole("button", { name: "保存する" }).click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/, { timeout: 30_000 });
+
+  // 1. ブラウザから Storage API への直接アップロードが実際に起きている
+  const storageUploads = requests.filter(
+    (r) => r.method === "POST" && r.url.includes("/storage/v1/object/"),
+  );
+  expect(storageUploads.length).toBeGreaterThan(0);
+  expect(storageUploads[0].bodyBytes).toBeGreaterThan(100_000); // 画像本体が載っている
+
+  // 2. Server Action（同一オリジンへの POST）の本文はメタデータだけで、画像は載っていない
+  const actionPosts = requests.filter(
+    (r) => r.method === "POST" && !r.url.includes("/storage/v1/"),
+  );
+  expect(actionPosts.length).toBeGreaterThan(0);
+  for (const post of actionPosts) {
+    expect(post.bodyBytes).toBeLessThan(50_000);
+  }
 
   // 詳細ページで署名付き URL の写真が実際に表示され、長辺が 1600px 以下になっている
   const photo = page.locator("main img").first();
@@ -80,4 +117,11 @@ test("UC-P01: 長辺 1600px を超える写真が縮小されて記録に付き�
   expect(Math.max(size.w, size.h)).toBeGreaterThan(0);
   // アスペクト比が保たれている（3:2）
   expect(size.w / size.h).toBeCloseTo(3 / 2, 1);
+
+  // 保存された実体が JPEG に再圧縮されている（PNG のままでは寸法検査は通ってしまう）
+  const contentType = await photo.evaluate(async (el) => {
+    const res = await fetch((el as HTMLImageElement).currentSrc);
+    return res.headers.get("content-type");
+  });
+  expect(contentType).toContain("image/jpeg");
 });

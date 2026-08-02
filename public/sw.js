@@ -19,7 +19,29 @@ const PRECACHE = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(PRECACHE)),
+    (async () => {
+      const cache = await caches.open(SHELL_CACHE);
+      await cache.addAll(PRECACHE);
+      // /offline の HTML が参照するビルド成果物（JS/CSS）も先読みする。
+      // これが無いとオフライン時にフォールバック HTML は出るが hydration に失敗し、
+      // Next のエラー画面に置き換わる（E2E のオフライン検証で発覚）。
+      // 対象は同一オリジンの /_next/static のみ（Supabase を触らない不変条件は不変）。
+      try {
+        const res = await cache.match(OFFLINE_URL);
+        if (res) {
+          const html = await res.clone().text();
+          const assets = [
+            ...new Set(html.match(/\/_next\/static\/[^"'\s>]+/g) ?? []),
+          ];
+          if (assets.length > 0) {
+            const staticCache = await caches.open(STATIC_CACHE);
+            await staticCache.addAll(assets);
+          }
+        }
+      } catch {
+        // 先読み失敗は致命的ではない（フォールバック自体は表示される）
+      }
+    })(),
   );
   self.skipWaiting();
 });

@@ -30,9 +30,24 @@ test("SW: 静的アセットはキャッシュされ、Supabase 由来は一切�
   await login(page);
   await waitForServiceWorker(page);
   // SW 制御下でもう一度読み込み、静的アセットのキャッシュと
-  // Supabase への実リクエスト（REST・署名付きサムネイル）を発生させる
+  // Supabase への実リクエスト（署名付きサムネイル）を発生させる
   await page.reload();
   await expect(page.getByRole("heading", { name: "記録一覧" })).toBeVisible();
+
+  // 「ブラウザ発の Supabase リクエスト」が実際に起きてからキャッシュを見る。
+  // 一覧クエリは Server Component 側で SW を通らないため、ブラウザ側で SW を
+  // 通り得るのは署名付きサムネイルの取得だけ（photoUpload.spec が先に写真を
+  // 1 枚作っている前提。読み込み完了前に検査すると空振りの緑になる）
+  const thumb = page.locator('main img[src*="/storage/v1/"]').first();
+  await expect(thumb).toBeVisible({ timeout: 15_000 });
+  await expect
+    .poll(() =>
+      thumb.evaluate((el) => {
+        const img = el as HTMLImageElement;
+        return img.complete && img.naturalWidth > 0;
+      }),
+    )
+    .toBe(true);
 
   // 正の対照: 静的アセットのキャッシュが実際に発生している
   await expect
@@ -52,21 +67,27 @@ test("SW: 静的アセットはキャッシュされ、Supabase 由来は一切�
   expect(banned).toEqual([]);
 });
 
+// このテストは認証不要（SW は /login でも登録され、フォールバックは認可と無関係）。
+// setOffline は SW の fetch に効かないため、実験フラグ（config で有効化）＋
+// route 遮断で「SW から見てもネットワークが死んでいる」状況を作る。
 test("SW: オフライン時のナビゲーションは /offline へフォールバックする", async ({
   page,
   context,
 }) => {
-  await login(page);
+  await page.goto("/login");
   await waitForServiceWorker(page);
   await page.reload();
-  await expect(page.getByRole("heading", { name: "記録一覧" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "メールアドレスでログイン" }),
+  ).toBeVisible();
 
-  await context.setOffline(true);
-  await page.goto("/calendar").catch(() => {
+  // SW の fetch も含めて全ネットワークを遮断（Cache Storage の参照は網の外なので生きる）
+  await context.route("**/*", (route) => route.abort());
+  await page.goto("/help").catch(() => {
     // SW がフォールバックを返せなかった場合はこの後の見出しアサーションで落ちる
   });
   await expect(
     page.getByRole("heading", { name: "オフラインです" }),
   ).toBeVisible();
-  await context.setOffline(false);
+  await context.unroute("**/*");
 });

@@ -6,6 +6,11 @@ import { defineConfig, devices } from "@playwright/test";
 // `npm run build` してから `npm run test:e2e`（webServer が next start を起動する）。
 const PORT = 3100;
 
+// Service Worker が発行する fetch を Playwright のルーティング/ネットワーク制御の
+// 対象にする（既定では SW のリクエストは素通しになり、オフライン遮断が SW に効かない）。
+// serviceWorker.spec.ts のオフラインフォールバック検証に必要。
+process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS ??= "1";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   globalSetup: "./tests/e2e/global-setup.ts",
