@@ -129,12 +129,8 @@ UC: 保育園から帰ったあと、ごはんの記録を 3 タップで残す
 
 プロトとスペックと受け入れ条件が揃っているので、ここは一気に進めます。
 
-> ⚠️ **E2E の基盤（Playwright）はまだ入っていません。** Unit テスト（Vitest / `tests/unit/`, D30）は
-> ありますが、CI は lint / typecheck / unit test / build ＋ pgTAP だけです。**最初にこの手順を通す
-> 機能で、Playwright を 1 本だけ入れてください**（D25 の受け入れ判定と、D26 の画面スクリーンショット
-> 生成は**同じ基盤に乗ります** —— 1 つ入れれば両方が動き出す）。入れたらこの注記を消してください。
-
-1. E2E テストを先に書く（この時点では落ちる）
+1. E2E テストを先に書く（この時点では落ちる）。基盤は導入済み（Playwright / `tests/e2e/`、
+   `npm run test:e2e`。ローカル Supabase と `npm run build` が前提 → `playwright.config.ts`）
 2. マークアップをプロトから移植（`class` → `className`）
 3. 固定データを実データに差し替える
    - Server Component で supabase から取得する
