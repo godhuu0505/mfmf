@@ -36,6 +36,9 @@ yarn-error.log*
 /test-results/
 /playwright-report/
 
+# integration テストの seed 実 ID（globalSetup が生成）
+/tests/integration/.seed.json
+
 # vercel
 .vercel
 

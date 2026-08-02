@@ -23,6 +23,7 @@
 | Lint 単体 | `npm run lint` |
 | 型チェック単体 | `npm run typecheck` |
 | Unit テスト単体（Vitest / `tests/unit/`） | `npm run test:unit` |
+| Integration テスト（Vitest + 実 Supabase / `tests/integration/`。要ローカル Supabase） | `npm run test:integration` |
 | E2E + VRT（Playwright / `tests/e2e/`。要ローカル Supabase + build） | `npm run test:e2e` |
 | 本番ビルド単体 | `npm run build` |
 | PWA アイコン生成 | `npm run icons` |
