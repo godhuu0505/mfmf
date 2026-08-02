@@ -139,3 +139,24 @@ test("UC-Q05: Escape で閉じてフォーカスが FAB へ戻る", async ({ pag
     page.getByRole("button", { name: "クイック記録" }),
   ).toBeFocused();
 });
+
+test("UC-Q06: 絞り込み中の URL から保存しても、絞り込みなしの先頭で見える", async ({
+  page,
+}) => {
+  const marker = `E2E-filtered-${Date.now()}`;
+  await login(page);
+  // 「保育園のみ・古い順」で絞り込んだ状態からおうちの記録を残す
+  await page.goto("/?source=daycare&sort=date_asc");
+  await openSheet(page);
+
+  await sheet(page).getByRole("button", { name: "＋ ひとことを足す" }).click();
+  await sheet(page).getByPlaceholder("ひとこと（任意）").fill(marker);
+  await sheet(page).getByRole("button", { name: "保存する" }).click();
+
+  await expect(sheet(page)).not.toBeVisible();
+  // 保存後は絞り込みなしの先頭へ戻り、いま残した記録が見えている
+  await page.waitForURL(
+    (url) => url.pathname === "/" && url.search === "",
+  );
+  await expect(firstCard(page)).toContainText(marker);
+});

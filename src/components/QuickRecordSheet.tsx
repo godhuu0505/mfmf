@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, X } from "lucide-react";
 import type { RecordSource } from "@/types/database";
 
@@ -56,6 +57,7 @@ export default function QuickRecordSheet({
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState("");
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const fabRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -82,12 +84,12 @@ export default function QuickRecordSheet({
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeSheet();
+      if (e.key === "Escape") dismissSheet();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, isPending]);
 
   function openSheet() {
     setError(null);
@@ -100,6 +102,13 @@ export default function QuickRecordSheet({
     setOpen(false);
     // モーダルを閉じたらフォーカスを開いた場所（FAB）へ戻す
     requestAnimationFrame(() => fabRef.current?.focus({ preventScroll: true }));
+  }
+
+  // ユーザー操作（X・背景・Escape）による閉じる。保存中は無効にする —— 閉じて
+  // 開き直した下書きを、遅れて完了した保存処理の後始末が消してしまわないように。
+  function dismissSheet() {
+    if (isPending) return;
+    closeSheet();
   }
 
   function resetSheet() {
@@ -135,20 +144,24 @@ export default function QuickRecordSheet({
       if (toastTimer.current) clearTimeout(toastTimer.current);
       setToast("残しました");
       toastTimer.current = setTimeout(() => setToast(""), 1800);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      // 絞り込み・並び替え・ページ中でも「一覧の先頭に出る」を成立させるため、
+      // 保存後は絞り込みなしの先頭へ戻す（UC-Q06）。
+      router.push("/");
     });
   }
 
   return (
     <>
-      {/* FAB: クイック記録の入口（親指の届く右下・セーフエリア回避） */}
+      {/* FAB: クイック記録の入口（親指の届く右下・セーフエリア回避）。
+          右下最下段は全画面共通の FeedbackWidget が使っているため、その真上に積む
+          （重ねると FeedbackWidget がクリックを横取りする。E2E UC-Q01〜Q05 で検出）。 */}
       <button
         ref={fabRef}
         type="button"
         onClick={openSheet}
         aria-haspopup="dialog"
         data-quick-record-bg
-        className="fixed right-4 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-40 flex h-14 items-center gap-2 rounded-full bg-primary pl-4 pr-5 text-sm font-medium text-primary-foreground shadow-lg transition hover:bg-primary-hover"
+        className="fixed right-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+3.5rem)] z-40 flex h-14 items-center gap-2 rounded-full bg-primary pl-4 pr-5 text-sm font-medium text-primary-foreground shadow-lg transition hover:bg-primary-hover"
       >
         <Plus className="h-5 w-5" aria-hidden="true" />
         クイック記録
@@ -156,7 +169,7 @@ export default function QuickRecordSheet({
 
       {/* 背景 */}
       <div
-        onClick={closeSheet}
+        onClick={dismissSheet}
         aria-hidden="true"
         className={
           "fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 " +
@@ -188,9 +201,10 @@ export default function QuickRecordSheet({
               </p>
               <button
                 type="button"
-                onClick={closeSheet}
+                onClick={dismissSheet}
+                disabled={isPending}
                 aria-label="閉じる"
-                className="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted"
+                className="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted disabled:opacity-40"
               >
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -306,7 +320,7 @@ export default function QuickRecordSheet({
       <div
         role="status"
         className={
-          "pointer-events-none fixed left-1/2 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg transition-opacity duration-300 " +
+          "pointer-events-none fixed left-1/2 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+7.5rem)] z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg transition-opacity duration-300 " +
           (toast ? "opacity-100" : "opacity-0")
         }
       >

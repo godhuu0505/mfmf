@@ -191,7 +191,9 @@ export default async function HomePage({
         id="main"
         className={
           "mx-auto max-w-2xl px-4 pt-6 " +
-          (readOnly ? "pb-6" : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]")
+          (readOnly
+            ? "pb-6"
+            : "pb-[calc(max(1rem,env(safe-area-inset-bottom))+8.5rem)]")
         }
       >
         <div className="mb-4 flex items-center justify-between">
