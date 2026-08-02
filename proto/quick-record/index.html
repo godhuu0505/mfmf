@@ -37,6 +37,7 @@
     --radius-lg: 0.5rem;
     --radius-xl: 0.75rem;
     --radius-2xl: 1rem;
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
     --default-transition-duration: 150ms;
     --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     --default-font-family: var(--font-sans);
@@ -195,6 +196,17 @@
   .pointer-events-none {
     pointer-events: none;
   }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
   .fixed {
     position: fixed;
   }
@@ -224,6 +236,9 @@
   }
   .bottom-\[calc\(5\.5rem\+env\(safe-area-inset-bottom\)\)\] {
     bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+  .left-1 {
+    left: var(--spacing);
   }
   .left-1\/2 {
     left: calc(1 / 2 * 100%);
@@ -269,6 +284,9 @@
   }
   .inline-flex {
     display: inline-flex;
+  }
+  .table {
+    display: table;
   }
   .h-1 {
     height: var(--spacing);
@@ -327,8 +345,18 @@
   .flex-1 {
     flex: 1;
   }
+  .flex-shrink {
+    flex-shrink: 1;
+  }
   .shrink-0 {
     flex-shrink: 0;
+  }
+  .border-collapse {
+    border-collapse: collapse;
+  }
+  .-translate-x-1 {
+    --tw-translate-x: calc(var(--spacing) * -1);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
   }
   .-translate-x-1\/2 {
     --tw-translate-x: calc(calc(1 / 2 * 100%) * -1);
@@ -337,6 +365,9 @@
   .translate-y-full {
     --tw-translate-y: 100%;
     translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
+  .resize {
+    resize: both;
   }
   .flex-wrap {
     flex-wrap: wrap;
@@ -404,6 +435,9 @@
   .bg-amber-100 {
     background-color: var(--color-amber-100);
   }
+  .bg-black {
+    background-color: var(--color-black);
+  }
   .bg-black\/40 {
     background-color: color-mix(in srgb, #000 40%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
@@ -446,8 +480,14 @@
   .px-4 {
     padding-inline: calc(var(--spacing) * 4);
   }
+  .py-0 {
+    padding-block: 0px;
+  }
   .py-0\.5 {
     padding-block: calc(var(--spacing) * 0.5);
+  }
+  .py-1 {
+    padding-block: var(--spacing);
   }
   .py-1\.5 {
     padding-block: calc(var(--spacing) * 1.5);
@@ -467,11 +507,17 @@
   .pt-3 {
     padding-top: calc(var(--spacing) * 3);
   }
+  .pt-6 {
+    padding-top: calc(var(--spacing) * 6);
+  }
   .pr-5 {
     padding-right: calc(var(--spacing) * 5);
   }
   .pb-\[calc\(1rem\+env\(safe-area-inset-bottom\)\)\] {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+  .pb-\[calc\(6\.5rem\+env\(safe-area-inset-bottom\)\)\] {
+    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
   }
   .pl-4 {
     padding-left: calc(var(--spacing) * 4);
@@ -526,6 +572,9 @@
   .text-sky-900 {
     color: var(--color-sky-900);
   }
+  .underline {
+    text-decoration-line: underline;
+  }
   .opacity-0 {
     opacity: 0%;
   }
@@ -558,8 +607,16 @@
   .ring-sky-400 {
     --tw-ring-color: var(--color-sky-400);
   }
+  .outline {
+    outline-style: var(--tw-outline-style);
+    outline-width: 1px;
+  }
   .backdrop-blur {
     --tw-backdrop-blur: blur(8px);
+    -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+    backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+  }
+  .backdrop-filter {
     -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
     backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
   }
@@ -581,6 +638,10 @@
   .duration-300 {
     --tw-duration: 300ms;
     transition-duration: 300ms;
+  }
+  .ease-in-out {
+    --tw-ease: var(--ease-in-out);
+    transition-timing-function: var(--ease-in-out);
   }
   .placeholder\:text-muted-foreground::placeholder {
     color: var(--muted-foreground);
@@ -808,6 +869,11 @@ body {
   inherits: false;
   initial-value: 0 0 #0000;
 }
+@property --tw-outline-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
 @property --tw-backdrop-blur {
   syntax: "*";
   inherits: false;
@@ -848,6 +914,10 @@ body {
   syntax: "*";
   inherits: false;
 }
+@property --tw-ease {
+  syntax: "*";
+  inherits: false;
+}
 @layer properties {
   @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
     *, ::before, ::after, ::backdrop {
@@ -871,6 +941,7 @@ body {
       --tw-ring-offset-width: 0px;
       --tw-ring-offset-color: #fff;
       --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-outline-style: solid;
       --tw-backdrop-blur: initial;
       --tw-backdrop-brightness: initial;
       --tw-backdrop-contrast: initial;
@@ -881,6 +952,7 @@ body {
       --tw-backdrop-saturate: initial;
       --tw-backdrop-sepia: initial;
       --tw-duration: initial;
+      --tw-ease: initial;
     }
   }
 }
@@ -943,7 +1015,8 @@ body {
 </header>
 
 <!-- ===== 一覧（本番 page.tsx の再現・モックデータ） ===== -->
-<main id="main" class="mx-auto max-w-2xl px-4 py-6">
+<!-- 下端は FAB（h-14 + オフセット）と重ならないよう余白を確保する -->
+<main id="main" class="mx-auto max-w-2xl px-4 pt-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
   <div class="mb-4 flex items-center justify-between">
     <h1 class="text-xl font-bold text-foreground">記録一覧</h1>
     <div class="flex items-center gap-2">
@@ -973,7 +1046,8 @@ body {
 
 <!-- ===== ボトムシート ===== -->
 <div id="backdrop" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
-<div id="sheet" role="dialog" aria-modal="true" aria-label="クイック記録"
+<!-- 閉じている間は inert でフォーカス・支援技術から外す -->
+<div id="sheet" role="dialog" aria-modal="true" aria-label="クイック記録" inert
   class="fixed inset-x-0 bottom-0 z-50 translate-y-full rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-transform duration-300">
   <div class="mx-auto max-w-2xl px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
@@ -1082,6 +1156,10 @@ function render() {
   const line = $("countLine");
   list.innerHTML = "";
   if (records.length === 0) {
+    // viewer には出せない「＋ 新規」への誘導を出さない
+    empty.innerHTML = viewer
+      ? "まだ記録がありません。"
+      : 'まだ記録がありません。<br />「＋ 新規」から最初の記録を追加しましょう。';
     empty.classList.remove("hidden");
     line.textContent = "";
   } else {
@@ -1153,24 +1231,43 @@ function applyVariant() {
   }
 }
 
+let focusTimer = null;
+
 function openSheet() {
   $("sheetDate").textContent = formatDate(new Date());
   applyVariant();
+  $("sheet").inert = false;
   $("sheet").classList.remove("translate-y-full");
   $("backdrop").classList.remove("opacity-0", "pointer-events-none");
   updatePreview();
-  if (variant === "B") setTimeout(() => $("noteInput").focus(), 300);
+  // 開くアニメーション中に閉じられたら closeSheet 側でキャンセルする
+  if (variant === "B") focusTimer = setTimeout(() => $("noteInput").focus(), 300);
 }
 
 function closeSheet() {
+  clearTimeout(focusTimer);
+  focusTimer = null;
+  $("sheet").inert = true;
   $("sheet").classList.add("translate-y-full");
   $("backdrop").classList.add("opacity-0", "pointer-events-none");
   $("noteInput").blur();
 }
 
+function setSource(src) {
+  source = src;
+  document.querySelectorAll(".source-btn").forEach((b) => {
+    const on = b.dataset.source === source;
+    b.classList.toggle("ring-2", on);
+    b.classList.toggle("ring-0", !on);
+    b.classList.toggle("ring-amber-400", on && b.dataset.source === "home");
+    b.classList.toggle("ring-sky-400", on && b.dataset.source === "daycare");
+  });
+}
+
 function resetSheet() {
   selectedChips = [];
   $("noteInput").value = "";
+  setSource("home"); // 既定はおうち（notes.md の仮置き）に毎回戻す
   renderChips();
   updatePreview();
 }
@@ -1188,16 +1285,7 @@ $("noteOpenBtn").onclick = () => {
 $("noteInput").oninput = updatePreview;
 
 document.querySelectorAll(".source-btn").forEach((btn) => {
-  btn.onclick = () => {
-    source = btn.dataset.source;
-    document.querySelectorAll(".source-btn").forEach((b) => {
-      const on = b.dataset.source === source;
-      b.classList.toggle("ring-2", on);
-      b.classList.toggle("ring-0", !on);
-      b.classList.toggle("ring-amber-400", on && b.dataset.source === "home");
-      b.classList.toggle("ring-sky-400", on && b.dataset.source === "daycare");
-    });
-  };
+  btn.onclick = () => setSource(btn.dataset.source);
 });
 
 $("saveBtn").onclick = () => {
