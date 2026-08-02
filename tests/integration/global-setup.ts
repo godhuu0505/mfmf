@@ -129,16 +129,27 @@ async function ensureGuestGrant(
   createdBy: string,
   period: "active" | "expired",
 ) {
-  const existing = await db.query(
-    "select id from public.guest_grants where user_id = $1 and scope_pet_id = $2",
-    [guestUserId, petId],
-  );
-  if (existing.rows.length > 0) return;
   // active: 昨日〜7日後 / expired: 30日前〜昨日
   const range =
     period === "active"
       ? "current_date - 1, current_date + 7"
       : "current_date - 30, current_date - 1";
+  const existing = await db.query(
+    "select id from public.guest_grants where user_id = $1 and scope_pet_id = $2",
+    [guestUserId, petId],
+  );
+  if (existing.rows.length > 0) {
+    // スタックを使い回しても期間条件が腐らないよう、毎回「今日」基準で貼り直す
+    // （7 日より古い grant を残すと guestActive が実は期間切れ、という嘘の緑になる）
+    const [from, to] = range.split(", ");
+    await db.query(
+      `update public.guest_grants
+          set valid_from = ${from}, valid_to = ${to}, revoked_at = null
+        where id = $1`,
+      [existing.rows[0].id],
+    );
+    return;
+  }
   await db.query(
     `insert into public.guest_grants
        (household_id, user_id, scope_pet_id, role, valid_from, valid_to, created_by)

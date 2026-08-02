@@ -287,6 +287,42 @@ describe("作成系: 認可の基準は「シート/フォームを描画した�
     expect(rows[0].household_id).toBe(seed.householdB); // Cookie ではなくフォーム基準
   });
 
+  it("createRecord も editor はフォームの世帯に作成でき、クライアント生成 id が行の id になる", async () => {
+    await loginAs(PERSONAS.aEditor);
+    const recordId = crypto.randomUUID();
+    const body = marker("editor-full");
+    await expectRedirectTo(
+      createRecord(fullRecordForm(seed.householdA, recordId, body)),
+      `/records/${recordId}`,
+    );
+    const row = await recordById(recordId);
+    expect(row).not.toBeNull();
+    expect(row.household_id).toBe(seed.householdA);
+    expect(row.body).toBe(body);
+  });
+
+  it("createRecord: Cookie の現在世帯が A でも、フォームの世帯 B に作成される（兼任者）", async () => {
+    await loginAs(PERSONAS.abEditor);
+    setHouseholdCookie(seed.householdA);
+    const recordId = crypto.randomUUID();
+    const body = marker("ab-full-form-wins");
+    await expectRedirectTo(
+      createRecord(fullRecordForm(seed.householdB, recordId, body)),
+      `/records/${recordId}`,
+    );
+    const row = await recordById(recordId);
+    expect(row.household_id).toBe(seed.householdB);
+  });
+
+  it("createRecord: メンバーでない世帯の hidden は拒否され、行は作られない", async () => {
+    await loginAs(PERSONAS.aEditor); // B のメンバーではない
+    const recordId = crypto.randomUUID();
+    await expect(
+      createRecord(fullRecordForm(seed.householdB, recordId, marker("full-cross"))),
+    ).rejects.toThrow(/この世帯のメンバーではありません/);
+    expect(await recordById(recordId)).toBeNull();
+  });
+
   it("createQuickRecord は本文が空なら保存しない", async () => {
     await loginAs(PERSONAS.aEditor);
     await expect(
