@@ -66,7 +66,9 @@ cat > .proto-tmp.css <<EOF
 @import "tailwindcss" source(none);
 @source "$(pwd)/proto/<slug>/index.html";
 EOF
-sed -n '3,50p' src/app/globals.css >> .proto-tmp.css   # トークン・ダークモード・セーフエリア
+# globals.css の @source not 行より後ろ（トークン・ダークモード・セーフエリア等）を全部取り込む。
+# 行番号指定（sed -n '3,50p'）は globals.css が伸びると黙って途中で切れるので使わない（一度踏んだ）。
+sed '1,/^@source not/d' src/app/globals.css >> .proto-tmp.css
 npx @tailwindcss/cli -i .proto-tmp.css -o proto/<slug>/proto.css
 rm .proto-tmp.css
 ```
