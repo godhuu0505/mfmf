@@ -5,7 +5,12 @@
 // 一切キャッシュしない。認証状態が絡む情報をブラウザに残さないため、
 // ナビゲーションは network-first（オフライン時のみシェルへフォールバック）。
 
-const VERSION = "v1";
+// ⚠️ この SW のキャッシュ戦略・プリキャッシュ内容を変えるときは VERSION を上げること。
+// キャッシュ名に VERSION が入っているため、新 SW の install は稼働中 SW のキャッシュと
+// 別領域に書き込む。上げ忘れると、install が途中で失敗したときに稼働中 SW の
+// キャッシュ（特に /offline とそのチャンクの組）を中途半端に上書きして壊す。
+// 旧バージョンのキャッシュは activate が掃除する。
+const VERSION = "v2";
 const STATIC_CACHE = `mfmf-static-${VERSION}`;
 const SHELL_CACHE = `mfmf-shell-${VERSION}`;
 const OFFLINE_URL = "/offline";
@@ -19,7 +24,26 @@ const PRECACHE = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(PRECACHE)),
+    (async () => {
+      const cache = await caches.open(SHELL_CACHE);
+      await cache.addAll(PRECACHE);
+      // /offline の HTML が参照するビルド成果物（JS/CSS）も必ず先読みする。
+      // これが無いとオフライン時にフォールバック HTML は出るが hydration に失敗し、
+      // Next のエラー画面に置き換わる（E2E のオフライン検証で発覚）。
+      // 対象は同一オリジンの /_next/static のみ（Supabase を触らない不変条件は不変）。
+      // 1 つでも取れなければ install ごと失敗させる —— 中途半端に有効化すると
+      // 上記の壊れたフォールバックを配る SW になる。失敗時はブラウザが次の機会に
+      // インストールを再試行する。
+      const res = await cache.match(OFFLINE_URL);
+      const html = res ? await res.clone().text() : "";
+      const assets = [
+        ...new Set(html.match(/\/_next\/static\/[^"'\s>]+/g) ?? []),
+      ];
+      if (assets.length > 0) {
+        const staticCache = await caches.open(STATIC_CACHE);
+        await staticCache.addAll(assets);
+      }
+    })(),
   );
   self.skipWaiting();
 });
