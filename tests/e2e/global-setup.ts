@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
+import { assertLocalSupabase } from "../localGuard";
 
 // E2E 用ユーザーをローカル Supabase に用意する（再実行に対して冪等）。
 //
@@ -30,6 +31,8 @@ export default async function globalSetup() {
       "NEXT_PUBLIC_SUPABASE_ANON_KEY が未設定です（`npx supabase start` 後にローカル値を export してから実行）",
     );
   }
+  // .env.local が本番を指したまま実行しても、本物へは 1 リクエストも送らせない
+  assertLocalSupabase(SUPABASE_URL, DB_URL);
   const supabase = createClient(SUPABASE_URL, ANON_KEY);
 
   // 既存ユーザーならそのままサインインできる
