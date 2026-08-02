@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { login } from "./helpers";
+import { login, prepareOversizedPhotoForm, savePhotoRecord } from "./helpers";
 
 // Service Worker の不変条件（CLAUDE.md 厳守事項 / D23）:
 // 「Supabase の API レスポンスと署名付き写真 URL をキャッシュしない」。
@@ -28,6 +28,11 @@ test("SW: 静的アセットはキャッシュされ、Supabase 由来は一切�
   page,
 }) => {
   await login(page);
+  // この spec 単体でも成立するよう、署名付きサムネイルの材料（写真つき記録）を
+  // 自前で用意する（他 spec の実行順に依存すると絞り込み実行やシャーディングで壊れる）
+  await prepareOversizedPhotoForm(page, "E2E: SW 検証用の写真つき記録");
+  await savePhotoRecord(page);
+  await page.goto("/");
   await waitForServiceWorker(page);
   // SW 制御下でもう一度読み込み、静的アセットのキャッシュと
   // Supabase への実リクエスト（署名付きサムネイル）を発生させる
@@ -36,8 +41,7 @@ test("SW: 静的アセットはキャッシュされ、Supabase 由来は一切�
 
   // 「ブラウザ発の Supabase リクエスト」が実際に起きてからキャッシュを見る。
   // 一覧クエリは Server Component 側で SW を通らないため、ブラウザ側で SW を
-  // 通り得るのは署名付きサムネイルの取得だけ（photoUpload.spec が先に写真を
-  // 1 枚作っている前提。読み込み完了前に検査すると空振りの緑になる）
+  // 通り得るのは署名付きサムネイルの取得だけ（読み込み完了前に検査すると空振りの緑になる）
   const thumb = page.locator('main img[src*="/storage/v1/"]').first();
   await expect(thumb).toBeVisible({ timeout: 15_000 });
   await expect
@@ -49,9 +53,16 @@ test("SW: 静的アセットはキャッシュされ、Supabase 由来は一切�
     )
     .toBe(true);
 
-  // 正の対照: 静的アセットのキャッシュが実際に発生している
+  // 正の対照: 実行時キャッシュ（/_next/static）が実際に発生している。
+  // 件数だけ見ると SHELL_CACHE のプリキャッシュ 4 件で自明に成立してしまい、
+  // 実行時キャッシュが全壊しても緑のままになる
   await expect
-    .poll(async () => (await listCachedUrls(page)).length, { timeout: 15_000 })
+    .poll(
+      async () =>
+        (await listCachedUrls(page)).filter((u) => u.includes("/_next/static/"))
+          .length,
+      { timeout: 15_000 },
+    )
     .toBeGreaterThan(0);
 
   const urls = await listCachedUrls(page);
