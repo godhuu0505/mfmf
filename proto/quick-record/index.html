@@ -465,6 +465,9 @@
       background-color: color-mix(in oklab, var(--surface) 80%, transparent);
     }
   }
+  .p-1 {
+    padding: var(--spacing);
+  }
   .p-1\.5 {
     padding: calc(var(--spacing) * 1.5);
   }
@@ -981,6 +984,9 @@ body {
 }
 </style>
 
+<!-- シート表示中は背景（この wrapper 全体）を inert にしてフォーカスを閉じ込める -->
+<div id="pageRoot">
+
 <!-- ===== デバッグバー（プロト専用・実装に持ち込まない） ===== -->
 <div class="border-b border-dashed border-border bg-surface-muted px-4 py-2 text-xs text-muted-foreground">
   <div class="mx-auto flex max-w-2xl flex-wrap items-center gap-2">
@@ -1047,10 +1053,12 @@ body {
   クイック記録
 </button>
 
+</div><!-- /#pageRoot -->
+
 <!-- ===== ボトムシート ===== -->
 <div id="backdrop" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
 <!-- 閉じている間は inert でフォーカス・支援技術から外す -->
-<div id="sheet" role="dialog" aria-modal="true" aria-label="クイック記録" inert
+<div id="sheet" role="dialog" aria-modal="true" aria-label="クイック記録" inert tabindex="-1"
   class="fixed inset-x-0 bottom-0 z-50 translate-y-full rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-transform duration-300">
   <div class="mx-auto max-w-2xl px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
@@ -1095,9 +1103,8 @@ body {
 </div>
 
 <!-- ===== トースト ===== -->
-<div id="toast" class="pointer-events-none fixed left-1/2 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-0 shadow-lg transition-opacity duration-300">
-  残しました
-</div>
+<!-- 中身は保存成功時に JS が入れる（role=status で読み上げ）。初期状態では空 -->
+<div id="toast" role="status" class="pointer-events-none fixed left-1/2 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-0 shadow-lg transition-opacity duration-300"></div>
 
 <script>
 // ====== 固定モックデータ（バックエンドへの経路は存在しない） ======
@@ -1197,19 +1204,29 @@ function render() {
 }
 
 // ====== シート ======
+function chipClass(active) {
+  return active
+    ? "rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition"
+    : "rounded-full bg-surface-muted px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted";
+}
+
+// チップは一度だけ生成し、トグルはその場でクラスを更新する
+// （作り直すとフォーカス中のボタンが消え、キーボード操作が背景へ落ちる）
 function renderChips() {
   const grid = $("chipGrid");
   grid.innerHTML = "";
   for (const chip of CHIPS) {
     const btn = document.createElement("button");
-    const active = selectedChips.includes(chip);
-    btn.className = active
-      ? "rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition"
-      : "rounded-full bg-surface-muted px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted";
+    const isActive = () => selectedChips.includes(chip);
+    btn.className = chipClass(isActive());
+    btn.setAttribute("aria-pressed", String(isActive()));
     btn.textContent = chip;
     btn.onclick = () => {
-      selectedChips = active ? selectedChips.filter((c) => c !== chip) : [...selectedChips, chip];
-      renderChips();
+      selectedChips = isActive()
+        ? selectedChips.filter((c) => c !== chip)
+        : [...selectedChips, chip];
+      btn.className = chipClass(isActive());
+      btn.setAttribute("aria-pressed", String(isActive()));
       updatePreview();
     };
     grid.appendChild(btn);
@@ -1245,18 +1262,24 @@ let focusTimer = null;
 function openSheet() {
   $("sheetDate").textContent = formatDate(new Date());
   applyVariant();
+  $("pageRoot").inert = true; // 背景をフォーカス・支援技術から外す（Tab がシートから漏れない）
   $("sheet").inert = false;
   $("sheet").classList.remove("translate-y-full");
   $("backdrop").classList.remove("opacity-0", "pointer-events-none");
   updatePreview();
   // 開くアニメーション中に閉じられたら closeSheet 側でキャンセルする
-  if (variant === "B") focusTimer = setTimeout(() => $("noteInput").focus(), 300);
+  if (variant === "B") {
+    focusTimer = setTimeout(() => $("noteInput").focus(), 300);
+  } else {
+    $("sheet").focus({ preventScroll: true }); // 案 A はダイアログ自体へ（IME を開かない）
+  }
 }
 
 function closeSheet() {
   clearTimeout(focusTimer);
   focusTimer = null;
   $("sheet").inert = true;
+  $("pageRoot").inert = false;
   $("sheet").classList.add("translate-y-full");
   $("backdrop").classList.add("opacity-0", "pointer-events-none");
   $("noteInput").blur();
@@ -1304,6 +1327,8 @@ document.querySelectorAll(".source-btn").forEach((btn) => {
   btn.onclick = () => setSource(btn.dataset.source);
 });
 
+let toastTimer = null;
+
 $("saveBtn").onclick = () => {
   const body = composedBody();
   if (!body) return;
@@ -1311,9 +1336,15 @@ $("saveBtn").onclick = () => {
   render();
   closeSheet();
   resetSheet();
+  // role=status のリージョンにテキストを入れた時点で読み上げられる
   const toast = $("toast");
+  clearTimeout(toastTimer);
+  toast.textContent = "残しました";
   toast.classList.remove("opacity-0");
-  setTimeout(() => toast.classList.add("opacity-0"), 1800);
+  toastTimer = setTimeout(() => {
+    toast.classList.add("opacity-0");
+    toast.textContent = "";
+  }, 1800);
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
 

@@ -460,6 +460,9 @@
       background-color: color-mix(in oklab, var(--surface) 80%, transparent);
     }
   }
+  .p-1 {
+    padding: var(--spacing);
+  }
   .p-1\.5 {
     padding: calc(var(--spacing) * 1.5);
   }
