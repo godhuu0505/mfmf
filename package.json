@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run",
     "icons": "node scripts/generate-icons.mjs",
     "feedback:issues": "node scripts/feedback-to-issues.mjs"
   },
@@ -29,6 +30,7 @@
     "eslint": "^9.37.0",
     "eslint-config-next": "^15.5.4",
     "tailwindcss": "^4.1.14",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.10"
   }
 }

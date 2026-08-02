@@ -40,10 +40,11 @@ dev-lan:
     fi; \
     npm run dev -- -H 0.0.0.0
 
-# CI gate: lint -> typecheck -> build
+# CI gate: lint -> typecheck -> unit tests -> build
 check:
     npm run lint
     npm run typecheck
+    npm run test:unit
     npm run build
 
 # Start Next.js via Docker

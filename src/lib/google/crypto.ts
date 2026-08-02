@@ -28,7 +28,9 @@ export function encryptSecret(plaintext: string): string {
 // encryptSecret が返した文字列を復号する。改ざんは GCM の認証タグで検出される。
 export function decryptSecret(payload: string): string {
   const [ivB64, tagB64, dataB64] = payload.split(".");
-  if (!ivB64 || !tagB64 || !dataB64) {
+  // 暗号文は空平文のとき正当に空になる（GCM は空でも認証タグで守られる）ため、
+  // dataB64 は欠落だけを弾く。iv / tag が空になる正当なケースは無い。
+  if (!ivB64 || !tagB64 || dataB64 === undefined) {
     throw new Error("暗号化データの形式が不正です。");
   }
   const decipher = crypto.createDecipheriv(
