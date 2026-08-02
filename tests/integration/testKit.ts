@@ -70,6 +70,15 @@ export function marker(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+// 今日（実行時点）の YYYY-MM-DD。ゲスト grant の期間（今日基準で seed される）に
+// 収まる日付が要るテストで使う —— 固定日付を書くとその日を過ぎた瞬間に壊れる。
+export function todayISO(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 // instanceof はモジュールの二重解決で偽陰性になり得るため name で判定する
 export function isRedirectTo(e: unknown, url: string): boolean {
   return (

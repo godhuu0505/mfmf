@@ -11,6 +11,7 @@ import {
   loginAs,
   marker,
   newDb,
+  todayISO,
 } from "./testKit";
 
 // onboarding(1) / invite(1) / guest(1) / feedback(3) の認可検証。
@@ -172,7 +173,7 @@ describe("guest: createGuestRecord（不変条件4: 対象ペット・期間の�
   function guestForm(petId: string, body: string): FormData {
     return form({
       pet_id: petId,
-      record_date: "2026-08-02",
+      record_date: todayISO(), // grant は「今日」基準で seed される。固定日付は期限切れで壊れる
       source: "home",
       author: "ゲスト",
       body,
@@ -249,8 +250,10 @@ describe("feedback: 本人の行のみ操作できる", () => {
     const feedbackId = rows[0].id as string;
     const originalStatus = rows[0].status as string;
 
-    // 他人（bOwner）による状態変更・削除は owner_id 条件で空振りする（エラーにはならない）
-    await loginAs(PERSONAS.bOwner);
+    // 同じ世帯のメンバー（aOwner）による状態変更・削除は owner_id 条件で空振りする。
+    // 攻撃者を同一世帯にするのが要点: 世帯 RLS はメンバーに他人の feedback 操作を
+    // 許すため、別世帯ユーザーだと RLS で弾かれてアクション側のフィルタを検証できない
+    await loginAs(PERSONAS.aOwner);
     await setFeedbackStatus(feedbackId, form({ status: "triaged" }));
     await deleteFeedback(feedbackId);
     const { rows: untouched } = await db.query(

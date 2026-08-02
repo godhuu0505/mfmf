@@ -10,6 +10,7 @@ import {
   loginAs,
   marker,
   newDb,
+  todayISO,
 } from "./testKit";
 
 // settings/actions.ts（12 アクション）の認可検証（Integration 層 / D30）。
@@ -191,11 +192,15 @@ describe("招待の発行・取消（owner のみ）", () => {
       }),
     );
     const { rows } = await db.query(
-      "select scope_pet_id, valid_from, valid_to from public.household_invites where email = $1",
+      "select scope_pet_id, valid_from::text, valid_to::text from public.household_invites where email = $1",
       [email],
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].scope_pet_id).toBe(seed.petA);
+    // 期間も送信どおり保存されていること（受諾時に guest_grants へ複写される値。
+    // valid_to が落ちると無期限 grant になるため、ここの取りこぼしは実害になる）
+    expect(rows[0].valid_from).toBe("2026-08-01");
+    expect(rows[0].valid_to).toBe("2026-08-31");
 
     // 終了日 < 開始日は拒否
     await expect(
@@ -233,7 +238,7 @@ describe("ゲスト付与の失効（UC-G04）", () => {
     await loginAs(PERSONAS.guestActive);
     const fd = form({
       pet_id: seed.petA,
-      record_date: "2026-08-02",
+      record_date: todayISO(), // 固定日付は grant 期間（今日基準）を外れて壊れる
       source: "home",
       body: marker("revoked-guest"),
     });
