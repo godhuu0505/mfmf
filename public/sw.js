@@ -5,7 +5,12 @@
 // 一切キャッシュしない。認証状態が絡む情報をブラウザに残さないため、
 // ナビゲーションは network-first（オフライン時のみシェルへフォールバック）。
 
-const VERSION = "v1";
+// ⚠️ この SW のキャッシュ戦略・プリキャッシュ内容を変えるときは VERSION を上げること。
+// キャッシュ名に VERSION が入っているため、新 SW の install は稼働中 SW のキャッシュと
+// 別領域に書き込む。上げ忘れると、install が途中で失敗したときに稼働中 SW の
+// キャッシュ（特に /offline とそのチャンクの組）を中途半端に上書きして壊す。
+// 旧バージョンのキャッシュは activate が掃除する。
+const VERSION = "v2";
 const STATIC_CACHE = `mfmf-static-${VERSION}`;
 const SHELL_CACHE = `mfmf-shell-${VERSION}`;
 const OFFLINE_URL = "/offline";
