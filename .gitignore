@@ -32,6 +32,10 @@ yarn-error.log*
 .branches
 .temp
 
+# playwright（ベースライン画像 *-snapshots はコミットする）
+/test-results/
+/playwright-report/
+
 # vercel
 .vercel
 
