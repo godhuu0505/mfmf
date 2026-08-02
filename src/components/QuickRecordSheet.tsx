@@ -186,8 +186,12 @@ export default function QuickRecordSheet({
         inert={!open}
         tabIndex={-1}
         className={
-          "fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-transform duration-300 " +
-          (open ? "translate-y-0" : "translate-y-full")
+          // visibility も transition に含める: 閉じるときはスライド完了後に hidden になり、
+          // 開くときは即 visible に戻る（CSS の離散プロパティ遷移の標準挙動）。
+          // translate だけだと「画面外にあるが visible」のままで、支援技術や
+          // Playwright の可視性判定に閉じたことが伝わらない。
+          "fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300 " +
+          (open ? "visible translate-y-0" : "invisible translate-y-full")
         }
       >
         <div className="mx-auto max-w-2xl px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
