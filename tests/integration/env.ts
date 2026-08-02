@@ -31,9 +31,18 @@ export const PERSONAS = {
     email: "int-guest-expired@example.com",
     password: "int-pass-guest-exp-1",
   },
+  // removeMember / leaveHousehold の対象（毎 setup で A の viewer として貼り直される）
+  aRemovable: {
+    email: "int-a-removable@example.com",
+    password: "int-pass-a-removable-1",
+  },
+  aLeaver: {
+    email: "int-a-leaver@example.com",
+    password: "int-pass-a-leaver-1",
+  },
 } as const;
 
-export type Persona = (typeof PERSONAS)[keyof typeof PERSONAS];
+export type Persona = { email: string; password: string };
 
 export const HOUSEHOLD_A_NAME = "Int世帯A";
 export const HOUSEHOLD_B_NAME = "Int世帯B";
@@ -45,5 +54,6 @@ export type SeedIds = {
   householdA: string;
   householdB: string;
   petA: string;
+  petB: string;
   users: Record<keyof typeof PERSONAS, string>;
 };

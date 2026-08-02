@@ -194,12 +194,16 @@ export default async function globalSetup() {
     // 兼任ユーザー: A と B の両方で editor（「対象行の世帯」不変条件の検証用）
     await ensureMembership(db, householdA, users.abEditor, "editor");
     await ensureMembership(db, householdB, users.abEditor, "editor");
+    // removeMember / leaveHousehold の対象。テストが削除しても毎回貼り直される
+    await ensureMembership(db, householdA, users.aRemovable, "viewer");
+    await ensureMembership(db, householdA, users.aLeaver, "viewer");
 
     const petA = await ensurePet(db, users.aOwner, householdA, "Intポチ");
+    const petB = await ensurePet(db, users.bOwner, householdB, "Intタマ");
     await ensureGuestGrant(db, householdA, users.guestActive, petA, users.aOwner, "active");
     await ensureGuestGrant(db, householdA, users.guestExpired, petA, users.aOwner, "expired");
 
-    const seed: SeedIds = { householdA, householdB, petA, users };
+    const seed: SeedIds = { householdA, householdB, petA, petB, users };
     writeFileSync(SEED_FILE, JSON.stringify(seed, null, 2));
   } finally {
     await db.end();
