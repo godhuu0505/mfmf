@@ -416,6 +416,9 @@
   .h-px {
     height: 1px;
   }
+  .max-h-\[92vh\] {
+    max-height: 92vh;
+  }
   .min-h-screen {
     min-height: 100vh;
   }
@@ -590,6 +593,9 @@
   }
   .overflow-x-auto {
     overflow-x: auto;
+  }
+  .overflow-y-auto {
+    overflow-y: auto;
   }
   .rounded-2xl {
     border-radius: var(--radius-2xl);
@@ -1959,7 +1965,7 @@ body {
           <p class="font-semibold">佐藤家</p>
           <p class="text-xs text-muted-foreground">あなたの権限: オーナー</p>
         </div>
-        <button class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">名前を変更</button>
+        <button data-editor-only class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">名前を変更</button>
       </div>
     </div>
 
@@ -1991,13 +1997,13 @@ body {
         <div class="flex items-center gap-3 py-3">
           <span class="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-sm font-bold">太</span>
           <div class="min-w-0 flex-1"><p class="text-sm font-medium">佐藤 太郎</p><p class="truncate text-xs text-muted-foreground">taro@example.com</p></div>
-          <button onclick="cycleRole()" class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium hover:bg-border"><span id="role-pill-label">編集者</span><svg class="h-3 w-3"><use href="#i-chevron-right"/></svg></button>
+          <button data-editor-only onclick="cycleRole()" class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium hover:bg-border"><span id="role-pill-label">編集者</span><svg class="h-3 w-3"><use href="#i-chevron-right"/></svg></button>
         </div>
       </div>
       <p class="mt-1 text-xs text-muted-foreground">権限バッジをタップして変更（現行のセレクト＋「変更」ボタンを置き換え）</p>
     </div>
 
-    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+    <div data-editor-only class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
       <h2 class="mb-3 text-sm font-semibold">招待</h2>
       <div class="grid grid-cols-2 gap-2">
         <button class="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground">メンバーを招待</button>
@@ -2012,7 +2018,7 @@ body {
       <p class="mt-2 text-xs text-muted-foreground">招待リンクは「コピー」ボタンで共有（現行はパス文字列の表示のみ）</p>
     </div>
 
-    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+    <div data-editor-only class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
       <h2 class="mb-1 text-sm font-semibold">外部ゲスト（保育園・シッター）</h2>
       <div class="flex items-center justify-between py-2">
         <div><p class="text-sm font-medium">さくら保育園</p><p class="text-xs text-muted-foreground">モカ ・ 8月1日〜8月31日 ・ 記入可</p></div>
@@ -2024,7 +2030,7 @@ body {
       <h2 class="mb-2 text-sm font-semibold text-red-600 dark:text-red-400">危険な操作</h2>
       <div class="space-y-2">
         <button class="w-full rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-surface-muted dark:text-red-400">この世帯から退出する</button>
-        <button class="w-full rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground" disabled>世帯を削除する（メンバーが残っています）</button>
+        <button data-editor-only class="w-full rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground" disabled>世帯を削除する（メンバーが残っています）</button>
       </div>
     </div>
     <p class="text-xs text-muted-foreground">現行の 1 枚 621 行ページを機能別カードに分割。メニュー直下に昇格（現行はアカウント設定の奥）。</p>
@@ -2328,7 +2334,7 @@ body {
 <!-- ============================================================ -->
 <div id="sheet-quick" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="クイック記録">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-quick')"></div>
-  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl translate-y-full rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-semibold">サッと記録 <span id="qs-date" class="ml-1 text-xs font-normal text-muted-foreground">8月3日（月）</span></h2>
@@ -2356,7 +2362,7 @@ body {
 <!-- 日別シート(カレンダー) -->
 <div id="sheet-day" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="この日の記録">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-day')"></div>
-  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl translate-y-full rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-semibold"><span id="day-title">8月3日（月）</span>の記録</h2>
@@ -2370,7 +2376,7 @@ body {
 <!-- 記録詳細の「…」メニュー -->
 <div id="sheet-more" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="その他の操作">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-more')"></div>
-  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl translate-y-full rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="overflow-hidden rounded-xl bg-surface-muted">
       <button onclick="closeSheet('sheet-more');openForm(true)" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-pencil"/></svg>編集する</button>
@@ -2386,7 +2392,7 @@ body {
 <!-- ペット編集シート -->
 <div id="sheet-pet" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="ペットを編集">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-pet')"></div>
-  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl translate-y-full rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-semibold">モカを編集</h2>
@@ -2410,7 +2416,7 @@ body {
 <!-- プロト設定シート -->
 <div id="sheet-proto" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="プロト設定">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-proto')"></div>
-  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl translate-y-full rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <h2 class="mb-3 text-base font-semibold">プロト設定（検証用）</h2>
     <div class="space-y-3 text-sm">
@@ -2478,6 +2484,8 @@ body {
       var on = b.getAttribute("data-tab") === active;
       b.classList.toggle("text-primary", on);
       b.classList.toggle("text-muted-foreground", !on);
+      if (on) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
     });
   }
 
