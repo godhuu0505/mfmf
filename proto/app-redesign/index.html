@@ -1579,7 +1579,7 @@ body {
       <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-surface-muted text-muted-foreground"><svg class="h-7 w-7"><use href="#i-paw"/></svg></span>
       <p class="font-medium">まだ記録がありません</p>
       <p class="mt-1 text-sm text-muted-foreground">下の「＋」から今日の様子を残してみましょう</p>
-      <button onclick="openQuick()" class="mt-4 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">はじめての記録</button>
+      <button data-editor-only onclick="openQuick()" class="mt-4 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">はじめての記録</button>
     </div>
 
     <!-- 日付グループのタイムライン -->
@@ -1927,14 +1927,14 @@ body {
           <p class="text-lg font-semibold">モカ</p>
           <p class="text-sm text-muted-foreground">トイプードル ・ 2023年5月生まれ（3歳）</p>
         </div>
-        <button onclick="openSheet('sheet-pet')" aria-label="モカを編集" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-pencil"/></svg></button>
+        <button data-editor-only onclick="openSheet('sheet-pet')" aria-label="モカを編集" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-pencil"/></svg></button>
       </div>
       <div class="mt-3 flex gap-2 border-t border-border pt-3">
         <button onclick="go('weight')" class="inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-3 py-1.5 text-xs font-medium"><svg class="h-3.5 w-3.5"><use href="#i-scale"/></svg>体重 3.20 kg</button>
         <span class="inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-3 py-1.5 text-xs font-medium"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>写真 142 枚</span>
       </div>
     </div>
-    <button class="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border py-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-muted">
+    <button data-editor-only class="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border py-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-muted">
       <svg class="h-4 w-4"><use href="#i-plus"/></svg>ペットを追加
     </button>
     <p class="text-xs text-muted-foreground">現行の「常時展開の編集フォーム」→ カード表示＋鉛筆アイコンで編集シート（誤操作を防ぎ一覧が見やすく）。</p>
@@ -1991,7 +1991,7 @@ body {
         <div class="flex items-center gap-3 py-3">
           <span class="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-sm font-bold">太</span>
           <div class="min-w-0 flex-1"><p class="text-sm font-medium">佐藤 太郎</p><p class="truncate text-xs text-muted-foreground">taro@example.com</p></div>
-          <button class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium hover:bg-border">編集者<svg class="h-3 w-3"><use href="#i-chevron-right"/></svg></button>
+          <button onclick="cycleRole()" class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium hover:bg-border"><span id="role-pill-label">編集者</span><svg class="h-3 w-3"><use href="#i-chevron-right"/></svg></button>
         </div>
       </div>
       <p class="mt-1 text-xs text-muted-foreground">権限バッジをタップして変更（現行のセレクト＋「変更」ボタンを置き換え）</p>
@@ -2078,8 +2078,8 @@ body {
     <div class="safe-px mx-auto flex max-w-2xl items-center gap-1 py-2">
       <button onclick="go('home')" aria-label="戻る" class="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
       <h1 id="det-title" class="flex-1 text-base font-semibold">8月3日（月）</h1>
-      <button onclick="openForm(true)" class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">編集</button>
-      <button onclick="openSheet('sheet-more')" aria-label="その他の操作" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-more"/></svg></button>
+      <button data-editor-only onclick="openForm(true)" class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">編集</button>
+      <button data-editor-only onclick="openSheet('sheet-more')" aria-label="その他の操作" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-more"/></svg></button>
     </div>
   </header>
   <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
@@ -2118,7 +2118,7 @@ body {
     <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-2">
       <button onclick="formClose()" class="rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted">キャンセル</button>
       <h1 id="form-title" class="text-base font-semibold">記録を追加</h1>
-      <button onclick="formClose()" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
+      <button onclick="formSave()" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
     </div>
   </header>
   <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-16">
@@ -2363,7 +2363,7 @@ body {
       <button onclick="closeSheet('sheet-day')" aria-label="閉じる" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-x"/></svg></button>
     </div>
     <ul id="day-list" class="space-y-2"></ul>
-    <button onclick="closeSheet('sheet-day');openSheet('sheet-quick')" class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-surface-muted"><svg class="h-4 w-4"><use href="#i-plus"/></svg>この日の記録を追加</button>
+    <button data-editor-only onclick="closeSheet('sheet-day');openSheet('sheet-quick')" class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-surface-muted"><svg class="h-4 w-4"><use href="#i-plus"/></svg>この日の記録を追加</button>
   </div>
 </div>
 
@@ -2483,6 +2483,7 @@ body {
 
   /* ---- シート（背景 inert + パネルへフォーカス移動。トランジションは Tailwind の translate-y ユーティリティ） ---- */
   var sheetTriggers = {};
+  var sheetTimers = {};
   function anySheetOpen() {
     return document.querySelectorAll('[role="dialog"]:not(.hidden)').length > 0;
   }
@@ -2495,6 +2496,7 @@ body {
   window.openSheet = function (id) {
     var el = document.getElementById(id);
     var panel = el.querySelector("[data-sheet-panel]");
+    clearTimeout(sheetTimers[id]);
     sheetTriggers[id] = document.activeElement;
     el.hidden = false;
     el.classList.remove("hidden");
@@ -2510,7 +2512,8 @@ body {
     var panel = el.querySelector("[data-sheet-panel]");
     panel.classList.remove("translate-y-0");
     panel.classList.add("translate-y-full");
-    setTimeout(function () {
+    clearTimeout(sheetTimers[id]);
+    sheetTimers[id] = setTimeout(function () {
       el.classList.add("hidden");
       if (!anySheetOpen()) {
         setBackgroundInert(false);
@@ -2522,6 +2525,7 @@ body {
 
   window.setViewer = function (on) {
     viewerMode = on;
+    document.querySelectorAll("[data-editor-only]").forEach(function (el) { el.hidden = on; });
     updateChrome();
   };
 
@@ -2739,38 +2743,43 @@ body {
   function tagChip(name) {
     return '<a href="#" onclick="go(\'home\');return false" class="rounded-full bg-surface px-3 py-1 text-xs font-medium ring-1 ring-border">#' + name + "</a>";
   }
+  function detBadges(d) {
+    var b = d.src === "school"
+      ? '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span>'
+      : '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3.5 w-3.5"><use href="#i-home-src"/></svg>おうち</span>';
+    if (d.weight) b += '<span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 ' + d.weight + ' kg</span>';
+    b += '<span class="text-xs text-muted-foreground">記入: ' + d.author + '</span>';
+    return b;
+  }
+  function fmtDate(dateStr) {
+    var dt = new Date(dateStr + "T00:00:00");
+    return (dt.getMonth() + 1) + "月" + dt.getDate() + "日（" + ["日", "月", "火", "水", "木", "金", "土"][dt.getDay()] + "）";
+  }
   var DETAIL = [
-    { title: "8月3日（月）", navLabel: "8月3日（保育園）", src: "school", weight: "3.20", date: "2026-08-03", share: true,
-      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span><span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 3.20 kg</span><span class="text-xs text-muted-foreground">記入: さくら保育園</span>',
+    { title: "8月3日（月）", navLabel: "8月3日（保育園）", src: "school", weight: "3.20", date: "2026-08-03", share: true, author: "さくら保育園",
       body: "園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。\n\nお迎えのときは少し眠そうでしたが、帰り際にしっぽをたくさん振ってくれました。",
       photos: photoTile("from-amber-200 to-orange-300", "🐕") + photoTile("from-emerald-200 to-teal-300", "🎾"),
       tags: tagChip("ボール遊び") },
-    { title: "8月3日（月）", navLabel: "8月3日（おうち）", src: "home", weight: "", date: "2026-08-03", share: false,
-      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3.5 w-3.5"><use href="#i-home-src"/></svg>おうち</span><span class="text-xs text-muted-foreground">記入: 佐藤 花子</span>',
+    { title: "8月3日（月）", navLabel: "8月3日（おうち）", src: "home", weight: "", date: "2026-08-03", share: false, author: "佐藤 花子",
       body: "夜ごはん完食。散歩は 30 分、いつもより元気だった。",
       photos: "", tags: "" },
-    { title: "8月2日（日）", navLabel: "8月2日", src: "home", weight: "", date: "2026-08-02", share: false,
-      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3.5 w-3.5"><use href="#i-home-src"/></svg>おうち</span><span class="text-xs text-muted-foreground">記入: 佐藤 花子</span>',
+    { title: "8月2日（日）", navLabel: "8月2日", src: "home", weight: "", date: "2026-08-02", share: false, author: "佐藤 花子",
       body: "公園までロング散歩。帰りに足を洗うのを嫌がらなくなってきた。\n\n水飲みはいつもどおり。夜はぐっすり。",
       photos: photoTile("from-sky-200 to-indigo-300", "🌳") + photoTile("from-pink-200 to-rose-300", "🐶"),
       tags: "" },
-    { title: "8月1日（土）", navLabel: "8月1日", src: "home", weight: "3.25", date: "2026-08-01", share: true,
-      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3.5 w-3.5"><use href="#i-home-src"/></svg>おうち</span><span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 3.25 kg</span><span class="text-xs text-muted-foreground">記入: 佐藤 太郎</span>',
+    { title: "8月1日（土）", navLabel: "8月1日", src: "home", weight: "3.25", date: "2026-08-01", share: true, author: "佐藤 太郎",
       body: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。",
       photos: photoTile("from-rose-200 to-pink-300", "✂️"),
       tags: tagChip("トリミング") },
-    { title: "7月30日（木）", navLabel: "7月30日", src: "school", weight: "", date: "2026-07-30", share: true,
-      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span><span class="text-xs text-muted-foreground">記入: さくら保育園</span>',
+    { title: "7月30日（木）", navLabel: "7月30日", src: "school", weight: "", date: "2026-07-30", share: true, author: "さくら保育園",
       body: "お友達のマロンちゃんと仲良く遊べました。お昼寝はいつもより長め。",
       photos: photoTile("from-emerald-200 to-teal-300", "💤") + photoTile("from-violet-200 to-purple-300", "🐾"),
       tags: "" },
-    { title: "7月28日（火）", navLabel: "7月28日", src: "school", weight: "", date: "2026-07-28", share: true,
-      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span><span class="text-xs text-muted-foreground">記入: さくら保育園</span>',
+    { title: "7月28日（火）", navLabel: "7月28日", src: "school", weight: "", date: "2026-07-28", share: true, author: "さくら保育園",
       body: "初めてのおやつタイム。少し警戒してから完食しました。",
       photos: photoTile("from-orange-200 to-amber-300", "🍚"),
       tags: "" },
-    { title: "7月20日（月）", navLabel: "7月20日", src: "school", weight: "3.10", date: "2026-07-20", share: false,
-      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span><span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 3.10 kg</span><span class="text-xs text-muted-foreground">記入: さくら保育園</span>',
+    { title: "7月20日（月）", navLabel: "7月20日", src: "school", weight: "3.10", date: "2026-07-20", share: false, author: "さくら保育園",
       body: "身体測定の日。体重 3.10kg、落ち着いて測れました。",
       photos: "", tags: "" }
   ];
@@ -2778,7 +2787,7 @@ body {
     currentDetail = i;
     var d = DETAIL[i];
     document.getElementById("det-title").textContent = d.title;
-    document.getElementById("det-badges").innerHTML = d.badges;
+    document.getElementById("det-badges").innerHTML = detBadges(d);
     document.getElementById("det-body").textContent = d.body;
     document.getElementById("det-photos").innerHTML = d.photos;
     document.getElementById("det-photos").hidden = !d.photos;
@@ -2879,6 +2888,34 @@ body {
   };
   window.formClose = function () {
     go(formEdit ? "record-detail" : "home");
+  };
+  window.formSave = function () {
+    if (formEdit) {
+      var d = DETAIL[currentDetail];
+      d.body = document.getElementById("form-body").value;
+      d.weight = document.getElementById("form-weight").value.trim();
+      d.date = document.getElementById("form-date").value || d.date;
+      d.src = document.getElementById("form-src-school").getAttribute("aria-pressed") === "true" ? "school" : "home";
+      d.title = fmtDate(d.date);
+      var link = document.querySelector('li[data-src] a[onclick*="showDetail(' + currentDetail + ');"]');
+      if (link) {
+        var li = link.closest("li");
+        li.setAttribute("data-src", d.src);
+        var ex = link.querySelector(".line-clamp-2");
+        if (ex) ex.textContent = d.body.split("\n")[0];
+      }
+      showDetail(currentDetail);
+      go("record-detail");
+      toast("更新しました");
+    } else {
+      go("home");
+      toast("残しました（モック）");
+    }
+  };
+  window.cycleRole = function () {
+    var el = document.getElementById("role-pill-label");
+    el.textContent = el.textContent === "編集者" ? "閲覧者" : "編集者";
+    toast("権限を変更しました（モック）");
   };
 
   document.addEventListener("keydown", function (e) {
