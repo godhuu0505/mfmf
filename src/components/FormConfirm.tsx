@@ -22,6 +22,33 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  // モーダルの作法: 開いたらダイアログへフォーカスを移し、背景（body 直下の
+  // 兄弟要素）を inert にする。閉じたら元のトリガーへフォーカスを戻す。
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const prevFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const dialogEl = rootRef.current;
+    const others = Array.from(document.body.children).filter(
+      (el): el is HTMLElement => el instanceof HTMLElement && el !== dialogEl,
+    );
+    const prevInert = others.map((el) => el.inert);
+    others.forEach((el) => {
+      el.inert = true;
+    });
+    requestAnimationFrame(() =>
+      rootRef.current?.focus({ preventScroll: true }),
+    );
+    return () => {
+      others.forEach((el, i) => {
+        el.inert = prevInert[i];
+      });
+      prevFocus?.focus({ preventScroll: true });
+    };
+  }, []);
+
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -39,6 +66,8 @@ export function ConfirmDialog({
 
   return createPortal(
     <div
+      ref={rootRef}
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
