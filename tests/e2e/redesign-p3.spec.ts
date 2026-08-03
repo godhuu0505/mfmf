@@ -18,7 +18,7 @@ test("UC-F01: 記録フォームのキャンセルは確認してから破棄す
   await expect(dialog).toBeVisible();
 
   // もどる → フォームに残る
-  await dialog.getByRole("button", { name: "もどる" }).click();
+  await dialog.getByRole("button", { name: "もどる", exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await expect(
     page.getByPlaceholder("今日の様子などを記録します"),
@@ -60,8 +60,10 @@ test("UC-D01: 記録詳細の「…」から確認つきで削除できる", asy
   await login(page);
   await quickRecord(page, marker);
 
-  // いま作った記録（先頭カード）を開く
-  await page.locator("main ul > li").first().click();
+  // いま作った記録が先頭カードに反映されるのを待ってから開く
+  const first = page.locator("main ul > li").first();
+  await expect(first).toContainText(marker);
+  await first.click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/);
   await expect(page.getByText(marker)).toBeVisible();
 
