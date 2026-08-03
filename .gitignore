@@ -32,6 +32,13 @@ yarn-error.log*
 .branches
 .temp
 
+# playwright（ベースライン画像 *-snapshots はコミットする）
+/test-results/
+/playwright-report/
+
+# integration テストの seed 実 ID（globalSetup が生成）
+/tests/integration/.seed.json
+
 # vercel
 .vercel
 

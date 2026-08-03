@@ -5,7 +5,7 @@ mfmf を「夫婦2人の最小記録アプリ」から、**ペットのケアに
 スキーマ・RLS は採用が決まった時点で個別ドキュメント／migration に落とします。
 
 - 現状の「何が」あるかは [reference/architecture.md](../reference/architecture.md)
-- 現状の「なぜ」は [design-decisions.md](./design-decisions.md)
+- 現状の「なぜ」は [decisions.md](./decisions.md)
 - DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/)
 
 > ⚠️ 本書は将来構想を含みます。ここに書かれた機能の多くは **未実装** です。実装状況は各表の「状態」列を参照。
@@ -14,20 +14,20 @@ mfmf を「夫婦2人の最小記録アプリ」から、**ペットのケアに
 
 ## 1. ゴールの進化
 
-| | フェーズ1（現状） | これから（本書の構想） |
-| --- | --- | --- |
-| 利用者 | 夫婦2人・1アカウント共用 | 家族＋外部（保育園・ペット/ベビーシッター）が**各自のアカウント**で参加 |
-| 共有方針 | (A) `owner_id = auth.uid()` 一本 | (B+) **家族（family）× メンバー × ペットの多対多** ＋ 権限（role） |
-| 写真 | Supabase Storage（private） | **原本は Google Drive・サムネだけ Supabase**（容量節約） |
-| 守備範囲 | 記録（テキスト＋写真）の CRUD | 記録＋**予定・予防接種リマインダー・レポート・アルバム** |
-| 立ち位置 | 単機能アプリ | **Google サービス（Drive / Calendar / Photos…）を束ねるハブ** |
+| | フェーズ1（**当初**） | 本書の構想 | 現況 |
+| --- | --- | --- | --- |
+| 利用者 | 夫婦2人・1アカウント共用 | 家族＋外部（保育園・ペット/ベビーシッター）が**各自のアカウント**で参加 | ✅ Phase 3.5 で実現 |
+| 共有方針 | (A) `owner_id = auth.uid()` 一本 | (B+) **家族（family）× メンバー × ペットの多対多** ＋ 権限（role） | ✅ Phase 3.5 で実現（`households` / role / `guest_grants`） |
+| 写真 | Supabase Storage（private） | **原本は Google Drive・サムネだけ Supabase**（容量節約） | 🟢 未実装（トークン保存の基盤のみ） |
+| 守備範囲 | 記録（テキスト＋写真）の CRUD | 記録＋**予定・予防接種リマインダー・レポート・アルバム** | 🟢 未実装 |
+| 立ち位置 | 単機能アプリ | **Google サービス（Drive / Calendar / Photos…）を束ねるハブ** | 🟢 未実装 |
 
 新しい一文ゴール:
 
 > **ペットのケアに関わる人が、適切な権限でつながり、記録・写真・予定・健康情報を一か所で扱える。
 > その裏側でバラバラな Google サービスを一元的に束ねる、無料運用のハブ。**
 
-「芯」として **引き継ぐ不変条件**（[design-decisions.md](./design-decisions.md) 参照）:
+「芯」として **引き継ぐ不変条件**（[decisions.md](./decisions.md) 参照）:
 
 - セキュリティの一次防衛線は **RLS**（multi-tenant 化後も維持）
 - Service Worker は **private・期限付き URL をキャッシュしない**
@@ -170,11 +170,11 @@ events            (id, pet_id, kind, start_at, end_at,   -- 予定・予防接�
 ### H. 共有・権限
 | 機能 | 概要 | 状態 |
 | --- | --- | --- |
-| Google ログイン | 各自アカウントで参加 | 🟢 |
-| 家族（family）と多対多メンバー | 複数家族に所属可能 | 🟢 |
-| 3段階 role | owner / editor / viewer | 🟢 |
-| 招待フロー | メール/リンクで招待・受諾 | 🟢 |
-| 外部ゲスト | 保育園・シッターを期間/対象限定で招く | 🟢 |
+| Google ログイン | 各自アカウントで参加 | ✅ |
+| 家族（household）と多対多メンバー | 複数世帯に所属可能 | ✅ |
+| 3段階 role | owner / editor / viewer | ✅ |
+| 招待フロー | メール/リンクで招待・受諾 | ✅ |
+| 外部ゲスト | 保育園・シッターを期間/対象限定で招く | ✅ |
 
 ### I. データ保全・基盤
 | 機能 | 概要 | 状態 |
@@ -242,7 +242,11 @@ RLS 作り替えを **n=2 のうちに**済ませるのが核。
 ## 7. 未決事項（次回以降に詰める）
 
 - **Google トークンの保管方式**：Supabase の provider token か、暗号化列＋Edge Function か。
-- **外部ゲストの RLS 設計**：`guest_grants` の期間/対象スコープをどう RLS に落とすか。
+- ~~**外部ゲストの RLS 設計**：`guest_grants` の期間/対象スコープをどう RLS に落とすか。~~
+  → **Phase 3.5 / S4 で決着**（`supabase/migrations/20260705000000_guest_grants.sql`）。
+  `has_guest_record_access(household_id, pet_id, record_date)` で対象ペットと期間を判定し、
+  `pets_select_guest` / `records_select_guest` / `records_insert_guest` に適用。
+  付与の管理は世帯 owner 限定（UC-G01・UC-G06）。
 - **Drive 原本の配信方式**：アプリ経由プロキシ（private 維持）の実装コストと SW 不変条件の両立。
 - **1匹を複数家族で共同管理**（`pet_families`）まで踏み込むか（スコープ肥大の懸念）。
 - **AI 機能**（月次要約など）を Claude API で入れるかどうか（コストと ¥0 方針の折り合い）。

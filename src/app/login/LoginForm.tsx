@@ -109,7 +109,8 @@ export default function LoginForm({ signupEnabled }: Props) {
       </button>
 
       <p className="text-center text-xs text-muted-foreground">
-        写真は Google Drive に保存されます。
+        Google Drive へのアクセス許可を求めます（将来の写真保存用。
+        現在の写真は mfmf 内に保存されます）。
       </p>
 
       <div className="flex items-center gap-3">

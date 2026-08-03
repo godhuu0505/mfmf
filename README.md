@@ -6,14 +6,17 @@
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
 ![Supabase](https://img.shields.io/badge/Supabase-Free-3ECF8E)
 
-夫婦で 1 アカウントを共用し、保育園とおうち（両親）どちらのノートも同じ仕組みで記録します。
+家族で 1 つの世帯を共有し、保育園とおうち（両親）どちらのノートも同じ仕組みで記録します。
+世帯には **editor / viewer** で招待でき（owner は参加後に既存 owner が昇格させる）、保育園やシッターは対象ペット・期間を
+限定した外部ゲストとして招けます。
 フロントは **Next.js（App Router）/ Vercel**、バックエンド（認証・DB・画像）は **Supabase**。
 どちらも無料枠で完結します。
 
 ## クイックスタート
 
-本アプリは **Google OAuth 一本化**（メール/パスワードログインは使えません）。
-どのルートを選んでも、Google Cloud Console での OAuth クライアント発行が必須です。
+ログインは **Google OAuth** と **メール/パスワード**の 2 方式。
+Google ログイン（および Drive 連携）を使う場合は Google Cloud Console での
+OAuth クライアント発行が必要です。セルフ登録（`/signup`）は `SIGNUP_ENABLED=true` のときだけ開きます。
 
 ### A. リモート Supabase に繋ぐ（最短）
 
@@ -41,18 +44,40 @@ git clone https://github.com/godhuu0505/mfmf.git && cd mfmf
 npm install
 ```
 
-**初回 1 回だけ** Google Cloud Console で **OAuth クライアント**を発行します（約 5 分）。
-リダイレクト URI に `http://127.0.0.1:54321/auth/v1/callback` を登録（`localhost` ではなく
-`127.0.0.1`）。発行手順は [docs/guides/google-drive-setup.md](./docs/guides/google-drive-setup.md) 1 章。
-
-その後、コマンド 3 つで起動できます：
-
 ```bash
 just setup           # Supabase 起動 + .env.local 自動生成（URL/anon key/TOKEN_ENC_KEY）
-just setup-google    # CLIENT_ID/SECRET を対話入力 → 全箇所に投入 + Supabase 再起動
 just up              # docker compose で Next.js 起動（CI と同じ Node 22）
 # または just dev でホスト Node 起動
 ```
+
+**Google ログイン / Drive 連携を使う場合のみ**、追加で OAuth クライアントの発行が要ります
+（初回 1 回だけ・約 5 分）。リダイレクト URI に `http://127.0.0.1:54321/auth/v1/callback` を
+登録（`localhost` ではなく `127.0.0.1`）。発行手順は
+[docs/guides/google-drive-setup.md](./docs/guides/google-drive-setup.md) 1 章。
+
+```bash
+just setup-google    # CLIENT_ID/SECRET を対話入力 → 全箇所に投入 + Supabase 再起動
+```
+
+**メール/パスワードだけで動かす場合**は上記は不要です。ローカルで自分のアカウントを
+作る手順:
+
+1. **`just up` / `just dev` を実行する前に**、`.env.local` に `SIGNUP_ENABLED=true` を設定
+   （本番では既定で閉じています）。
+   `docker-compose.yml` は `.env.local` を `env_file` で読むため、**起動後に編集しても
+   すでに動いているコンテナには反映されません**。あとから変えた場合は
+   `just down && just up`（`just dev` ならプロセスを再起動）
+2. `/signup` で登録する
+3. **確認メールは実際のメールボックスには届きません。** ローカルスタックは
+   `enable_confirmations = true`（`supabase/config.toml`）で、メールは Mailpit が受け取ります。
+   **`http://127.0.0.1:54324` を開いて確認リンクを踏んでください**
+4. `/login` からログイン
+
+> ⚠️ この構成でも **`/login` の「Google でログイン」ボタンは表示されます**が、Supabase 側で
+> Google プロバイダが無効（`supabase/config.toml` の `[auth.external.google] enabled = false`）
+> なので、押すと `/login?error=oauth` に戻ります。**メール/パスワードのフォームを使ってください。**
+> ボタンを出し分けていないのは、Google が使えるかどうかが Supabase 側の設定で決まり、
+> アプリからは判定できないためです（→ [docs/explanation/decisions.md](./docs/explanation/decisions.md) の未決事項）。
 
 詳細・トラブルシュートは **[docs/guides/local-supabase.md](./docs/guides/local-supabase.md)**。
 
@@ -87,8 +112,9 @@ just setup-google   # 初回のみ：Google OAuth 認証情報を対話投入
 | ローカル Supabase / つまずき | [docs/guides/local-supabase.md](./docs/guides/local-supabase.md) |
 | デプロイ・リリース | [docs/guides/deploy.md](./docs/guides/deploy.md) |
 | 動作確認 | [docs/guides/verify-backend.md](./docs/guides/verify-backend.md) |
-| 構成・データモデル・環境変数 | [docs/reference/](./docs/reference/architecture.md) |
-| 設計の「なぜ」 | [docs/explanation/design-decisions.md](./docs/explanation/design-decisions.md) |
+| 構成の地図・環境変数 | [docs/reference/](./docs/reference/architecture.md) |
+| 判断基準（Mission / Vision / Values） | [docs/explanation/principles.md](./docs/explanation/principles.md) |
+| 決定ログ（却下した案と理由） | [docs/explanation/decisions.md](./docs/explanation/decisions.md) |
 
 AI コーディングエージェント向けの作業指針は [AGENTS.md](./AGENTS.md) / [CLAUDE.md](./CLAUDE.md)。
 

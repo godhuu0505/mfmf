@@ -3,7 +3,7 @@
 mfmf は **GitHub Actions から Vercel CLI で明示的にデプロイ**します。
 「いつ・どこへ出すか」を Actions に一本化するため、Vercel の Git 連携自動デプロイは
 `vercel.json` の `git.deploymentEnabled: false` で無効化しています
-（この方針の背景は [explanation/design-decisions.md](../explanation/design-decisions.md#デプロイ方針)）。
+（この方針の背景は [explanation/decisions.md](../explanation/decisions.md) の D22）。
 
 ## フロー
 

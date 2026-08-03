@@ -67,8 +67,11 @@ export default function RecordForm({
     () => existingRecordId ?? crypto.randomUUID(),
     [existingRecordId],
   );
-  // Storage パスの先頭セグメント。世帯があれば {household_id}/...（Phase 3.5 手順8 の
-  // 新規約）、未所属時は従来どおり {owner_id}/...（RLS も両規約を併存で許可する）。
+  // Storage パスの先頭セグメント。**世帯があるときだけアップロードが成立する。**
+  // ⚠️ owner_id へのフォールバックは insert ポリシーが無いので RLS で落ちる
+  // （daycare_photos_insert_own は 20260704000000 で drop 済み）。
+  // 未所属ユーザーは /onboarding で世帯作成へ回されるため通常は到達しないが、
+  // この経路を消すか明示的に失敗させるかは未決（PR #127 の判断待ち項目）。
   const storageScopeId = householdId ?? ownerId;
   const [source, setSource] = useState<RecordSource>(defaultSource);
 

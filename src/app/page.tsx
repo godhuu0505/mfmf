@@ -19,7 +19,10 @@ import { getTagDictionary } from "@/lib/tags";
 import { canEdit, getCurrentMembership, householdScopeFilter } from "@/lib/household";
 import { hasActiveGuestGrant } from "@/lib/guest";
 import { createPhotoSignedUrls } from "@/lib/photos";
+import { getCurrentProfile } from "@/lib/profile";
+import { createQuickRecord } from "@/app/records/actions";
 import AppHeader from "@/components/AppHeader";
+import QuickRecordSheet from "@/components/QuickRecordSheet";
 import RecordFilters from "@/components/RecordFilters";
 import SourceIcon from "@/components/SourceIcon";
 import { Camera, PawPrint, Scale, X } from "lucide-react";
@@ -91,6 +94,8 @@ export default async function HomePage({
   const householdId = membership.householdId;
   // viewer には編集系 UI を出さない（UC-A06。サーバー強制は RLS / Server Action）。
   const readOnly = !canEdit(membership.role);
+  // クイック記録の記入者はプロフィールの既定記入者を自動で使う（画面には出さない）。
+  const profile = readOnly ? null : await getCurrentProfile();
 
   // 一覧 + 先頭写真 + 付与タグをまとめて取得。
   let query = supabase
@@ -178,8 +183,19 @@ export default async function HomePage({
 
   return (
     <>
+      {/* クイック記録シート表示中は背景（この wrapper）が inert になる。
+          main の下端はシートの FAB（h-14 + オフセット）と重ならない余白を確保する。 */}
+      <div data-quick-record-bg>
       <AppHeader />
-      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
+      <main
+        id="main"
+        className={
+          "mx-auto max-w-2xl px-4 pt-6 " +
+          (readOnly
+            ? "pb-6"
+            : "pb-[calc(max(1rem,env(safe-area-inset-bottom))+8.5rem)]")
+        }
+      >
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-foreground">記録一覧</h1>
           <div className="flex items-center gap-2">
@@ -376,6 +392,15 @@ export default async function HomePage({
           </nav>
         )}
       </main>
+      </div>
+
+      {!readOnly && (
+        <QuickRecordSheet
+          action={createQuickRecord}
+          householdId={householdId}
+          defaultAuthor={profile?.default_author ?? ""}
+        />
+      )}
     </>
   );
 }

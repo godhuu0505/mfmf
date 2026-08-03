@@ -1,7 +1,7 @@
 name: CI
 
-# lint / typecheck / build の検証ゲート。
-# Claude Code のローカルゲート（npm run lint / typecheck / build）と同一。
+# lint / typecheck / unit test / build の検証ゲート。
+# Claude Code のローカルゲート（just check = npm run lint / typecheck / test:unit / build）と同一。
 # - PR では単独で走る。
 # - main への push 時はデプロイワークフロー（deploy-production.yml）から workflow_call で再利用し、
 #   この検証が緑のときだけ migration 適用 + Vercel Production デプロイする（ゲート）。
@@ -38,6 +38,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # tests/unit/（Vitest, D30）。純粋関数の入力変換・境界値をここで守る。
+      - name: Unit tests
+        run: npm run test:unit
+
       - name: Build
         # NEXT_PUBLIC_* はブラウザ公開前提の値。ビルド通過用のプレースホルダで十分
         # （秘密情報ではない / service_role key は使わない）。
@@ -49,11 +53,22 @@ jobs:
   # Supabase ローカルスタックを起動し、migration 適用後に pgTAP で RLS のテナント分離を検証する。
   # RLS（一次防衛線）を弱める変更が入るとここで赤くなり PR が落ちる（Issue #38 / #92 手順5）。
   # workflow_call（deploy 系から再利用）でも走らせ、main マージ前にも分離を担保する。
+  # 続けて Integration テスト（tests/integration/ / D30）も同じスタックで実行する
+  # —— 起動コストを二重に払わないための相乗り。pgTAP が「DB が守っているか」、
+  # Integration が「Server Action がどの世帯を基準に認可したか」を見る。
   db-rls-tests:
     name: RLS tenant isolation (pgTAP)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       # deploy-production.yml と同じ supabase/setup-cli@v2 を使う。
       - uses: supabase/setup-cli@v2
@@ -67,6 +82,78 @@ jobs:
       # supabase/tests/**/*.sql を pg_prove で実行。1 つでも失敗すれば exit≠0 でジョブが落ちる。
       - name: Run pgTAP tests
         run: supabase test db
+
+      # ローカルスタックの anon key（ブラウザ公開前提の値。秘密情報ではない）
+      - name: Export local Supabase env
+        run: |
+          ANON_KEY=$(supabase status -o env | awk -F= '/^ANON_KEY=/{print $2}' | tr -d '"')
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321" >> "$GITHUB_ENV"
+
+      - name: Run integration tests (Server Action 認可)
+        run: npm run test:integration
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup
+
+  # System 層（D25 の E2E + D31 の VRT）: ローカル Supabase ＋ next start に対して
+  # Playwright を実行する。pgTAP（db-rls-tests）とは別ジョブ（DB だけでなくアプリ本体を
+  # 起動するため）。VRT ベースラインは Linux + Noto CJK + lock で固定した chromium で
+  # 生成されており、このジョブが同一条件で比較する。
+  e2e:
+    name: E2E + VRT (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: supabase/setup-cli@v2
+        with:
+          version: latest
+
+      - name: Start Supabase (apply migrations)
+        run: supabase start
+
+      # ローカルスタックの anon key（ブラウザ公開前提の値。秘密情報ではない）を後続へ渡す
+      - name: Export local Supabase env
+        run: |
+          ANON_KEY=$(supabase status -o env | awk -F= '/^ANON_KEY=/{print $2}' | tr -d '"')
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321" >> "$GITHUB_ENV"
+
+      # VRT のフォントをベースライン生成環境と揃える（D31）
+      - name: Install Japanese fonts
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Run Playwright tests
+        env:
+          TOKEN_ENC_KEY: e2e-local-dummy
+        run: npm run test:e2e
+
+      # 失敗時の一次情報（トレース・VRT の actual/diff 画像）
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 
       - name: Stop Supabase
         if: always()
