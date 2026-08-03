@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { canEdit, getRoleInHousehold, requireEditableHousehold } from "@/lib/household";
+import { AVATAR_BUCKET } from "@/types/database";
+import { isAvatarPathForScope } from "@/lib/storagePath";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -94,6 +96,50 @@ export async function updatePet(petId: string, formData: FormData) {
   const { error } = await supabase.from("pets").update(fields).eq("id", petId);
   if (error) {
     throw new Error(`ペットの更新に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/pets");
+  revalidatePath("/");
+}
+
+// ペットのアバター画像を設定 / 変更 / 削除する（editor 以上 / 世帯で共有）。
+// 画像本体はクライアントが avatars バケットへ直接アップロード済みで、ここには
+// そのオブジェクトパス（削除時は空文字）だけが渡る（record 写真と同方針）。
+export async function updatePetAvatar(petId: string, formData: FormData) {
+  const { supabase, user } = await requireUser();
+
+  // 対象ペットの世帯・現在のアバターを取得（ロール検査は「ペットの世帯」基準）。
+  const { data: pet } = await supabase
+    .from("pets")
+    .select("household_id, avatar_path")
+    .eq("id", petId)
+    .maybeSingle();
+  if (!pet) {
+    throw new Error("ペットが見つかりません（または権限がありません）");
+  }
+  const role = await getRoleInHousehold(supabase, user.id, pet.household_id);
+  if (role && !canEdit(role)) {
+    throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
+  }
+
+  const newPath = String(formData.get("avatar_path") || "").trim();
+  // 空文字 = 削除。新規パスは「ペットの世帯」配下のものだけ受け付ける（越境防止・RLS が最終防衛）。
+  if (newPath !== "" && !isAvatarPathForScope(newPath, pet.household_id)) {
+    throw new Error("不正なアバターパスです");
+  }
+
+  const { error } = await supabase
+    .from("pets")
+    .update({ avatar_path: newPath === "" ? null : newPath })
+    .eq("id", petId);
+  if (error) {
+    throw new Error(`アバターの保存に失敗しました: ${error.message}`);
+  }
+
+  // 差し替え / 削除で不要になった旧オブジェクトを片付ける（オーファン防止・失敗は無視）。
+  const oldPath = pet.avatar_path;
+  if (oldPath && oldPath !== newPath) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]).catch(() => {});
   }
 
   revalidatePath("/pets");

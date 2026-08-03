@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { getRoleInHousehold, HOUSEHOLD_COOKIE } from "@/lib/household";
-import { GUEST_ROLES, type GuestRole } from "@/types/database";
+import { AVATAR_BUCKET, GUEST_ROLES, type GuestRole } from "@/types/database";
+import { isAvatarPathForScope } from "@/lib/storagePath";
 
 export type SettingsResult = {
   ok: boolean;
@@ -43,6 +44,47 @@ export async function updateProfile(
   revalidatePath("/settings/account");
   revalidatePath("/records/new");
   return { ok: true, message: "プロフィールを保存しました。" };
+}
+
+// ユーザー（自分）のアバター画像を設定 / 変更 / 削除する（個人スコープ・profiles）。
+// 画像本体はクライアントが avatars バケットへ直接アップロード済みで、ここには
+// そのオブジェクトパス（削除時は空文字）だけが渡る。scope は自分の uid。
+export async function updateUserAvatar(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const newPath = String(formData.get("avatar_path") || "").trim();
+  // 新規パスは自分の uid 配下のものだけ受け付ける（越境防止・RLS が最終防衛）。
+  if (newPath !== "" && !isAvatarPathForScope(newPath, user.id)) {
+    throw new Error("不正なアバターパスです");
+  }
+
+  const { data: current } = await supabase
+    .from("profiles")
+    .select("avatar_path")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
+  // profiles 行が無いユーザーもいるため upsert。avatar_path 以外の列は
+  // 既存行では温存され（提供列のみ更新）、新規行では既定 null になる。
+  const { error } = await supabase.from("profiles").upsert(
+    { owner_id: user.id, avatar_path: newPath === "" ? null : newPath },
+    { onConflict: "owner_id" },
+  );
+  if (error) {
+    throw new Error(`アバターの保存に失敗しました: ${error.message}`);
+  }
+
+  const oldPath = current?.avatar_path;
+  if (oldPath && oldPath !== newPath) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]).catch(() => {});
+  }
+
+  revalidatePath("/settings/account");
+  revalidatePath("/settings");
 }
 
 // パスワードを変更する。確認入力との一致と最小文字数を検証する。
@@ -117,6 +159,43 @@ export async function renameHousehold(householdId: string, formData: FormData) {
     .eq("id", householdId);
   if (error) {
     throw new Error(`世帯名の変更に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/settings");
+}
+
+// 世帯のアバター画像を設定 / 変更 / 削除する（owner のみ / 世帯名と同じ扱い）。
+// 画像本体はクライアントが avatars バケットへ直接アップロード済みで、ここには
+// そのオブジェクトパス（削除時は空文字）だけが渡る。
+export async function updateHouseholdAvatar(
+  householdId: string,
+  formData: FormData,
+) {
+  const { supabase } = await requireOwnerOf(householdId);
+
+  const newPath = String(formData.get("avatar_path") || "").trim();
+  // 新規パスは当該世帯配下のものだけ受け付ける（越境防止・RLS が最終防衛）。
+  if (newPath !== "" && !isAvatarPathForScope(newPath, householdId)) {
+    throw new Error("不正なアバターパスです");
+  }
+
+  const { data: current } = await supabase
+    .from("households")
+    .select("avatar_path")
+    .eq("id", householdId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("households")
+    .update({ avatar_path: newPath === "" ? null : newPath })
+    .eq("id", householdId);
+  if (error) {
+    throw new Error(`アバターの保存に失敗しました: ${error.message}`);
+  }
+
+  const oldPath = current?.avatar_path;
+  if (oldPath && oldPath !== newPath) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]).catch(() => {});
   }
 
   revalidatePath("/settings");

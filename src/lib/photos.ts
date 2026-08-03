@@ -9,7 +9,7 @@ const SIGNED_URL_TTL = 60 * 60; // 1時間
 // 直接到達できる NEXT_PUBLIC_SUPABASE_URL に書き換える必要がある。
 // 署名はパス+クエリに対する HMAC なのでホスト差し替えは安全。
 // just dev / 本番ではどちらの URL も一致するので no-op。
-function toBrowserUrl(url: string): string {
+export function toBrowserUrl(url: string): string {
   const internal = process.env.SUPABASE_INTERNAL_URL;
   const publicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!internal || !publicUrl || internal === publicUrl) return url;
