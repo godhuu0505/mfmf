@@ -81,5 +81,11 @@ export async function prepareOversizedPhotoForm(
 // 写真つき記録を保存して詳細ページへ遷移するまで待つ
 export async function savePhotoRecord(page: Page): Promise<void> {
   await page.getByRole("button", { name: "保存する" }).click();
+  // 保存の確認ダイアログ（UC-F01 / D33）を通す
+  const confirm = page.getByRole("dialog", {
+    name: "この内容で保存しますか？",
+  });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "保存する" }).click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/, { timeout: 30_000 });
 }

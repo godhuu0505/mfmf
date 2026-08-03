@@ -1,15 +1,20 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
+import {
+  canEdit,
+  getCurrentMembership,
+  householdScopeFilter,
+} from "@/lib/household";
 import { SOURCE_LABEL, type RecordWithPhotos } from "@/types/database";
+import CalendarMonth, {
+  type CalendarDayRecord,
+} from "@/components/CalendarMonth";
 import SourceIcon from "@/components/SourceIcon";
 import { Camera } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "カレンダー" };
-
-const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
 // "YYYY-MM" を {year, month(1-12)} に。未指定・不正は今月。
 function parseYearMonth(ym: string | undefined): { year: number; month: number } {
@@ -52,7 +57,9 @@ export default async function CalendarPage({
 
   const supabase = await createClient();
   // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
-  const householdId = await getCurrentHouseholdId(supabase);
+  const membership = await getCurrentMembership(supabase);
+  const householdId = membership?.householdId ?? null;
+  const canAdd = membership !== null && canEdit(membership.role);
   let query = supabase
     .from("daycare_records")
     .select("*, record_photos(*)")
@@ -113,73 +120,27 @@ export default async function CalendarPage({
           </Link>
         </div>
 
-        {/* 月カレンダー */}
-        <div className="grid grid-cols-7 gap-1 text-center">
-          {WEEKDAYS.map((w, i) => (
-            <div
-              key={w}
-              className={
-                "py-1 text-xs font-medium " +
-                (i === 0
-                  ? "text-rose-500"
-                  : i === 6
-                    ? "text-sky-500"
-                    : "text-muted-foreground")
-              }
-            >
-              {w}
-            </div>
-          ))}
-          {cells.map((d, i) => {
-            if (d === null) return <div key={`empty-${i}`} />;
-            const dateStr = `${year}-${pad(month)}-${pad(d)}`;
-            const dayRecords = byDate.get(dateStr) ?? [];
-            const has = dayRecords.length > 0;
-            const isToday = dateStr === todayStr;
-            const sources = new Set(dayRecords.map((r) => r.source));
-            const cellInner = (
-              <div
-                className={
-                  "flex h-14 flex-col items-center justify-start rounded-lg p-1 text-sm " +
-                  (has
-                    ? "bg-surface shadow-sm ring-1 ring-border"
-                    : "text-muted-foreground") +
-                  (isToday ? " ring-2 ring-foreground" : "")
-                }
-              >
-                <span className={has ? "font-semibold text-foreground" : ""}>
-                  {d}
-                </span>
-                {has && (
-                  <span className="mt-1 flex items-center gap-0.5">
-                    {sources.has("daycare") && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
-                    )}
-                    {sources.has("home") && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                    )}
-                  </span>
-                )}
-              </div>
-            );
-            return has ? (
-              <a key={dateStr} href={`#day-${dateStr}`}>
-                {cellInner}
-              </a>
-            ) : (
-              <div key={dateStr}>{cellInner}</div>
-            );
-          })}
-        </div>
-
-        <p className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-sky-500" /> 保育園
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> おうち
-          </span>
-        </p>
+        {/* 月カレンダー（日タップでその日のシートが開く / UC-C01） */}
+        <CalendarMonth
+          year={year}
+          month={month}
+          cells={cells}
+          todayStr={todayStr}
+          canAdd={canAdd}
+          days={Object.fromEntries(
+            [...byDate.entries()].map(([date, rs]) => [
+              date,
+              rs.map(
+                (r): CalendarDayRecord => ({
+                  id: r.id,
+                  source: r.source,
+                  body: r.body,
+                  photoCount: r.record_photos?.length ?? 0,
+                }),
+              ),
+            ]),
+          )}
+        />
 
         {/* この月の記録（日付ごと） */}
         <section className="mt-8">

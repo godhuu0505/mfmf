@@ -13,6 +13,7 @@ import {
   type RecordTagJoin,
 } from "@/types/database";
 import RecordForm from "@/components/RecordForm";
+import RecordActionsSheet from "@/components/RecordActionsSheet";
 import PhotoGallery from "@/components/PhotoGallery";
 import SubmitButton from "@/components/SubmitButton";
 import SourceIcon from "@/components/SourceIcon";
@@ -80,6 +81,36 @@ export default async function RecordDetailPage({
     .returns<RecordTagJoin[]>();
   const tags = tagsFromJoin(tagRows);
   const tagNames = tags.map((t) => t.name);
+
+  // 前後の記録（UC-D01）。一覧と同じ (record_date, created_at) 順の隣を 1 件ずつ引く。
+  let prevQuery = supabase
+    .from("daycare_records")
+    .select("id, record_date")
+    .or(
+      `record_date.lt.${record.record_date},and(record_date.eq.${record.record_date},created_at.lt.${record.created_at})`,
+    )
+    .order("record_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1);
+  let nextQuery = supabase
+    .from("daycare_records")
+    .select("id, record_date")
+    .or(
+      `record_date.gt.${record.record_date},and(record_date.eq.${record.record_date},created_at.gt.${record.created_at})`,
+    )
+    .order("record_date", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (householdId) {
+    prevQuery = prevQuery.or(householdScopeFilter(householdId));
+    nextQuery = nextQuery.or(householdScopeFilter(householdId));
+  }
+  const [{ data: prevRows }, { data: nextRows }] = await Promise.all([
+    prevQuery.returns<{ id: string; record_date: string }[]>(),
+    nextQuery.returns<{ id: string; record_date: string }[]>(),
+  ]);
+  const prevRecord = prevRows?.[0] ?? null;
+  const nextRecord = nextRows?.[0] ?? null;
 
   // 編集フォームのサジェスト用に世帯のタグ辞書を取得
   const tagSuggestions = isEditable
@@ -169,12 +200,27 @@ export default async function RecordDetailPage({
                 )}
               </div>
               {!readOnly && (
-                <Link
-                  href={`/records/${record.id}?edit=1`}
-                  className="shrink-0 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
-                >
-                  編集
-                </Link>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Link
+                    href={`/records/${record.id}?edit=1`}
+                    className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
+                  >
+                    編集
+                  </Link>
+                  <RecordActionsSheet
+                    editHref={`/records/${record.id}?edit=1`}
+                    deleteForm={
+                      <form action={deleteRecord.bind(null, record.id)}>
+                        <SubmitButton
+                          pendingLabel="削除中…"
+                          className="w-full rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                        >
+                          削除する
+                        </SubmitButton>
+                      </form>
+                    }
+                  />
+                </div>
               )}
             </div>
 
@@ -243,18 +289,35 @@ export default async function RecordDetailPage({
               </form>
             )}
 
-            {!readOnly && (
-              <form
-                action={deleteRecord.bind(null, record.id)}
-                className="mt-10 border-t border-border pt-6"
+            {/* 前後の記録ナビ（UC-D01） */}
+            {(prevRecord || nextRecord) && (
+              <nav
+                aria-label="前後の記録"
+                className="mt-8 flex items-center justify-between border-t border-border pt-4 text-sm"
               >
-                <SubmitButton
-                  pendingLabel="削除中…"
-                  className="text-sm text-red-600 transition hover:text-red-800 disabled:opacity-60"
-                >
-                  この記録を削除する
-                </SubmitButton>
-              </form>
+                {prevRecord ? (
+                  <Link
+                    href={`/records/${prevRecord.id}`}
+                    rel="prev"
+                    className="font-medium text-muted-foreground transition hover:text-foreground"
+                  >
+                    ← {formatDate(prevRecord.record_date)}
+                  </Link>
+                ) : (
+                  <span className="text-muted">前の記録なし</span>
+                )}
+                {nextRecord ? (
+                  <Link
+                    href={`/records/${nextRecord.id}`}
+                    rel="next"
+                    className="font-medium text-muted-foreground transition hover:text-foreground"
+                  >
+                    {formatDate(nextRecord.record_date)} →
+                  </Link>
+                ) : (
+                  <span className="text-muted">次の記録なし</span>
+                )}
+              </nav>
             )}
           </>
         )}

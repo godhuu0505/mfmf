@@ -6,6 +6,10 @@ import { resizeImages } from "@/lib/imageResize";
 import { buildStoragePath } from "@/lib/storagePath";
 import TagInput from "@/components/TagInput";
 import {
+  ConfirmCancelButton,
+  ConfirmDialog,
+} from "@/components/FormConfirm";
+import {
   PHOTO_BUCKET,
   RECORD_SOURCES,
   SOURCE_LABEL,
@@ -83,6 +87,10 @@ export default function RecordForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // 保存の確認ダイアログ（D33）。確認済みフラグが立っているときだけ実送信する。
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmedRef = useRef(false);
+
   const busy = processing || uploading || isPending;
 
   // 選択画像をアップロード前に縮小・圧縮し、送信用に保持する。
@@ -120,6 +128,13 @@ export default function RecordForm({
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return;
+    // 確認ダイアログを挟む（UC-F01）。確認後の requestSubmit で再入してくる。
+    if (!confirmedRef.current) {
+      setConfirmOpen(true);
+      return;
+    }
+    confirmedRef.current = false;
     const form = e.currentTarget;
     setError(null);
 
@@ -335,13 +350,26 @@ export default function RecordForm({
         >
           {uploading ? "写真を保存中…" : isPending ? "保存中…" : submitLabel}
         </button>
-        <a
+        <ConfirmCancelButton
           href={cancelHref}
           className="text-sm text-muted-foreground transition hover:text-foreground"
-        >
-          キャンセル
-        </a>
+        />
       </div>
+
+      {confirmOpen && (
+        <ConfirmDialog
+          title="この内容で保存しますか？"
+          message="保存したあともいつでも編集できます。"
+          confirmLabel="保存する"
+          confirmClassName="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover"
+          onClose={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            confirmedRef.current = true;
+            formRef.current?.requestSubmit();
+          }}
+        />
+      )}
     </form>
   );
 }
