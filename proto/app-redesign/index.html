@@ -1753,7 +1753,8 @@ body {
   <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
     <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-3">
       <h1 class="text-base font-semibold">アルバム</h1>
-      <span class="text-xs text-muted-foreground">142 枚</span>
+      <span data-empty-hide class="text-xs text-muted-foreground">142 枚</span>
+      <span data-empty-show hidden class="text-xs text-muted-foreground">0 枚</span>
     </div>
   </header>
   <main class="safe-px mx-auto max-w-2xl space-y-5 py-4 pb-32">
@@ -2205,7 +2206,7 @@ body {
     <div class="rounded-2xl bg-surface p-6 shadow-sm ring-1 ring-border">
       <label class="block text-xs font-medium text-muted-foreground">世帯の名前（あとから変更できます）
         <input placeholder="例: 佐藤家" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" /></label>
-      <button onclick="go('home')" class="mt-4 w-full rounded-xl bg-primary px-4 py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">世帯を作成してはじめる</button>
+      <button onclick="toast('つづいてペットを登録します');go('pets')" class="mt-4 w-full rounded-xl bg-primary px-4 py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">世帯を作成してはじめる</button>
     </div>
     <div class="mt-4 rounded-2xl bg-surface-muted p-4 text-sm text-muted-foreground">
       招待を受けている方は、届いた<strong class="text-foreground">招待リンク</strong>を開くだけで参加できます。ここで世帯を作る必要はありません。
@@ -2248,9 +2249,9 @@ body {
         <li class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
           <div class="flex items-center gap-1.5">
             <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>
-            <span class="text-xs text-muted-foreground">8月2日（日）・ 佐藤 花子</span>
+            <span class="text-xs text-muted-foreground">8月1日（土）・ 佐藤 太郎 ・ 共有された記録</span>
           </div>
-          <p class="mt-1.5 text-sm">公園までロング散歩。よく食べてよく寝ています。</p>
+          <p class="mt-1.5 text-sm">トリミングでさっぱり。少し緊張していたけど最後はご機嫌。</p>
         </li>
       </ul>
     </div>
@@ -2348,7 +2349,7 @@ body {
     <input id="qs-note-input" hidden placeholder="ひとことを追加" oninput="qsPreview()" class="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
     <p id="qs-preview" class="mb-3 rounded-lg bg-surface-muted px-3 py-2 text-sm text-muted-foreground">チップをタップして記録をつくる</p>
     <button id="qs-save" onclick="qsSave()" disabled class="w-full rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-50">保存する</button>
-    <button onclick="closeSheet('sheet-quick');openForm(false)" class="mt-2 w-full py-2 text-center text-sm font-medium text-primary">写真つきでくわしく記録する →</button>
+    <button onclick="closeSheet('sheet-quick');openFormFromQuick()" class="mt-2 w-full py-2 text-center text-sm font-medium text-primary">写真つきでくわしく記録する →</button>
   </div>
 </div>
 
@@ -2425,6 +2426,10 @@ body {
         <span class="font-medium">記録 0 件の状態を表示<span class="block text-xs font-normal text-muted-foreground">ホーム・アルバム・カレンダー・体重に反映</span></span>
         <input id="empty-toggle" type="checkbox" onchange="setEmpty(this.checked)" class="h-5 w-5 accent-[var(--primary)]" />
       </label>
+      <label class="flex items-center justify-between rounded-xl bg-surface-muted p-3">
+        <span class="font-medium">閲覧者（viewer）として表示<span class="block text-xs font-normal text-muted-foreground">記録作成の導線（中央＋ / FAB）を隠します</span></span>
+        <input id="viewer-toggle" type="checkbox" onchange="setViewer(this.checked)" class="h-5 w-5 accent-[var(--primary)]" />
+      </label>
       <button onclick="closeSheet('sheet-proto');go('intro')" class="w-full rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-surface-muted">提案の説明にもどる</button>
     </div>
   </div>
@@ -2448,6 +2453,7 @@ body {
   var selectedDay = 3;
   var currentDetail = 0;
   var moreLoaded = false;
+  var viewerMode = false;
 
   window.go = function (id) {
     document.querySelectorAll("[data-screen]").forEach(function (s) { s.hidden = s.getAttribute("data-screen") !== id; });
@@ -2460,7 +2466,13 @@ body {
     var showChrome = CHROME_SCREENS.indexOf(current) !== -1;
     document.getElementById("tabbar").hidden = !showChrome;
     var listScreen = current === "home" || current === "calendar" || current === "gallery";
-    document.getElementById("fab").hidden = !(showChrome && navVariant === "b" && listScreen);
+    var centerVisible = navVariant === "a" && !viewerMode;
+    var center = document.getElementById("tab-center");
+    var grid = document.getElementById("tabgrid");
+    center.hidden = !centerVisible;
+    grid.classList.toggle("grid-cols-5", centerVisible);
+    grid.classList.toggle("grid-cols-4", !centerVisible);
+    document.getElementById("fab").hidden = !(showChrome && navVariant === "b" && !viewerMode && listScreen);
     var active = TAB_SCREENS[current];
     document.querySelectorAll("[data-tab]").forEach(function (b) {
       var on = b.getAttribute("data-tab") === active;
@@ -2508,13 +2520,13 @@ body {
     }, 300);
   };
 
+  window.setViewer = function (on) {
+    viewerMode = on;
+    updateChrome();
+  };
+
   window.setNav = function (v) {
     navVariant = v;
-    var center = document.getElementById("tab-center");
-    var grid = document.getElementById("tabgrid");
-    center.hidden = v === "b";
-    grid.classList.toggle("grid-cols-5", v === "a");
-    grid.classList.toggle("grid-cols-4", v === "b");
     var a = document.getElementById("nav-a-btn"), b = document.getElementById("nav-b-btn");
     [[a, v === "a"], [b, v === "b"]].forEach(function (pair) {
       pair[0].classList.toggle("bg-primary", pair[1]);
@@ -2666,6 +2678,19 @@ body {
     qsReset();
     toast("残しました");
   };
+  /* 「くわしく記録する」への乗り換え時は下書きを引き継ぐ */
+  window.openFormFromQuick = function () {
+    var parts = [];
+    document.querySelectorAll("#qs-chips [data-chip].bg-primary").forEach(function (b) { parts.push(b.getAttribute("data-chip")); });
+    var note = document.getElementById("qs-note-input").value.trim();
+    if (note) parts.push(note);
+    var seg = document.querySelector('#sheet-quick [data-seg][aria-pressed="true"]');
+    var school = seg && seg.textContent.indexOf("保育園") !== -1;
+    openForm(false);
+    if (parts.length) document.getElementById("form-body").value = parts.join("、");
+    if (school) segPick(document.getElementById("form-src-school"));
+    qsReset();
+  };
 
   /* ---- カレンダーの日別シート ---- */
   function badgeHtml(src) {
@@ -2729,7 +2754,7 @@ body {
       body: "公園までロング散歩。帰りに足を洗うのを嫌がらなくなってきた。\n\n水飲みはいつもどおり。夜はぐっすり。",
       photos: photoTile("from-sky-200 to-indigo-300", "🌳") + photoTile("from-pink-200 to-rose-300", "🐶"),
       tags: "" },
-    { title: "8月1日（土）", navLabel: "8月1日", src: "home", weight: "3.25", date: "2026-08-01", share: false,
+    { title: "8月1日（土）", navLabel: "8月1日", src: "home", weight: "3.25", date: "2026-08-01", share: true,
       badges: '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3.5 w-3.5"><use href="#i-home-src"/></svg>おうち</span><span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 3.25 kg</span><span class="text-xs text-muted-foreground">記入: 佐藤 太郎</span>',
       body: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。",
       photos: photoTile("from-rose-200 to-pink-300", "✂️"),
