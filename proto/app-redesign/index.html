@@ -894,6 +894,9 @@
   .pt-9 {
     padding-top: calc(var(--spacing) * 9);
   }
+  .pr-\[env\(safe-area-inset-right\)\] {
+    padding-right: env(safe-area-inset-right);
+  }
   .pb-1 {
     padding-bottom: var(--spacing);
   }
@@ -914,6 +917,9 @@
   }
   .pl-5 {
     padding-left: calc(var(--spacing) * 5);
+  }
+  .pl-\[env\(safe-area-inset-left\)\] {
+    padding-left: env(safe-area-inset-left);
   }
   .text-center {
     text-align: center;
@@ -1592,7 +1598,7 @@ body {
     <!-- 検索（アイコンで展開。現行の常時表示カードを置き換え） -->
     <div id="search-panel" hidden class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
       <div class="flex gap-2">
-        <input id="search-kw" type="search" placeholder="本文・タグを検索" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
+        <input id="search-kw" type="search" placeholder="本文・タグを検索" onkeydown="if(event.key==='Enter'){searchApply();this.blur()}" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
         <button onclick="searchApply()" class="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">検索</button>
         <button onclick="searchClear()" class="shrink-0 rounded-lg border border-border px-4 py-2 text-sm font-medium">クリア</button>
       </div>
@@ -2203,11 +2209,7 @@ body {
       </div>
       <div class="mt-3">
         <p class="text-xs font-medium text-muted-foreground">タグ</p>
-        <div class="mt-1.5 flex flex-wrap gap-1.5">
-          <span class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">#ボール遊び <svg class="h-3 w-3"><use href="#i-x"/></svg></span>
-          <button class="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground">＋ トリミング</button>
-          <button class="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground">＋ 通院</button>
-        </div>
+        <div id="form-tags" class="mt-1.5 flex flex-wrap gap-1.5"></div>
       </div>
     </div>
     <p class="text-xs text-muted-foreground">保存はキーボードに隠れない上部固定（iOS 定石）。写真を上段に昇格。編集も同じ画面。</p>
@@ -2329,7 +2331,7 @@ body {
       </div>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <label class="block text-xs font-medium text-muted-foreground">日付
-          <input type="date" value="2026-08-03" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <input id="guest-date" type="date" value="2026-08-03" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
         <label class="block text-xs font-medium text-muted-foreground">体重（kg）
           <input inputmode="decimal" placeholder="3.20" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
       </div>
@@ -2350,17 +2352,17 @@ body {
 <!-- ============================================================ -->
 <!-- タブバー（案A: 5スロット・中央记録） -->
 <!-- ============================================================ -->
-<nav id="tabbar" hidden class="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+<nav id="tabbar" hidden class="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur">
   <div id="tabgrid" class="mx-auto grid max-w-2xl grid-cols-5">
     <button data-tab="home" onclick="go('home')" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-muted-foreground">
       <svg class="h-6 w-6"><use href="#i-house"/></svg>ホーム</button>
     <button data-tab="calendar" onclick="go('calendar')" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-muted-foreground">
       <svg class="h-6 w-6"><use href="#i-calendar"/></svg>カレンダー</button>
-    <div id="tab-center" class="relative">
-      <button onclick="openQuick()" aria-label="記録を追加" class="absolute left-1/2 top-0 -mt-5 -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover">
-        <svg class="h-7 w-7"><use href="#i-plus"/></svg></button>
+    <button id="tab-center" onclick="openQuick()" aria-label="記録を追加" class="relative">
+      <span class="absolute left-1/2 top-0 -mt-5 -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover">
+        <svg class="h-7 w-7"><use href="#i-plus"/></svg></span>
       <span class="block pb-1.5 pt-9 text-center text-[10px] font-medium text-muted-foreground">記録</span>
-    </div>
+    </button>
     <button data-tab="gallery" onclick="go('gallery')" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-muted-foreground">
       <svg class="h-6 w-6"><use href="#i-images"/></svg>アルバム</button>
     <button data-tab="menu" onclick="go('menu')" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-muted-foreground">
@@ -2567,6 +2569,7 @@ body {
       var el = document.getElementById(id);
       if (el) el.inert = on;
     });
+    document.body.style.overflow = on ? "hidden" : "";
   }
   window.openSheet = function (id) {
     var el = document.getElementById(id);
@@ -2851,29 +2854,29 @@ body {
     { title: "8月3日（月）", navLabel: "8月3日（保育園）", src: "school", weight: "3.20", date: "2026-08-03", share: true, author: "さくら保育園",
       body: "園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。\n\nお迎えのときは少し眠そうでしたが、帰り際にしっぽをたくさん振ってくれました。",
       photos: photoTile("from-amber-200 to-orange-300", "🐕") + photoTile("from-emerald-200 to-teal-300", "🎾"),
-      tags: tagChip("ボール遊び") },
+      tagNames: ["ボール遊び"] },
     { title: "8月3日（月）", navLabel: "8月3日（おうち）", src: "home", weight: "", date: "2026-08-03", share: false, author: "佐藤 花子",
       body: "夜ごはん完食。散歩は 30 分、いつもより元気だった。",
-      photos: "", tags: "" },
+      photos: "", tagNames: [] },
     { title: "8月2日（日）", navLabel: "8月2日", src: "home", weight: "", date: "2026-08-02", share: false, author: "佐藤 花子",
       body: "公園までロング散歩。帰りに足を洗うのを嫌がらなくなってきた。\n\n水飲みはいつもどおり。夜はぐっすり。",
       photos: photoTile("from-sky-200 to-indigo-300", "🌳") + photoTile("from-pink-200 to-rose-300", "🐶"),
-      tags: "" },
+      tagNames: [] },
     { title: "8月1日（土）", navLabel: "8月1日", src: "home", weight: "3.25", date: "2026-08-01", share: true, author: "佐藤 太郎",
       body: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。",
       photos: photoTile("from-rose-200 to-pink-300", "✂️"),
-      tags: tagChip("トリミング") },
+      tagNames: ["トリミング"] },
     { title: "7月30日（木）", navLabel: "7月30日", src: "school", weight: "", date: "2026-07-30", share: true, author: "さくら保育園",
       body: "お友達のマロンちゃんと仲良く遊べました。お昼寝はいつもより長め。",
       photos: photoTile("from-emerald-200 to-teal-300", "💤") + photoTile("from-violet-200 to-purple-300", "🐾"),
-      tags: "" },
+      tagNames: [] },
     { title: "7月28日（火）", navLabel: "7月28日", src: "school", weight: "", date: "2026-07-28", share: true, author: "さくら保育園",
       body: "初めてのおやつタイム。少し警戒してから完食しました。",
       photos: photoTile("from-orange-200 to-amber-300", "🍚"),
-      tags: "" },
+      tagNames: [] },
     { title: "7月20日（月）", navLabel: "7月20日", src: "school", weight: "3.10", date: "2026-07-20", share: false, author: "さくら保育園",
       body: "身体測定の日。体重 3.10kg、落ち着いて測れました。",
-      photos: "", tags: "" }
+      photos: "", tagNames: [] }
   ];
   window.showDetail = function (i) {
     currentDetail = i;
@@ -2883,7 +2886,7 @@ body {
     document.getElementById("det-body").textContent = d.body;
     document.getElementById("det-photos").innerHTML = d.photos;
     document.getElementById("det-photos").hidden = !d.photos;
-    document.getElementById("det-tags").innerHTML = d.tags;
+    document.getElementById("det-tags").innerHTML = (d.tagNames || []).map(tagChip).join("");
     document.getElementById("det-share").hidden = !d.share;
     document.getElementById("more-share-label").textContent = d.share ? "ゲスト共有を解除" : "ゲストに共有";
     var older = DETAIL[i + 1], newer = DETAIL[i - 1];
@@ -2958,6 +2961,14 @@ body {
   };
 
   /* ---- 記録フォーム（新規 / 編集を 1 画面で。編集は表示中の記録から複写、新規は選択中の日付） ---- */
+  function formTagsRender(names) {
+    var html = (names || []).map(function (n) {
+      return '<span class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">#' + n + ' <svg class="h-3 w-3"><use href="#i-x"/></svg></span>';
+    }).join("");
+    html += '<button class="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground">＋ トリミング</button>' +
+      '<button class="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground">＋ 通院</button>';
+    document.getElementById("form-tags").innerHTML = html;
+  }
   window.openForm = function (edit) {
     formEdit = !!edit;
     document.getElementById("form-title").textContent = formEdit ? "記録を編集" : "記録を追加";
@@ -2971,11 +2982,13 @@ body {
       weight.value = d.weight;
       date.value = d.date;
       author.value = d.author;
+      formTagsRender(d.tagNames);
       segPick(document.getElementById(d.src === "school" ? "form-src-school" : "form-src-home"));
     } else {
       body.value = "";
       weight.value = "";
       author.value = "はなこ";
+      formTagsRender([]);
       date.value = "2026-08-" + (selectedDay < 10 ? "0" : "") + selectedDay;
       segPick(document.getElementById("form-src-home"));
     }
@@ -3001,8 +3014,17 @@ body {
   };
   window.confirmSaveYes = function () {
     closeSheet("sheet-form-save");
-    if (confirmCtx === "guest") { go("guest"); toast("残しました（モック）"); }
-    else formSave();
+    if (confirmCtx === "guest") {
+      var gd = document.getElementById("guest-date").value;
+      if (gd && (gd < "2026-08-01" || gd > "2026-08-31")) {
+        toast("お預かり期間外の日付は選べません（8月1日〜31日）");
+        return;
+      }
+      go("guest");
+      toast("残しました（モック）");
+    } else {
+      formSave();
+    }
   };
   window.formSave = function () {
     if (formEdit) {
@@ -3048,8 +3070,9 @@ body {
   };
   window.cycleRole = function () {
     var el = document.getElementById("role-pill-label");
-    el.textContent = el.textContent === "編集者" ? "閲覧者" : "編集者";
-    toast("権限を変更しました（モック）");
+    var next = { "編集者": "閲覧者", "閲覧者": "オーナー", "オーナー": "編集者" };
+    el.textContent = next[el.textContent] || "編集者";
+    toast("権限を「" + el.textContent + "」に変更しました（モック）");
   };
 
   document.addEventListener("keydown", function (e) {
