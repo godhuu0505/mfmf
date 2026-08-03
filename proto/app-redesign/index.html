@@ -1970,8 +1970,8 @@ body {
       <div class="flex items-center gap-4">
         <span class="flex h-16 w-16 items-center justify-center rounded-full bg-linear-to-br from-amber-200 to-orange-300 text-3xl">🐩</span>
         <div class="min-w-0 flex-1">
-          <p class="text-lg font-semibold">モカ</p>
-          <p class="text-sm text-muted-foreground">トイプードル ・ 2023年5月生まれ（3歳）</p>
+          <p id="pet-name" class="text-lg font-semibold">モカ</p>
+          <p id="pet-meta" class="text-sm text-muted-foreground">トイプードル ・ 2023年5月生まれ（3歳）</p>
         </div>
         <button data-editor-only onclick="openSheet('sheet-pet')" aria-label="モカを編集" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-pencil"/></svg></button>
       </div>
@@ -2444,14 +2444,14 @@ body {
     </div>
     <div class="space-y-3">
       <label class="block text-xs font-medium text-muted-foreground">名前
-        <input value="モカ" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" /></label>
+        <input id="pet-input-name" value="モカ" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" /></label>
       <div class="grid grid-cols-2 gap-2">
         <label class="block text-xs font-medium text-muted-foreground">種類
-          <input value="トイプードル" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <input id="pet-input-species" value="トイプードル" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
         <label class="block text-xs font-medium text-muted-foreground">誕生日
-          <input type="date" value="2023-05-10" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <input id="pet-input-birth" type="date" value="2023-05-10" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
       </div>
-      <button onclick="closeSheet('sheet-pet')" class="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground">更新する</button>
+      <button onclick="petSave()" class="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground">更新する</button>
       <button class="w-full py-2 text-center text-sm font-medium text-red-600 dark:text-red-400">このペットを削除する</button>
     </div>
   </div>
@@ -2596,7 +2596,7 @@ body {
       if (!anySheetOpen()) {
         setBackgroundInert(false);
         var t = sheetTriggers[id];
-        if (t && document.contains(t)) t.focus();
+        if (t && document.contains(t) && !t.closest("[hidden]")) t.focus();
       }
     }, 300);
   };
@@ -2662,6 +2662,7 @@ body {
   var CHIP_ON = ["bg-primary", "text-primary-foreground"];
   var CHIP_OFF = ["bg-surface", "ring-1", "ring-border"];
   function chipState(btn, on) {
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
     CHIP_ON.forEach(function (c) { btn.classList.toggle(c, on); });
     CHIP_OFF.forEach(function (c) { btn.classList.toggle(c, !on); });
   }
@@ -3031,6 +3032,20 @@ body {
     btn.closest("[data-member-row]").remove();
     toast("メンバーを削除しました（モック）");
   };
+  window.petSave = function () {
+    var name = document.getElementById("pet-input-name").value.trim() || "モカ";
+    var species = document.getElementById("pet-input-species").value.trim();
+    var birth = document.getElementById("pet-input-birth").value;
+    document.getElementById("pet-name").textContent = name;
+    var meta = species || "種類未設定";
+    if (birth) {
+      var dt = new Date(birth + "T00:00:00");
+      meta += " ・ " + dt.getFullYear() + "年" + (dt.getMonth() + 1) + "月生まれ";
+    }
+    document.getElementById("pet-meta").textContent = meta;
+    closeSheet("sheet-pet");
+    toast("更新しました");
+  };
   window.cycleRole = function () {
     var el = document.getElementById("role-pill-label");
     el.textContent = el.textContent === "編集者" ? "閲覧者" : "編集者";
@@ -3043,6 +3058,9 @@ body {
     }
   });
 
+  document.querySelectorAll("#home-filters [data-filter], #qs-chips [data-chip], #wt-ranges [data-range]").forEach(function (b) {
+    b.setAttribute("aria-pressed", b.classList.contains("bg-primary") ? "true" : "false");
+  });
   drawWeight("1m");
   showDetail(0);
   go("intro");
