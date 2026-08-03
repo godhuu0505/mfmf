@@ -51,10 +51,11 @@ NN/g の調査もあり、現行の「アイコンのみトップバー＋どこ
 
 ### 3. デザイントークン
 
-- `--primary` を slate-900 → **オレンジ（light `#ea580c` / dark `#fb923c`）**。
-  変更箇所は globals.css のトークン値のみ（クラス名は不変）
+- `--primary` を slate-900 → **オレンジ（light `#c2410c` / dark `#fb923c`）**。
+  変更箇所は globals.css のトークン値のみ（クラス名は不変）。
+  白文字とのコントラストは light 5.2:1、dark（前景 `#431407`）6.9:1 で WCAG AA を満たす
 - 記録元バッジ等に `dark:` 変種を追加（`bg-amber-100 … dark:bg-amber-950 dark:text-amber-300` など）
-- WeightChart の固定色 `#0284c7` → `currentColor`（text-primary）+ `var(--border)` に トークン化
+- WeightChart の固定色 `#0284c7` → `currentColor`（text-primary）+ `var(--border-color)` に トークン化
 
 ### 4. 画面別の変更点
 

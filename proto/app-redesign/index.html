@@ -1,4 +1,5 @@
 <title>mfmf UI/UX 再設計プロト</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <style>
 /*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */
 @layer properties;
@@ -1441,11 +1442,10 @@ body {
   }
 }
 
-
 /* ===== 提案トークン（採用時は globals.css の値を差し替えるだけ） ===== */
 :root {
-  --primary: #ea580c;          /* 提案: ブランド色（暖色オレンジ）。現行は slate-900 */
-  --primary-hover: #c2410c;
+  --primary: #c2410c;          /* 提案: ブランド色（暖色オレンジ）。現行は slate-900。白文字と 5.2:1 (WCAG AA) */
+  --primary-hover: #9a3412;
   --primary-foreground: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
@@ -1531,7 +1531,7 @@ body {
         <button onclick="go('login')" class="rounded-lg border border-border bg-surface px-4 py-2.5 font-medium hover:bg-surface-muted">ログイン画面</button>
         <button onclick="go('onboarding')" class="rounded-lg border border-border bg-surface px-4 py-2.5 font-medium hover:bg-surface-muted">オンボーディング</button>
         <button onclick="go('guest')" class="rounded-lg border border-border bg-surface px-4 py-2.5 font-medium hover:bg-surface-muted">ゲスト画面</button>
-        <button onclick="go('record-new')" class="rounded-lg border border-border bg-surface px-4 py-2.5 font-medium hover:bg-surface-muted">記録フォーム</button>
+        <button onclick="openForm(false)" class="rounded-lg border border-border bg-surface px-4 py-2.5 font-medium hover:bg-surface-muted">記録フォーム</button>
       </div>
     </div>
   </main>
@@ -1682,9 +1682,9 @@ body {
     </div>
     <div class="grid grid-cols-7 gap-1">
       <span></span><span></span><span></span><span></span><span></span><span></span>
-      <button onclick="openSheet('sheet-day')" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm shadow-sm ring-1 ring-border">1<span class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
-      <button onclick="openSheet('sheet-day')" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm shadow-sm ring-1 ring-border">2<span class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
-      <button onclick="openSheet('sheet-day')" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm font-bold shadow-sm ring-2 ring-primary">3<span class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-sky-400"></i><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
+      <button onclick="openDay(1)" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm shadow-sm ring-1 ring-border">1<span data-empty-hide class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
+      <button onclick="openDay(2)" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm shadow-sm ring-1 ring-border">2<span data-empty-hide class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
+      <button onclick="openDay(3)" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm font-bold shadow-sm ring-2 ring-primary">3<span data-empty-hide class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-sky-400"></i><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
       <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">4</span>
       <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">5</span>
       <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">6</span>
@@ -1714,14 +1714,18 @@ body {
       <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">30</span>
       <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">31</span>
     </div>
-    <div class="flex items-center gap-4 text-xs text-muted-foreground">
+    <div data-empty-hide class="flex items-center gap-4 text-xs text-muted-foreground">
       <span class="inline-flex items-center gap-1.5"><i class="h-1.5 w-1.5 rounded-full bg-sky-400"></i>保育園</span>
       <span class="inline-flex items-center gap-1.5"><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i>おうち</span>
       <span class="ml-auto">日付をタップで詳細</span>
     </div>
-    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+    <div data-empty-hide class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
       <h2 class="mb-2 text-sm font-semibold">この月の記録（5件）</h2>
       <p class="text-sm text-muted-foreground">日付をタップすると、その日の記録が下からのシートで開きます（現行のページ内アンカージャンプを置き換え）。</p>
+    </div>
+    <div data-empty-show hidden class="rounded-2xl border-2 border-dashed border-border p-10 text-center">
+      <p class="font-medium">この月の記録はありません</p>
+      <p class="mt-1 text-sm text-muted-foreground">日付をタップして記録を残せます</p>
     </div>
   </main>
 </section>
@@ -1848,14 +1852,18 @@ body {
       <button class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">1年</button>
       <button class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">全期間</button>
     </div>
-    <div class="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+    <div data-empty-show hidden class="rounded-2xl border-2 border-dashed border-border p-10 text-center">
+      <p class="font-medium">まだ体重の記録がありません</p>
+      <p class="mt-1 text-sm text-muted-foreground">記録に体重を入力するとグラフになります</p>
+    </div>
+    <div data-empty-hide class="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
       <p class="text-xs text-muted-foreground">最新の体重（8月3日）</p>
       <p class="mt-1 flex items-baseline gap-1"><span class="text-3xl font-bold tracking-tight">3.20</span><span class="text-sm text-muted-foreground">kg</span>
         <span class="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">+0.15 kg / 1ヶ月</span></p>
       <svg viewBox="0 0 320 160" class="mt-4 w-full text-primary" role="img" aria-label="体重の推移グラフ">
-        <line x1="0" y1="30" x2="320" y2="30" stroke="var(--border)" stroke-width="1"/>
-        <line x1="0" y1="80" x2="320" y2="80" stroke="var(--border)" stroke-width="1"/>
-        <line x1="0" y1="130" x2="320" y2="130" stroke="var(--border)" stroke-width="1"/>
+        <line x1="0" y1="30" x2="320" y2="30" stroke="var(--border-color)" stroke-width="1"/>
+        <line x1="0" y1="80" x2="320" y2="80" stroke="var(--border-color)" stroke-width="1"/>
+        <line x1="0" y1="130" x2="320" y2="130" stroke="var(--border-color)" stroke-width="1"/>
         <text x="4" y="26" font-size="10" fill="var(--muted-foreground)">3.3</text>
         <text x="4" y="126" font-size="10" fill="var(--muted-foreground)">3.0</text>
         <polyline points="20,110 80,95 140,100 200,70 260,55 300,45" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1864,7 +1872,7 @@ body {
         <text x="284" y="150" font-size="10" fill="var(--muted-foreground)">8/3</text>
       </svg>
     </div>
-    <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+    <div data-empty-hide class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
       <a href="#" onclick="go('record-detail');return false" class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-muted">
         <span class="text-sm">8月3日（月）<span class="ml-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300">保育園</span></span>
         <span class="font-semibold">3.20 kg</span>
@@ -1964,7 +1972,7 @@ body {
       <div class="mt-3 rounded-xl bg-surface-muted p-3">
         <div class="flex items-center justify-between">
           <div class="min-w-0"><p class="truncate text-sm font-medium">jiji@example.com</p><p class="text-xs text-muted-foreground">閲覧者として招待中 ・ 8月10日まで有効</p></div>
-          <button class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium"><svg class="h-3.5 w-3.5"><use href="#i-copy"/></svg>リンクをコピー</button>
+          <button onclick="copyInvite(this)" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium"><svg class="h-3.5 w-3.5"><use href="#i-copy"/></svg><span>リンクをコピー</span></button>
         </div>
       </div>
       <p class="mt-2 text-xs text-muted-foreground">招待リンクは「コピー」ボタンで共有（現行はパス文字列の表示のみ）</p>
@@ -2036,7 +2044,7 @@ body {
     <div class="safe-px mx-auto flex max-w-2xl items-center gap-1 py-2">
       <button onclick="go('home')" aria-label="戻る" class="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
       <h1 class="flex-1 text-base font-semibold">8月3日（月）</h1>
-      <button onclick="go('record-new')" class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">編集</button>
+      <button onclick="openForm(true)" class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">編集</button>
       <button onclick="openSheet('sheet-more')" aria-label="その他の操作" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-more"/></svg></button>
     </div>
   </header>
@@ -2074,16 +2082,16 @@ body {
 <section data-screen="record-new" hidden>
   <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
     <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-2">
-      <button onclick="go('home')" class="rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted">キャンセル</button>
-      <h1 class="text-base font-semibold">記録を追加</h1>
-      <button onclick="go('home')" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
+      <button onclick="formClose()" class="rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted">キャンセル</button>
+      <h1 id="form-title" class="text-base font-semibold">記録を追加</h1>
+      <button onclick="formClose()" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
     </div>
   </header>
   <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-16">
     <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
       <div class="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1">
-        <button class="rounded-lg bg-surface py-2 text-sm font-semibold shadow-sm">🏠 おうち</button>
-        <button class="rounded-lg py-2 text-sm font-medium text-muted-foreground">🏫 保育園</button>
+        <button id="form-src-home" data-seg onclick="segPick(this)" aria-pressed="true" class="rounded-lg bg-surface py-2 text-sm font-semibold shadow-sm">🏠 おうち</button>
+        <button id="form-src-school" data-seg onclick="segPick(this)" aria-pressed="false" class="rounded-lg py-2 text-sm font-medium text-muted-foreground">🏫 保育園</button>
       </div>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <label class="block text-xs font-medium text-muted-foreground">ペット
@@ -2102,12 +2110,12 @@ body {
     </div>
     <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
       <label class="block text-xs font-medium text-muted-foreground">今日の様子
-        <textarea rows="6" placeholder="ごはん・散歩・体調など" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"></textarea></label>
+        <textarea id="form-body" rows="6" placeholder="ごはん・散歩・体調など" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"></textarea></label>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <label class="block text-xs font-medium text-muted-foreground">記入者
           <input value="はなこ" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
         <label class="block text-xs font-medium text-muted-foreground">体重（kg）
-          <input inputmode="decimal" placeholder="3.20" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <input id="form-weight" inputmode="decimal" placeholder="3.20" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
       </div>
       <div class="mt-3">
         <p class="text-xs font-medium text-muted-foreground">タグ</p>
@@ -2192,7 +2200,7 @@ body {
         <span class="flex h-12 w-12 items-center justify-center rounded-full bg-linear-to-br from-amber-200 to-orange-300 text-2xl">🐩</span>
         <div class="flex-1"><p class="font-semibold">モカ</p><p class="text-xs text-muted-foreground">お預かり期間: 8月1日〜8月31日 ・ 記入できます</p></div>
       </div>
-      <button onclick="go('record-new')" class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"><svg class="h-4 w-4"><use href="#i-plus"/></svg>今日の記録を追加</button>
+      <button onclick="go('guest-record-new')" class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"><svg class="h-4 w-4"><use href="#i-plus"/></svg>今日の記録を追加</button>
     </div>
     <div>
       <h2 class="mb-2 text-sm font-semibold text-muted-foreground">これまでの記録</h2>
@@ -2214,6 +2222,42 @@ body {
       </ul>
     </div>
     <p class="text-xs text-muted-foreground">写真は共有されません。「記録を追加」を最上部の大ボタンに（現行は右上の小ボタン）。タブバーは出しません。</p>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- ゲスト記録フォーム（写真・タグなし = 現行 D8 を踏襲） -->
+<!-- ============================================================ -->
+<section data-screen="guest-record-new" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-2">
+      <button onclick="go('guest')" class="rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted">キャンセル</button>
+      <h1 class="text-base font-semibold">記録を追加</h1>
+      <button onclick="go('guest')" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-16">
+    <p class="text-sm text-muted-foreground">モカ の記録（お預かり期間: 8月1日〜8月31日）</p>
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <div class="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1">
+        <button data-seg onclick="segPick(this)" aria-pressed="true" class="rounded-lg bg-surface py-2 text-sm font-semibold shadow-sm">🏫 保育園</button>
+        <button data-seg onclick="segPick(this)" aria-pressed="false" class="rounded-lg py-2 text-sm font-medium text-muted-foreground">🏠 おうち</button>
+      </div>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <label class="block text-xs font-medium text-muted-foreground">日付
+          <input type="date" value="2026-08-03" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+        <label class="block text-xs font-medium text-muted-foreground">体重（kg）
+          <input inputmode="decimal" placeholder="3.20" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+      </div>
+      <p class="mt-1.5 text-xs text-muted-foreground">お預かり期間内の日付のみ選べます</p>
+    </div>
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <label class="block text-xs font-medium text-muted-foreground">今日の様子
+        <textarea rows="6" placeholder="ごはん・あそび・体調など" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"></textarea></label>
+      <label class="mt-3 block text-xs font-medium text-muted-foreground">記入者
+        <input value="さくら保育園" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+    </div>
+    <p class="text-xs text-muted-foreground">ゲストは写真・タグを使えません（現行仕様どおり）。保存・キャンセルはゲストのホームへ戻ります。</p>
   </main>
 </section>
 
@@ -2250,49 +2294,41 @@ body {
 <!-- ============================================================ -->
 <div id="sheet-quick" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="クイック記録">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-quick')"></div>
-  <div class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
-      <h2 class="text-base font-semibold">今日をサッと記録 <span class="ml-1 text-xs font-normal text-muted-foreground">8月3日（月）</span></h2>
+      <h2 class="text-base font-semibold">サッと記録 <span id="qs-date" class="ml-1 text-xs font-normal text-muted-foreground">8月3日（月）</span></h2>
       <button onclick="closeSheet('sheet-quick')" aria-label="閉じる" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-x"/></svg></button>
     </div>
     <div class="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1">
-      <button class="rounded-lg bg-surface py-2 text-sm font-semibold shadow-sm">🏠 おうち</button>
-      <button class="rounded-lg py-2 text-sm font-medium text-muted-foreground">🏫 保育園</button>
+      <button data-seg onclick="segPick(this)" aria-pressed="true" class="rounded-lg bg-surface py-2 text-sm font-semibold shadow-sm">🏠 おうち</button>
+      <button data-seg onclick="segPick(this)" aria-pressed="false" class="rounded-lg py-2 text-sm font-medium text-muted-foreground">🏫 保育園</button>
     </div>
-    <div class="mb-3 flex flex-wrap gap-1.5">
-      <button class="rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">ごはん完食</button>
-      <button class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">散歩</button>
-      <button class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">うんち◎</button>
-      <button class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">元気</button>
-      <button class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">お昼寝</button>
-      <button class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">＋ ひとこと</button>
+    <div id="qs-chips" class="mb-3 flex flex-wrap gap-1.5">
+      <button data-chip="ごはん完食" onclick="qsChip(this)" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">ごはん完食</button>
+      <button data-chip="散歩" onclick="qsChip(this)" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">散歩</button>
+      <button data-chip="うんち◎" onclick="qsChip(this)" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">うんち◎</button>
+      <button data-chip="元気" onclick="qsChip(this)" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">元気</button>
+      <button data-chip="お昼寝" onclick="qsChip(this)" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">お昼寝</button>
+      <button id="qs-note-btn" onclick="qsNoteShow()" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">＋ ひとこと</button>
     </div>
-    <p class="mb-3 rounded-lg bg-surface-muted px-3 py-2 text-sm text-muted-foreground">ごはん完食</p>
-    <button onclick="closeSheet('sheet-quick')" class="w-full rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">保存する</button>
-    <button onclick="closeSheet('sheet-quick');go('record-new')" class="mt-2 w-full py-2 text-center text-sm font-medium text-primary">写真つきでくわしく記録する →</button>
+    <input id="qs-note-input" hidden placeholder="ひとことを追加" oninput="qsPreview()" class="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
+    <p id="qs-preview" class="mb-3 rounded-lg bg-surface-muted px-3 py-2 text-sm text-muted-foreground">チップをタップして記録をつくる</p>
+    <button onclick="qsSave()" class="w-full rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">保存する</button>
+    <button onclick="closeSheet('sheet-quick');openForm(false)" class="mt-2 w-full py-2 text-center text-sm font-medium text-primary">写真つきでくわしく記録する →</button>
   </div>
 </div>
 
 <!-- 日別シート(カレンダー) -->
 <div id="sheet-day" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="この日の記録">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-day')"></div>
-  <div class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
-      <h2 class="text-base font-semibold">8月3日（月）の記録</h2>
+      <h2 class="text-base font-semibold"><span id="day-title">8月3日（月）</span>の記録</h2>
       <button onclick="closeSheet('sheet-day')" aria-label="閉じる" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-x"/></svg></button>
     </div>
-    <ul class="space-y-2">
-      <li><a href="#" onclick="closeSheet('sheet-day');go('record-detail');return false" class="flex items-center gap-3 rounded-xl bg-surface-muted p-3">
-        <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3 w-3"><use href="#i-school"/></svg>保育園</span>
-        <span class="min-w-0 flex-1 truncate text-sm">園庭でボール遊びをたくさんしました。</span>
-        <svg class="h-4 w-4 shrink-0 text-muted-foreground"><use href="#i-chevron-right"/></svg></a></li>
-      <li><a href="#" onclick="closeSheet('sheet-day');go('record-detail');return false" class="flex items-center gap-3 rounded-xl bg-surface-muted p-3">
-        <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>
-        <span class="min-w-0 flex-1 truncate text-sm">夜ごはん完食。散歩は 30 分。</span>
-        <svg class="h-4 w-4 shrink-0 text-muted-foreground"><use href="#i-chevron-right"/></svg></a></li>
-    </ul>
+    <ul id="day-list" class="space-y-2"></ul>
     <button onclick="closeSheet('sheet-day');openSheet('sheet-quick')" class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-surface-muted"><svg class="h-4 w-4"><use href="#i-plus"/></svg>この日の記録を追加</button>
   </div>
 </div>
@@ -2300,10 +2336,10 @@ body {
 <!-- 記録詳細の「…」メニュー -->
 <div id="sheet-more" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="その他の操作">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-more')"></div>
-  <div class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="overflow-hidden rounded-xl bg-surface-muted">
-      <button onclick="closeSheet('sheet-more');go('record-new')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-pencil"/></svg>編集する</button>
+      <button onclick="closeSheet('sheet-more');openForm(true)" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-pencil"/></svg>編集する</button>
       <div class="border-t border-border"></div>
       <button class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-users"/></svg>ゲスト共有を解除</button>
       <div class="border-t border-border"></div>
@@ -2316,7 +2352,7 @@ body {
 <!-- ペット編集シート -->
 <div id="sheet-pet" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="ペットを編集">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-pet')"></div>
-  <div class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-semibold">モカを編集</h2>
@@ -2340,7 +2376,7 @@ body {
 <!-- プロト設定シート -->
 <div id="sheet-proto" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="プロト設定">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-proto')"></div>
-  <div class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <h2 class="mb-3 text-base font-semibold">プロト設定（検証用）</h2>
     <div class="space-y-3 text-sm">
@@ -2353,13 +2389,16 @@ body {
         <p class="mt-2 text-xs text-muted-foreground">案A = 5スロットタブの中央に記録ボタン / 案B = 4タブ＋右下フローティングボタン</p>
       </div>
       <label class="flex items-center justify-between rounded-xl bg-surface-muted p-3">
-        <span class="font-medium">記録 0 件の状態を表示</span>
+        <span class="font-medium">記録 0 件の状態を表示<span class="block text-xs font-normal text-muted-foreground">ホーム・アルバム・カレンダー・体重に反映</span></span>
         <input id="empty-toggle" type="checkbox" onchange="setEmpty(this.checked)" class="h-5 w-5 accent-[var(--primary)]" />
       </label>
       <button onclick="closeSheet('sheet-proto');go('intro')" class="w-full rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-surface-muted">提案の説明にもどる</button>
     </div>
   </div>
 </div>
+
+<!-- トースト -->
+<div id="toast" hidden class="fixed left-1/2 z-40 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg" role="status" style="bottom:calc(88px + env(safe-area-inset-bottom))">残しました</div>
 
 <!-- プロト設定チップ -->
 <button id="proto-chip" onclick="openSheet('sheet-proto')" class="fixed left-3 z-30 rounded-full bg-foreground/70 px-2.5 py-1 text-[10px] font-medium text-background backdrop-blur" style="bottom:calc(76px + env(safe-area-inset-bottom))">プロト設定</button>
@@ -2370,6 +2409,8 @@ body {
   var CHROME_SCREENS = ["home", "calendar", "gallery", "menu", "weight", "pets", "settings-household", "settings-account", "record-detail"];
   var navVariant = "a";
   var current = "intro";
+  var emptyMode = false;
+  var formEdit = false;
 
   window.go = function (id) {
     document.querySelectorAll("[data-screen]").forEach(function (s) { s.hidden = s.getAttribute("data-screen") !== id; });
@@ -2380,9 +2421,8 @@ body {
 
   function updateChrome() {
     var showChrome = CHROME_SCREENS.indexOf(current) !== -1;
-    document.getElementById("tabbar").hidden = !showChrome || current === "record-new";
+    document.getElementById("tabbar").hidden = !showChrome;
     document.getElementById("fab").hidden = !(showChrome && navVariant === "b" && (current === "home" || current === "calendar"));
-    document.getElementById("proto-chip").hidden = false;
     var active = TAB_SCREENS[current];
     document.querySelectorAll("[data-tab]").forEach(function (b) {
       var on = b.getAttribute("data-tab") === active;
@@ -2391,16 +2431,40 @@ body {
     });
   }
 
+  /* ---- シート（フォーカス管理: 背景 inert + パネルへフォーカス移動） ---- */
+  var sheetTriggers = {};
+  function anySheetOpen() {
+    return document.querySelectorAll('[role="dialog"]:not(.hidden)').length > 0;
+  }
+  function setBackgroundInert(on) {
+    ["app", "tabbar", "fab", "proto-chip"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.inert = on;
+    });
+  }
   window.openSheet = function (id) {
     var el = document.getElementById(id);
+    sheetTriggers[id] = document.activeElement;
     el.hidden = false;
     el.classList.remove("hidden");
-    requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.add("sheet-open"); }); });
+    setBackgroundInert(true);
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      el.classList.add("sheet-open");
+      var panel = el.querySelector(".sheet-panel");
+      if (panel) panel.focus();
+    }); });
   };
   window.closeSheet = function (id) {
     var el = document.getElementById(id);
     el.classList.remove("sheet-open");
-    setTimeout(function () { el.classList.add("hidden"); }, 250);
+    setTimeout(function () {
+      el.classList.add("hidden");
+      if (!anySheetOpen()) {
+        setBackgroundInert(false);
+        var t = sheetTriggers[id];
+        if (t && document.contains(t)) t.focus();
+      }
+    }, 250);
   };
 
   window.setNav = function (v) {
@@ -2421,6 +2485,7 @@ body {
   };
 
   window.setEmpty = function (on) {
+    emptyMode = on;
     document.querySelectorAll("[data-empty-hide]").forEach(function (el) { el.hidden = on; });
     document.querySelectorAll("[data-empty-show]").forEach(function (el) { el.hidden = !on; });
   };
@@ -2428,6 +2493,125 @@ body {
   window.toggleSearch = function () {
     var p = document.getElementById("search-panel");
     p.hidden = !p.hidden;
+  };
+
+  /* ---- トースト ---- */
+  var toastTimer = null;
+  function showToast(text) {
+    var t = document.getElementById("toast");
+    t.textContent = text;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 1800);
+  }
+
+  /* ---- セグメント（記録元トグル: 兄弟間で選択を切り替え） ---- */
+  var SEG_ON = ["bg-surface", "font-semibold", "shadow-sm"];
+  var SEG_OFF = ["font-medium", "text-muted-foreground"];
+  window.segPick = function (btn) {
+    btn.parentElement.querySelectorAll("[data-seg]").forEach(function (b) {
+      var on = b === btn;
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      SEG_ON.forEach(function (c) { b.classList.toggle(c, on); });
+      SEG_OFF.forEach(function (c) { b.classList.toggle(c, !on); });
+    });
+  };
+
+  /* ---- クイック記録（chips-first / D32 準拠） ---- */
+  var CHIP_ON = ["bg-primary", "text-primary-foreground"];
+  var CHIP_OFF = ["bg-surface", "ring-1", "ring-border"];
+  window.qsChip = function (btn) {
+    var on = !btn.classList.contains("bg-primary");
+    CHIP_ON.forEach(function (c) { btn.classList.toggle(c, on); });
+    CHIP_OFF.forEach(function (c) { btn.classList.toggle(c, !on); });
+    qsPreview();
+  };
+  window.qsNoteShow = function () {
+    var input = document.getElementById("qs-note-input");
+    input.hidden = false;
+    input.focus();
+  };
+  window.qsPreview = function () {
+    var parts = [];
+    document.querySelectorAll("#qs-chips [data-chip].bg-primary").forEach(function (b) { parts.push(b.getAttribute("data-chip")); });
+    var note = document.getElementById("qs-note-input").value.trim();
+    if (note) parts.push(note);
+    var p = document.getElementById("qs-preview");
+    p.textContent = parts.length ? parts.join("、") : "チップをタップして記録をつくる";
+  };
+  window.qsSave = function () {
+    closeSheet("sheet-quick");
+    showToast("残しました");
+  };
+
+  /* ---- カレンダーの日別シート（タップした日付を反映） ---- */
+  function badgeHtml(src) {
+    if (src === "school") {
+      return '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3 w-3"><use href="#i-school"/></svg>保育園</span>';
+    }
+    return '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>';
+  }
+  var DAY_DATA = {
+    1: { label: "8月1日（土）", rows: [{ src: "home", text: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。" }] },
+    2: { label: "8月2日（日）", rows: [{ src: "home", text: "公園までロング散歩。足を洗うのを嫌がらなくなってきた。" }] },
+    3: { label: "8月3日（月）", rows: [
+      { src: "school", text: "園庭でボール遊びをたくさんしました。" },
+      { src: "home", text: "夜ごはん完食。散歩は 30 分。" }
+    ] }
+  };
+  window.openDay = function (day) {
+    var data = DAY_DATA[day] || { label: "8月" + day + "日", rows: [] };
+    document.getElementById("day-title").textContent = data.label;
+    document.getElementById("qs-date").textContent = data.label;
+    var rows = emptyMode ? [] : data.rows;
+    var list = document.getElementById("day-list");
+    if (!rows.length) {
+      list.innerHTML = '<li class="rounded-xl bg-surface-muted p-3 text-sm text-muted-foreground">この日の記録はありません</li>';
+    } else {
+      list.innerHTML = rows.map(function (r) {
+        return '<li><a href="#" onclick="closeSheet(\'sheet-day\');go(\'record-detail\');return false" class="flex items-center gap-3 rounded-xl bg-surface-muted p-3">' +
+          badgeHtml(r.src) +
+          '<span class="min-w-0 flex-1 truncate text-sm">' + r.text + '</span>' +
+          '<svg class="h-4 w-4 shrink-0 text-muted-foreground"><use href="#i-chevron-right"/></svg></a></li>';
+      }).join("");
+    }
+    openSheet("sheet-day");
+  };
+
+  /* ---- 記録フォーム（新規 / 編集を 1 画面で） ---- */
+  window.openForm = function (edit) {
+    formEdit = !!edit;
+    document.getElementById("form-title").textContent = formEdit ? "記録を編集" : "記録を追加";
+    var body = document.getElementById("form-body");
+    var weight = document.getElementById("form-weight");
+    if (formEdit) {
+      body.value = "園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。\n\nお迎えのときは少し眠そうでしたが、帰り際にしっぽをたくさん振ってくれました。";
+      weight.value = "3.20";
+      segPick(document.getElementById("form-src-school"));
+    } else {
+      body.value = "";
+      weight.value = "";
+      segPick(document.getElementById("form-src-home"));
+    }
+    go("record-new");
+  };
+  window.formClose = function () {
+    go(formEdit ? "record-detail" : "home");
+  };
+
+  /* ---- 招待リンクのコピー ---- */
+  window.copyInvite = function (btn) {
+    var label = btn.querySelector("span:last-child");
+    var done = function () {
+      label.textContent = "コピーしました";
+      setTimeout(function () { label.textContent = "リンクをコピー"; }, 1800);
+    };
+    var url = "https://mfmf.example.com/invite/mock-token";
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done, done);
+    } else {
+      done();
+    }
   };
 
   document.addEventListener("keydown", function (e) {
