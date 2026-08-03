@@ -25,6 +25,13 @@ import { Camera, PawPrint, Scale, X } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
+// Asia/Tokyo の今日/昨日（YYYY-MM-DD）。サーバーの実行 TZ に依存させない。
+function jstDateISO(offsetDays = 0): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(
+    new Date(Date.now() + offsetDays * 86_400_000),
+  );
+}
+
 function formatDate(d: string) {
   const date = new Date(d);
   return new Intl.DateTimeFormat("ja-JP", {
@@ -175,6 +182,95 @@ export default async function HomePage({
   const prevHref = pageHref(filters.page - 1);
   const nextHref = pageHref(filters.page + 1);
 
+  // 日付ソート時は日付見出しのタイムラインにする（UC-H01）。体重ソート時は
+  // 日付順にならないため、従来どおりカード内に日付を出すフラット表示のまま。
+  const groupByDate =
+    filters.sort === "date_desc" || filters.sort === "date_asc";
+  const dateGroups: { date: string; items: typeof list }[] = [];
+  if (groupByDate) {
+    for (const r of list) {
+      const last = dateGroups[dateGroups.length - 1];
+      if (last && last.date === r.record_date) last.items.push(r);
+      else dateGroups.push({ date: r.record_date, items: [r] });
+    }
+  }
+  const todayISO = jstDateISO();
+  const yesterdayISO = jstDateISO(-1);
+  const relativeLabel = (d: string) =>
+    d === todayISO ? "今日" : d === yesterdayISO ? "昨日" : null;
+
+  const recordCard = (r: (typeof list)[number], showDate: boolean) => {
+    const thumbPath = r.record_photos?.[0]?.storage_path;
+    const thumbUrl = thumbPath ? urlByPath.get(thumbPath) : undefined;
+    const photoCount = r.record_photos?.length ?? 0;
+
+    return (
+      <li key={r.id}>
+        <Link
+          href={`/records/${r.id}`}
+          className="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition hover:ring-border"
+        >
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-muted">
+            {thumbUrl ? (
+              <Image
+                src={thumbUrl}
+                alt=""
+                fill
+                sizes="80px"
+                className="object-cover"
+                unoptimized
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                <PawPrint className="h-8 w-8" aria-hidden="true" />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <SourceBadge source={r.source} />
+              {r.weight_kg != null && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                  <Scale className="h-3.5 w-3.5" aria-hidden="true" />
+                  {r.weight_kg}kg
+                </span>
+              )}
+            </div>
+            {showDate && (
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {formatDate(r.record_date)}
+              </p>
+            )}
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {excerpt(r.body) || "（本文なし）"}
+            </p>
+            {(() => {
+              const recordTags = tagsFromJoin(r.record_tags);
+              return recordTags.length > 0 ? (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {recordTags.map((tg) => (
+                    <span
+                      key={tg.id}
+                      className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted-foreground"
+                    >
+                      #{tg.name}
+                    </span>
+                  ))}
+                </div>
+              ) : null;
+            })()}
+            {photoCount > 0 && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+                写真 {photoCount} 枚
+              </p>
+            )}
+          </div>
+        </Link>
+      </li>
+    );
+  };
+
   return (
     <>
       {/* inert 範囲・タブバー分の下端余白は (app)/layout.tsx と globals.css が受け持つ */}
@@ -246,82 +342,33 @@ export default async function HomePage({
               <>
                 まだ記録がありません。
                 <br />
-                「＋ 新規」から最初の記録を追加しましょう。
+                下の「＋」から最初の記録を追加しましょう。
               </>
             )}
           </div>
-        ) : (
-          <ul className="space-y-3">
-            {list.map((r) => {
-              const thumbPath = r.record_photos?.[0]?.storage_path;
-              const thumbUrl = thumbPath ? urlByPath.get(thumbPath) : undefined;
-              const photoCount = r.record_photos?.length ?? 0;
-
+        ) : groupByDate ? (
+          <div className="space-y-5">
+            {dateGroups.map((g) => {
+              const rel = relativeLabel(g.date);
               return (
-                <li key={r.id}>
-                  <Link
-                    href={`/records/${r.id}`}
-                    className="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition hover:ring-border"
-                  >
-                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-muted">
-                      {thumbUrl ? (
-                        <Image
-                          src={thumbUrl}
-                          alt=""
-                          fill
-                          sizes="80px"
-                          className="object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                          <PawPrint className="h-8 w-8" aria-hidden="true" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <SourceBadge source={r.source} />
-                        {r.weight_kg != null && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                            <Scale className="h-3.5 w-3.5" aria-hidden="true" />
-                            {r.weight_kg}kg
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 text-sm font-semibold text-foreground">
-                        {formatDate(r.record_date)}
-                      </p>
-                      <p className="mt-0.5 text-sm text-muted-foreground">
-                        {excerpt(r.body) || "（本文なし）"}
-                      </p>
-                      {(() => {
-                        const recordTags = tagsFromJoin(r.record_tags);
-                        return recordTags.length > 0 ? (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {recordTags.map((t) => (
-                              <span
-                                key={t.id}
-                                className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted-foreground"
-                              >
-                                #{t.name}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null;
-                      })()}
-                      {photoCount > 0 && (
-                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                          <Camera className="h-3.5 w-3.5" aria-hidden="true" />
-                          写真 {photoCount} 枚
-                        </p>
-                      )}
-                    </div>
-                  </Link>
-                </li>
+                <section key={g.date} aria-label={formatDate(g.date)}>
+                  <h2 className="mb-2 flex items-baseline gap-2 text-sm font-semibold text-foreground">
+                    {rel ?? formatDate(g.date)}
+                    {rel && (
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {formatDate(g.date)}
+                      </span>
+                    )}
+                  </h2>
+                  <ul className="space-y-3">
+                    {g.items.map((r) => recordCard(r, false))}
+                  </ul>
+                </section>
               );
             })}
-          </ul>
+          </div>
+        ) : (
+          <ul className="space-y-3">{list.map((r) => recordCard(r, true))}</ul>
         )}
 
         {totalPages > 1 && (

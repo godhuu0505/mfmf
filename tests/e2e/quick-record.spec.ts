@@ -4,18 +4,6 @@ import { E2E_USER } from "./global-setup";
 // クイック記録（proto/quick-record/spec.md の受け入れ条件 UC-Q01〜Q05）。
 // D25: この UC 群が通らない限り受け入れ未達。
 
-// アプリの一覧表示（Intl ja-JP long + 曜日 short）と同じ形式で「今日」を作る。
-// テストは Asia/Tokyo で回す（playwright.config.ts の timezoneId と揃える）。
-function todayLabel(): string {
-  return new Intl.DateTimeFormat("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(new Date());
-}
-
 async function login(page: Page) {
   await page.goto("/login");
   await page.getByLabel("メールアドレス").fill(E2E_USER.email);
@@ -60,8 +48,14 @@ test("UC-Q01: チップだけで残す（IME 不要・今日/おうちが既定�
 
   const card = firstCard(page);
   await expect(card).toContainText("ごはん完食");
-  await expect(card).toContainText(todayLabel());
   await expect(card).toContainText("おうち");
+  // 日付はカード内ではなく日付グループの見出しに出る（UC-H01）
+  await expect(
+    page
+      .locator("main section")
+      .first()
+      .getByRole("heading", { name: "今日", exact: false }),
+  ).toBeVisible();
 });
 
 test("UC-Q02: チップ＋ひとことの合成と、リロード後の永続化", async ({

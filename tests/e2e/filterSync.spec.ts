@@ -16,7 +16,8 @@ test("UC-F01: キーワード絞り込みが URL に載り、リロードして�
   await quickRecord(page, markerB);
   await expect(page.getByText(markerB)).toBeVisible();
 
-  // キーワードで絞り込む
+  // 検索パネルは既定で畳まれている（UC-H01）。開いてからキーワードで絞り込む
+  await page.getByRole("button", { name: "検索・絞り込み" }).click();
   await page.getByPlaceholder("本文・記入者で検索").fill(markerA);
   await page.getByRole("button", { name: "検索" }).click();
   await page.waitForURL((url) => url.searchParams.get("q") === markerA);

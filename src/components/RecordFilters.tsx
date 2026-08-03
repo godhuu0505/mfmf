@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
 import {
   buildQueryString,
   hasActiveFilters,
@@ -65,11 +67,34 @@ export default function RecordFilters({
   }
 
   const active = hasActiveFilters(filters);
+  // 検索パネルは既定で畳む（UC-H01）。絞り込み中は自動で開く（条件が見えないと
+  // 「なぜ一覧が少ないのか」が分からなくなるため）。
+  const [openPanel, setOpenPanel] = useState(active);
 
   return (
+    <div className="mb-4">
+      <button
+        type="button"
+        onClick={() => setOpenPanel((v) => !v)}
+        aria-expanded={openPanel}
+        aria-controls="record-filters-panel"
+        className="mb-3 flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
+      >
+        <Search className="h-4 w-4" aria-hidden="true" />
+        検索・絞り込み
+        {active && (
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-primary"
+            aria-hidden="true"
+          />
+        )}
+      </button>
+
+      {openPanel && (
     <form
+      id="record-filters-panel"
       onSubmit={handleSubmit}
-      className="mb-4 space-y-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border"
+      className="space-y-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border"
     >
       {/* キーワード検索 */}
       <div className="flex gap-2">
@@ -164,5 +189,7 @@ export default function RecordFilters({
         </div>
       )}
     </form>
+      )}
+    </div>
   );
 }
