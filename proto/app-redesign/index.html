@@ -1544,7 +1544,7 @@ body {
       <div class="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
         <h2 class="mb-2 text-base font-semibold">提案の柱</h2>
         <ul class="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-          <li><strong class="text-foreground">ボトムタブバー</strong> — ホーム / カレンダー / <strong class="text-foreground">中央の記録ボタン</strong> / アルバム / メニュー</li>
+          <li><strong class="text-foreground">ボトムタブバー</strong> — ホーム / カレンダー / <strong class="text-foreground">中央の記録ボタン</strong> / アルバム / メニュー（<strong class="text-foreground">案A で合意済み</strong>）</li>
           <li><strong class="text-foreground">メニュー画面を新設</strong> — 体重・ペット・設定・ヘルプへの迷子を解消</li>
           <li><strong class="text-foreground">ブランド色</strong> — 近黒 → 暖色オレンジ（ダークモード対応）</li>
           <li>ホームは<strong class="text-foreground">日付グループのタイムライン</strong>、検索は折りたたみ</li>
@@ -2166,9 +2166,9 @@ body {
 <section data-screen="record-new" hidden>
   <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
     <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-2">
-      <button onclick="formClose()" class="rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted">キャンセル</button>
+      <button onclick="openCancelConfirm('main')" class="rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted">キャンセル</button>
       <h1 id="form-title" class="text-base font-semibold">記録を追加</h1>
-      <button onclick="formSave()" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
+      <button onclick="openSaveConfirm('main')" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
     </div>
   </header>
   <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-16">
@@ -2315,9 +2315,9 @@ body {
 <section data-screen="guest-record-new" hidden>
   <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
     <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-2">
-      <button onclick="go('guest')" class="rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted">キャンセル</button>
+      <button onclick="openCancelConfirm('guest')" class="rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted">キャンセル</button>
       <h1 class="text-base font-semibold">記録を追加</h1>
-      <button onclick="go('guest')" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
+      <button onclick="openSaveConfirm('guest')" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
     </div>
   </header>
   <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-16">
@@ -2467,10 +2467,10 @@ body {
       <div class="rounded-xl bg-surface-muted p-3">
         <p class="mb-2 text-xs font-medium text-muted-foreground">ナビゲーション案</p>
         <div class="grid grid-cols-2 gap-1 rounded-lg bg-surface p-1 ring-1 ring-border">
-          <button id="nav-a-btn" onclick="setNav('a')" class="rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground">案A: 中央＋</button>
+          <button id="nav-a-btn" onclick="setNav('a')" class="rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground">案A: 中央＋ ✓採用</button>
           <button id="nav-b-btn" onclick="setNav('b')" class="rounded-md py-2 text-sm font-medium text-muted-foreground">案B: 右下FAB</button>
         </div>
-        <p class="mt-2 text-xs text-muted-foreground">案A = 5スロットタブの中央に記録ボタン / 案B = 4タブ＋右下フローティングボタン</p>
+        <p class="mt-2 text-xs text-muted-foreground">案A（中央の記録ボタン）で合意済み（2026-08-03 / D33）。案B は比較参照用に残しています</p>
       </div>
       <label class="flex items-center justify-between rounded-xl bg-surface-muted p-3">
         <span class="font-medium">記録 0 件の状態を表示<span class="block text-xs font-normal text-muted-foreground">ホーム・アルバム・カレンダー・体重に反映</span></span>
@@ -2482,6 +2482,29 @@ body {
       </label>
       <button onclick="closeSheet('sheet-proto');go('intro')" class="w-full rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-surface-muted">提案の説明にもどる</button>
     </div>
+  </div>
+</div>
+
+<!-- 記録フォームの確認ダイアログ -->
+<div id="sheet-form-cancel" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="編集を破棄の確認">
+  <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-form-cancel')"></div>
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <h2 class="mb-1 text-base font-semibold">編集をやめますか？</h2>
+    <p class="mb-3 text-sm text-muted-foreground">入力した内容は保存されません。</p>
+    <button onclick="confirmCancelYes()" class="w-full rounded-xl bg-surface py-3 text-sm font-medium text-red-600 ring-1 ring-border dark:text-red-400">破棄してもどる</button>
+    <button onclick="closeSheet('sheet-form-cancel')" class="mt-2 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground">編集を続ける</button>
+  </div>
+</div>
+
+<div id="sheet-form-save" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="保存の確認">
+  <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-form-save')"></div>
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <h2 class="mb-1 text-base font-semibold">この内容で保存しますか？</h2>
+    <p class="mb-3 text-sm text-muted-foreground">保存したあともいつでも編集できます。</p>
+    <button onclick="confirmSaveYes()" class="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground">保存する</button>
+    <button onclick="closeSheet('sheet-form-save')" class="mt-2 w-full rounded-xl bg-surface py-3 text-sm font-medium ring-1 ring-border">もどる</button>
   </div>
 </div>
 
@@ -2959,6 +2982,26 @@ body {
   };
   window.formClose = function () {
     go(formEdit ? "record-detail" : "home");
+  };
+  /* キャンセル/保存は確認ダイアログを挟む（実機合意 2026-08-03） */
+  var confirmCtx = "main";
+  window.openCancelConfirm = function (ctx) {
+    confirmCtx = ctx;
+    openSheet("sheet-form-cancel");
+  };
+  window.openSaveConfirm = function (ctx) {
+    confirmCtx = ctx;
+    openSheet("sheet-form-save");
+  };
+  window.confirmCancelYes = function () {
+    closeSheet("sheet-form-cancel");
+    if (confirmCtx === "guest") go("guest");
+    else formClose();
+  };
+  window.confirmSaveYes = function () {
+    closeSheet("sheet-form-save");
+    if (confirmCtx === "guest") { go("guest"); toast("残しました（モック）"); }
+    else formSave();
   };
   window.formSave = function () {
     if (formEdit) {
