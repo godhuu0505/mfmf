@@ -60,14 +60,14 @@ export default function WeightChart({ points }: { points: WeightPoint[] }) {
               x2={W - PAD_X}
               y1={gy}
               y2={gy}
-              stroke="#e2e8f0"
+              stroke="var(--border-color)"
               strokeWidth={1}
             />
             <text
               x={PAD_X - 6}
               y={gy + 3}
               textAnchor="end"
-              className="fill-slate-400"
+              fill="var(--muted-foreground)"
               fontSize={9}
             >
               {v.toFixed(2)}
@@ -81,7 +81,7 @@ export default function WeightChart({ points }: { points: WeightPoint[] }) {
         <polyline
           points={linePath}
           fill="none"
-          stroke="#0284c7"
+          stroke="var(--primary)"
           strokeWidth={2}
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -91,14 +91,14 @@ export default function WeightChart({ points }: { points: WeightPoint[] }) {
       {/* 各データ点 */}
       {coords.map((c, i) => (
         <g key={i}>
-          <circle cx={c.cx} cy={c.cy} r={3} fill="#0284c7" />
+          <circle cx={c.cx} cy={c.cy} r={3} fill="var(--primary)" />
           {/* 端の日付ラベル（最初と最後のみ表示して混雑を避ける） */}
           {(i === 0 || i === coords.length - 1) && (
             <text
               x={c.cx}
               y={H - 4}
               textAnchor={i === 0 ? "start" : "end"}
-              className="fill-slate-400"
+              fill="var(--muted-foreground)"
               fontSize={9}
             >
               {formatShortDate(c.date)}

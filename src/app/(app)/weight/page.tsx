@@ -21,7 +21,26 @@ type WeightRow = Pick<
   "id" | "record_date" | "weight_kg" | "source"
 >;
 
-export default async function WeightPage() {
+// 期間切替（D33 / proto 合意）。URL クエリで共有・リロード再現できるようにする。
+const RANGES = [
+  { key: "1m", label: "1ヶ月", days: 31 },
+  { key: "3m", label: "3ヶ月", days: 92 },
+  { key: "1y", label: "1年", days: 366 },
+  { key: "all", label: "全期間", days: null },
+] as const;
+type RangeKey = (typeof RANGES)[number]["key"];
+
+export default async function WeightPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
+  const { range } = await searchParams;
+  const rangeKey: RangeKey = (RANGES.some((r) => r.key === range)
+    ? range
+    : "all") as RangeKey;
+  const rangeDef = RANGES.find((r) => r.key === rangeKey)!;
+
   const supabase = await createClient();
   // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
   const householdId = await getCurrentHouseholdId(supabase);
@@ -31,6 +50,12 @@ export default async function WeightPage() {
     .select("id, record_date, weight_kg, source")
     .not("weight_kg", "is", null)
     .order("record_date", { ascending: true });
+  if (rangeDef.days != null) {
+    const cutoff = new Date(Date.now() - rangeDef.days * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    query = query.gte("record_date", cutoff);
+  }
   if (householdId) query = query.or(householdScopeFilter(householdId));
   const { data } = await query.returns<WeightRow[]>();
 
@@ -57,11 +82,39 @@ export default async function WeightPage() {
         </div>
         <h1 className="mb-4 text-xl font-bold text-foreground">体重の推移</h1>
 
+        {/* 期間切替チップ（選択中は primary。URL クエリが正） */}
+        <div className="mb-4 flex gap-2">
+          {RANGES.map((r) => {
+            const isActive = r.key === rangeKey;
+            return (
+              <Link
+                key={r.key}
+                href={r.key === "all" ? "/weight" : `/weight?range=${r.key}`}
+                aria-current={isActive ? "page" : undefined}
+                className={
+                  "rounded-full px-3.5 py-1.5 text-sm font-medium transition " +
+                  (isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-surface text-foreground ring-1 ring-border hover:bg-surface-muted")
+                }
+              >
+                {r.label}
+              </Link>
+            );
+          })}
+        </div>
+
         {rows.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
-            体重が記録された日がまだありません。
-            <br />
-            記録の追加・編集で体重(kg)を入力すると、ここに推移が表示されます。
+            {rangeKey === "all" ? (
+              <>
+                体重が記録された日がまだありません。
+                <br />
+                記録の追加・編集で体重(kg)を入力すると、ここに推移が表示されます。
+              </>
+            ) : (
+              <>この期間に体重の記録はありません。</>
+            )}
           </div>
         ) : (
           <>
@@ -76,7 +129,7 @@ export default async function WeightPage() {
                 </p>
                 {rows.length > 1 && (
                   <p className="text-sm text-muted-foreground">
-                    最初の記録から{" "}
+                    {rangeKey === "all" ? "最初の記録" : `${rangeDef.label}前`}から{" "}
                     <span
                       className={
                         "font-semibold " +

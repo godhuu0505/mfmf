@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership, listCurrentMemberships } from "@/lib/household";
 import { createAvatarSignedUrl } from "@/lib/avatars";
 import AvatarUploader from "@/components/AvatarUploader";
+import CopyLinkButton from "@/components/CopyLinkButton";
 import SubmitButton from "@/components/SubmitButton";
 import {
   createGuestInvite,
@@ -190,6 +191,7 @@ export default async function SettingsPage() {
 
           {/* 世帯（household）: 名前・メンバー・ロール（Phase 3.5 S2） */}
           {membership && (
+            <>
             <section className="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
               <div>
                 <h2 className="text-base font-bold text-foreground">世帯</h2>
@@ -352,12 +354,15 @@ export default async function SettingsPage() {
                 </form>
               </div>
 
-              {/* 招待（owner のみ / UC-O09〜O11。宛先メール固定 D12） */}
+            </section>
+
+              {/* 招待（owner のみ / UC-O09〜O11。宛先メール固定 D12）。
+                  機能別のカードに分割（D33） */}
               {isOwner && (
-                <div className="border-t border-border pt-4">
-                  <h3 className="mb-2 text-sm font-medium text-foreground">
+                <section className="space-y-3 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+                  <h2 className="mb-2 text-base font-bold text-foreground">
                     メンバーを招待
-                  </h3>
+                  </h2>
                   <form
                     action={createInvite.bind(null, membership.householdId)}
                     className="flex flex-wrap items-end gap-2"
@@ -424,24 +429,26 @@ export default async function SettingsPage() {
                             )}
                           </div>
                           {inviteStatus(inv) === "有効" && (
-                            <p className="mt-1 break-all text-xs text-muted-foreground">
-                              招待リンク: /invite/{inv.token}
-                              （このリンクを本人に共有してください）
-                            </p>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                              <CopyLinkButton path={`/invite/${inv.token}`} />
+                              <span className="text-xs text-muted-foreground">
+                                コピーしたリンクを本人に共有してください
+                              </span>
+                            </div>
                           )}
                         </li>
                       ))}
                     </ul>
                   )}
-                </div>
+                </section>
               )}
 
               {/* 外部ゲスト（保育園/シッター・S4 / UC-G01〜G04）: owner のみ */}
               {isOwner && (
-                <div className="border-t border-border pt-4">
-                  <h3 className="mb-1 text-sm font-medium text-foreground">
+                <section className="space-y-3 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+                  <h2 className="mb-1 text-base font-bold text-foreground">
                     外部ゲスト（保育園・シッター）
-                  </h3>
+                  </h2>
                   <p className="mb-2 text-xs text-muted-foreground">
                     対象のペット 1 匹と期間を限定して招待します。ゲストに見えるのは
                     担当ペットのプロフィールと、期間内の「ゲストに共有」した記録・
@@ -581,15 +588,15 @@ export default async function SettingsPage() {
                       ))}
                     </ul>
                   )}
-                </div>
+                </section>
               )}
 
               {/* 世帯の削除（owner のみ / UC-H09）。参照データの無い世帯だけ削除できる。 */}
               {isOwner && (
-                <div className="border-t border-border pt-4">
-                  <h3 className="mb-1 text-sm font-medium text-red-600">
+                <section className="space-y-3 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+                  <h2 className="mb-1 text-base font-bold text-red-600">
                     世帯を削除する
-                  </h3>
+                  </h2>
                   {householdEmpty ? (
                     <>
                       <p className="mb-2 text-xs text-muted-foreground">
@@ -608,9 +615,9 @@ export default async function SettingsPage() {
                       準備中です（#51）。
                     </p>
                   )}
-                </div>
+                </section>
               )}
-            </section>
+            </>
           )}
         </div>
       </main>

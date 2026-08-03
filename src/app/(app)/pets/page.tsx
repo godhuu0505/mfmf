@@ -5,6 +5,7 @@ import { listPets } from "@/lib/pets";
 import { canEdit, getCurrentMembership } from "@/lib/household";
 import { createAvatarSignedUrls } from "@/lib/avatars";
 import AvatarUploader from "@/components/AvatarUploader";
+import PetEditSheet from "@/components/PetEditSheet";
 import SubmitButton from "@/components/SubmitButton";
 import { createPet, updatePet, deletePet, updatePetAvatar } from "@/app/(app)/pets/actions";
 
@@ -67,83 +68,84 @@ export default async function PetsPage() {
                     disabled={readOnly}
                   />
                 </div>
-                {readOnly ? (
-                  <div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
                     <p className="font-medium text-foreground">{pet.name}</p>
                     <p className="mt-0.5 text-sm text-muted-foreground">
                       {pet.species ?? "種類未設定"}
                       {pet.birthday ? ` ・ 誕生日 ${pet.birthday}` : ""}
                     </p>
                   </div>
-                ) : (
-                <>
-                <form
-                  action={updatePet.bind(null, pet.id)}
-                  className="space-y-3"
-                >
-                  <div className="flex flex-wrap gap-3">
-                    <div className="flex-1 min-w-[10rem]">
-                      <label className={labelClass}>名前</label>
-                      <input
-                        name="name"
-                        type="text"
-                        required
-                        defaultValue={pet.name}
-                        className={inputClass}
-                      />
-                    </div>
-                    <div className="w-32">
-                      <label className={labelClass}>
-                        種類
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">
-                          （任意）
-                        </span>
-                      </label>
-                      <input
-                        name="species"
-                        type="text"
-                        defaultValue={pet.species ?? ""}
-                        placeholder="犬 / 猫 など"
-                        className={inputClass}
-                      />
-                    </div>
-                    <div className="w-40">
-                      <label className={labelClass}>
-                        誕生日
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">
-                          （任意）
-                        </span>
-                      </label>
-                      <input
-                        name="birthday"
-                        type="date"
-                        defaultValue={pet.birthday ?? ""}
-                        className={inputClass}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <SubmitButton
-                      pendingLabel="更新中…"
-                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
-                    >
-                      更新
-                    </SubmitButton>
-                  </div>
-                </form>
-                <form
-                  action={deletePet.bind(null, pet.id)}
-                  className="mt-2 border-t border-border pt-2"
-                >
-                  <SubmitButton
-                    pendingLabel="削除中…"
-                    className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
-                  >
-                    このペットを削除する
-                  </SubmitButton>
-                </form>
-                </>
-                )}
+                  {!readOnly && (
+                    <PetEditSheet
+                      petName={pet.name}
+                      editForm={
+                        <form
+                          action={updatePet.bind(null, pet.id)}
+                          className="space-y-3"
+                        >
+                          <div>
+                            <label className={labelClass}>名前</label>
+                            <input
+                              name="name"
+                              type="text"
+                              required
+                              defaultValue={pet.name}
+                              className={inputClass}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className={labelClass}>
+                                種類
+                                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                  （任意）
+                                </span>
+                              </label>
+                              <input
+                                name="species"
+                                type="text"
+                                defaultValue={pet.species ?? ""}
+                                placeholder="犬 / 猫 など"
+                                className={inputClass}
+                              />
+                            </div>
+                            <div>
+                              <label className={labelClass}>
+                                誕生日
+                                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                  （任意）
+                                </span>
+                              </label>
+                              <input
+                                name="birthday"
+                                type="date"
+                                defaultValue={pet.birthday ?? ""}
+                                className={inputClass}
+                              />
+                            </div>
+                          </div>
+                          <SubmitButton
+                            pendingLabel="更新中…"
+                            className="w-full rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
+                          >
+                            更新する
+                          </SubmitButton>
+                        </form>
+                      }
+                      deleteForm={
+                        <form action={deletePet.bind(null, pet.id)}>
+                          <SubmitButton
+                            pendingLabel="削除中…"
+                            className="w-full rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                          >
+                            削除する
+                          </SubmitButton>
+                        </form>
+                      }
+                    />
+                  )}
+                </div>
               </li>
             ))}
           </ul>
