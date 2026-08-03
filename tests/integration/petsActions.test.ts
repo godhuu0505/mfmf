@@ -32,7 +32,7 @@ vi.mock("@/lib/supabase/server", async () => {
   return { createClient: async () => getServerClient() };
 });
 
-import { createPet, deletePet, updatePet } from "@/app/pets/actions";
+import { createPet, deletePet, updatePet } from "@/app/(app)/pets/actions";
 
 const seed = loadSeed();
 let db: PgClient;

@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership, listCurrentMemberships } from "@/lib/household";
 import { createAvatarSignedUrl } from "@/lib/avatars";
-import AppHeader from "@/components/AppHeader";
 import AvatarUploader from "@/components/AvatarUploader";
 import SubmitButton from "@/components/SubmitButton";
 import {
@@ -18,8 +17,8 @@ import {
   switchHousehold,
   updateHouseholdAvatar,
   updateMemberRole,
-} from "@/app/settings/actions";
-import DeleteHouseholdForm from "@/app/settings/DeleteHouseholdForm";
+} from "@/app/(app)/settings/actions";
+import DeleteHouseholdForm from "@/app/(app)/settings/DeleteHouseholdForm";
 
 export const dynamic = "force-dynamic";
 
@@ -157,7 +156,6 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <AppHeader />
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
           <Link

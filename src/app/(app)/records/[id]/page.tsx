@@ -12,7 +12,6 @@ import {
   type RecordPhoto,
   type RecordTagJoin,
 } from "@/types/database";
-import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
 import PhotoGallery from "@/components/PhotoGallery";
 import SubmitButton from "@/components/SubmitButton";
@@ -22,7 +21,7 @@ import {
   updateRecord,
   deleteRecord,
   setRecordGuestVisible,
-} from "@/app/records/actions";
+} from "@/app/(app)/records/actions";
 import { Scale } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +90,6 @@ export default async function RecordDetailPage({
 
   return (
     <>
-      <AppHeader />
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">

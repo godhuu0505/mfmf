@@ -44,8 +44,8 @@ import {
   deleteFeedback,
   setFeedbackStatus,
   submitFeedback,
-} from "@/app/feedback/actions";
-import { createInvite, deleteHousehold, renameHousehold } from "@/app/settings/actions";
+} from "@/app/(app)/feedback/actions";
+import { createInvite, deleteHousehold, renameHousehold } from "@/app/(app)/settings/actions";
 
 const seed = loadSeed();
 let db: PgClient;

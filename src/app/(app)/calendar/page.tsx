@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { SOURCE_LABEL, type RecordWithPhotos } from "@/types/database";
-import AppHeader from "@/components/AppHeader";
 import SourceIcon from "@/components/SourceIcon";
 import { Camera } from "lucide-react";
 
@@ -87,7 +86,6 @@ export default async function CalendarPage({
 
   return (
     <>
-      <AppHeader />
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">

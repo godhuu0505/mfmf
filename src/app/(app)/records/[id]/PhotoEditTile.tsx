@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Image from "next/image";
-import { deletePhoto } from "@/app/records/actions";
+import { deletePhoto } from "@/app/(app)/records/actions";
 
 // 編集画面の写真サムネ。削除ボタン押下で即時に非表示にし、
 // 裏で Server Action を呼ぶ。失敗したら復元。

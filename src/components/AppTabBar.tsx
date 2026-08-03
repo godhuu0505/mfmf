@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { CalendarDays, House, Images, Menu, Plus } from "lucide-react";
 
 // ボトムタブバー（D33: 案A・5 スロット・中央に記録ボタン）。
@@ -77,9 +77,14 @@ function TabLink({ tab, pathname }: { tab: TabDef; pathname: string }) {
 
 export default function AppTabBar({ readOnly }: { readOnly: boolean }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  // 記録フォームは全画面モーダル扱い（D33）。タブバーを出さない。
+  // 記録フォーム（新規 / 編集 ?edit=1）は全画面モーダル扱い（D33）。
+  // タブバーを出さない（誤タップで下書きを失わないため）。
   if (pathname === "/records/new") return null;
+  if (pathname.startsWith("/records/") && searchParams.get("edit") === "1") {
+    return null;
+  }
 
   return (
     <nav

@@ -12,7 +12,6 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership, type HouseholdRole } from "@/lib/household";
 import { hasActiveGuestGrant } from "@/lib/guest";
-import AppHeader from "@/components/AppHeader";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import MenuLogoutItem from "@/components/MenuLogoutItem";
 
@@ -71,7 +70,6 @@ export default async function MenuPage() {
 
   return (
     <>
-      <AppHeader />
       <main id="main" className="mx-auto max-w-2xl space-y-4 px-4 py-6">
         <h1 className="sr-only">メニュー</h1>
 

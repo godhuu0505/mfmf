@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { createPhotoSignedUrls } from "@/lib/photos";
-import AppHeader from "@/components/AppHeader";
 import PhotoGallery, { type GalleryImage } from "@/components/PhotoGallery";
 
 export const dynamic = "force-dynamic";
@@ -69,7 +68,6 @@ export default async function GalleryPage() {
 
   return (
     <>
-      <AppHeader />
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">

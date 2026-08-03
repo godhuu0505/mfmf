@@ -4,9 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { canEdit, getCurrentMembership } from "@/lib/household";
 import { getCurrentProfile } from "@/lib/profile";
 import { listPets } from "@/lib/pets";
-import AppHeader from "@/components/AppHeader";
 import RecordForm from "@/components/RecordForm";
-import { createRecord } from "@/app/records/actions";
+import { createRecord } from "@/app/(app)/records/actions";
 import { getTagDictionary } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +34,6 @@ export default async function NewRecordPage() {
 
   return (
     <>
-      <AppHeader />
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">

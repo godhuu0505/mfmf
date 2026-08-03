@@ -5,7 +5,7 @@ import {
   updateProfile,
   changePassword,
   type SettingsResult,
-} from "@/app/settings/actions";
+} from "@/app/(app)/settings/actions";
 
 function ResultMessage({ result }: { result: SettingsResult | null }) {
   if (!result) return null;

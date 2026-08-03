@@ -19,7 +19,6 @@ import { getTagDictionary } from "@/lib/tags";
 import { canEdit, getCurrentMembership, householdScopeFilter } from "@/lib/household";
 import { hasActiveGuestGrant } from "@/lib/guest";
 import { createPhotoSignedUrls } from "@/lib/photos";
-import AppHeader from "@/components/AppHeader";
 import RecordFilters from "@/components/RecordFilters";
 import SourceIcon from "@/components/SourceIcon";
 import { Camera, PawPrint, Scale, X } from "lucide-react";
@@ -178,14 +177,8 @@ export default async function HomePage({
 
   return (
     <>
-      <AppHeader />
-      {/* クイック記録シート表示中は背景（main）が inert になる。
-          タブバー分の下端余白は globals.css（body:has([data-app-tabbar])）が確保する。 */}
-      <main
-        id="main"
-        data-quick-record-bg
-        className="mx-auto max-w-2xl px-4 py-6"
-      >
+      {/* inert 範囲・タブバー分の下端余白は (app)/layout.tsx と globals.css が受け持つ */}
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-foreground">記録一覧</h1>
         </div>

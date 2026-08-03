@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { SOURCE_LABEL, type DaycareRecord } from "@/types/database";
-import AppHeader from "@/components/AppHeader";
 import SourceIcon from "@/components/SourceIcon";
 import WeightChart, { type WeightPoint } from "@/components/WeightChart";
 
@@ -50,7 +49,6 @@ export default async function WeightPage() {
 
   return (
     <>
-      <AppHeader />
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">

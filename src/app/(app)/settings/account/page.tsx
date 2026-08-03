@@ -5,10 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/household";
 import { getCurrentProfile } from "@/lib/profile";
 import { createAvatarSignedUrl } from "@/lib/avatars";
-import AppHeader from "@/components/AppHeader";
 import AvatarUploader from "@/components/AvatarUploader";
-import { ProfileForm, PasswordForm } from "@/app/settings/SettingsForms";
-import { updateUserAvatar } from "@/app/settings/actions";
+import { ProfileForm, PasswordForm } from "@/app/(app)/settings/SettingsForms";
+import { updateUserAvatar } from "@/app/(app)/settings/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +30,6 @@ export default async function AccountSettingsPage() {
 
   return (
     <>
-      <AppHeader />
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
           <Link

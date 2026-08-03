@@ -4,10 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { listPets } from "@/lib/pets";
 import { canEdit, getCurrentMembership } from "@/lib/household";
 import { createAvatarSignedUrls } from "@/lib/avatars";
-import AppHeader from "@/components/AppHeader";
 import AvatarUploader from "@/components/AvatarUploader";
 import SubmitButton from "@/components/SubmitButton";
-import { createPet, updatePet, deletePet, updatePetAvatar } from "@/app/pets/actions";
+import { createPet, updatePet, deletePet, updatePetAvatar } from "@/app/(app)/pets/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +34,6 @@ export default async function PetsPage() {
 
   return (
     <>
-      <AppHeader />
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">

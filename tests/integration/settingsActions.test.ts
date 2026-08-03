@@ -48,7 +48,7 @@ import {
   switchHousehold,
   updateMemberRole,
   updateProfile,
-} from "@/app/settings/actions";
+} from "@/app/(app)/settings/actions";
 import { createGuestRecord } from "@/app/guest/actions";
 
 const seed = loadSeed();

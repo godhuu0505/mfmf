@@ -9,7 +9,6 @@ import {
   type Feedback,
   type FeedbackStatus,
 } from "@/types/database";
-import AppHeader from "@/components/AppHeader";
 import SubmitButton from "@/components/SubmitButton";
 import { setFeedbackStatus, deleteFeedback } from "./actions";
 
@@ -86,7 +85,6 @@ export default async function FeedbackTriagePage({
 
   return (
     <>
-      <AppHeader />
       <main id="main" className="mx-auto max-w-3xl px-4 py-6">
         <div className="mb-4">
           <Link

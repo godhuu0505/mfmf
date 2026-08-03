@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { submitFeedback } from "@/app/feedback/actions";
-import { initialFeedbackState } from "@/app/feedback/types";
+import { submitFeedback } from "@/app/(app)/feedback/actions";
+import { initialFeedbackState } from "@/app/(app)/feedback/types";
 import {
   FEEDBACK_FREQUENCIES,
   FEEDBACK_FREQUENCY_LABEL,
