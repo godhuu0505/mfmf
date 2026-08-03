@@ -269,6 +269,15 @@
   .bottom-0 {
     bottom: 0px;
   }
+  .bottom-\[calc\(72px_\+_env\(safe-area-inset-bottom\)\)\] {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+  .bottom-\[calc\(76px_\+_env\(safe-area-inset-bottom\)\)\] {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  .bottom-\[calc\(88px_\+_env\(safe-area-inset-bottom\)\)\] {
+    bottom: calc(88px + env(safe-area-inset-bottom));
+  }
   .left-1\/2 {
     left: calc(1 / 2 * 100%);
   }
@@ -878,6 +887,12 @@
   }
   .pb-32 {
     padding-bottom: calc(var(--spacing) * 32);
+  }
+  .pb-\[calc\(1\.25rem_\+_env\(safe-area-inset-bottom\)\)\] {
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+  }
+  .pb-\[env\(safe-area-inset-bottom\)\] {
+    padding-bottom: env(safe-area-inset-bottom);
   }
   .pl-5 {
     padding-left: calc(var(--spacing) * 5);
@@ -2306,7 +2321,7 @@ body {
 <!-- ============================================================ -->
 <!-- タブバー（案A: 5スロット・中央记録） -->
 <!-- ============================================================ -->
-<nav id="tabbar" hidden class="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 backdrop-blur" style="padding-bottom:env(safe-area-inset-bottom)">
+<nav id="tabbar" hidden class="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur">
   <div id="tabgrid" class="mx-auto grid max-w-2xl grid-cols-5">
     <button data-tab="home" onclick="go('home')" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-muted-foreground">
       <svg class="h-6 w-6"><use href="#i-house"/></svg>ホーム</button>
@@ -2325,7 +2340,7 @@ body {
 </nav>
 
 <!-- FAB（案B: 4タブ＋右下FAB） -->
-<button id="fab" hidden onclick="openQuick()" aria-label="記録を追加" class="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover" style="bottom:calc(72px + env(safe-area-inset-bottom))">
+<button id="fab" hidden onclick="openQuick()" aria-label="記録を追加" class="fixed right-4 bottom-[calc(72px_+_env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover">
   <svg class="h-7 w-7"><use href="#i-plus"/></svg>
 </button>
 
@@ -2334,7 +2349,7 @@ body {
 <!-- ============================================================ -->
 <div id="sheet-quick" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="クイック記録">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-quick')"></div>
-  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-semibold">サッと記録 <span id="qs-date" class="ml-1 text-xs font-normal text-muted-foreground">8月3日（月）</span></h2>
@@ -2362,7 +2377,7 @@ body {
 <!-- 日別シート(カレンダー) -->
 <div id="sheet-day" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="この日の記録">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-day')"></div>
-  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-semibold"><span id="day-title">8月3日（月）</span>の記録</h2>
@@ -2376,7 +2391,7 @@ body {
 <!-- 記録詳細の「…」メニュー -->
 <div id="sheet-more" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="その他の操作">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-more')"></div>
-  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="overflow-hidden rounded-xl bg-surface-muted">
       <button onclick="closeSheet('sheet-more');openForm(true)" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-pencil"/></svg>編集する</button>
@@ -2392,7 +2407,7 @@ body {
 <!-- ペット編集シート -->
 <div id="sheet-pet" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="ペットを編集">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-pet')"></div>
-  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-semibold">モカを編集</h2>
@@ -2416,7 +2431,7 @@ body {
 <!-- プロト設定シート -->
 <div id="sheet-proto" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="プロト設定">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-proto')"></div>
-  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <h2 class="mb-3 text-base font-semibold">プロト設定（検証用）</h2>
     <div class="space-y-3 text-sm">
@@ -2442,10 +2457,10 @@ body {
 </div>
 
 <!-- トースト -->
-<div id="toast" hidden class="fixed left-1/2 z-40 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg" role="status" style="bottom:calc(88px + env(safe-area-inset-bottom))">残しました</div>
+<div id="toast" hidden class="fixed left-1/2 bottom-[calc(88px_+_env(safe-area-inset-bottom))] z-40 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg" role="status">残しました</div>
 
 <!-- プロト設定チップ -->
-<button id="proto-chip" onclick="openSheet('sheet-proto')" class="fixed left-3 z-30 rounded-full bg-foreground/70 px-2.5 py-1 text-[10px] font-medium text-background backdrop-blur" style="bottom:calc(76px + env(safe-area-inset-bottom))">プロト設定</button>
+<button id="proto-chip" onclick="openSheet('sheet-proto')" class="fixed left-3 bottom-[calc(76px_+_env(safe-area-inset-bottom))] z-30 rounded-full bg-foreground/70 px-2.5 py-1 text-[10px] font-medium text-background backdrop-blur">プロト設定</button>
 
 <script>
 (function () {
@@ -2505,7 +2520,10 @@ body {
     var el = document.getElementById(id);
     var panel = el.querySelector("[data-sheet-panel]");
     clearTimeout(sheetTimers[id]);
-    sheetTriggers[id] = document.activeElement;
+    /* シート内の要素から別シートを開いたときは、元のシートのトリガーを引き継ぐ */
+    var act = document.activeElement;
+    var dlg = act && act.closest ? act.closest('[role="dialog"]') : null;
+    sheetTriggers[id] = dlg && sheetTriggers[dlg.id] ? sheetTriggers[dlg.id] : act;
     el.hidden = false;
     el.classList.remove("hidden");
     setBackgroundInert(true);
