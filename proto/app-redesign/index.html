@@ -1062,6 +1062,9 @@
   .focus\:ring-foreground:focus {
     --tw-ring-color: var(--foreground);
   }
+  .disabled\:opacity-50:disabled {
+    opacity: 50%;
+  }
   @media (prefers-reduced-motion: reduce) {
     .motion-reduce\:transition-none {
       transition-property: none;
@@ -1592,7 +1595,7 @@ body {
                 <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium">3.20 kg</span>
               </span>
               <span class="mt-1 line-clamp-2 block text-sm">園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。</span>
-              <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span>#ボール遊び</span><span class="inline-flex items-center gap-0.5"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>3枚</span></span>
+              <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span>#ボール遊び</span><span class="inline-flex items-center gap-0.5"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>2枚</span></span>
             </span>
           </a></li>
           <li data-src="home" data-tags="" data-date="2026-08-03"><a href="#" onclick="showDetail(1);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
@@ -1733,7 +1736,7 @@ body {
       <span class="ml-auto">日付をタップで詳細</span>
     </div>
     <div data-empty-hide class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
-      <h2 class="mb-2 text-sm font-semibold">この月の記録（5件）</h2>
+      <h2 class="mb-2 text-sm font-semibold">この月の記録（4件）</h2>
       <p class="text-sm text-muted-foreground">日付をタップすると、その日の記録が下からのシートで開きます（現行のページ内アンカージャンプを置き換え）。</p>
     </div>
     <div data-empty-show hidden class="rounded-2xl border-2 border-dashed border-border p-10 text-center">
@@ -1957,6 +1960,23 @@ body {
         </div>
         <button class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">名前を変更</button>
       </div>
+    </div>
+
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <h2 class="mb-1 text-sm font-semibold">世帯を切り替え</h2>
+      <div class="divide-y divide-border">
+        <div class="flex items-center gap-3 py-3">
+          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-linear-to-br from-orange-200 to-amber-300 text-base">🏠</span>
+          <div class="min-w-0 flex-1"><p class="text-sm font-medium">佐藤家</p><p class="text-xs text-muted-foreground">オーナー</p></div>
+          <span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">表示中</span>
+        </div>
+        <div class="flex items-center gap-3 py-3">
+          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-linear-to-br from-sky-200 to-indigo-300 text-base">🏡</span>
+          <div class="min-w-0 flex-1"><p class="text-sm font-medium">実家</p><p class="text-xs text-muted-foreground">閲覧者</p></div>
+          <button onclick="toast('世帯を切り替えました（モックのため表示は 佐藤家 のまま）')" class="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-muted">この世帯を表示</button>
+        </div>
+      </div>
+      <p class="mt-1 text-xs text-muted-foreground">複数世帯に所属している場合のみ表示（UC-H08 を維持）</p>
     </div>
 
     <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
@@ -2327,7 +2347,7 @@ body {
     </div>
     <input id="qs-note-input" hidden placeholder="ひとことを追加" oninput="qsPreview()" class="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
     <p id="qs-preview" class="mb-3 rounded-lg bg-surface-muted px-3 py-2 text-sm text-muted-foreground">チップをタップして記録をつくる</p>
-    <button onclick="qsSave()" class="w-full rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">保存する</button>
+    <button id="qs-save" onclick="qsSave()" disabled class="w-full rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-50">保存する</button>
     <button onclick="closeSheet('sheet-quick');openForm(false)" class="mt-2 w-full py-2 text-center text-sm font-medium text-primary">写真つきでくわしく記録する →</button>
   </div>
 </div>
@@ -2354,7 +2374,7 @@ body {
     <div class="overflow-hidden rounded-xl bg-surface-muted">
       <button onclick="closeSheet('sheet-more');openForm(true)" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-pencil"/></svg>編集する</button>
       <div class="border-t border-border"></div>
-      <button class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-users"/></svg>ゲスト共有を解除</button>
+      <button onclick="toggleShare()" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-users"/></svg><span id="more-share-label">ゲスト共有を解除</span></button>
       <div class="border-t border-border"></div>
       <button onclick="closeSheet('sheet-more')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium text-red-600 dark:text-red-400"><svg class="h-5 w-5"><use href="#i-trash"/></svg>この記録を削除する</button>
     </div>
@@ -2427,6 +2447,7 @@ body {
   var formEdit = false;
   var selectedDay = 3;
   var currentDetail = 0;
+  var moreLoaded = false;
 
   window.go = function (id) {
     document.querySelectorAll("[data-screen]").forEach(function (s) { s.hidden = s.getAttribute("data-screen") !== id; });
@@ -2513,7 +2534,6 @@ body {
       document.getElementById("more-records").hidden = true;
       document.getElementById("more-btn").hidden = true;
     } else {
-      document.getElementById("more-btn").hidden = false;
       applyHomeFilters();
     }
   };
@@ -2558,6 +2578,9 @@ body {
   var dateTo = "";
   function applyHomeFilters() {
     if (emptyMode) return;
+    /* 検索/絞り込み中は未読込の記録も対象にする（本番はページングの前に検索が効くため） */
+    var filtersActive = chipFilter !== "all" || keyword !== "" || dateFrom !== "" || dateTo !== "";
+    var includeMore = moreLoaded || filtersActive;
     var visible = 0;
     document.querySelectorAll("li[data-src]").forEach(function (li) {
       var ok = true;
@@ -2570,16 +2593,13 @@ body {
       if (ok && dateFrom) ok = d >= dateFrom;
       if (ok && dateTo) ok = d <= dateTo;
       li.hidden = !ok;
-      if (ok && !li.closest("#more-records")) visible++;
+      if (ok && (includeMore || !li.closest("#more-records"))) visible++;
     });
-    var moreLoaded = document.getElementById("more-btn").hidden;
-    if (moreLoaded) {
-      document.querySelectorAll("#more-records li[data-src]:not([hidden])").forEach(function () { visible++; });
-    }
     document.querySelectorAll("[data-group]").forEach(function (g) {
-      if (g.id === "more-records" && !moreLoaded) { g.hidden = true; return; }
+      if (g.id === "more-records" && !includeMore) { g.hidden = true; return; }
       g.hidden = !g.querySelector("li[data-src]:not([hidden])");
     });
+    document.getElementById("more-btn").hidden = moreLoaded || filtersActive;
     document.getElementById("no-results").hidden = visible > 0;
   }
   window.homeFilter = function (btn) {
@@ -2603,8 +2623,7 @@ body {
 
   /* ---- もっと見る ---- */
   window.loadMore = function () {
-    document.getElementById("more-btn").hidden = true;
-    document.getElementById("more-records").hidden = false;
+    moreLoaded = true;
     applyHomeFilters();
     toast("残りの記録を読み込みました（モックは 1 件）");
   };
@@ -2640,6 +2659,7 @@ body {
     if (note) parts.push(note);
     var p = document.getElementById("qs-preview");
     p.textContent = parts.length ? parts.join("、") : "チップをタップして記録をつくる";
+    document.getElementById("qs-save").disabled = parts.length === 0;
   };
   window.qsSave = function () {
     closeSheet("sheet-quick");
@@ -2739,6 +2759,7 @@ body {
     document.getElementById("det-photos").hidden = !d.photos;
     document.getElementById("det-tags").innerHTML = d.tags;
     document.getElementById("det-share").hidden = !d.share;
+    document.getElementById("more-share-label").textContent = d.share ? "ゲスト共有を解除" : "ゲストに共有";
     var older = DETAIL[i + 1], newer = DETAIL[i - 1];
     var prev = older
       ? '<a href="#" onclick="showDetail(' + (i + 1) + ');return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground"><svg class="h-4 w-4"><use href="#i-chevron-left"/></svg>' + older.navLabel + "の記録</a>"
@@ -2748,6 +2769,14 @@ body {
       : '<span class="text-muted-foreground/50">次の記録なし</span>';
     document.getElementById("det-nav").innerHTML = prev + next;
     window.scrollTo(0, 0);
+  };
+
+  window.toggleShare = function () {
+    var d = DETAIL[currentDetail];
+    d.share = !d.share;
+    showDetail(currentDetail);
+    closeSheet("sheet-more");
+    toast(d.share ? "ゲストに共有しました" : "共有を解除しました");
   };
 
   /* ---- 体重の期間切替 ---- */

@@ -1058,6 +1058,9 @@
   .focus\:ring-foreground:focus {
     --tw-ring-color: var(--foreground);
   }
+  .disabled\:opacity-50:disabled {
+    opacity: 50%;
+  }
   @media (prefers-reduced-motion: reduce) {
     .motion-reduce\:transition-none {
       transition-property: none;
