@@ -293,6 +293,24 @@
   .z-40 {
     z-index: 40;
   }
+  .container {
+    width: 100%;
+    @media (width >= 40rem) {
+      max-width: 40rem;
+    }
+    @media (width >= 48rem) {
+      max-width: 48rem;
+    }
+    @media (width >= 64rem) {
+      max-width: 64rem;
+    }
+    @media (width >= 80rem) {
+      max-width: 80rem;
+    }
+    @media (width >= 96rem) {
+      max-width: 96rem;
+    }
+  }
   .mx-auto {
     margin-inline: auto;
   }
@@ -1584,6 +1602,13 @@ body {
         <label class="text-xs text-muted-foreground">終了日
           <input id="search-to" type="date" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
       </div>
+      <label class="mt-3 block text-xs text-muted-foreground">並び替え
+        <select onchange="sortTimeline(this.value)" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+          <option value="date-desc">日付が新しい順</option>
+          <option value="date-asc">日付が古い順</option>
+          <option value="weight-desc">体重が重い順</option>
+          <option value="weight-asc">体重が軽い順</option>
+        </select></label>
     </div>
 
     <!-- 絞り込みチップ（記録元セレクト → セグメント化） -->
@@ -1604,11 +1629,11 @@ body {
     </div>
 
     <!-- 日付グループのタイムライン -->
-    <div data-empty-hide class="space-y-5">
+    <div id="timeline" data-empty-hide class="space-y-5">
       <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>今日</span><span class="text-xs font-normal text-muted-foreground">8月3日（月）</span></h2>
         <ul class="space-y-3">
-          <li data-src="school" data-tags="ボール遊び" data-date="2026-08-03"><a href="#" onclick="showDetail(0);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="school" data-tags="ボール遊び" data-date="2026-08-03" data-author="さくら保育園"><a href="#" onclick="showDetail(0);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-amber-200 to-orange-300 text-3xl">🐕</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1619,7 +1644,7 @@ body {
               <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span>#ボール遊び</span><span class="inline-flex items-center gap-0.5"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>2枚</span></span>
             </span>
           </a></li>
-          <li data-src="home" data-tags="" data-date="2026-08-03"><a href="#" onclick="showDetail(1);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="home" data-tags="" data-date="2026-08-03" data-author="佐藤 花子"><a href="#" onclick="showDetail(1);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
                 <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>
@@ -1632,7 +1657,7 @@ body {
       <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>昨日</span><span class="text-xs font-normal text-muted-foreground">8月2日（日）</span></h2>
         <ul class="space-y-3">
-          <li data-src="home" data-tags="" data-date="2026-08-02"><a href="#" onclick="showDetail(2);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="home" data-tags="" data-date="2026-08-02" data-author="佐藤 花子"><a href="#" onclick="showDetail(2);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-sky-200 to-indigo-300 text-3xl">🌳</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1647,7 +1672,7 @@ body {
       <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>8月1日（土）</span></h2>
         <ul class="space-y-3">
-          <li data-src="home" data-tags="トリミング" data-date="2026-08-01"><a href="#" onclick="showDetail(3);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="home" data-tags="トリミング" data-date="2026-08-01" data-author="佐藤 太郎"><a href="#" onclick="showDetail(3);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-rose-200 to-pink-300 text-3xl">✂️</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1663,7 +1688,7 @@ body {
       <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>7月30日（木）</span></h2>
         <ul class="space-y-3">
-          <li data-src="school" data-tags="" data-date="2026-07-30"><a href="#" onclick="showDetail(4);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="school" data-tags="" data-date="2026-07-30" data-author="さくら保育園"><a href="#" onclick="showDetail(4);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-emerald-200 to-teal-300 text-3xl">💤</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1679,7 +1704,7 @@ body {
       <div id="more-records" hidden data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>7月28日（火）</span></h2>
         <ul class="space-y-3">
-          <li data-src="school" data-tags="" data-date="2026-07-28"><a href="#" onclick="showDetail(5);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="school" data-tags="" data-date="2026-07-28" data-author="さくら保育園"><a href="#" onclick="showDetail(5);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-orange-200 to-amber-300 text-3xl">🍚</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1980,7 +2005,10 @@ body {
           <p class="font-semibold">佐藤家</p>
           <p class="text-xs text-muted-foreground">あなたの権限: オーナー</p>
         </div>
-        <button data-editor-only class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">名前を変更</button>
+        <div class="flex gap-2">
+          <button data-editor-only class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">画像を変更</button>
+          <button data-editor-only class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">名前を変更</button>
+        </div>
       </div>
     </div>
 
@@ -2009,10 +2037,11 @@ body {
           <div class="min-w-0 flex-1"><p class="text-sm font-medium">佐藤 花子（あなた）</p><p class="truncate text-xs text-muted-foreground">hanako@example.com</p></div>
           <span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">オーナー</span>
         </div>
-        <div class="flex items-center gap-3 py-3">
+        <div data-member-row class="flex items-center gap-3 py-3">
           <span class="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-sm font-bold">太</span>
           <div class="min-w-0 flex-1"><p class="text-sm font-medium">佐藤 太郎</p><p class="truncate text-xs text-muted-foreground">taro@example.com</p></div>
           <button data-editor-only onclick="cycleRole()" class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium hover:bg-border"><span id="role-pill-label">編集者</span><svg class="h-3 w-3"><use href="#i-chevron-right"/></svg></button>
+          <button data-editor-only onclick="removeMemberRow(this)" class="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-surface-muted dark:text-red-400">削除</button>
         </div>
       </div>
       <p class="mt-1 text-xs text-muted-foreground">権限バッジをタップして変更（現行のセレクト＋「変更」ボタンを置き換え）</p>
@@ -2168,7 +2197,7 @@ body {
         <textarea id="form-body" rows="6" placeholder="ごはん・散歩・体調など" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"></textarea></label>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <label class="block text-xs font-medium text-muted-foreground">記入者
-          <input value="はなこ" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <input id="form-author" value="はなこ" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
         <label class="block text-xs font-medium text-muted-foreground">体重（kg）
           <input id="form-weight" inputmode="decimal" placeholder="3.20" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
       </div>
@@ -2630,7 +2659,7 @@ body {
         if (chipFilter.indexOf("tag:") === 0) ok = (li.getAttribute("data-tags") || "").split(" ").indexOf(chipFilter.slice(4)) !== -1;
         else ok = li.getAttribute("data-src") === chipFilter;
       }
-      if (ok && keyword) ok = li.textContent.indexOf(keyword) !== -1;
+      if (ok && keyword) ok = li.textContent.indexOf(keyword) !== -1 || (li.getAttribute("data-author") || "").indexOf(keyword) !== -1;
       var d = li.getAttribute("data-date") || "";
       if (ok && dateFrom) ok = d >= dateFrom;
       if (ok && dateTo) ok = d <= dateTo;
@@ -2654,6 +2683,18 @@ body {
     dateFrom = document.getElementById("search-from").value;
     dateTo = document.getElementById("search-to").value;
     applyHomeFilters();
+  };
+  window.sortTimeline = function (v) {
+    if (v.indexOf("weight") === 0) { toast("体重順の並び替えは実装時に対応（モックは日付順のみ）"); return; }
+    var container = document.getElementById("timeline");
+    var groups = Array.prototype.slice.call(container.querySelectorAll("[data-group]"));
+    groups.sort(function (a, b) {
+      var da = (a.querySelector("li[data-date]") || {}).getAttribute ? a.querySelector("li[data-date]").getAttribute("data-date") : "";
+      var db = (b.querySelector("li[data-date]") || {}).getAttribute ? b.querySelector("li[data-date]").getAttribute("data-date") : "";
+      return v === "date-asc" ? (da < db ? -1 : 1) : (da < db ? 1 : -1);
+    });
+    var anchor = document.getElementById("more-btn");
+    groups.forEach(function (g) { container.insertBefore(g, anchor); });
   };
   window.searchClear = function () {
     document.getElementById("search-kw").value = "";
@@ -2898,15 +2939,18 @@ body {
     var body = document.getElementById("form-body");
     var weight = document.getElementById("form-weight");
     var date = document.getElementById("form-date");
+    var author = document.getElementById("form-author");
     if (formEdit) {
       var d = DETAIL[currentDetail];
       body.value = d.body;
       weight.value = d.weight;
       date.value = d.date;
+      author.value = d.author;
       segPick(document.getElementById(d.src === "school" ? "form-src-school" : "form-src-home"));
     } else {
       body.value = "";
       weight.value = "";
+      author.value = "はなこ";
       date.value = "2026-08-" + (selectedDay < 10 ? "0" : "") + selectedDay;
       segPick(document.getElementById("form-src-home"));
     }
@@ -2921,6 +2965,7 @@ body {
       d.body = document.getElementById("form-body").value;
       d.weight = document.getElementById("form-weight").value.trim();
       d.date = document.getElementById("form-date").value || d.date;
+      d.author = document.getElementById("form-author").value.trim() || d.author;
       d.src = document.getElementById("form-src-school").getAttribute("aria-pressed") === "true" ? "school" : "home";
       d.title = fmtDate(d.date);
       var link = document.querySelector('li[data-src] a[onclick*="showDetail(' + currentDetail + ');"]');
@@ -2937,6 +2982,10 @@ body {
       go("home");
       toast("残しました（モック）");
     }
+  };
+  window.removeMemberRow = function (btn) {
+    btn.closest("[data-member-row]").remove();
+    toast("メンバーを削除しました（モック）");
   };
   window.cycleRole = function () {
     var el = document.getElementById("role-pill-label");
