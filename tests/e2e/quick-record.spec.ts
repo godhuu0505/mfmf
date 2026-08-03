@@ -129,7 +129,7 @@ test("UC-Q04: 保育園に切り替えて残すとバッジに反映される", 
   );
 });
 
-test("UC-Q05: Escape で閉じてフォーカスが FAB へ戻る", async ({ page }) => {
+test("UC-Q05: Escape で閉じてフォーカスがタブバーの記録ボタンへ戻る", async ({ page }) => {
   await login(page);
   await openSheet(page);
 

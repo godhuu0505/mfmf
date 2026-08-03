@@ -30,12 +30,12 @@
   --border-color: #e2e8f0; /* slate-200 */
   --muted: #cbd5e1; /* slate-300 */
   --muted-foreground: #475569; /* slate-600 */
-  --primary: #0f172a; /* slate-900 */
-  --primary-hover: #334155; /* slate-700 */
+  --primary: #c2410c; /* orange-700。ブランド色（D33）。白文字と 5.2:1 (WCAG AA) */
+  --primary-hover: #9a3412; /* orange-800 */
   --primary-foreground: #ffffff;
   --skeleton-base: #e2e8f0; /* slate-200 */
   --skeleton-shine: rgba(248, 250, 252, 0.9);
-  --focus-ring: #0f172a; /* slate-900 */
+  --focus-ring: #c2410c; /* primary に追従 */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,12 +47,12 @@
     --border-color: #334155; /* slate-700 */
     --muted: #475569; /* slate-600 */
     --muted-foreground: #94a3b8; /* slate-400 */
-    --primary: #e2e8f0; /* slate-200 */
-    --primary-hover: #cbd5e1; /* slate-300 */
-    --primary-foreground: #0f172a; /* slate-900 */
+    --primary: #fb923c; /* orange-400。前景 #431407 と 6.9:1 (WCAG AA) */
+    --primary-hover: #fdba74; /* orange-300 */
+    --primary-foreground: #431407; /* orange-950 */
     --skeleton-base: #1f2937;
     --skeleton-shine: rgba(71, 85, 105, 0.6);
-    --focus-ring: #e2e8f0;
+    --focus-ring: #fb923c;
   }
 }
 
@@ -66,6 +66,13 @@ body {
   -webkit-font-smoothing: antialiased;
   /* PWA スタンドアロン表示でノッチ等に被らないようにする */
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ボトムタブバー（AppTabBar）があるページでは、main の下端がタブバーに隠れない
+   余白を確保する。Tailwind の pb-* は @layer utilities 内のため、この無レイヤー
+   規則が優先される（ページ側で個別の pb 計算を持たなくてよい）。 */
+body:has([data-app-tabbar]) main {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 }
 
 /* セーフエリア（左右 + 上）を考慮した水平パディング用のユーティリティ。

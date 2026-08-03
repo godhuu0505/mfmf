@@ -67,24 +67,43 @@ const inputClass =
 const labelClass = "mb-1 block text-sm font-medium text-foreground";
 const hintClass = "mb-1.5 text-xs leading-relaxed text-muted-foreground";
 
-export default function FeedbackWidget() {
+// variant:
+//   "fab" … 右下フローティングボタン（旧来の形。現在は未使用だが残す）
+//   "row" … メニュー画面のリスト行（D33 でフローティングを廃止しメニューへ移設）
+export default function FeedbackWidget({
+  variant = "fab",
+}: {
+  variant?: "fab" | "row";
+}) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      {/* どの画面でも右下に出るフローティングボタン。
-          data-quick-record-bg: ホームのクイック記録シート表示中は inert になる
-          （モーダルの外にフォーカスが漏れないようにする）。 */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
-        data-quick-record-bg
-        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg ring-1 ring-black/5 transition hover:bg-primary-hover active:scale-95"
-      >
-        <MessageCircle className="h-5 w-5" aria-hidden="true" />
-        ご意見・不具合
-      </button>
+      {variant === "fab" ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          data-quick-record-bg
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg ring-1 ring-black/5 transition hover:bg-primary-hover active:scale-95"
+        >
+          <MessageCircle className="h-5 w-5" aria-hidden="true" />
+          ご意見・不具合
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium text-foreground transition hover:bg-surface-muted"
+        >
+          <MessageCircle
+            className="h-5 w-5 text-muted-foreground"
+            aria-hidden="true"
+          />
+          ご意見・不具合を送る
+        </button>
+      )}
 
       {open && <FeedbackDialog onClose={() => setOpen(false)} />}
     </>
