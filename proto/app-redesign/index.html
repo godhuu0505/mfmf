@@ -1,5 +1,6 @@
 <title>mfmf UI/UX 再設計プロト</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%BE%3C/text%3E%3C/svg%3E" />
 <style>
 /*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */
 @layer properties;
@@ -479,8 +480,13 @@
     --tw-translate-x: calc(calc(1 / 2 * 100%) * -1);
     translate: var(--tw-translate-x) var(--tw-translate-y);
   }
-  .transform {
-    transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,);
+  .translate-y-0 {
+    --tw-translate-y: 0px;
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
+  .translate-y-full {
+    --tw-translate-y: 100%;
+    translate: var(--tw-translate-x) var(--tw-translate-y);
   }
   .list-disc {
     list-style-type: disc;
@@ -1006,20 +1012,27 @@
   .ring-primary {
     --tw-ring-color: var(--primary);
   }
+  .filter {
+    filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,);
+  }
   .backdrop-blur {
     --tw-backdrop-blur: blur(8px);
     -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
     backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
   }
-  .transition {
-    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
-    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
-    transition-duration: var(--tw-duration, var(--default-transition-duration));
-  }
   .transition-colors {
     transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
     transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
     transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .transition-transform {
+    transition-property: transform, translate, scale, rotate;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .duration-300 {
+    --tw-duration: 300ms;
+    transition-duration: 300ms;
   }
   .outline-none {
     --tw-outline-style: none;
@@ -1048,6 +1061,11 @@
   }
   .focus\:ring-foreground:focus {
     --tw-ring-color: var(--foreground);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .motion-reduce\:transition-none {
+      transition-property: none;
+    }
   }
   @media (width >= 40rem) {
     .sm\:grid-cols-4 {
@@ -1199,26 +1217,6 @@ body {
   inherits: false;
   initial-value: 0;
 }
-@property --tw-rotate-x {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-rotate-y {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-rotate-z {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-skew-x {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-skew-y {
-  syntax: "*";
-  inherits: false;
-}
 @property --tw-space-y-reverse {
   syntax: "*";
   inherits: false;
@@ -1353,6 +1351,59 @@ body {
   inherits: false;
   initial-value: 0 0 #0000;
 }
+@property --tw-blur {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-brightness {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-contrast {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-grayscale {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-hue-rotate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-invert {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-opacity {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-saturate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-sepia {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-drop-shadow {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-drop-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-drop-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-drop-shadow-size {
+  syntax: "*";
+  inherits: false;
+}
 @property --tw-backdrop-blur {
   syntax: "*";
   inherits: false;
@@ -1389,17 +1440,16 @@ body {
   syntax: "*";
   inherits: false;
 }
+@property --tw-duration {
+  syntax: "*";
+  inherits: false;
+}
 @layer properties {
   @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
     *, ::before, ::after, ::backdrop {
       --tw-translate-x: 0;
       --tw-translate-y: 0;
       --tw-translate-z: 0;
-      --tw-rotate-x: initial;
-      --tw-rotate-y: initial;
-      --tw-rotate-z: initial;
-      --tw-skew-x: initial;
-      --tw-skew-y: initial;
       --tw-space-y-reverse: 0;
       --tw-divide-y-reverse: 0;
       --tw-border-style: solid;
@@ -1429,6 +1479,19 @@ body {
       --tw-ring-offset-width: 0px;
       --tw-ring-offset-color: #fff;
       --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-blur: initial;
+      --tw-brightness: initial;
+      --tw-contrast: initial;
+      --tw-grayscale: initial;
+      --tw-hue-rotate: initial;
+      --tw-invert: initial;
+      --tw-opacity: initial;
+      --tw-saturate: initial;
+      --tw-sepia: initial;
+      --tw-drop-shadow: initial;
+      --tw-drop-shadow-color: initial;
+      --tw-drop-shadow-alpha: 100%;
+      --tw-drop-shadow-size: initial;
       --tw-backdrop-blur: initial;
       --tw-backdrop-brightness: initial;
       --tw-backdrop-contrast: initial;
@@ -1438,6 +1501,7 @@ body {
       --tw-backdrop-opacity: initial;
       --tw-backdrop-saturate: initial;
       --tw-backdrop-sepia: initial;
+      --tw-duration: initial;
     }
   }
 }
@@ -1455,10 +1519,6 @@ body {
     --primary-foreground: #431407;
   }
 }
-/* シートのトランジション（実装時は QuickRecordSheet と同じ手法） */
-.sheet-panel { transition: transform 0.25s ease; transform: translateY(100%); }
-.sheet-open .sheet-panel { transform: translateY(0); }
-@media (prefers-reduced-motion: reduce) { .sheet-panel { transition: none; } }
 </style>
 
 <svg hidden aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -1568,12 +1628,12 @@ body {
     </div>
 
     <!-- 絞り込みチップ（記録元セレクト → セグメント化） -->
-    <div class="flex gap-2 overflow-x-auto pb-1" data-empty-hide>
-      <button class="shrink-0 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground">すべて</button>
-      <button class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">🏫 保育園</button>
-      <button class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">🏠 おうち</button>
-      <button class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">#ボール遊び</button>
-      <button class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">#トリミング</button>
+    <div id="home-filters" class="flex gap-2 overflow-x-auto pb-1" data-empty-hide>
+      <button data-filter="all" onclick="homeFilter(this)" class="shrink-0 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground">すべて</button>
+      <button data-filter="school" onclick="homeFilter(this)" class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">🏫 保育園</button>
+      <button data-filter="home" onclick="homeFilter(this)" class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">🏠 おうち</button>
+      <button data-filter="tag:ボール遊び" onclick="homeFilter(this)" class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">#ボール遊び</button>
+      <button data-filter="tag:トリミング" onclick="homeFilter(this)" class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">#トリミング</button>
     </div>
 
     <!-- 空状態（プロト設定で切替） -->
@@ -1581,15 +1641,15 @@ body {
       <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-surface-muted text-muted-foreground"><svg class="h-7 w-7"><use href="#i-paw"/></svg></span>
       <p class="font-medium">まだ記録がありません</p>
       <p class="mt-1 text-sm text-muted-foreground">下の「＋」から今日の様子を残してみましょう</p>
-      <button onclick="openSheet('sheet-quick')" class="mt-4 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">はじめての記録</button>
+      <button onclick="openQuick()" class="mt-4 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">はじめての記録</button>
     </div>
 
     <!-- 日付グループのタイムライン -->
     <div data-empty-hide class="space-y-5">
-      <div>
+      <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>今日</span><span class="text-xs font-normal text-muted-foreground">8月3日（月）</span></h2>
         <ul class="space-y-3">
-          <li><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="school" data-tags="ボール遊び"><a href="#" onclick="showDetail(0);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-amber-200 to-orange-300 text-3xl">🐕</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1600,7 +1660,7 @@ body {
               <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span>#ボール遊び</span><span class="inline-flex items-center gap-0.5"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>3枚</span></span>
             </span>
           </a></li>
-          <li><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="home" data-tags=""><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
                 <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>
@@ -1610,10 +1670,10 @@ body {
           </a></li>
         </ul>
       </div>
-      <div>
+      <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>昨日</span><span class="text-xs font-normal text-muted-foreground">8月2日（日）</span></h2>
         <ul class="space-y-3">
-          <li><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="home" data-tags=""><a href="#" onclick="showDetail(1);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-sky-200 to-indigo-300 text-3xl">🌳</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1625,10 +1685,10 @@ body {
           </a></li>
         </ul>
       </div>
-      <div>
+      <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>8月1日（土）</span></h2>
         <ul class="space-y-3">
-          <li><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="home" data-tags="トリミング"><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-rose-200 to-pink-300 text-3xl">✂️</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1641,10 +1701,10 @@ body {
           </a></li>
         </ul>
       </div>
-      <div>
+      <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>7月30日（木）</span></h2>
         <ul class="space-y-3">
-          <li><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="school" data-tags=""><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-emerald-200 to-teal-300 text-3xl">💤</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1657,7 +1717,21 @@ body {
         </ul>
       </div>
       <!-- ページ番号ナビ → 「もっと見る」に置き換え -->
-      <button class="w-full rounded-xl border border-border bg-surface py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-muted">もっと見る（全 42 件）</button>
+      <div id="more-records" hidden data-group>
+        <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>7月28日（火）</span></h2>
+        <ul class="space-y-3">
+          <li data-src="school" data-tags=""><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+            <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-orange-200 to-amber-300 text-3xl">🍚</span>
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3 w-3"><use href="#i-school"/></svg>保育園</span>
+              </span>
+              <span class="mt-1 line-clamp-2 block text-sm">初めてのおやつタイム。少し警戒してから完食しました。</span>
+            </span>
+          </a></li>
+        </ul>
+      </div>
+      <button id="more-btn" onclick="loadMore()" class="w-full rounded-xl border border-border bg-surface py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-muted">もっと見る（全 42 件）</button>
     </div>
   </main>
 </section>
@@ -1685,34 +1759,34 @@ body {
       <button onclick="openDay(1)" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm shadow-sm ring-1 ring-border">1<span data-empty-hide class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
       <button onclick="openDay(2)" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm shadow-sm ring-1 ring-border">2<span data-empty-hide class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
       <button onclick="openDay(3)" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm font-bold shadow-sm ring-2 ring-primary">3<span data-empty-hide class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-sky-400"></i><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">4</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">5</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">6</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">7</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">8</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">9</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">10</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">11</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">12</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">13</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">14</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">15</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">16</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">17</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">18</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">19</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">20</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">21</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">22</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">23</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">24</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">25</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">26</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">27</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">28</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">29</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">30</span>
-      <span class="flex h-14 items-center justify-center text-sm text-muted-foreground">31</span>
+      <button onclick="openDay(4)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">4</button>
+      <button onclick="openDay(5)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">5</button>
+      <button onclick="openDay(6)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">6</button>
+      <button onclick="openDay(7)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">7</button>
+      <button onclick="openDay(8)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">8</button>
+      <button onclick="openDay(9)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">9</button>
+      <button onclick="openDay(10)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">10</button>
+      <button onclick="openDay(11)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">11</button>
+      <button onclick="openDay(12)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">12</button>
+      <button onclick="openDay(13)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">13</button>
+      <button onclick="openDay(14)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">14</button>
+      <button onclick="openDay(15)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">15</button>
+      <button onclick="openDay(16)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">16</button>
+      <button onclick="openDay(17)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">17</button>
+      <button onclick="openDay(18)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">18</button>
+      <button onclick="openDay(19)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">19</button>
+      <button onclick="openDay(20)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">20</button>
+      <button onclick="openDay(21)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">21</button>
+      <button onclick="openDay(22)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">22</button>
+      <button onclick="openDay(23)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">23</button>
+      <button onclick="openDay(24)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">24</button>
+      <button onclick="openDay(25)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">25</button>
+      <button onclick="openDay(26)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">26</button>
+      <button onclick="openDay(27)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">27</button>
+      <button onclick="openDay(28)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">28</button>
+      <button onclick="openDay(29)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">29</button>
+      <button onclick="openDay(30)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">30</button>
+      <button onclick="openDay(31)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">31</button>
     </div>
     <div data-empty-hide class="flex items-center gap-4 text-xs text-muted-foreground">
       <span class="inline-flex items-center gap-1.5"><i class="h-1.5 w-1.5 rounded-full bg-sky-400"></i>保育園</span>
@@ -1817,12 +1891,12 @@ body {
 
     <!-- サポート -->
     <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
-      <button class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-muted">
+      <button onclick="toast('使い方ガイドは現行ページを流用します（プロト対象外）')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-muted">
         <svg class="h-5 w-5 text-muted-foreground"><use href="#i-help"/></svg><span class="flex-1 text-sm font-medium">使い方ガイド</span>
         <svg class="h-5 w-5 text-muted-foreground"><use href="#i-chevron-right"/></svg>
       </button>
       <div class="border-t border-border"></div>
-      <button class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-muted">
+      <button onclick="toast('既存のフィードバック画面へ遷移します（プロト対象外）')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-muted">
         <svg class="h-5 w-5 text-muted-foreground"><use href="#i-message"/></svg><span class="flex-1 text-sm font-medium">ご意見・不具合を送る</span>
         <svg class="h-5 w-5 text-muted-foreground"><use href="#i-chevron-right"/></svg>
       </button>
@@ -1846,11 +1920,11 @@ body {
     </div>
   </header>
   <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
-    <div class="flex gap-2">
-      <button class="rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground">1ヶ月</button>
-      <button class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">3ヶ月</button>
-      <button class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">1年</button>
-      <button class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">全期間</button>
+    <div id="wt-ranges" class="flex gap-2">
+      <button data-range="1m" onclick="weightRange(this)" class="rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground">1ヶ月</button>
+      <button data-range="3m" onclick="weightRange(this)" class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">3ヶ月</button>
+      <button data-range="1y" onclick="weightRange(this)" class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">1年</button>
+      <button data-range="all" onclick="weightRange(this)" class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">全期間</button>
     </div>
     <div data-empty-show hidden class="rounded-2xl border-2 border-dashed border-border p-10 text-center">
       <p class="font-medium">まだ体重の記録がありません</p>
@@ -1859,17 +1933,17 @@ body {
     <div data-empty-hide class="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
       <p class="text-xs text-muted-foreground">最新の体重（8月3日）</p>
       <p class="mt-1 flex items-baseline gap-1"><span class="text-3xl font-bold tracking-tight">3.20</span><span class="text-sm text-muted-foreground">kg</span>
-        <span class="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">+0.15 kg / 1ヶ月</span></p>
+        <span id="wt-delta" class="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">+0.15 kg / 1ヶ月</span></p>
       <svg viewBox="0 0 320 160" class="mt-4 w-full text-primary" role="img" aria-label="体重の推移グラフ">
         <line x1="0" y1="30" x2="320" y2="30" stroke="var(--border-color)" stroke-width="1"/>
         <line x1="0" y1="80" x2="320" y2="80" stroke="var(--border-color)" stroke-width="1"/>
         <line x1="0" y1="130" x2="320" y2="130" stroke="var(--border-color)" stroke-width="1"/>
         <text x="4" y="26" font-size="10" fill="var(--muted-foreground)">3.3</text>
         <text x="4" y="126" font-size="10" fill="var(--muted-foreground)">3.0</text>
-        <polyline points="20,110 80,95 140,100 200,70 260,55 300,45" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="20" cy="110" r="3.5" fill="currentColor"/><circle cx="80" cy="95" r="3.5" fill="currentColor"/><circle cx="140" cy="100" r="3.5" fill="currentColor"/><circle cx="200" cy="70" r="3.5" fill="currentColor"/><circle cx="260" cy="55" r="3.5" fill="currentColor"/><circle cx="300" cy="45" r="4.5" fill="currentColor"/>
-        <text x="20" y="150" font-size="10" fill="var(--muted-foreground)">7/1</text>
-        <text x="284" y="150" font-size="10" fill="var(--muted-foreground)">8/3</text>
+        <polyline id="wt-line" points="20,110 80,95 140,100 200,70 260,55 300,45" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <g id="wt-dots"></g>
+        <text id="wt-x0" x="20" y="150" font-size="10" fill="var(--muted-foreground)">7/1</text>
+        <text id="wt-x1" x="284" y="150" font-size="10" fill="var(--muted-foreground)">8/3</text>
       </svg>
     </div>
     <div data-empty-hide class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
@@ -2043,33 +2117,33 @@ body {
   <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
     <div class="safe-px mx-auto flex max-w-2xl items-center gap-1 py-2">
       <button onclick="go('home')" aria-label="戻る" class="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
-      <h1 class="flex-1 text-base font-semibold">8月3日（月）</h1>
+      <h1 id="det-title" class="flex-1 text-base font-semibold">8月3日（月）</h1>
       <button onclick="openForm(true)" class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">編集</button>
       <button onclick="openSheet('sheet-more')" aria-label="その他の操作" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-more"/></svg></button>
     </div>
   </header>
   <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
-    <div class="flex flex-wrap items-center gap-2">
+    <div id="det-badges" class="flex flex-wrap items-center gap-2">
       <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span>
       <span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 3.20 kg</span>
       <span class="text-xs text-muted-foreground">記入: さくら保育園</span>
     </div>
-    <article class="whitespace-pre-wrap rounded-2xl bg-surface p-5 text-sm leading-relaxed shadow-sm ring-1 ring-border">園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。
+    <article id="det-body" class="whitespace-pre-wrap rounded-2xl bg-surface p-5 text-sm leading-relaxed shadow-sm ring-1 ring-border">園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。
 
 お迎えのときは少し眠そうでしたが、帰り際にしっぽをたくさん振ってくれました。</article>
-    <div class="grid grid-cols-2 gap-1.5">
+    <div id="det-photos" class="grid grid-cols-2 gap-1.5">
       <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-amber-200 to-orange-300 text-5xl">🐕</button>
       <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-emerald-200 to-teal-300 text-5xl">🎾</button>
     </div>
-    <div class="flex flex-wrap gap-1.5">
+    <div id="det-tags" class="flex flex-wrap gap-1.5">
       <a href="#" onclick="go('home');return false" class="rounded-full bg-surface px-3 py-1 text-xs font-medium ring-1 ring-border">#ボール遊び</a>
     </div>
-    <div class="flex items-center justify-between rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+    <div id="det-share" class="flex items-center justify-between rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
       <div><p class="text-sm font-medium">ゲストに共有</p><p class="text-xs text-muted-foreground">さくら保育園が閲覧できます</p></div>
       <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">共有中</span>
     </div>
-    <nav class="flex items-center justify-between border-t border-border pt-3 text-sm">
-      <a href="#" class="inline-flex items-center gap-1 font-medium text-muted-foreground"><svg class="h-4 w-4"><use href="#i-chevron-left"/></svg>8月2日の記録</a>
+    <nav id="det-nav" class="flex items-center justify-between border-t border-border pt-3 text-sm">
+      <a href="#" onclick="showDetail(1);return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground"><svg class="h-4 w-4"><use href="#i-chevron-left"/></svg>8月2日の記録</a>
       <span class="text-muted-foreground/50">次の記録なし</span>
     </nav>
     <p class="text-xs text-muted-foreground">削除は右上「…」メニューへ移動（現行はページ最下部の赤リンク）。前後の記録への移動を新設。</p>
@@ -2273,7 +2347,7 @@ body {
     <button data-tab="calendar" onclick="go('calendar')" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-muted-foreground">
       <svg class="h-6 w-6"><use href="#i-calendar"/></svg>カレンダー</button>
     <div id="tab-center" class="relative">
-      <button onclick="openSheet('sheet-quick')" aria-label="記録を追加" class="absolute left-1/2 top-0 -mt-5 -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover">
+      <button onclick="openQuick()" aria-label="記録を追加" class="absolute left-1/2 top-0 -mt-5 -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover">
         <svg class="h-7 w-7"><use href="#i-plus"/></svg></button>
       <span class="block pb-1.5 pt-9 text-center text-[10px] font-medium text-muted-foreground">記録</span>
     </div>
@@ -2285,7 +2359,7 @@ body {
 </nav>
 
 <!-- FAB（案B: 4タブ＋右下FAB） -->
-<button id="fab" hidden onclick="openSheet('sheet-quick')" aria-label="記録を追加" class="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover" style="bottom:calc(72px + env(safe-area-inset-bottom))">
+<button id="fab" hidden onclick="openQuick()" aria-label="記録を追加" class="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover" style="bottom:calc(72px + env(safe-area-inset-bottom))">
   <svg class="h-7 w-7"><use href="#i-plus"/></svg>
 </button>
 
@@ -2294,7 +2368,7 @@ body {
 <!-- ============================================================ -->
 <div id="sheet-quick" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="クイック記録">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-quick')"></div>
-  <div tabindex="-1" class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl translate-y-full rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-semibold">サッと記録 <span id="qs-date" class="ml-1 text-xs font-normal text-muted-foreground">8月3日（月）</span></h2>
@@ -2322,7 +2396,7 @@ body {
 <!-- 日別シート(カレンダー) -->
 <div id="sheet-day" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="この日の記録">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-day')"></div>
-  <div tabindex="-1" class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl translate-y-full rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-semibold"><span id="day-title">8月3日（月）</span>の記録</h2>
@@ -2336,7 +2410,7 @@ body {
 <!-- 記録詳細の「…」メニュー -->
 <div id="sheet-more" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="その他の操作">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-more')"></div>
-  <div tabindex="-1" class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl translate-y-full rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="overflow-hidden rounded-xl bg-surface-muted">
       <button onclick="closeSheet('sheet-more');openForm(true)" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-pencil"/></svg>編集する</button>
@@ -2352,7 +2426,7 @@ body {
 <!-- ペット編集シート -->
 <div id="sheet-pet" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="ペットを編集">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-pet')"></div>
-  <div tabindex="-1" class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl translate-y-full rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-base font-semibold">モカを編集</h2>
@@ -2376,7 +2450,7 @@ body {
 <!-- プロト設定シート -->
 <div id="sheet-proto" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="プロト設定">
   <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-proto')"></div>
-  <div tabindex="-1" class="sheet-panel absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface p-4 shadow-lg" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl translate-y-full rounded-t-2xl bg-surface p-4 shadow-lg transition-transform duration-300 motion-reduce:transition-none" style="padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
     <h2 class="mb-3 text-base font-semibold">プロト設定（検証用）</h2>
     <div class="space-y-3 text-sm">
@@ -2407,6 +2481,7 @@ body {
 (function () {
   var TAB_SCREENS = { home: "home", calendar: "calendar", gallery: "gallery", menu: "menu", weight: "menu", pets: "menu", "settings-household": "menu", "settings-account": "menu", "record-detail": "home" };
   var CHROME_SCREENS = ["home", "calendar", "gallery", "menu", "weight", "pets", "settings-household", "settings-account", "record-detail"];
+  var TODAY_LABEL = "8月3日（月）";
   var navVariant = "a";
   var current = "intro";
   var emptyMode = false;
@@ -2422,7 +2497,8 @@ body {
   function updateChrome() {
     var showChrome = CHROME_SCREENS.indexOf(current) !== -1;
     document.getElementById("tabbar").hidden = !showChrome;
-    document.getElementById("fab").hidden = !(showChrome && navVariant === "b" && (current === "home" || current === "calendar"));
+    var listScreen = current === "home" || current === "calendar" || current === "gallery";
+    document.getElementById("fab").hidden = !(showChrome && navVariant === "b" && listScreen);
     var active = TAB_SCREENS[current];
     document.querySelectorAll("[data-tab]").forEach(function (b) {
       var on = b.getAttribute("data-tab") === active;
@@ -2431,7 +2507,7 @@ body {
     });
   }
 
-  /* ---- シート（フォーカス管理: 背景 inert + パネルへフォーカス移動） ---- */
+  /* ---- シート（背景 inert + パネルへフォーカス移動。トランジションは Tailwind の translate-y ユーティリティ） ---- */
   var sheetTriggers = {};
   function anySheetOpen() {
     return document.querySelectorAll('[role="dialog"]:not(.hidden)').length > 0;
@@ -2444,19 +2520,22 @@ body {
   }
   window.openSheet = function (id) {
     var el = document.getElementById(id);
+    var panel = el.querySelector("[data-sheet-panel]");
     sheetTriggers[id] = document.activeElement;
     el.hidden = false;
     el.classList.remove("hidden");
     setBackgroundInert(true);
     requestAnimationFrame(function () { requestAnimationFrame(function () {
-      el.classList.add("sheet-open");
-      var panel = el.querySelector(".sheet-panel");
-      if (panel) panel.focus();
+      panel.classList.remove("translate-y-full");
+      panel.classList.add("translate-y-0");
+      panel.focus();
     }); });
   };
   window.closeSheet = function (id) {
     var el = document.getElementById(id);
-    el.classList.remove("sheet-open");
+    var panel = el.querySelector("[data-sheet-panel]");
+    panel.classList.remove("translate-y-0");
+    panel.classList.add("translate-y-full");
     setTimeout(function () {
       el.classList.add("hidden");
       if (!anySheetOpen()) {
@@ -2464,7 +2543,7 @@ body {
         var t = sheetTriggers[id];
         if (t && document.contains(t)) t.focus();
       }
-    }, 250);
+    }, 300);
   };
 
   window.setNav = function (v) {
@@ -2488,6 +2567,12 @@ body {
     emptyMode = on;
     document.querySelectorAll("[data-empty-hide]").forEach(function (el) { el.hidden = on; });
     document.querySelectorAll("[data-empty-show]").forEach(function (el) { el.hidden = !on; });
+    if (on) {
+      document.getElementById("more-records").hidden = true;
+      document.getElementById("more-btn").hidden = true;
+    } else {
+      document.getElementById("more-btn").hidden = false;
+    }
   };
 
   window.toggleSearch = function () {
@@ -2497,15 +2582,15 @@ body {
 
   /* ---- トースト ---- */
   var toastTimer = null;
-  function showToast(text) {
+  window.toast = function (text) {
     var t = document.getElementById("toast");
     t.textContent = text;
     t.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.hidden = true; }, 1800);
-  }
+    toastTimer = setTimeout(function () { t.hidden = true; }, 2200);
+  };
 
-  /* ---- セグメント（記録元トグル: 兄弟間で選択を切り替え） ---- */
+  /* ---- チップ/セグメントの選択スタイル ---- */
   var SEG_ON = ["bg-surface", "font-semibold", "shadow-sm"];
   var SEG_OFF = ["font-medium", "text-muted-foreground"];
   window.segPick = function (btn) {
@@ -2516,14 +2601,44 @@ body {
       SEG_OFF.forEach(function (c) { b.classList.toggle(c, !on); });
     });
   };
-
-  /* ---- クイック記録（chips-first / D32 準拠） ---- */
   var CHIP_ON = ["bg-primary", "text-primary-foreground"];
   var CHIP_OFF = ["bg-surface", "ring-1", "ring-border"];
-  window.qsChip = function (btn) {
-    var on = !btn.classList.contains("bg-primary");
+  function chipState(btn, on) {
     CHIP_ON.forEach(function (c) { btn.classList.toggle(c, on); });
     CHIP_OFF.forEach(function (c) { btn.classList.toggle(c, !on); });
+  }
+
+  /* ---- ホームの絞り込みチップ ---- */
+  window.homeFilter = function (btn) {
+    var filter = btn.getAttribute("data-filter");
+    document.querySelectorAll("#home-filters [data-filter]").forEach(function (b) { chipState(b, b === btn); });
+    document.querySelectorAll("[data-src]").forEach(function (li) {
+      var ok;
+      if (filter === "all") ok = true;
+      else if (filter.indexOf("tag:") === 0) ok = (li.getAttribute("data-tags") || "").split(" ").indexOf(filter.slice(4)) !== -1;
+      else ok = li.getAttribute("data-src") === filter;
+      li.hidden = !ok;
+    });
+    document.querySelectorAll("[data-group]").forEach(function (g) {
+      if (g.id === "more-records" && document.getElementById("more-btn").hidden === false) return;
+      g.hidden = !g.querySelector("li[data-src]:not([hidden])");
+    });
+  };
+
+  /* ---- もっと見る ---- */
+  window.loadMore = function () {
+    document.getElementById("more-records").hidden = false;
+    document.getElementById("more-btn").hidden = true;
+    toast("残りの記録を読み込みました（モックは 1 件）");
+  };
+
+  /* ---- クイック記録（chips-first / D32 準拠） ---- */
+  window.openQuick = function () {
+    document.getElementById("qs-date").textContent = TODAY_LABEL;
+    openSheet("sheet-quick");
+  };
+  window.qsChip = function (btn) {
+    chipState(btn, !btn.classList.contains("bg-primary"));
     qsPreview();
   };
   window.qsNoteShow = function () {
@@ -2541,10 +2656,10 @@ body {
   };
   window.qsSave = function () {
     closeSheet("sheet-quick");
-    showToast("残しました");
+    toast("残しました");
   };
 
-  /* ---- カレンダーの日別シート（タップした日付を反映） ---- */
+  /* ---- カレンダーの日別シート ---- */
   function badgeHtml(src) {
     if (src === "school") {
       return '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3 w-3"><use href="#i-school"/></svg>保育園</span>';
@@ -2552,30 +2667,120 @@ body {
     return '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>';
   }
   var DAY_DATA = {
-    1: { label: "8月1日（土）", rows: [{ src: "home", text: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。" }] },
-    2: { label: "8月2日（日）", rows: [{ src: "home", text: "公園までロング散歩。足を洗うのを嫌がらなくなってきた。" }] },
-    3: { label: "8月3日（月）", rows: [
-      { src: "school", text: "園庭でボール遊びをたくさんしました。" },
+    1: { rows: [{ src: "home", text: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。" }] },
+    2: { rows: [{ src: "home", text: "公園までロング散歩。足を洗うのを嫌がらなくなってきた。", det: 1 }] },
+    3: { rows: [
+      { src: "school", text: "園庭でボール遊びをたくさんしました。", det: 0 },
       { src: "home", text: "夜ごはん完食。散歩は 30 分。" }
     ] }
   };
+  function dayLabel(day) {
+    var wd = ["土", "日", "月", "火", "水", "木", "金"][(day - 1) % 7];
+    return "8月" + day + "日（" + wd + "）";
+  }
   window.openDay = function (day) {
-    var data = DAY_DATA[day] || { label: "8月" + day + "日", rows: [] };
-    document.getElementById("day-title").textContent = data.label;
-    document.getElementById("qs-date").textContent = data.label;
-    var rows = emptyMode ? [] : data.rows;
+    var label = dayLabel(day);
+    var rows = emptyMode ? [] : ((DAY_DATA[day] || {}).rows || []);
+    document.getElementById("day-title").textContent = label;
+    document.getElementById("qs-date").textContent = label;
     var list = document.getElementById("day-list");
     if (!rows.length) {
       list.innerHTML = '<li class="rounded-xl bg-surface-muted p-3 text-sm text-muted-foreground">この日の記録はありません</li>';
     } else {
       list.innerHTML = rows.map(function (r) {
-        return '<li><a href="#" onclick="closeSheet(\'sheet-day\');go(\'record-detail\');return false" class="flex items-center gap-3 rounded-xl bg-surface-muted p-3">' +
+        var det = typeof r.det === "number" ? "showDetail(" + r.det + ");" : "";
+        return '<li><a href="#" onclick="closeSheet(\'sheet-day\');' + det + 'go(\'record-detail\');return false" class="flex items-center gap-3 rounded-xl bg-surface-muted p-3">' +
           badgeHtml(r.src) +
           '<span class="min-w-0 flex-1 truncate text-sm">' + r.text + '</span>' +
           '<svg class="h-4 w-4 shrink-0 text-muted-foreground"><use href="#i-chevron-right"/></svg></a></li>';
       }).join("");
     }
     openSheet("sheet-day");
+  };
+
+  /* ---- 記録詳細（前後の記録ナビ用に 2 状態を持つ） ---- */
+  var DETAIL = [
+    {
+      title: "8月3日（月）",
+      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span><span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 3.20 kg</span><span class="text-xs text-muted-foreground">記入: さくら保育園</span>',
+      body: "園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。\n\nお迎えのときは少し眠そうでしたが、帰り際にしっぽをたくさん振ってくれました。",
+      photos: '<button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-amber-200 to-orange-300 text-5xl">🐕</button><button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-emerald-200 to-teal-300 text-5xl">🎾</button>',
+      tags: '<a href="#" onclick="go(\'home\');return false" class="rounded-full bg-surface px-3 py-1 text-xs font-medium ring-1 ring-border">#ボール遊び</a>',
+      share: true,
+      nav: '<a href="#" onclick="showDetail(1);return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground"><svg class="h-4 w-4"><use href="#i-chevron-left"/></svg>8月2日の記録</a><span class="text-muted-foreground/50">次の記録なし</span>'
+    },
+    {
+      title: "8月2日（日）",
+      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3.5 w-3.5"><use href="#i-home-src"/></svg>おうち</span><span class="text-xs text-muted-foreground">記入: 佐藤 花子</span>',
+      body: "公園までロング散歩。帰りに足を洗うのを嫌がらなくなってきた。\n\n水飲みはいつもどおり。夜はぐっすり。",
+      photos: '<button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-sky-200 to-indigo-300 text-5xl">🌳</button><button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-pink-200 to-rose-300 text-5xl">🐶</button>',
+      tags: "",
+      share: false,
+      nav: '<span class="text-muted-foreground/50">前の記録なし（モックは 2 件）</span><a href="#" onclick="showDetail(0);return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground">8月3日の記録<svg class="h-4 w-4"><use href="#i-chevron-right"/></svg></a>'
+    }
+  ];
+  window.showDetail = function (i) {
+    var d = DETAIL[i];
+    document.getElementById("det-title").textContent = d.title;
+    document.getElementById("det-badges").innerHTML = d.badges;
+    document.getElementById("det-body").textContent = d.body;
+    document.getElementById("det-photos").innerHTML = d.photos;
+    document.getElementById("det-tags").innerHTML = d.tags;
+    document.getElementById("det-share").hidden = !d.share;
+    document.getElementById("det-nav").innerHTML = d.nav;
+    window.scrollTo(0, 0);
+  };
+
+  /* ---- 体重の期間切替 ---- */
+  var WEIGHT = {
+    "1m": { points: "20,110 80,95 140,100 200,70 260,55 300,45", x0: "7/1", delta: "+0.15 kg / 1ヶ月" },
+    "3m": { points: "20,120 60,112 100,105 140,98 180,100 220,70 260,55 300,45", x0: "5/3", delta: "+0.30 kg / 3ヶ月" },
+    "1y": { points: "20,135 60,125 100,118 140,105 180,95 220,80 260,60 300,45", x0: "2025/8", delta: "+0.55 kg / 1年" },
+    "all": { points: "20,145 60,130 100,115 140,100 180,90 220,75 260,58 300,45", x0: "2023/6", delta: "+0.85 kg / 全期間" }
+  };
+  function drawWeight(key) {
+    var d = WEIGHT[key];
+    document.getElementById("wt-line").setAttribute("points", d.points);
+    document.getElementById("wt-x0").textContent = d.x0;
+    document.getElementById("wt-delta").textContent = d.delta;
+    var pts = d.points.split(" ").map(function (p) { return p.split(","); });
+    var dots = document.getElementById("wt-dots");
+    dots.innerHTML = pts.map(function (p, i) {
+      var r = i === pts.length - 1 ? 4.5 : 3.5;
+      return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + r + '" fill="currentColor"/>';
+    }).join("");
+  }
+  window.weightRange = function (btn) {
+    document.querySelectorAll("#wt-ranges [data-range]").forEach(function (b) { chipState(b, b === btn); });
+    drawWeight(btn.getAttribute("data-range"));
+  };
+
+  /* ---- 招待リンクのコピー（失敗時はその旨を表示） ---- */
+  window.copyInvite = function (btn) {
+    var label = btn.querySelector("span:last-child");
+    var show = function (text) {
+      label.textContent = text;
+      setTimeout(function () { label.textContent = "リンクをコピー"; }, 1800);
+    };
+    var url = "https://mfmf.example.com/invite/mock-token";
+    var legacy = function () {
+      var ta = document.createElement("textarea");
+      ta.value = url;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      show(ok ? "コピーしました" : "コピーできませんでした");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { show("コピーしました"); }, legacy);
+    } else {
+      legacy();
+    }
   };
 
   /* ---- 記録フォーム（新規 / 編集を 1 画面で） ---- */
@@ -2599,27 +2804,13 @@ body {
     go(formEdit ? "record-detail" : "home");
   };
 
-  /* ---- 招待リンクのコピー ---- */
-  window.copyInvite = function (btn) {
-    var label = btn.querySelector("span:last-child");
-    var done = function () {
-      label.textContent = "コピーしました";
-      setTimeout(function () { label.textContent = "リンクをコピー"; }, 1800);
-    };
-    var url = "https://mfmf.example.com/invite/mock-token";
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(done, done);
-    } else {
-      done();
-    }
-  };
-
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
       document.querySelectorAll('[role="dialog"]:not(.hidden)').forEach(function (el) { window.closeSheet(el.id); });
     }
   });
 
+  drawWeight("1m");
   go("intro");
 })();
 </script>
