@@ -43,12 +43,15 @@ export async function updateSession(request: NextRequest) {
   // - /share/*: 読み取り専用の共有ビュー（共有「管理」画面 /shares は保護対象）
   // - /signup, /forgot-password: セルフ登録（UC-O02）・パスワード再設定の入口
   //   （/reset-password は回復セッション確立後に到達するため保護対象のまま）
+  // - /terms, /privacy: 利用規約・プライバシーポリシー（サインアップ前に閲覧する）
   const isPublicRoute =
     pathname === "/offline" ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/share/") ||
     pathname.startsWith("/signup") ||
-    pathname.startsWith("/forgot-password");
+    pathname.startsWith("/forgot-password") ||
+    pathname === "/terms" ||
+    pathname === "/privacy";
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     // 未ログイン → /login へ

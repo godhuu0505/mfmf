@@ -23,12 +23,34 @@ async function shootForgotPassword(page: Page, name: string) {
   await expect(page).toHaveScreenshot(name, { fullPage: true });
 }
 
+async function shootTerms(page: Page, name: string) {
+  await page.goto("/terms");
+  await expect(page.getByRole("heading", { name: "利用規約" })).toBeVisible();
+  await expect(page).toHaveScreenshot(name, { fullPage: true });
+}
+
+async function shootPrivacy(page: Page, name: string) {
+  await page.goto("/privacy");
+  await expect(
+    page.getByRole("heading", { name: "プライバシーポリシー" }),
+  ).toBeVisible();
+  await expect(page).toHaveScreenshot(name, { fullPage: true });
+}
+
 test("VRT: ログイン画面", async ({ page }) => {
   await shootLogin(page, "login.png");
 });
 
 test("VRT: パスワード再設定の入口", async ({ page }) => {
   await shootForgotPassword(page, "forgot-password.png");
+});
+
+test("VRT: 利用規約（下書き）", async ({ page }) => {
+  await shootTerms(page, "terms.png");
+});
+
+test("VRT: プライバシーポリシー（下書き）", async ({ page }) => {
+  await shootPrivacy(page, "privacy.png");
 });
 
 test.describe("ダークモード", () => {
@@ -40,5 +62,13 @@ test.describe("ダークモード", () => {
 
   test("VRT: パスワード再設定の入口（ダーク）", async ({ page }) => {
     await shootForgotPassword(page, "forgot-password-dark.png");
+  });
+
+  test("VRT: 利用規約（下書き・ダーク）", async ({ page }) => {
+    await shootTerms(page, "terms-dark.png");
+  });
+
+  test("VRT: プライバシーポリシー（下書き・ダーク）", async ({ page }) => {
+    await shootPrivacy(page, "privacy-dark.png");
   });
 });
