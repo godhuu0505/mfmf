@@ -115,8 +115,14 @@ export function ConfirmSubmitButton({
           onClose={() => setOpen(false)}
           onConfirm={() => {
             setOpen(false);
+            const form = btnRef.current?.closest("form");
+            // 必須項目エラー時はブラウザの検証メッセージに任せ、ボタンは押せるまま残す
+            if (form && !form.checkValidity()) {
+              form.reportValidity();
+              return;
+            }
             setSubmitted(true);
-            btnRef.current?.closest("form")?.requestSubmit();
+            form?.requestSubmit();
           }}
         />
       )}

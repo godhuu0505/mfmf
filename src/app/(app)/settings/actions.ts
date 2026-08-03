@@ -43,6 +43,9 @@ export async function updateProfile(
   revalidatePath("/settings");
   revalidatePath("/settings/account");
   revalidatePath("/records/new");
+  // 表示名・既定記入者は (app)/layout.tsx（ヘッダー / クイック記録）でも読むため、
+  // レイアウトごと無効化して古い値が残らないようにする
+  revalidatePath("/", "layout");
   return { ok: true, message: "プロフィールを保存しました。" };
 }
 

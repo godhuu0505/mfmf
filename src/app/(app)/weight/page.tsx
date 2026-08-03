@@ -129,7 +129,7 @@ export default async function WeightPage({
                 </p>
                 {rows.length > 1 && (
                   <p className="text-sm text-muted-foreground">
-                    {rangeKey === "all" ? "最初の記録" : `${rangeDef.label}前`}から{" "}
+                    {first ? formatDate(first.record_date) : ""}から{" "}
                     <span
                       className={
                         "font-semibold " +

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Pencil, X } from "lucide-react";
 
 // ペットの編集シート（D33 / proto 合意）。常時展開フォームをやめ、
@@ -18,6 +19,8 @@ export default function PetEditSheet({
   deleteForm: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [confirming, setConfirming] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -26,12 +29,19 @@ export default function PetEditSheet({
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const bg = document.querySelectorAll<HTMLElement>("[data-quick-record-bg]");
+    bg.forEach((el) => {
+      el.inert = true;
+    });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
+      bg.forEach((el) => {
+        el.inert = false;
+      });
       window.removeEventListener("keydown", onKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -65,6 +75,9 @@ export default function PetEditSheet({
       >
         <Pencil className="h-5 w-5" aria-hidden="true" />
       </button>
+      {mounted &&
+        createPortal(
+          <>
 
       <div
         onClick={close}
@@ -132,6 +145,9 @@ export default function PetEditSheet({
           )}
         </div>
       </div>
+          </>,
+          document.body,
+        )}
     </>
   );
 }

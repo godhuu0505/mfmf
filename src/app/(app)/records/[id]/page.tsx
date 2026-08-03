@@ -23,7 +23,7 @@ import {
   deleteRecord,
   setRecordGuestVisible,
 } from "@/app/(app)/records/actions";
-import { Scale } from "lucide-react";
+import { Scale, Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -209,6 +209,30 @@ export default async function RecordDetailPage({
                   </Link>
                   <RecordActionsSheet
                     editHref={`/records/${record.id}?edit=1`}
+                    shareForm={
+                      record.pet_id ? (
+                        <form
+                          action={setRecordGuestVisible.bind(
+                            null,
+                            record.id,
+                            !record.guest_visible,
+                          )}
+                        >
+                          <SubmitButton
+                            pendingLabel="変更中…"
+                            className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+                          >
+                            <Users
+                              className="h-5 w-5 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                            {record.guest_visible
+                              ? "ゲスト共有を解除"
+                              : "ゲストに共有"}
+                          </SubmitButton>
+                        </form>
+                      ) : undefined
+                    }
                     deleteForm={
                       <form action={deleteRecord.bind(null, record.id)}>
                         <SubmitButton

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Camera, Plus, X } from "lucide-react";
 
@@ -42,6 +43,8 @@ export default function CalendarMonth({
   canAdd,
 }: Props) {
   const [openDate, setOpenDate] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const sheetRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
 
@@ -50,12 +53,19 @@ export default function CalendarMonth({
     if (!openDate) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const bg = document.querySelectorAll<HTMLElement>("[data-quick-record-bg]");
+    bg.forEach((el) => {
+      el.inert = true;
+    });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
+      bg.forEach((el) => {
+        el.inert = false;
+      });
       window.removeEventListener("keydown", onKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,6 +169,9 @@ export default function CalendarMonth({
         <span className="ml-auto">日付をタップで詳細</span>
       </p>
 
+      {mounted &&
+        createPortal(
+          <>
       {/* 日別シート */}
       <div
         onClick={close}
@@ -244,6 +257,9 @@ export default function CalendarMonth({
           )}
         </div>
       </div>
+          </>,
+          document.body,
+        )}
     </>
   );
 }

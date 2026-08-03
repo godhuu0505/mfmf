@@ -40,7 +40,7 @@
 ## アーキテクチャ / 規約
 
 - **App Router**。ページは原則 Server Component。クライアント操作が必要な箇所だけ `"use client"`。
-- **データ変更は Server Action**（`src/app/records/actions.ts`）で行い、`redirect` / `revalidatePath` で反映。
+- **データ変更は Server Action**（`src/app/(app)/records/actions.ts`）で行い、`redirect` / `revalidatePath` で反映。
   API Route は基本作らない（`auth/signout` の Route Handler は例外）。
 - **Supabase クライアントは用途別に使い分ける**:
   - Client Component: `src/lib/supabase/client.ts`
@@ -109,6 +109,10 @@ CSS は Tailwind CLI に `@source` でその HTML を渡して生成し、本番
 - 作業ブランチで開発し、`git push -u origin <branch>` でプッシュ。`main` へ直接 push しない。
 - 強制 push（`--force` / `-f`）は禁止（ガードでブロック）。
 - PR は lint / typecheck / build の CI（`.github/workflows/ci.yml`）を通す。
+- **UI に変更が入る PR には、変更後のスクリーンショットを必ず貼る**（どの画面がどう変わるかを
+  レビュアーが差分コードなしで判断できるように）。キャプチャは CI の E2E が生成する
+  `tests/e2e/zz-screenshots.spec.ts` の出力（playwright-report アーティファクト内
+  `test-results/screenshots/`）を使い、ブランチにコミットして PR 本文/コメントから参照する。
 
 ## DB スキーマ変更
 
