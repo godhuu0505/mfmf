@@ -15,6 +15,7 @@ async function shot(page: Page, name: string, fullPage = true) {
 }
 
 test("スクリーンショット一式（ライト）", async ({ page }) => {
+  test.setTimeout(120_000); // 12 画面ぶんの遷移とキャプチャ
   await page.goto("/login");
   await shot(page, "login");
 

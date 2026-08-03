@@ -99,7 +99,10 @@ export default function PetEditSheet({
           (open ? "visible translate-y-0" : "invisible translate-y-full")
         }
       >
-        <div className="mx-auto max-w-2xl px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div
+          onSubmit={() => close()}
+          className="mx-auto max-w-2xl px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+        >
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted" />
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-bold text-foreground">

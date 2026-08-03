@@ -135,7 +135,7 @@ test.describe("招待リンクのコピー", () => {
     await login(page);
 
     await page.goto("/settings");
-    await page.getByLabel(/宛先メールアドレス/).fill(email);
+    await page.locator("#invite_email").fill(email);
     await page.getByRole("button", { name: "招待を発行" }).click();
     await expect(page.getByText(email, { exact: false })).toBeVisible();
 
