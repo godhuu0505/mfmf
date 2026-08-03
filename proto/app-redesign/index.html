@@ -1584,7 +1584,7 @@ body {
         <span class="text-base font-semibold tracking-tight">mfmf</span>
         <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">佐藤家</span>
       </div>
-      <button onclick="toggleSearch()" aria-label="検索と絞り込み" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-search"/></svg></button>
+      <button id="search-toggle" onclick="toggleSearch()" aria-label="検索と絞り込み" aria-expanded="false" aria-controls="search-panel" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-search"/></svg></button>
     </div>
   </header>
   <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
@@ -2275,7 +2275,7 @@ body {
         <span class="text-base font-semibold tracking-tight">mfmf</span>
         <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">ゲスト</span>
       </div>
-      <button aria-label="ログアウト" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-logout"/></svg></button>
+      <button aria-label="ログアウト" onclick="go('login')" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-logout"/></svg></button>
     </div>
   </header>
   <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-16">
@@ -2612,6 +2612,7 @@ body {
   window.toggleSearch = function () {
     var p = document.getElementById("search-panel");
     p.hidden = !p.hidden;
+    document.getElementById("search-toggle").setAttribute("aria-expanded", p.hidden ? "false" : "true");
   };
 
   /* ---- トースト ---- */
