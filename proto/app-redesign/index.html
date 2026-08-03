@@ -239,6 +239,9 @@
   }
 }
 @layer utilities {
+  .visible {
+    visibility: visible;
+  }
   .absolute {
     position: absolute;
   }
@@ -1012,9 +1015,6 @@
   .ring-primary {
     --tw-ring-color: var(--primary);
   }
-  .filter {
-    filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,);
-  }
   .backdrop-blur {
     --tw-backdrop-blur: blur(8px);
     -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
@@ -1351,59 +1351,6 @@ body {
   inherits: false;
   initial-value: 0 0 #0000;
 }
-@property --tw-blur {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-brightness {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-contrast {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-grayscale {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-hue-rotate {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-invert {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-opacity {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-saturate {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-sepia {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-drop-shadow {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-drop-shadow-color {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-drop-shadow-alpha {
-  syntax: "<percentage>";
-  inherits: false;
-  initial-value: 100%;
-}
-@property --tw-drop-shadow-size {
-  syntax: "*";
-  inherits: false;
-}
 @property --tw-backdrop-blur {
   syntax: "*";
   inherits: false;
@@ -1479,19 +1426,6 @@ body {
       --tw-ring-offset-width: 0px;
       --tw-ring-offset-color: #fff;
       --tw-ring-offset-shadow: 0 0 #0000;
-      --tw-blur: initial;
-      --tw-brightness: initial;
-      --tw-contrast: initial;
-      --tw-grayscale: initial;
-      --tw-hue-rotate: initial;
-      --tw-invert: initial;
-      --tw-opacity: initial;
-      --tw-saturate: initial;
-      --tw-sepia: initial;
-      --tw-drop-shadow: initial;
-      --tw-drop-shadow-color: initial;
-      --tw-drop-shadow-alpha: 100%;
-      --tw-drop-shadow-size: initial;
       --tw-backdrop-blur: initial;
       --tw-backdrop-brightness: initial;
       --tw-backdrop-contrast: initial;
@@ -1616,14 +1550,15 @@ body {
     <!-- 検索（アイコンで展開。現行の常時表示カードを置き換え） -->
     <div id="search-panel" hidden class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
       <div class="flex gap-2">
-        <input type="search" placeholder="本文・タグを検索" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
-        <button class="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">検索</button>
+        <input id="search-kw" type="search" placeholder="本文・タグを検索" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
+        <button onclick="searchApply()" class="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">検索</button>
+        <button onclick="searchClear()" class="shrink-0 rounded-lg border border-border px-4 py-2 text-sm font-medium">クリア</button>
       </div>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <label class="text-xs text-muted-foreground">開始日
-          <input type="date" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <input id="search-from" type="date" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
         <label class="text-xs text-muted-foreground">終了日
-          <input type="date" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <input id="search-to" type="date" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
       </div>
     </div>
 
@@ -1649,7 +1584,7 @@ body {
       <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>今日</span><span class="text-xs font-normal text-muted-foreground">8月3日（月）</span></h2>
         <ul class="space-y-3">
-          <li data-src="school" data-tags="ボール遊び"><a href="#" onclick="showDetail(0);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="school" data-tags="ボール遊び" data-date="2026-08-03"><a href="#" onclick="showDetail(0);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-amber-200 to-orange-300 text-3xl">🐕</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1660,7 +1595,7 @@ body {
               <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span>#ボール遊び</span><span class="inline-flex items-center gap-0.5"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>3枚</span></span>
             </span>
           </a></li>
-          <li data-src="home" data-tags=""><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="home" data-tags="" data-date="2026-08-03"><a href="#" onclick="showDetail(1);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
                 <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>
@@ -1673,7 +1608,7 @@ body {
       <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>昨日</span><span class="text-xs font-normal text-muted-foreground">8月2日（日）</span></h2>
         <ul class="space-y-3">
-          <li data-src="home" data-tags=""><a href="#" onclick="showDetail(1);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="home" data-tags="" data-date="2026-08-02"><a href="#" onclick="showDetail(2);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-sky-200 to-indigo-300 text-3xl">🌳</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1688,7 +1623,7 @@ body {
       <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>8月1日（土）</span></h2>
         <ul class="space-y-3">
-          <li data-src="home" data-tags="トリミング"><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="home" data-tags="トリミング" data-date="2026-08-01"><a href="#" onclick="showDetail(3);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-rose-200 to-pink-300 text-3xl">✂️</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1704,7 +1639,7 @@ body {
       <div data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>7月30日（木）</span></h2>
         <ul class="space-y-3">
-          <li data-src="school" data-tags=""><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="school" data-tags="" data-date="2026-07-30"><a href="#" onclick="showDetail(4);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-emerald-200 to-teal-300 text-3xl">💤</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1720,7 +1655,7 @@ body {
       <div id="more-records" hidden data-group>
         <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>7月28日（火）</span></h2>
         <ul class="space-y-3">
-          <li data-src="school" data-tags=""><a href="#" onclick="go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+          <li data-src="school" data-tags="" data-date="2026-07-28"><a href="#" onclick="showDetail(5);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
             <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-orange-200 to-amber-300 text-3xl">🍚</span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-1.5">
@@ -1732,6 +1667,10 @@ body {
         </ul>
       </div>
       <button id="more-btn" onclick="loadMore()" class="w-full rounded-xl border border-border bg-surface py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-muted">もっと見る（全 42 件）</button>
+      <div id="no-results" hidden class="rounded-2xl border-2 border-dashed border-border p-10 text-center">
+        <p class="font-medium">条件に合う記録がありません</p>
+        <p class="mt-1 text-sm text-muted-foreground">検索条件やチップを変えてみてください</p>
+      </div>
     </div>
   </main>
 </section>
@@ -1742,11 +1681,11 @@ body {
 <section data-screen="calendar" hidden>
   <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
     <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-2">
-      <button aria-label="前月" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
+      <button aria-label="前月" onclick="toast('月の移動はプロト対象外です（2026年8月固定）')" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
       <h1 class="text-base font-semibold">2026年8月</h1>
       <div class="flex items-center gap-1">
-        <button class="rounded-full px-3 py-1.5 text-sm font-medium text-primary hover:bg-surface-muted">今日</button>
-        <button aria-label="翌月" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-right"/></svg></button>
+        <button onclick="toast('今日は 8月3日（月）です')" class="rounded-full px-3 py-1.5 text-sm font-medium text-primary hover:bg-surface-muted">今日</button>
+        <button aria-label="翌月" onclick="toast('月の移動はプロト対象外です（2026年8月固定）')" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-right"/></svg></button>
       </div>
     </div>
   </header>
@@ -1947,17 +1886,17 @@ body {
       </svg>
     </div>
     <div data-empty-hide class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
-      <a href="#" onclick="go('record-detail');return false" class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-muted">
+      <a href="#" onclick="showDetail(0);go('record-detail');return false" class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-muted">
         <span class="text-sm">8月3日（月）<span class="ml-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300">保育園</span></span>
         <span class="font-semibold">3.20 kg</span>
       </a>
       <div class="border-t border-border"></div>
-      <a href="#" onclick="go('record-detail');return false" class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-muted">
+      <a href="#" onclick="showDetail(3);go('record-detail');return false" class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-muted">
         <span class="text-sm">8月1日（土）<span class="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300">おうち</span></span>
         <span class="font-semibold">3.25 kg</span>
       </a>
       <div class="border-t border-border"></div>
-      <a href="#" onclick="go('record-detail');return false" class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-muted">
+      <a href="#" onclick="showDetail(6);go('record-detail');return false" class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-muted">
         <span class="text-sm">7月20日（月）<span class="ml-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300">保育園</span></span>
         <span class="font-semibold">3.10 kg</span>
       </a>
@@ -2171,7 +2110,7 @@ body {
         <label class="block text-xs font-medium text-muted-foreground">ペット
           <select class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"><option>モカ</option></select></label>
         <label class="block text-xs font-medium text-muted-foreground">日付
-          <input type="date" value="2026-08-03" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <input id="form-date" type="date" value="2026-08-03" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
       </div>
     </div>
     <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
@@ -2486,6 +2425,8 @@ body {
   var current = "intro";
   var emptyMode = false;
   var formEdit = false;
+  var selectedDay = 3;
+  var currentDetail = 0;
 
   window.go = function (id) {
     document.querySelectorAll("[data-screen]").forEach(function (s) { s.hidden = s.getAttribute("data-screen") !== id; });
@@ -2567,11 +2508,13 @@ body {
     emptyMode = on;
     document.querySelectorAll("[data-empty-hide]").forEach(function (el) { el.hidden = on; });
     document.querySelectorAll("[data-empty-show]").forEach(function (el) { el.hidden = !on; });
+    document.getElementById("no-results").hidden = true;
     if (on) {
       document.getElementById("more-records").hidden = true;
       document.getElementById("more-btn").hidden = true;
     } else {
       document.getElementById("more-btn").hidden = false;
+      applyHomeFilters();
     }
   };
 
@@ -2608,32 +2551,76 @@ body {
     CHIP_OFF.forEach(function (c) { btn.classList.toggle(c, !on); });
   }
 
-  /* ---- ホームの絞り込みチップ ---- */
-  window.homeFilter = function (btn) {
-    var filter = btn.getAttribute("data-filter");
-    document.querySelectorAll("#home-filters [data-filter]").forEach(function (b) { chipState(b, b === btn); });
-    document.querySelectorAll("[data-src]").forEach(function (li) {
-      var ok;
-      if (filter === "all") ok = true;
-      else if (filter.indexOf("tag:") === 0) ok = (li.getAttribute("data-tags") || "").split(" ").indexOf(filter.slice(4)) !== -1;
-      else ok = li.getAttribute("data-src") === filter;
+  /* ---- ホームの絞り込み（チップ + 検索キーワード + 期間を合成） ---- */
+  var chipFilter = "all";
+  var keyword = "";
+  var dateFrom = "";
+  var dateTo = "";
+  function applyHomeFilters() {
+    if (emptyMode) return;
+    var visible = 0;
+    document.querySelectorAll("li[data-src]").forEach(function (li) {
+      var ok = true;
+      if (chipFilter !== "all") {
+        if (chipFilter.indexOf("tag:") === 0) ok = (li.getAttribute("data-tags") || "").split(" ").indexOf(chipFilter.slice(4)) !== -1;
+        else ok = li.getAttribute("data-src") === chipFilter;
+      }
+      if (ok && keyword) ok = li.textContent.indexOf(keyword) !== -1;
+      var d = li.getAttribute("data-date") || "";
+      if (ok && dateFrom) ok = d >= dateFrom;
+      if (ok && dateTo) ok = d <= dateTo;
       li.hidden = !ok;
+      if (ok && !li.closest("#more-records")) visible++;
     });
+    var moreLoaded = document.getElementById("more-btn").hidden;
+    if (moreLoaded) {
+      document.querySelectorAll("#more-records li[data-src]:not([hidden])").forEach(function () { visible++; });
+    }
     document.querySelectorAll("[data-group]").forEach(function (g) {
-      if (g.id === "more-records" && document.getElementById("more-btn").hidden === false) return;
+      if (g.id === "more-records" && !moreLoaded) { g.hidden = true; return; }
       g.hidden = !g.querySelector("li[data-src]:not([hidden])");
     });
+    document.getElementById("no-results").hidden = visible > 0;
+  }
+  window.homeFilter = function (btn) {
+    chipFilter = btn.getAttribute("data-filter");
+    document.querySelectorAll("#home-filters [data-filter]").forEach(function (b) { chipState(b, b === btn); });
+    applyHomeFilters();
+  };
+  window.searchApply = function () {
+    keyword = document.getElementById("search-kw").value.trim();
+    dateFrom = document.getElementById("search-from").value;
+    dateTo = document.getElementById("search-to").value;
+    applyHomeFilters();
+  };
+  window.searchClear = function () {
+    document.getElementById("search-kw").value = "";
+    document.getElementById("search-from").value = "";
+    document.getElementById("search-to").value = "";
+    keyword = ""; dateFrom = ""; dateTo = "";
+    applyHomeFilters();
   };
 
   /* ---- もっと見る ---- */
   window.loadMore = function () {
-    document.getElementById("more-records").hidden = false;
     document.getElementById("more-btn").hidden = true;
+    document.getElementById("more-records").hidden = false;
+    applyHomeFilters();
     toast("残りの記録を読み込みました（モックは 1 件）");
   };
 
-  /* ---- クイック記録（chips-first / D32 準拠） ---- */
+  /* ---- クイック記録（chips-first / D32 準拠。保存で状態をリセット） ---- */
+  function qsReset() {
+    document.querySelectorAll("#qs-chips [data-chip]").forEach(function (b) { chipState(b, false); });
+    var note = document.getElementById("qs-note-input");
+    note.value = "";
+    note.hidden = true;
+    var segs = document.querySelectorAll("#sheet-quick [data-seg]");
+    if (segs.length) segPick(segs[0]);
+    qsPreview();
+  }
   window.openQuick = function () {
+    selectedDay = 3;
     document.getElementById("qs-date").textContent = TODAY_LABEL;
     openSheet("sheet-quick");
   };
@@ -2656,6 +2643,7 @@ body {
   };
   window.qsSave = function () {
     closeSheet("sheet-quick");
+    qsReset();
     toast("残しました");
   };
 
@@ -2667,11 +2655,11 @@ body {
     return '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>';
   }
   var DAY_DATA = {
-    1: { rows: [{ src: "home", text: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。" }] },
-    2: { rows: [{ src: "home", text: "公園までロング散歩。足を洗うのを嫌がらなくなってきた。", det: 1 }] },
+    1: { rows: [{ src: "home", text: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。", det: 3 }] },
+    2: { rows: [{ src: "home", text: "公園までロング散歩。足を洗うのを嫌がらなくなってきた。", det: 2 }] },
     3: { rows: [
       { src: "school", text: "園庭でボール遊びをたくさんしました。", det: 0 },
-      { src: "home", text: "夜ごはん完食。散歩は 30 分。" }
+      { src: "home", text: "夜ごはん完食。散歩は 30 分。", det: 1 }
     ] }
   };
   function dayLabel(day) {
@@ -2679,6 +2667,7 @@ body {
     return "8月" + day + "日（" + wd + "）";
   }
   window.openDay = function (day) {
+    selectedDay = day;
     var label = dayLabel(day);
     var rows = emptyMode ? [] : ((DAY_DATA[day] || {}).rows || []);
     document.getElementById("day-title").textContent = label;
@@ -2698,36 +2687,66 @@ body {
     openSheet("sheet-day");
   };
 
-  /* ---- 記録詳細（前後の記録ナビ用に 2 状態を持つ） ---- */
+  /* ---- 記録詳細（タイムラインの全モック記録に対応。新しい順） ---- */
+  function photoTile(grad, emoji) {
+    return '<button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br ' + grad + ' text-5xl">' + emoji + "</button>";
+  }
+  function tagChip(name) {
+    return '<a href="#" onclick="go(\'home\');return false" class="rounded-full bg-surface px-3 py-1 text-xs font-medium ring-1 ring-border">#' + name + "</a>";
+  }
   var DETAIL = [
-    {
-      title: "8月3日（月）",
+    { title: "8月3日（月）", navLabel: "8月3日（保育園）", src: "school", weight: "3.20", date: "2026-08-03", share: true,
       badges: '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span><span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 3.20 kg</span><span class="text-xs text-muted-foreground">記入: さくら保育園</span>',
       body: "園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。\n\nお迎えのときは少し眠そうでしたが、帰り際にしっぽをたくさん振ってくれました。",
-      photos: '<button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-amber-200 to-orange-300 text-5xl">🐕</button><button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-emerald-200 to-teal-300 text-5xl">🎾</button>',
-      tags: '<a href="#" onclick="go(\'home\');return false" class="rounded-full bg-surface px-3 py-1 text-xs font-medium ring-1 ring-border">#ボール遊び</a>',
-      share: true,
-      nav: '<a href="#" onclick="showDetail(1);return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground"><svg class="h-4 w-4"><use href="#i-chevron-left"/></svg>8月2日の記録</a><span class="text-muted-foreground/50">次の記録なし</span>'
-    },
-    {
-      title: "8月2日（日）",
+      photos: photoTile("from-amber-200 to-orange-300", "🐕") + photoTile("from-emerald-200 to-teal-300", "🎾"),
+      tags: tagChip("ボール遊び") },
+    { title: "8月3日（月）", navLabel: "8月3日（おうち）", src: "home", weight: "", date: "2026-08-03", share: false,
+      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3.5 w-3.5"><use href="#i-home-src"/></svg>おうち</span><span class="text-xs text-muted-foreground">記入: 佐藤 花子</span>',
+      body: "夜ごはん完食。散歩は 30 分、いつもより元気だった。",
+      photos: "", tags: "" },
+    { title: "8月2日（日）", navLabel: "8月2日", src: "home", weight: "", date: "2026-08-02", share: false,
       badges: '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3.5 w-3.5"><use href="#i-home-src"/></svg>おうち</span><span class="text-xs text-muted-foreground">記入: 佐藤 花子</span>',
       body: "公園までロング散歩。帰りに足を洗うのを嫌がらなくなってきた。\n\n水飲みはいつもどおり。夜はぐっすり。",
-      photos: '<button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-sky-200 to-indigo-300 text-5xl">🌳</button><button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-pink-200 to-rose-300 text-5xl">🐶</button>',
-      tags: "",
-      share: false,
-      nav: '<span class="text-muted-foreground/50">前の記録なし（モックは 2 件）</span><a href="#" onclick="showDetail(0);return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground">8月3日の記録<svg class="h-4 w-4"><use href="#i-chevron-right"/></svg></a>'
-    }
+      photos: photoTile("from-sky-200 to-indigo-300", "🌳") + photoTile("from-pink-200 to-rose-300", "🐶"),
+      tags: "" },
+    { title: "8月1日（土）", navLabel: "8月1日", src: "home", weight: "3.25", date: "2026-08-01", share: false,
+      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3.5 w-3.5"><use href="#i-home-src"/></svg>おうち</span><span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 3.25 kg</span><span class="text-xs text-muted-foreground">記入: 佐藤 太郎</span>',
+      body: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。",
+      photos: photoTile("from-rose-200 to-pink-300", "✂️"),
+      tags: tagChip("トリミング") },
+    { title: "7月30日（木）", navLabel: "7月30日", src: "school", weight: "", date: "2026-07-30", share: true,
+      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span><span class="text-xs text-muted-foreground">記入: さくら保育園</span>',
+      body: "お友達のマロンちゃんと仲良く遊べました。お昼寝はいつもより長め。",
+      photos: photoTile("from-emerald-200 to-teal-300", "💤") + photoTile("from-violet-200 to-purple-300", "🐾"),
+      tags: "" },
+    { title: "7月28日（火）", navLabel: "7月28日", src: "school", weight: "", date: "2026-07-28", share: true,
+      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span><span class="text-xs text-muted-foreground">記入: さくら保育園</span>',
+      body: "初めてのおやつタイム。少し警戒してから完食しました。",
+      photos: photoTile("from-orange-200 to-amber-300", "🍚"),
+      tags: "" },
+    { title: "7月20日（月）", navLabel: "7月20日", src: "school", weight: "3.10", date: "2026-07-20", share: false,
+      badges: '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span><span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 3.10 kg</span><span class="text-xs text-muted-foreground">記入: さくら保育園</span>',
+      body: "身体測定の日。体重 3.10kg、落ち着いて測れました。",
+      photos: "", tags: "" }
   ];
   window.showDetail = function (i) {
+    currentDetail = i;
     var d = DETAIL[i];
     document.getElementById("det-title").textContent = d.title;
     document.getElementById("det-badges").innerHTML = d.badges;
     document.getElementById("det-body").textContent = d.body;
     document.getElementById("det-photos").innerHTML = d.photos;
+    document.getElementById("det-photos").hidden = !d.photos;
     document.getElementById("det-tags").innerHTML = d.tags;
     document.getElementById("det-share").hidden = !d.share;
-    document.getElementById("det-nav").innerHTML = d.nav;
+    var older = DETAIL[i + 1], newer = DETAIL[i - 1];
+    var prev = older
+      ? '<a href="#" onclick="showDetail(' + (i + 1) + ');return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground"><svg class="h-4 w-4"><use href="#i-chevron-left"/></svg>' + older.navLabel + "の記録</a>"
+      : '<span class="text-muted-foreground/50">前の記録なし</span>';
+    var next = newer
+      ? '<a href="#" onclick="showDetail(' + (i - 1) + ');return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground">' + newer.navLabel + 'の記録<svg class="h-4 w-4"><use href="#i-chevron-right"/></svg></a>'
+      : '<span class="text-muted-foreground/50">次の記録なし</span>';
+    document.getElementById("det-nav").innerHTML = prev + next;
     window.scrollTo(0, 0);
   };
 
@@ -2783,19 +2802,23 @@ body {
     }
   };
 
-  /* ---- 記録フォーム（新規 / 編集を 1 画面で） ---- */
+  /* ---- 記録フォーム（新規 / 編集を 1 画面で。編集は表示中の記録から複写、新規は選択中の日付） ---- */
   window.openForm = function (edit) {
     formEdit = !!edit;
     document.getElementById("form-title").textContent = formEdit ? "記録を編集" : "記録を追加";
     var body = document.getElementById("form-body");
     var weight = document.getElementById("form-weight");
+    var date = document.getElementById("form-date");
     if (formEdit) {
-      body.value = "園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。\n\nお迎えのときは少し眠そうでしたが、帰り際にしっぽをたくさん振ってくれました。";
-      weight.value = "3.20";
-      segPick(document.getElementById("form-src-school"));
+      var d = DETAIL[currentDetail];
+      body.value = d.body;
+      weight.value = d.weight;
+      date.value = d.date;
+      segPick(document.getElementById(d.src === "school" ? "form-src-school" : "form-src-home"));
     } else {
       body.value = "";
       weight.value = "";
+      date.value = "2026-08-" + (selectedDay < 10 ? "0" : "") + selectedDay;
       segPick(document.getElementById("form-src-home"));
     }
     go("record-new");
@@ -2811,6 +2834,7 @@ body {
   });
 
   drawWeight("1m");
+  showDetail(0);
   go("intro");
 })();
 </script>
