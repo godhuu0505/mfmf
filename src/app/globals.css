@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* プロトタイプ（`proto/`）は本番 CSS の対象外にする。Tailwind v4 は自動でプロジェクト
+   ルートを走査するため、これが無いと D27 で PR に含めたプロトのクラスが本番の CSS に
+   混入する（実測: 検証用に置いた 3 クラスが 6 箇所混ざった）。
+   パスは**このファイルからの相対**。`"proto/"` と書くと `src/app/proto/` を指し、
+   ビルドは通るのに何も除外されない（一度これで踏んだ）。 */
+@source not "../../proto";
+
 /* セマンティックなカラートークン。Tailwind の `bg-surface` `text-foreground`
    `border-border` などとして使えるようにする（v4 の @theme inline）。 */
 @theme inline {

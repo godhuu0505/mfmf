@@ -2,13 +2,13 @@
 
 Phase 3.5（エピック [#91](https://github.com/godhuu0505/mfmf/issues/91)）を「家族グループ・認証認可・
 初回サインアップ・外部アカウント・共有」の観点で**ユースケース単位に洗い出した**バックログです。
-[vision-and-roadmap.md](./vision-and-roadmap.md) が **何を作るか（機能カタログ）** を俯瞰するのに対し、
+[roadmap.md](./roadmap.md) が **何を作るか（機能カタログ）** を俯瞰するのに対し、
 本書は **誰が・何のために・どう振る舞うべきか（受け入れ条件付き）** を残し、GitHub Issue（S1〜S5）へ
 落とすときの元ネタにします。
 
 - 現状の「何が」あるかは [reference/architecture.md](../reference/architecture.md)
-- 設計の「なぜ」は [design-decisions.md](./design-decisions.md)
-- フェーズ俯瞰・機能カタログは [vision-and-roadmap.md](./vision-and-roadmap.md)
+- 設計の「なぜ」は [decisions.md](./decisions.md)
+- フェーズ俯瞰・機能カタログは [roadmap.md](./roadmap.md)
 - DB / RLS の正は [`supabase/migrations/`](../../supabase/migrations/)
 
 状態凡例：✅実装済 / 🟢採用（未実装・ロードマップ確定）/ 🟡検討中 / 💡将来 / ⛔スコープ外

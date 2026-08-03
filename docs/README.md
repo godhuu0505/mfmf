@@ -25,15 +25,20 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 
 ## リファレンス（reference/）
 
-- [reference/architecture.md](./reference/architecture.md) — 技術スタック・画面・データモデル・RLS・Storage。
-- [reference/features.md](./reference/features.md) — 現状の機能一覧（ユーザー視点）。
+- [reference/architecture.md](./reference/architecture.md) — 構成の地図（技術スタック・デプロイ構成・ソースの地図）と「正はどこか」の対応表。
 - [reference/configuration.md](./reference/configuration.md) — 環境変数と npm スクリプトの一覧。
 
 ## 解説（explanation/）
 
-- [explanation/design-decisions.md](./explanation/design-decisions.md) — 共有方針・スコープ・PWA・セキュリティ・デプロイ方針の「なぜ」。
-- [explanation/vision-and-roadmap.md](./explanation/vision-and-roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
+- [explanation/principles.md](./explanation/principles.md) — **Mission / Vision / Values**。個別の決定を導く判断基準（V1〜V7）と、その根拠になった実例。
+- [explanation/decisions.md](./explanation/decisions.md) — 設計決定ログ（D ログ）。**却下した案とその理由**を 1 行で残す唯一の場所。
+- [explanation/prototype-first.md](./explanation/prototype-first.md) — 新機能の画面を静的プロトタイプ＋Artifact で決める理由（2026-07-30 に実コード案から方針転換した経緯と実測データ）。
+- [explanation/roadmap.md](./explanation/roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
 - [explanation/phase-3-5-use-cases.md](./explanation/phase-3-5-use-cases.md) — Phase 3.5（家族・権限・サインアップ・共有）のユースケース・バックログ（受け入れ条件・決定ログ・未決事項）。
+
+## アーカイブ（archive/）
+
+- [archive/](./archive/) — 役目を終えたプロトタイプとスペック。**現状の仕様ではなく**、合意した時点のスナップショット（[D27](./explanation/decisions.md)）。現役のプロトタイプは [`proto/`](../proto/)。
 
 ---
 

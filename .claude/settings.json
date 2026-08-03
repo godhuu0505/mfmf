@@ -23,7 +23,10 @@
       "Bash(git switch:*)",
       "Bash(git stash:*)",
       "Bash(git restore:*)",
-      "Bash(git push -u origin:*)"
+      "Bash(git push -u origin:*)",
+      "Bash(git reset --soft:*)",
+      "Bash(git worktree add ../mfmf-main origin/main)",
+      "Bash(git worktree list:*)"
     ],
     "deny": [
       "Read(.env)",
@@ -39,7 +42,9 @@
       "Read(**/id_rsa)",
       "Read(**/id_ed25519)",
       "Bash(git push --force:*)",
-      "Bash(git push -f:*)"
+      "Bash(git push -f:*)",
+      "Bash(git worktree remove --force:*)",
+      "Bash(git worktree remove -f:*)"
     ]
   },
   "hooks": {

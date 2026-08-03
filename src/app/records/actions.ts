@@ -325,6 +325,57 @@ export async function createRecord(formData: FormData) {
   redirect(`/records/${recordId}`);
 }
 
+// クイック記録（ホームのシート / UC-Q01〜Q05）: テキストのみの最小作成。
+// createRecord と違い、詳細ページへ遷移せずホームに留まる（redirect しない）ので、
+// シートを閉じて一覧の先頭に反映される。写真・体重・タグ・ペットは扱わない
+// （それらが要るときはフル記録 = createRecord を使う）。
+export async function createQuickRecord(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const fields = parseRecordFields(formData);
+  const body = fields.body.trim();
+  if (!body) {
+    throw new Error("本文が空です");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fields.record_date)) {
+    throw new Error("不正なリクエストです");
+  }
+
+  // 書き込み先の世帯は「シートを描画した世帯」（hidden で送信）を優先し、
+  // その世帯での editor+ を検証する（createRecord と同方針。Cookie の現在世帯に
+  // 依存すると別タブの世帯切替後の送信で食い違う）。
+  const formHousehold = String(formData.get("household_id") || "").trim();
+  let householdId: string | null;
+  if (UUID_RE.test(formHousehold)) {
+    const role = await getRoleInHousehold(supabase, user.id, formHousehold);
+    if (!role) {
+      throw new Error("この世帯のメンバーではありません");
+    }
+    if (!canEdit(role)) {
+      throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
+    }
+    householdId = formHousehold;
+  } else {
+    householdId = await requireEditableHousehold(supabase, user.id);
+  }
+
+  const { error } = await supabase.from("daycare_records").insert({
+    owner_id: user.id,
+    household_id: householdId,
+    ...fields,
+    body,
+  });
+  if (error) {
+    throw new Error(`記録の作成に失敗しました: ${error.message}`);
+  }
+
+  revalidatePath("/");
+}
+
 export async function updateRecord(recordId: string, formData: FormData) {
   const supabase = await createClient();
   const {

@@ -15,9 +15,10 @@
 > `NEXT_PUBLIC_*` はブラウザに公開される前提の値。RLS でデータを保護しているため公開しても問題ない。
 > `service_role` キーはサーバー専用の特権鍵で、本アプリでは**使わず**、リポジトリ・クライアントにも置かない。
 
-### Google Drive 連携（必須）
+### Google Drive 連携（任意）
 
-Google ログインと写真の Drive 保存に使う。設定手順は
+**Google ログイン / Drive 保存を使う場合のみ必要。** メール/パスワードだけで動かすなら不要
+（その場合は `SIGNUP_ENABLED=true` でセルフ登録を開放する）。設定手順は
 [guides/google-drive-setup.md](../guides/google-drive-setup.md)。いずれも **サーバー専用**
 （`NEXT_PUBLIC_` を付けない）。Vercel の環境変数とローカル `.env.local` の両方に設定する。
 
@@ -37,7 +38,7 @@ Google ログインと写真の Drive 保存に使う。設定手順は
 
 | 変数 | 用途 |
 | --- | --- |
-| `FEEDBACK_USER_EMAIL` / `FEEDBACK_USER_PASSWORD` | 夫婦共用ログイン（RLS 経由で `feedback` を取得） |
+| `FEEDBACK_USER_EMAIL` / `FEEDBACK_USER_PASSWORD` | フィードバック取得用アカウントの認証情報（RLS 経由で `feedback` を読む） |
 | `GITHUB_TOKEN` | Issues 書き込み権の Fine-grained PAT |
 | `GITHUB_FEEDBACK_REPO` | 登録先 `owner/repo`（★ 必ず非公開リポジトリ） |
 
