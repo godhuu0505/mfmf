@@ -44,11 +44,13 @@ test("UC-P01: ペットをカードから編集シートで更新・削除でき
   const renamed = `${name}改`;
   await login(page);
 
-  // 追加
+  // 追加（Server Action + revalidate が遅い runner で 5s を超えることがある）
   await page.goto("/pets");
   await page.getByLabel("名前").fill(name);
   await page.getByRole("button", { name: "追加する" }).click();
-  await expect(page.getByText(name, { exact: true })).toBeVisible();
+  await expect(page.getByText(name, { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
 
   // 編集シートで名前を変更
   await page.getByRole("button", { name: `${name}を編集` }).click();
@@ -136,7 +138,8 @@ test.describe("招待リンクのコピー", () => {
 
     await page.goto("/settings");
     await page.locator("#invite_email").fill(email);
-    await page.getByRole("button", { name: "招待を発行" }).click();
+    // exact: ペットが居るとゲスト招待フォームの「ゲスト招待を発行」に部分一致する
+    await page.getByRole("button", { name: "招待を発行", exact: true }).click();
     await expect(page.getByText(email, { exact: false })).toBeVisible();
 
     const copyBtn = page
