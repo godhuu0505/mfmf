@@ -166,10 +166,10 @@ export default async function HelpPage() {
               <li>
                 すべての写真は{" "}
                 <Link href="/gallery" className={inlineLink}>
-                  ギャラリー
+                  アルバム
                   <Images className={inlineIcon} aria-hidden="true" />
                 </Link>{" "}
-                から新しい順にまとめて見ることができます。
+                から月ごとに新しい順で見ることができます。
               </li>
             </ul>
           </section>

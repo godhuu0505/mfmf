@@ -179,10 +179,14 @@ jobs:
           success() && github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.full_name == github.repository
         run: |
-          HEAD_BRANCH="${{ github.head_ref }}"
-          SHOT_BRANCH="screenshots/$HEAD_BRANCH"
-          git fetch origin "${{ github.base_ref }}" "$HEAD_BRANCH"
-          if ! git diff --name-only "origin/${{ github.base_ref }}...origin/$HEAD_BRANCH" \
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          SHOT_BRANCH="screenshots/${{ github.head_ref }}"
+          # 浅い checkout（PR のマージ ref のみ）でも確実に差分を取れるよう、
+          # イベントの SHA を直接取得して 2 点の木を比較する（merge-base 不要）。
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" "$HEAD_SHA"
+          if ! git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
             | grep -qE '^(src/|public/)'; then
             echo "UI に触れない PR のためスキップ"
             exit 0
@@ -190,10 +194,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # 既存の screenshots ブランチがあればその続きに積む（fast-forward push で足りる）
-          if git fetch origin "refs/heads/$SHOT_BRANCH"; then
+          if git fetch --no-tags --depth=1 origin "refs/heads/$SHOT_BRANCH"; then
             git checkout -B screenshots-work FETCH_HEAD
           else
-            git checkout -B screenshots-work "origin/$HEAD_BRANCH"
+            git checkout -B screenshots-work "$HEAD_SHA"
           fi
           mkdir -p docs/screenshots/app-redesign
           cp test-results/screenshots/*.png docs/screenshots/app-redesign/

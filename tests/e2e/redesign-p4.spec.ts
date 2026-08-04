@@ -151,3 +151,20 @@ test.describe("招待リンクのコピー", () => {
     await page.getByRole("button", { name: "取り消す" }).first().click();
   });
 });
+
+test("アルバム: 「アルバム」の名称と月見出しのグループで表示される", async ({
+  page,
+}) => {
+  await login(page);
+  // photoUpload.spec（先行実行）が今日の日付で写真つき記録を残している
+  await page.goto("/gallery");
+  await expect(
+    page.getByRole("heading", { name: "アルバム", exact: true }),
+  ).toBeVisible();
+  const now = new Date();
+  await expect(
+    page.getByRole("heading", {
+      name: `${now.getFullYear()}年${now.getMonth() + 1}月`,
+    }),
+  ).toBeVisible();
+});

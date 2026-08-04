@@ -81,3 +81,30 @@ test("UC-D01: 記録詳細の「…」から確認つきで削除できる", asy
   await page.waitForURL((url) => url.pathname === "/");
   await expect(page.getByText(marker)).not.toBeVisible();
 });
+
+test("UC-C02: カレンダーの「今日」で今月に戻れる", async ({ page }) => {
+  await login(page);
+  await page.goto("/calendar");
+
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonth = `${prev.getFullYear()}年${prev.getMonth() + 1}月`;
+
+  // 今月表示中はショートカット不要なので出さない
+  await expect(
+    page.getByRole("heading", { name: thisMonth }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "今日" })).not.toBeVisible();
+
+  // 前月へ移動すると「今日」が現れ、押すと今月へ戻る
+  await page.getByRole("link", { name: "前の月" }).click();
+  await expect(
+    page.getByRole("heading", { name: prevMonth }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "今日" }).click();
+  await page.waitForURL((url) => url.pathname === "/calendar" && !url.searchParams.has("ym"));
+  await expect(
+    page.getByRole("heading", { name: thisMonth }),
+  ).toBeVisible();
+});

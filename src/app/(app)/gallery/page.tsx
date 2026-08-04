@@ -6,7 +6,7 @@ import PhotoGallery, { type GalleryImage } from "@/components/PhotoGallery";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "ギャラリー" };
+export const metadata = { title: "アルバム" };
 
 const MAX_PHOTOS = 300;
 
@@ -51,20 +51,28 @@ export default async function GalleryPage() {
   const urlByPath = await createPhotoSignedUrls(
     rows.map((r) => r.storage_path),
   );
-  const images: GalleryImage[] = rows
-    .map((r): GalleryImage | null => {
-      const url = urlByPath.get(r.storage_path);
-      if (!url) return null;
-      return {
-        id: r.id,
-        url,
-        recordId: r.record_id,
-        caption: r.daycare_records
-          ? formatDate(r.daycare_records.record_date)
-          : undefined,
-      };
-    })
-    .filter((x): x is GalleryImage => x !== null);
+
+  // 月ごとにグループ化して見出しを付ける（proto 合意 / notes.md「アルバム」）。
+  // rows は記録日の降順なので、そのまま前から詰めれば月も新しい順に並ぶ。
+  const monthGroups: { ym: string; label: string; images: GalleryImage[] }[] =
+    [];
+  for (const r of rows) {
+    const url = urlByPath.get(r.storage_path);
+    if (!url || !r.daycare_records) continue;
+    const image: GalleryImage = {
+      id: r.id,
+      url,
+      recordId: r.record_id,
+      caption: formatDate(r.daycare_records.record_date),
+    };
+    const [y, m] = r.daycare_records.record_date.split("-");
+    const ym = `${y}-${m}`;
+    const last = monthGroups[monthGroups.length - 1];
+    if (last && last.ym === ym) last.images.push(image);
+    else
+      monthGroups.push({ ym, label: `${y}年${Number(m)}月`, images: [image] });
+  }
+  const isEmpty = monthGroups.length === 0;
 
   return (
     <>
@@ -74,22 +82,31 @@ export default async function GalleryPage() {
             ← 一覧へ戻る
           </Link>
         </div>
-        <h1 className="mb-1 text-xl font-bold text-foreground">ギャラリー</h1>
+        <h1 className="mb-1 text-xl font-bold text-foreground">アルバム</h1>
         <p className="mb-6 text-sm text-muted-foreground">
-          すべての写真を新しい順に表示します。写真をタップすると拡大できます。
+          すべての写真を月ごとに新しい順で表示します。写真をタップすると拡大できます。
         </p>
 
-        {images.length === 0 ? (
+        {isEmpty ? (
           <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
             まだ写真がありません。
             <br />
             記録に写真を追加すると、ここにまとまって表示されます。
           </div>
         ) : (
-          <PhotoGallery
-            images={images}
-            gridClassName="grid grid-cols-3 gap-1.5 sm:grid-cols-4"
-          />
+          <div className="space-y-6">
+            {monthGroups.map((g) => (
+              <section key={g.ym} aria-label={g.label}>
+                <h2 className="mb-2 text-sm font-semibold text-foreground">
+                  {g.label}
+                </h2>
+                <PhotoGallery
+                  images={g.images}
+                  gridClassName="grid grid-cols-3 gap-1.5 sm:grid-cols-4"
+                />
+              </section>
+            ))}
+          </div>
         )}
       </main>
     </>

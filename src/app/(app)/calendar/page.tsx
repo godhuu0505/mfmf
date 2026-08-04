@@ -89,7 +89,10 @@ export default async function CalendarPage({
 
   const prev = shiftMonth(year, month, -1);
   const next = shiftMonth(year, month, 1);
-  const todayStr = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}-${pad(new Date().getDate())}`;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const isCurrentMonth =
+    year === now.getFullYear() && month === now.getMonth() + 1;
 
   return (
     <>
@@ -108,9 +111,20 @@ export default async function CalendarPage({
           >
             ‹ 前月
           </Link>
-          <h1 className="text-lg font-bold text-foreground">
-            {year}年{month}月
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-foreground">
+              {year}年{month}月
+            </h1>
+            {/* 今月へのショートカット（proto 合意 / notes.md）。今月表示中は出さない */}
+            {!isCurrentMonth && (
+              <Link
+                href="/calendar"
+                className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
+              >
+                今日
+              </Link>
+            )}
+          </div>
           <Link
             href={`/calendar?ym=${ymString(next.year, next.month)}`}
             className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
