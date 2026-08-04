@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
+import { jstTodayISO, minusMonthsISO } from "@/lib/dateRange";
 import { SOURCE_LABEL, type DaycareRecord } from "@/types/database";
 import SourceIcon from "@/components/SourceIcon";
 import WeightChart, { type WeightPoint } from "@/components/WeightChart";
@@ -23,10 +24,10 @@ type WeightRow = Pick<
 
 // 期間切替（D33 / proto 合意）。URL クエリで共有・リロード再現できるようにする。
 const RANGES = [
-  { key: "1m", label: "1ヶ月", days: 31 },
-  { key: "3m", label: "3ヶ月", days: 92 },
-  { key: "1y", label: "1年", days: 366 },
-  { key: "all", label: "全期間", days: null },
+  { key: "1m", label: "1ヶ月", months: 1 },
+  { key: "3m", label: "3ヶ月", months: 3 },
+  { key: "1y", label: "1年", months: 12 },
+  { key: "all", label: "全期間", months: null },
 ] as const;
 type RangeKey = (typeof RANGES)[number]["key"];
 
@@ -50,11 +51,11 @@ export default async function WeightPage({
     .select("id, record_date, weight_kg, source")
     .not("weight_kg", "is", null)
     .order("record_date", { ascending: true });
-  if (rangeDef.days != null) {
-    const cutoff = new Date(Date.now() - rangeDef.days * 86_400_000)
-      .toISOString()
-      .slice(0, 10);
-    query = query.gte("record_date", cutoff);
+  if (rangeDef.months != null) {
+    query = query.gte(
+      "record_date",
+      minusMonthsISO(jstTodayISO(), rangeDef.months),
+    );
   }
   if (householdId) query = query.or(householdScopeFilter(householdId));
   const { data } = await query.returns<WeightRow[]>();

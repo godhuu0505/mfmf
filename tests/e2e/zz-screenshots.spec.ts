@@ -15,7 +15,7 @@ async function shot(page: Page, name: string, fullPage = true) {
 }
 
 test("スクリーンショット一式（ライト）", async ({ page }) => {
-  test.setTimeout(120_000); // 12 画面ぶんの遷移とキャプチャ
+  test.setTimeout(240_000); // 12 画面ぶんの遷移と fullPage キャプチャ（CI で 120s 超の実績あり）
   await page.goto("/login");
   await shot(page, "login");
 
@@ -53,7 +53,7 @@ test("スクリーンショット一式（ライト）", async ({ page }) => {
   await shot(page, "record-new");
 
   await page.goto("/");
-  await page.locator("main ul > li").first().click();
+  await page.locator('main a[href^="/records/"]').first().click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/);
   await shot(page, "record-detail");
 });

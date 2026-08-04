@@ -185,6 +185,22 @@ export default function RecordForm({
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+      {/* アクション行は上部固定（notes.md「キャンセル・保存を上部固定 = IME に隠れない」）。
+          top はヘッダー高（AppHeader: h-14 + border 1px + safe-pt）に合わせる。 */}
+      <div className="sticky top-[calc(3.5rem+1px+env(safe-area-inset-top))] z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-2.5 backdrop-blur">
+        <ConfirmCancelButton
+          href={cancelHref}
+          className="text-sm text-muted-foreground transition hover:text-foreground"
+        />
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-lg bg-primary px-5 py-2 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
+        >
+          {uploading ? "写真を保存中…" : isPending ? "保存中…" : submitLabel}
+        </button>
+      </div>
+
       <div>
         <span className="mb-1 block text-sm font-medium text-foreground">
           記録元
@@ -341,20 +357,6 @@ export default function RecordForm({
           {error}
         </p>
       )}
-
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
-        >
-          {uploading ? "写真を保存中…" : isPending ? "保存中…" : submitLabel}
-        </button>
-        <ConfirmCancelButton
-          href={cancelHref}
-          className="text-sm text-muted-foreground transition hover:text-foreground"
-        />
-      </div>
 
       {confirmOpen && (
         <ConfirmDialog

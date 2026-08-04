@@ -154,3 +154,26 @@ test("UC-Q06: 絞り込み中の URL から保存しても、絞り込みなし�
   );
   await expect(firstCard(page)).toContainText(marker);
 });
+
+test("UC-Q07: 「くわしく記録する」で下書きを引き継いでフォームへ移れる", async ({
+  page,
+}) => {
+  await login(page);
+  await openSheet(page);
+
+  await sheet(page).getByRole("button", { name: "さんぽ" }).click();
+  await sheet(page).getByRole("radio", { name: "保育園" }).click();
+  await sheet(page)
+    .getByRole("button", { name: "写真つきでくわしく記録する →" })
+    .click();
+
+  await expect(sheet(page)).not.toBeVisible();
+  await page.waitForURL("**/records/new**");
+  // 下書き（本文・記録元）がフォームに引き継がれている
+  await expect(
+    page.getByPlaceholder("今日の様子などを記録します"),
+  ).toHaveValue("さんぽ");
+  await expect(
+    page.getByRole("button", { name: "保育園", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+});

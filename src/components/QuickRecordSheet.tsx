@@ -141,6 +141,18 @@ export default function QuickRecordSheet({
     );
   }
 
+  // 「写真つきでくわしく記録する →」（proto 合意の導線）。クイックの下書き
+  // （チップ・ひとこと・記録元）をクエリで /records/new に引き継ぐ。
+  function openDetailedForm() {
+    if (isPending) return;
+    const params = new URLSearchParams();
+    if (body) params.set("body", body);
+    params.set("source", source);
+    closeSheet();
+    resetSheet();
+    router.push(`/records/new?${params.toString()}`);
+  }
+
   function save() {
     if (!body || isPending) return;
     const fd = new FormData();
@@ -320,6 +332,15 @@ export default function QuickRecordSheet({
             className="w-full rounded-lg bg-primary px-4 py-3 text-base font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-40"
           >
             {isPending ? "保存中…" : "保存する"}
+          </button>
+
+          <button
+            type="button"
+            onClick={openDetailedForm}
+            disabled={isPending}
+            className="mt-2 w-full py-2 text-center text-sm font-medium text-primary transition hover:text-primary-hover disabled:opacity-40"
+          >
+            写真つきでくわしく記録する →
           </button>
         </div>
       </div>
