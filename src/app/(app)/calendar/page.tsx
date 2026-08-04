@@ -10,15 +10,18 @@ import CalendarMonth, {
   type CalendarDayRecord,
 } from "@/components/CalendarMonth";
 import SourceIcon from "@/components/SourceIcon";
+import { jstTodayISO } from "@/lib/dateRange";
 import { Camera } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "カレンダー" };
 
-// "YYYY-MM" を {year, month(1-12)} に。未指定・不正は今月。
-function parseYearMonth(ym: string | undefined): { year: number; month: number } {
-  const now = new Date();
+// "YYYY-MM" を {year, month(1-12)} に。未指定・不正は fallback（JST の今月）。
+function parseYearMonth(
+  ym: string | undefined,
+  fallback: { year: number; month: number },
+): { year: number; month: number } {
   if (ym) {
     const m = /^(\d{4})-(\d{1,2})$/.exec(ym);
     if (m) {
@@ -27,7 +30,7 @@ function parseYearMonth(ym: string | undefined): { year: number; month: number }
       if (month >= 1 && month <= 12) return { year, month };
     }
   }
-  return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  return fallback;
 }
 
 function pad(n: number) {
@@ -49,7 +52,14 @@ export default async function CalendarPage({
   searchParams: Promise<{ ym?: string }>;
 }) {
   const { ym } = await searchParams;
-  const { year, month } = parseYearMonth(ym);
+  // 「今日」「今月」は JST 基準（サーバーの実行 TZ が UTC だと、日本の 0:00〜8:59
+  // に前日・前月扱いになってしまう）。
+  const todayStr = jstTodayISO();
+  const [todayYear, todayMonth] = todayStr.split("-").map(Number);
+  const { year, month } = parseYearMonth(ym, {
+    year: todayYear,
+    month: todayMonth,
+  });
 
   const firstDay = `${year}-${pad(month)}-01`;
   const lastDate = new Date(year, month, 0).getDate(); // 当月末日
@@ -89,10 +99,7 @@ export default async function CalendarPage({
 
   const prev = shiftMonth(year, month, -1);
   const next = shiftMonth(year, month, 1);
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const isCurrentMonth =
-    year === now.getFullYear() && month === now.getMonth() + 1;
+  const isCurrentMonth = year === todayYear && month === todayMonth;
 
   return (
     <>
@@ -122,7 +129,7 @@ export default async function CalendarPage({
                 フル遷移でも体感差がないため、確実に動く方を取る。 */}
             {!isCurrentMonth && (
               <a
-                href={`/calendar?ym=${ymString(now.getFullYear(), now.getMonth() + 1)}`}
+                href={`/calendar?ym=${ymString(todayYear, todayMonth)}`}
                 className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
               >
                 今日

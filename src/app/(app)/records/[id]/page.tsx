@@ -128,11 +128,15 @@ export default async function RecordDetailPage({
   return (
     <>
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
-        <div className="mb-4">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← 一覧へ戻る
-          </Link>
-        </div>
+        {/* 編集（全画面モーダル型）では戻るリンクを出さない —— 離脱は確認つきの
+            キャンセルに一本化する（ヘッダーは HideOnFormRoute が隠す） */}
+        {!isEditable && (
+          <div className="mb-4">
+            <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
+              ← 一覧へ戻る
+            </Link>
+          </div>
+        )}
 
         {isEditable ? (
           <>

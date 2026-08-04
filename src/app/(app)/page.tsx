@@ -98,64 +98,81 @@ export default async function HomePage({
   // viewer には編集系 UI を出さない（UC-A06。サーバー強制は RLS / Server Action）。
   const readOnly = !canEdit(membership.role);
 
-  // 一覧 + 先頭写真 + 付与タグをまとめて取得。
-  let query = supabase
-    .from("daycare_records")
-    .select("*, record_photos(*), record_tags(tags(id, name))", {
-      count: "exact",
-    });
-
-  if (householdId) query = query.or(householdScopeFilter(householdId));
-  if (filters.source !== "all") query = query.eq("source", filters.source);
-  if (filters.from) query = query.gte("record_date", filters.from);
-  if (filters.to) query = query.lte("record_date", filters.to);
-  if (filters.q) query = query.or(buildIlikeOr(filters.q));
-
-  // タグ絞り込み: 該当タグを持つ記録 id に限定する。
+  // タグ絞り込み: 該当タグを持つ記録 id を先に解決しておく。
+  let taggedIds: string[] | null = null;
   if (activeTag) {
     const { data: tagged } = await supabase
       .from("record_tags")
       .select("record_id")
       .eq("tag_id", activeTag.id);
-    const ids = (tagged ?? []).map((t) => t.record_id);
-    // 該当が 0 件なら確実に空にする（in([]) は全件にならないよう注意）。
-    query = query.in("id", ids.length > 0 ? ids : [""]);
+    taggedIds = (tagged ?? []).map((t) => t.record_id);
   }
 
-  switch (filters.sort) {
-    case "date_asc":
-      query = query
-        .order("record_date", { ascending: true })
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true });
-      break;
-    case "weight_desc":
-      query = query
-        .order("weight_kg", { ascending: false, nullsFirst: false })
-        .order("record_date", { ascending: false });
-      break;
-    case "weight_asc":
-      query = query
-        .order("weight_kg", { ascending: true, nullsFirst: false })
-        .order("record_date", { ascending: false });
-      break;
-    default:
-      // id は同時刻 insert のタイブレーク（記録詳細の前後ナビと同じ順序規則）
-      query = query
-        .order("record_date", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false });
+  // 一覧 + 先頭写真 + 付与タグの取得クエリ（条件・並び順込み）。
+  // チャンクごとに新しいクエリを組み立てるため関数にしている。
+  function buildListQuery(withCount: boolean) {
+    let query = supabase
+      .from("daycare_records")
+      .select(
+        "*, record_photos(*), record_tags(tags(id, name))",
+        withCount ? { count: "exact" } : undefined,
+      );
+
+    if (householdId) query = query.or(householdScopeFilter(householdId));
+    if (filters.source !== "all") query = query.eq("source", filters.source);
+    if (filters.from) query = query.gte("record_date", filters.from);
+    if (filters.to) query = query.lte("record_date", filters.to);
+    if (filters.q) query = query.or(buildIlikeOr(filters.q));
+    // 該当が 0 件なら確実に空にする（in([]) は全件にならないよう注意）。
+    if (taggedIds) query = query.in("id", taggedIds.length > 0 ? taggedIds : [""]);
+
+    switch (filters.sort) {
+      case "date_asc":
+        query = query
+          .order("record_date", { ascending: true })
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
+        break;
+      case "weight_desc":
+        query = query
+          .order("weight_kg", { ascending: false, nullsFirst: false })
+          .order("record_date", { ascending: false });
+        break;
+      case "weight_asc":
+        query = query
+          .order("weight_kg", { ascending: true, nullsFirst: false })
+          .order("record_date", { ascending: false });
+        break;
+      default:
+        // id は同時刻 insert のタイブレーク（記録詳細の前後ナビと同じ順序規則）
+        query = query
+          .order("record_date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false });
+    }
+    return query;
   }
 
   // 「もっと見る」で先頭からの表示件数を増やす（ページ差し替えではなく追記。
   // page はもっと見るを押した回数 + 1 = 表示中のバッチ数）。タイムラインの
   // 文脈を保ったまま過去へ辿れる（proto 合意 / notes.md）。
-  query = query.range(0, filters.page * PAGE_SIZE - 1);
-
-  const { data: records, count } = await query.returns<RecordWithPhotos[]>();
-
-  const list = records ?? [];
-  const total = count ?? 0;
+  // Data API は 1 レスポンス最大 1000 行（supabase/config.toml の max_rows）
+  // なので、それを超える表示件数は 1000 行ずつに分けて取得して繋ぐ。
+  const SUPABASE_MAX_ROWS = 1000;
+  const limitRows = filters.page * PAGE_SIZE;
+  let list: RecordWithPhotos[] = [];
+  let total = 0;
+  for (let from = 0; from < limitRows; from += SUPABASE_MAX_ROWS) {
+    const to = Math.min(from + SUPABASE_MAX_ROWS, limitRows) - 1;
+    const { data, count } = await buildListQuery(from === 0)
+      .range(from, to)
+      .returns<RecordWithPhotos[]>();
+    const rows = data ?? [];
+    if (from === 0) total = count ?? 0;
+    list = list.concat(rows);
+    // このチャンクが要求より少ない = もう続きがない
+    if (rows.length < to - from + 1) break;
+  }
   const active = hasActiveFilters(filters) || activeTag != null;
 
   // タグチップのリンク（現在の検索条件は保ったまま tag だけ切り替え、ページは先頭へ戻す）。
@@ -370,6 +387,13 @@ export default async function HomePage({
           <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
             {active ? (
               <>条件に該当する記録はありません。</>
+            ) : readOnly ? (
+              // viewer には中央の「＋」が無いので、追加の案内はしない（UC-A06）
+              <>
+                まだ記録がありません。
+                <br />
+                ご家族が記録を追加すると、ここに表示されます。
+              </>
             ) : (
               <>
                 まだ記録がありません。

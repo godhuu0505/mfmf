@@ -4,6 +4,7 @@ import { canEdit, getCurrentMembership } from "@/lib/household";
 import { createQuickRecord } from "@/app/(app)/records/actions";
 import AppHeader from "@/components/AppHeader";
 import AppTabBar from "@/components/AppTabBar";
+import HideOnFormRoute from "@/components/HideOnFormRoute";
 import HouseholdSyncRefresher from "@/components/HouseholdSyncRefresher";
 import QuickRecordSheet from "@/components/QuickRecordSheet";
 
@@ -37,7 +38,12 @@ export default async function AppLayout({
       <HouseholdSyncRefresher householdId={membership?.householdId ?? null} />
       {/* クイック記録シート表示中に inert になる範囲（シート自身は外に置く） */}
       <div data-quick-record-bg>
-        <AppHeader />
+        {/* 記録フォーム（全画面モーダル型）ではヘッダーを出さない */}
+        <Suspense fallback={null}>
+          <HideOnFormRoute>
+            <AppHeader />
+          </HideOnFormRoute>
+        </Suspense>
         {children}
       </div>
       {membership && (

@@ -22,8 +22,6 @@ export default async function AppHeader() {
 
   return (
     <header className="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
-      {/* 高さは h-14 固定。RecordForm の sticky アクション行がこの高さ+境界線ぶん
-          （3.5rem + 1px + safe-pt）を top オフセットに使うので、変えるときは揃えること。 */}
       <div className="safe-px mx-auto flex h-14 max-w-2xl items-center justify-between">
         <Link
           href="/"

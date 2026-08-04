@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { canEdit, getCurrentMembership } from "@/lib/household";
@@ -45,12 +44,9 @@ export default async function NewRecordPage({
 
   return (
     <>
+      {/* 全画面モーダル型（ヘッダーは HideOnFormRoute が隠す）。離脱は
+          フォーム上部の確認つきキャンセルに一本化するため、戻るリンクは置かない */}
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
-        <div className="mb-4">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← 一覧へ戻る
-          </Link>
-        </div>
         <h1 className="mb-6 text-xl font-bold text-foreground">記録を追加</h1>
 
         <RecordForm

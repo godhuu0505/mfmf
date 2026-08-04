@@ -200,8 +200,9 @@ export default function RecordForm({
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
       {/* アクション行は上部固定（notes.md「キャンセル・保存を上部固定 = IME に隠れない」）。
-          top はヘッダー高（AppHeader: h-14 + border 1px + safe-pt）に合わせる。 */}
-      <div className="sticky top-[calc(3.5rem+1px+env(safe-area-inset-top))] z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-2.5 backdrop-blur">
+          フォーム画面は全画面モーダル型でヘッダーを出さない（HideOnFormRoute）ため、
+          セーフエリア直下に貼り付く。 */}
+      <div className="safe-pt sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-2.5 backdrop-blur">
         <ConfirmCancelButton
           href={cancelHref}
           className="text-sm text-muted-foreground transition hover:text-foreground"

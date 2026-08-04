@@ -4,9 +4,11 @@ import { useTransition } from "react";
 import { switchHousehold } from "@/app/(app)/settings/actions";
 import { broadcastHouseholdSwitch } from "@/lib/householdSync";
 
-// 「この世帯を表示」（UC-H08）。切替を他タブへブロードキャストしてから
-// Server Action を呼ぶ（自タブは action の revalidate + redirect が追従させる。
-// BroadcastChannel は送信元タブには届かない）。
+// 「この世帯を表示」（UC-H08）。Server Action が完了（= 世帯 Cookie が適用）
+// した後で他タブへブロードキャストする。先に投げると、受信タブが旧 Cookie の
+// まま refresh してしまい、その後の変化を拾う機会がない。
+// 自タブは action の revalidate + redirect が追従させる（BroadcastChannel は
+// 送信元タブには届かない）。
 export default function SwitchHouseholdButton({
   householdId,
   className,
@@ -25,11 +27,13 @@ export default function SwitchHouseholdButton({
       className={className}
       onClick={() =>
         startTransition(async () => {
-          // action は redirect で戻らないことがあるため、先に通知する。
-          // 切替が弾かれるのはメンバーでない場合だけで、その場合の余分な
-          // refresh は無害（各タブは自分の実世帯を再取得するだけ）。
-          broadcastHouseholdSwitch(householdId);
-          await switchHousehold(householdId);
+          try {
+            await switchHousehold(householdId);
+          } finally {
+            // redirect（throw）でも通知は必ず出す。切替が弾かれた場合の余分な
+            // refresh は無害（各タブは自分の実世帯を再取得するだけ）。
+            broadcastHouseholdSwitch(householdId);
+          }
         })
       }
     >

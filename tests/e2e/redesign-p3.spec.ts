@@ -86,10 +86,13 @@ test("UC-C02: カレンダーの「今日」で今月に戻れる", async ({ pag
   await login(page);
   await page.goto("/calendar");
 
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
-  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevMonth = `${prev.getFullYear()}年${prev.getMonth() + 1}月`;
+  // アプリは JST 基準（src/lib/dateRange.ts）。CI ランナーは UTC なので合わせる
+  const jstToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+  }).format(new Date());
+  const [y, m] = jstToday.split("-").map(Number);
+  const thisMonth = `${y}年${m}月`;
+  const prevMonth = m === 1 ? `${y - 1}年12月` : `${y}年${m - 1}月`;
 
   // 今月表示中はショートカット不要なので出さない
   await expect(
