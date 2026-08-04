@@ -116,14 +116,17 @@ export default async function CalendarPage({
               {year}年{month}月
             </h1>
             {/* 今月へのショートカット（proto 合意 / notes.md）。今月表示中は出さない。
-                前月/翌月と同じ「?ym= 付きの遷移」に揃える（クエリ除去の遷移にしない） */}
+                素の <a>（フル遷移）にしている: CI 環境でこのリンクだけ Link の
+                クライアント遷移が確定しない事象が再現し（最小再現では起きず、
+                計装との相互作用が疑い）、月ジャンプは毎回サーバー描画なので
+                フル遷移でも体感差がないため、確実に動く方を取る。 */}
             {!isCurrentMonth && (
-              <Link
+              <a
                 href={`/calendar?ym=${ymString(now.getFullYear(), now.getMonth() + 1)}`}
                 className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
               >
                 今日
-              </Link>
+              </a>
             )}
           </div>
           <Link
