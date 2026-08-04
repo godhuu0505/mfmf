@@ -73,10 +73,11 @@ jobs:
       # deploy-production.yml と同じ supabase/setup-cli@v2 を使う。
       - uses: supabase/setup-cli@v2
         with:
-          version: latest
-        env:
-          # 匿名 API のレートリミットで release 解決が失敗することがあるため認証して叩く
-          SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
+          # version: latest にすると起動のたびに GitHub API で最新 release を解決し、
+          # ランナー共有 IP の匿名レートリミットに当たって CI が落ちることがある
+          # （認証トークンはアクション側が自前の env で上書きするため渡せない）。
+          # バージョンは固定し、上げるときはここを書き換える。
+          version: 2.111.0
 
       # supabase start でローカルスタックを起動し、supabase/migrations/*.sql を順に適用する。
       - name: Start Supabase (apply migrations)
@@ -124,10 +125,11 @@ jobs:
 
       - uses: supabase/setup-cli@v2
         with:
-          version: latest
-        env:
-          # 匿名 API のレートリミットで release 解決が失敗することがあるため認証して叩く
-          SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
+          # version: latest にすると起動のたびに GitHub API で最新 release を解決し、
+          # ランナー共有 IP の匿名レートリミットに当たって CI が落ちることがある
+          # （認証トークンはアクション側が自前の env で上書きするため渡せない）。
+          # バージョンは固定し、上げるときはここを書き換える。
+          version: 2.111.0
 
       - name: Start Supabase (apply migrations)
         run: supabase start
