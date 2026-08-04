@@ -52,10 +52,12 @@ export default async function WeightPage({
     .not("weight_kg", "is", null)
     .order("record_date", { ascending: true });
   if (rangeDef.months != null) {
-    query = query.gte(
-      "record_date",
-      minusMonthsISO(jstTodayISO(), rangeDef.months),
-    );
+    // 上限も JST 今日で切る —— フォームは未来日付を許すため、上限なしだと
+    // 未来の記録が「最新の体重」や差分に混ざってしまう
+    const today = jstTodayISO();
+    query = query
+      .gte("record_date", minusMonthsISO(today, rangeDef.months))
+      .lte("record_date", today);
   }
   if (householdId) query = query.or(householdScopeFilter(householdId));
   const { data } = await query.returns<WeightRow[]>();

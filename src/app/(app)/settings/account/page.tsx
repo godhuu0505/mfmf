@@ -32,11 +32,12 @@ export default async function AccountSettingsPage() {
     <>
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4">
+          {/* メニューから開く画面なので戻り先もメニュー（proto 合意） */}
           <Link
-            href="/"
+            href="/menu"
             className="text-sm text-muted-foreground hover:text-foreground"
           >
-            ← 一覧へ戻る
+            ← メニューへ戻る
           </Link>
         </div>
         <h1 className="mb-6 text-xl font-bold text-foreground">アカウント設定</h1>
