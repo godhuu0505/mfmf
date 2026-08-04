@@ -155,6 +155,17 @@ jobs:
             test-results/
           retention-days: 7
 
+      # 成功時も UI キャプチャ（zz-screenshots.spec.ts の出力）だけは残す。
+      # UI 変更 PR はここから取得してブランチにコミットし、PR に貼る（CLAUDE.md「Git / PR」）。
+      - name: Upload UI screenshots
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: test-results/screenshots/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Stop Supabase
         if: always()
         run: supabase stop --no-backup
