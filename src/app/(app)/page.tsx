@@ -133,15 +133,21 @@ export default async function HomePage({
           .order("created_at", { ascending: true })
           .order("id", { ascending: true });
         break;
+      // created_at / id は同値時のタイブレーク。チャンク取得（下の range ループ）で
+      // 順序が不定だと、境界の同値行が重複・欠落するため全ソートで確定順にする。
       case "weight_desc":
         query = query
           .order("weight_kg", { ascending: false, nullsFirst: false })
-          .order("record_date", { ascending: false });
+          .order("record_date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false });
         break;
       case "weight_asc":
         query = query
           .order("weight_kg", { ascending: true, nullsFirst: false })
-          .order("record_date", { ascending: false });
+          .order("record_date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false });
         break;
       default:
         // id は同時刻 insert のタイブレーク（記録詳細の前後ナビと同じ順序規則）
