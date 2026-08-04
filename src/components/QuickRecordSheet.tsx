@@ -155,7 +155,7 @@ export default function QuickRecordSheet({
   // （本文はプライベートなメモなので URL・履歴・ログに載せない）。
   function openDetailedForm() {
     if (isPending) return;
-    saveQuickDraft({ body, source });
+    saveQuickDraft({ body, source, householdId });
     closeSheet();
     resetSheet();
     router.push("/records/new");

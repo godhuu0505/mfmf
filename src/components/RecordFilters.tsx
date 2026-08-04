@@ -62,7 +62,9 @@ export default function RecordFilters({
     pushWithTag(buildQueryString(next));
   }
 
-  const active = hasActiveFilters(filters);
+  // 並び替えが既定以外の場合も「条件あり」として扱う —— 畳んだままだと
+  // 一覧が非既定の順序になっている理由が見えず、戻す手段も隠れてしまう。
+  const active = hasActiveFilters(filters) || filters.sort !== "date_desc";
   // 検索パネルは既定で畳む（UC-H01）。絞り込み中は自動で開く（条件が見えないと
   // 「なぜ一覧が少ないのか」が分からなくなるため）。
   const [openPanel, setOpenPanel] = useState(active);
