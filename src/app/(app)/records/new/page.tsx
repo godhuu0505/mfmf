@@ -13,9 +13,9 @@ export const dynamic = "force-dynamic";
 export default async function NewRecordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; body?: string; source?: string }>;
+  searchParams: Promise<{ date?: string }>;
 }) {
-  const { date, body, source } = await searchParams;
+  const { date } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -25,10 +25,8 @@ export default async function NewRecordPage({
   const today = new Date().toISOString().slice(0, 10);
   // カレンダーの「この日の記録を追加」から日付を引き継ぐ（UC-C01）。不正値は今日。
   const defaultDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : today;
-  // クイック記録の「くわしく記録する」から下書きを引き継ぐ（proto 合意の導線）。
-  const defaultBody = typeof body === "string" ? body : "";
-  const defaultSource =
-    source === "home" || source === "daycare" ? source : "daycare";
+  // クイック記録からの下書きは sessionStorage 経由（RecordForm がマウント時に
+  // 取り込む。src/lib/quickDraft.ts）。URL には載せない。
   // householdId は Storage パス {household_id}/{record_id}/... の先頭セグメント（手順8）。
   const [profile, pets, dictionaryTags, membership] = await Promise.all([
     getCurrentProfile(),
@@ -58,8 +56,6 @@ export default async function NewRecordPage({
           ownerId={user.id}
           householdId={householdId}
           defaultDate={defaultDate}
-          defaultBody={defaultBody}
-          defaultSource={defaultSource}
           defaultAuthor={profile?.default_author ?? ""}
           pets={pets.map((p) => ({ id: p.id, name: p.name }))}
           defaultPetId={pets[0]?.id ?? null}

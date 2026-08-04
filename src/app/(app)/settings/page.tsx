@@ -15,11 +15,11 @@ import {
   renameHousehold,
   revokeGuestGrant,
   revokeInvite,
-  switchHousehold,
   updateHouseholdAvatar,
   updateMemberRole,
 } from "@/app/(app)/settings/actions";
 import DeleteHouseholdForm from "@/app/(app)/settings/DeleteHouseholdForm";
+import SwitchHouseholdButton from "@/components/SwitchHouseholdButton";
 
 export const dynamic = "force-dynamic";
 
@@ -219,14 +219,12 @@ export default async function SettingsPage() {
                             : ""}
                         </span>
                         {m.householdId !== membership.householdId && (
-                          <form action={switchHousehold.bind(null, m.householdId)}>
-                            <SubmitButton
-                              pendingLabel="切替中…"
-                              className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
-                            >
-                              この世帯を表示
-                            </SubmitButton>
-                          </form>
+                          <SwitchHouseholdButton
+                            householdId={m.householdId}
+                            className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+                          >
+                            この世帯を表示
+                          </SwitchHouseholdButton>
                         )}
                       </li>
                     ))}

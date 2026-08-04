@@ -111,9 +111,10 @@ CSS は Tailwind CLI に `@source` でその HTML を渡して生成し、本番
 - PR は lint / typecheck / build の CI（`.github/workflows/ci.yml`）を通す。
 - **UI に変更が入る PR には、変更後のスクリーンショットを必ず貼る**（どの画面がどう変わるかを
   レビュアーが差分コードなしで判断できるように）。キャプチャは CI の E2E が生成する
-  `tests/e2e/zz-screenshots.spec.ts` の出力（成功時は `ui-screenshots`、失敗時は
-  `playwright-report` アーティファクトの `test-results/screenshots/`）を使い、
-  ブランチにコミットして PR 本文/コメントから参照する。
+  `tests/e2e/zz-screenshots.spec.ts` の出力を CI が `screenshots/<headブランチ>`
+  ブランチへ自動コミットするので、そのコミット SHA の raw URL で PR 本文/コメントから
+  参照する（PR ブランチ自体には積まない。head がチェックなしのコミットになるため）。
+  失敗時の一次情報は `playwright-report` アーティファクト。
 
 ## DB スキーマ変更
 

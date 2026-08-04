@@ -4,6 +4,7 @@ import { canEdit, getCurrentMembership } from "@/lib/household";
 import { createQuickRecord } from "@/app/(app)/records/actions";
 import AppHeader from "@/components/AppHeader";
 import AppTabBar from "@/components/AppTabBar";
+import HouseholdSyncRefresher from "@/components/HouseholdSyncRefresher";
 import QuickRecordSheet from "@/components/QuickRecordSheet";
 
 // アプリ内画面（要ログイン圏）の共通クローム（D33）。
@@ -32,6 +33,8 @@ export default async function AppLayout({
 
   return (
     <>
+      {/* 他タブで世帯が切り替わったらこのレイアウトごと再取得する（UC-H08） */}
+      <HouseholdSyncRefresher householdId={membership?.householdId ?? null} />
       {/* クイック記録シート表示中に inert になる範囲（シート自身は外に置く） */}
       <div data-quick-record-bg>
         <AppHeader />

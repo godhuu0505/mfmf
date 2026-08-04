@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImages } from "@/lib/imageResize";
 import { buildStoragePath } from "@/lib/storagePath";
+import { takeQuickDraft } from "@/lib/quickDraft";
 import TagInput from "@/components/TagInput";
 import {
   ConfirmCancelButton,
@@ -80,6 +81,7 @@ export default function RecordForm({
   const [source, setSource] = useState<RecordSource>(defaultSource);
 
   const formRef = useRef<HTMLFormElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -92,6 +94,18 @@ export default function RecordForm({
   const confirmedRef = useRef(false);
 
   const busy = processing || uploading || isPending;
+
+  // クイック記録からの下書き（本文・記録元）を取り込む（新規作成のみ。
+  // sessionStorage 経由なので URL・履歴には載らない。src/lib/quickDraft.ts）。
+  useEffect(() => {
+    if (existingRecordId) return;
+    const draft = takeQuickDraft();
+    if (!draft) return;
+    if (draft.body && bodyRef.current && !bodyRef.current.value) {
+      bodyRef.current.value = draft.body;
+    }
+    setSource(draft.source);
+  }, [existingRecordId]);
 
   // 選択画像をアップロード前に縮小・圧縮し、送信用に保持する。
   async function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -318,6 +332,7 @@ export default function RecordForm({
           {source === "home" ? "おうちでの記録" : "保育園からの記録"}
         </label>
         <textarea
+          ref={bodyRef}
           id="body"
           name="body"
           rows={8}

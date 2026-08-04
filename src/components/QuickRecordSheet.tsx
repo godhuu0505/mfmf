@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { saveQuickDraft } from "@/lib/quickDraft";
 import type { RecordSource } from "@/types/database";
 
 // クイック記録の定型チップ（proto/quick-record 合意時の語彙 / D32）。
@@ -142,15 +143,14 @@ export default function QuickRecordSheet({
   }
 
   // 「写真つきでくわしく記録する →」（proto 合意の導線）。クイックの下書き
-  // （チップ・ひとこと・記録元）をクエリで /records/new に引き継ぐ。
+  // （チップ・ひとこと・記録元）を sessionStorage で /records/new に引き継ぐ
+  // （本文はプライベートなメモなので URL・履歴・ログに載せない）。
   function openDetailedForm() {
     if (isPending) return;
-    const params = new URLSearchParams();
-    if (body) params.set("body", body);
-    params.set("source", source);
+    saveQuickDraft({ body, source });
     closeSheet();
     resetSheet();
-    router.push(`/records/new?${params.toString()}`);
+    router.push("/records/new");
   }
 
   function save() {
