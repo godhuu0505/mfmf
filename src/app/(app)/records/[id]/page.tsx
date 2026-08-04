@@ -83,23 +83,29 @@ export default async function RecordDetailPage({
   const tagNames = tags.map((t) => t.name);
 
   // 前後の記録（UC-D01）。一覧と同じ (record_date, created_at) 順の隣を 1 件ずつ引く。
+  // created_at はトランザクション時刻なので一括 insert だと同値になり得る。
+  // id を最終タイブレークにして、同時刻の記録同士でも必ず隣が決まるようにする。
+  const d = record.record_date;
+  const t = record.created_at;
   let prevQuery = supabase
     .from("daycare_records")
     .select("id, record_date")
     .or(
-      `record_date.lt.${record.record_date},and(record_date.eq.${record.record_date},created_at.lt.${record.created_at})`,
+      `record_date.lt.${d},and(record_date.eq.${d},created_at.lt.${t}),and(record_date.eq.${d},created_at.eq.${t},id.lt.${record.id})`,
     )
     .order("record_date", { ascending: false })
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(1);
   let nextQuery = supabase
     .from("daycare_records")
     .select("id, record_date")
     .or(
-      `record_date.gt.${record.record_date},and(record_date.eq.${record.record_date},created_at.gt.${record.created_at})`,
+      `record_date.gt.${d},and(record_date.eq.${d},created_at.gt.${t}),and(record_date.eq.${d},created_at.eq.${t},id.gt.${record.id})`,
     )
     .order("record_date", { ascending: true })
     .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
     .limit(1);
   if (householdId) {
     prevQuery = prevQuery.or(householdScopeFilter(householdId));

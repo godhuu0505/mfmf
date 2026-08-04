@@ -11,6 +11,7 @@ import {
 import { PawPrint } from "lucide-react";
 import { createGuestRecord } from "@/app/guest/actions";
 import { RECORD_SOURCES, SOURCE_LABEL } from "@/types/database";
+import { jstTodayISO } from "@/lib/dateRange";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export default async function GuestNewRecordPage({
   // 指定ペット（クエリ）を優先。無効・未指定なら先頭の担当ペット。
   const grant = grants.find((g) => g.petId === pet) ?? grants[0];
   const profile = await getCurrentProfile();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = jstTodayISO();
 
   return (
     <>

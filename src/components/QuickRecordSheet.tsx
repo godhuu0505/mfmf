@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { jstTodayISO } from "@/lib/dateRange";
 import { saveQuickDraft } from "@/lib/quickDraft";
 import type { RecordSource } from "@/types/database";
 
@@ -19,16 +20,11 @@ const CHIPS = [
   "ごきげん",
 ];
 
-// 今日の日付（端末ローカル）。record_date は日付のみを持つ。
-function todayISO(): string {
-  const d = new Date();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
+// 表示・保存とも JST の「今日」（record_date は日付のみを持つ。
+// 一覧の「今日/昨日」見出しも Asia/Tokyo 基準なので揃える）。
 function formatToday(): string {
   return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -156,7 +152,7 @@ export default function QuickRecordSheet({
   function save() {
     if (!body || isPending) return;
     const fd = new FormData();
-    fd.set("record_date", todayISO());
+    fd.set("record_date", jstTodayISO());
     fd.set("source", source);
     fd.set("author", defaultAuthor);
     fd.set("body", body);

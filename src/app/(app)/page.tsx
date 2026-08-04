@@ -126,7 +126,8 @@ export default async function HomePage({
     case "date_asc":
       query = query
         .order("record_date", { ascending: true })
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
       break;
     case "weight_desc":
       query = query
@@ -139,19 +140,22 @@ export default async function HomePage({
         .order("record_date", { ascending: false });
       break;
     default:
+      // id は同時刻 insert のタイブレーク（記録詳細の前後ナビと同じ順序規則）
       query = query
         .order("record_date", { ascending: false })
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
   }
 
-  const fromIdx = (filters.page - 1) * PAGE_SIZE;
-  query = query.range(fromIdx, fromIdx + PAGE_SIZE - 1);
+  // 「もっと見る」で先頭からの表示件数を増やす（ページ差し替えではなく追記。
+  // page はもっと見るを押した回数 + 1 = 表示中のバッチ数）。タイムラインの
+  // 文脈を保ったまま過去へ辿れる（proto 合意 / notes.md）。
+  query = query.range(0, filters.page * PAGE_SIZE - 1);
 
   const { data: records, count } = await query.returns<RecordWithPhotos[]>();
 
   const list = records ?? [];
   const total = count ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const active = hasActiveFilters(filters) || activeTag != null;
 
   // タグチップのリンク（現在の検索条件は保ったまま tag だけ切り替え、ページは先頭へ戻す）。
@@ -163,7 +167,7 @@ export default async function HomePage({
     return s ? `/?${s}` : "/";
   }
 
-  // ページネーションのリンク（選択中タグを保持）。
+  // 「もっと見る」のリンク（選択中タグを保持）。
   function pageHref(page: number): string {
     const qs = buildQueryString(filters, { page });
     const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : qs);
@@ -172,15 +176,26 @@ export default async function HomePage({
     return s ? `/?${s}` : "/";
   }
 
+  // 記録元チップ（proto 合意: ワンタップで おうち/保育園 を絞り込む。URL が正）。
+  function sourceHref(source: "all" | "home" | "daycare"): string {
+    const qs = buildQueryString(filters, { source, page: 1 });
+    const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : qs);
+    if (activeTag) params.set("tag", activeTag.id);
+    const s = params.toString();
+    return s ? `/?${s}` : "/";
+  }
+  const sourceChips = [
+    { value: "all", label: "すべて" },
+    { value: "home", label: "おうち" },
+    { value: "daycare", label: "保育園" },
+  ] as const;
+
   // 各記録の先頭写真サムネに署名付き URL を付与
   const thumbPaths = list
     .map((r) => r.record_photos?.[0]?.storage_path)
     .filter((p): p is string => Boolean(p));
 
   const urlByPath = await createPhotoSignedUrls(thumbPaths);
-
-  const prevHref = pageHref(filters.page - 1);
-  const nextHref = pageHref(filters.page + 1);
 
   // 日付ソート時は日付見出しのタイムラインにする（UC-H01）。体重ソート時は
   // 日付順にならないため、従来どおりカード内に日付を出すフラット表示のまま。
@@ -286,15 +301,32 @@ export default async function HomePage({
           activeTagId={activeTag?.id ?? null}
         />
 
+        {/* 記録元チップ（常設・ワンタップ） */}
+        <div className="mb-3 flex items-center gap-1.5" aria-label="記録元で絞り込み">
+          {sourceChips.map((c) => {
+            const isActive = filters.source === c.value;
+            return (
+              <Link
+                key={c.value}
+                href={sourceHref(c.value)}
+                aria-current={isActive ? "page" : undefined}
+                className={
+                  "rounded-full px-3.5 py-1.5 text-sm font-medium transition " +
+                  (isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-surface text-foreground ring-1 ring-border hover:bg-surface-muted")
+                }
+              >
+                {c.label}
+              </Link>
+            );
+          })}
+        </div>
+
         {total > 0 && (
           <p className="mb-3 text-sm text-muted-foreground">
             全 {total} 件
-            {totalPages > 1 && (
-              <span>
-                {" "}
-                / {filters.page} ページ目（全 {totalPages} ページ）
-              </span>
-            )}
+            {list.length < total && <span>（{list.length} 件を表示中）</span>}
           </p>
         )}
 
@@ -371,38 +403,17 @@ export default async function HomePage({
           <ul className="space-y-3">{list.map((r) => recordCard(r, true))}</ul>
         )}
 
-        {totalPages > 1 && (
-          <nav className="mt-6 flex items-center justify-between">
-            {filters.page > 1 ? (
-              <Link
-                href={prevHref}
-                rel="prev"
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
-              >
-                ← 前へ
-              </Link>
-            ) : (
-              <span className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted">
-                ← 前へ
-              </span>
-            )}
-            <span className="text-sm text-muted-foreground">
-              {filters.page} / {totalPages}
-            </span>
-            {filters.page < totalPages ? (
-              <Link
-                href={nextHref}
-                rel="next"
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted"
-              >
-                次へ →
-              </Link>
-            ) : (
-              <span className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted">
-                次へ →
-              </span>
-            )}
-          </nav>
+        {/* もっと見る: 表示済みは保ったまま次のバッチを足す（scroll 位置も保持） */}
+        {list.length < total && (
+          <div className="mt-6 flex justify-center">
+            <Link
+              href={pageHref(filters.page + 1)}
+              scroll={false}
+              className="rounded-full border border-border px-6 py-2.5 text-sm font-medium text-foreground transition hover:bg-surface-muted"
+            >
+              もっと見る（残り {total - list.length} 件）
+            </Link>
+          </div>
         )}
       </main>
     </>

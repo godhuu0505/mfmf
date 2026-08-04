@@ -13,13 +13,9 @@ import {
   type SortKey,
 } from "@/lib/recordQuery";
 
-const SOURCE_OPTIONS: { value: RecordSourceFilter; label: string }[] = [
-  { value: "all", label: "すべて" },
-  { value: "daycare", label: "🏫 保育園" },
-  { value: "home", label: "🏠 おうち" },
-];
-
 // 記録一覧の検索・絞り込み・並び替えフォーム。
+// 記録元はホーム常設のチップ（page.tsx / proto 合意）が受け持ち、
+// ここでは hidden で保持だけする（検索してもチップの選択が消えないように）。
 // 送信時に空欄・既定値を除いた URL を組み立てて遷移するため、
 // 共有・リロードで同じ結果を再現できる（条件は URL クエリが正）。
 export default function RecordFilters({
@@ -113,41 +109,26 @@ export default function RecordFilters({
         </button>
       </div>
 
-      {/* 記録元 / 並び替え */}
-      <div className="grid grid-cols-2 gap-2">
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">
-            記録元
-          </span>
-          <select
-            name="source"
-            defaultValue={filters.source}
-            className="w-full rounded-lg border border-border bg-surface px-2 py-2 text-sm text-foreground focus:border-muted-foreground focus:outline-none"
-          >
-            {SOURCE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">
-            並び替え
-          </span>
-          <select
-            name="sort"
-            defaultValue={filters.sort}
-            className="w-full rounded-lg border border-border bg-surface px-2 py-2 text-sm text-foreground focus:border-muted-foreground focus:outline-none"
-          >
-            {SORT_KEYS.map((k) => (
-              <option key={k} value={k}>
-                {SORT_LABEL[k]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      {/* 記録元はホームのチップ選択を維持したまま送る */}
+      <input type="hidden" name="source" value={filters.source} />
+
+      {/* 並び替え */}
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-muted-foreground">
+          並び替え
+        </span>
+        <select
+          name="sort"
+          defaultValue={filters.sort}
+          className="w-full rounded-lg border border-border bg-surface px-2 py-2 text-sm text-foreground focus:border-muted-foreground focus:outline-none"
+        >
+          {SORT_KEYS.map((k) => (
+            <option key={k} value={k}>
+              {SORT_LABEL[k]}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {/* 期間 */}
       <div className="grid grid-cols-2 gap-2">

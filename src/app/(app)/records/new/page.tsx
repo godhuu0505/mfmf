@@ -7,6 +7,7 @@ import { listPets } from "@/lib/pets";
 import RecordForm from "@/components/RecordForm";
 import { createRecord } from "@/app/(app)/records/actions";
 import { getTagDictionary } from "@/lib/tags";
+import { jstTodayISO } from "@/lib/dateRange";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,8 @@ export default async function NewRecordPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const today = new Date().toISOString().slice(0, 10);
+  // JST の今日（UTC 日付だと日本の 0:00〜8:59 に前日になってしまう）
+  const today = jstTodayISO();
   // カレンダーの「この日の記録を追加」から日付を引き継ぐ（UC-C01）。不正値は今日。
   const defaultDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : today;
   // クイック記録からの下書きは sessionStorage 経由（RecordForm がマウント時に

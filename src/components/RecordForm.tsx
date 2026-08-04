@@ -324,26 +324,8 @@ export default function RecordForm({
         </div>
       </div>
 
-      <div>
-        <label
-          htmlFor="body"
-          className="mb-1 block text-sm font-medium text-foreground"
-        >
-          {source === "home" ? "おうちでの記録" : "保育園からの記録"}
-        </label>
-        <textarea
-          ref={bodyRef}
-          id="body"
-          name="body"
-          rows={8}
-          defaultValue={defaultBody}
-          placeholder="今日の様子などを記録します"
-          className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
-        />
-      </div>
-
-      <TagInput defaultTags={defaultTags} suggestions={tagSuggestions} />
-
+      {/* 写真は上段（proto 合意 / notes.md「写真を上段へ」。長いフォームの
+          末尾まで辿らなくても、主目的の写真を先に選べる） */}
       <div>
         <label
           htmlFor="photos"
@@ -366,6 +348,26 @@ export default function RecordForm({
             : summary ?? "アップロード時に自動で縮小・圧縮します（長辺 1600px）。"}
         </p>
       </div>
+
+      <div>
+        <label
+          htmlFor="body"
+          className="mb-1 block text-sm font-medium text-foreground"
+        >
+          {source === "home" ? "おうちでの記録" : "保育園からの記録"}
+        </label>
+        <textarea
+          ref={bodyRef}
+          id="body"
+          name="body"
+          rows={8}
+          defaultValue={defaultBody}
+          placeholder="今日の様子などを記録します"
+          className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
+        />
+      </div>
+
+      <TagInput defaultTags={defaultTags} suggestions={tagSuggestions} />
 
       {error && (
         <p className="text-sm text-red-600" role="alert">
