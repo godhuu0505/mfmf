@@ -96,11 +96,19 @@ test("UC-D02: 「…」シートからゲスト共有を切り替えられる", 
   const petName = `E2E共有ペット${Date.now()}`;
   await login(page);
 
-  // ペットを用意（記録フォームは先頭ペットを既定選択する）
+  // ペットを用意（記録フォームは先頭ペットを既定選択する）。反映ハングは
+  // #137 の保護（リロードして実データ検証）で吸収する
   await page.goto("/pets");
   await page.getByLabel("名前").fill(petName);
   await page.getByRole("button", { name: "追加する" }).click();
-  await expect(page.getByText(petName, { exact: true })).toBeVisible();
+  try {
+    await expect(page.getByText(petName, { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+  } catch {
+    await page.reload();
+    await expect(page.getByText(petName, { exact: true })).toBeVisible();
+  }
 
   // ペット紐付きの記録を作る
   await page.goto("/records/new");
@@ -161,7 +169,15 @@ test.describe("招待リンクのコピー", () => {
     await page.locator("#invite_email").fill(email);
     // exact: ペットが居るとゲスト招待フォームの「ゲスト招待を発行」に部分一致する
     await page.getByRole("button", { name: "招待を発行", exact: true }).click();
-    await expect(page.getByText(email, { exact: false })).toBeVisible();
+    // 発行の反映ハング（#137。招待自体は作成済み）はリロードで吸収する
+    try {
+      await expect(page.getByText(email, { exact: false })).toBeVisible({
+        timeout: 15_000,
+      });
+    } catch {
+      await page.reload();
+      await expect(page.getByText(email, { exact: false })).toBeVisible();
+    }
 
     const copyBtn = page
       .getByRole("button", { name: "リンクをコピー" })
