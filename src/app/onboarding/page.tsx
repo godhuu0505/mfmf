@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/household";
 import { hasActiveGuestGrant } from "@/lib/guest";
 import SubmitButton from "@/components/SubmitButton";
+import FeedbackWidget from "@/components/FeedbackWidget";
 import { createOwnHousehold } from "@/app/onboarding/actions";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +68,12 @@ export default async function OnboardingPage() {
             家族から招待を受けている場合は、届いた招待リンクを開くとその世帯に
             参加できます（この画面で世帯を作る必要はありません）。
           </p>
+        </div>
+
+        {/* 世帯未所属ユーザーは /menu に到達できないため、ここにも報告導線を残す
+            （グローバル FAB 廃止（D33）の代替。/guest と同じ扱い）。 */}
+        <div className="mt-4 overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+          <FeedbackWidget variant="row" />
         </div>
       </div>
     </main>

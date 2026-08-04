@@ -1,0 +1,230 @@
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import {
+  canEdit,
+  getCurrentMembership,
+  householdScopeFilter,
+} from "@/lib/household";
+import { SOURCE_LABEL, type RecordWithPhotos } from "@/types/database";
+import CalendarMonth, {
+  type CalendarDayRecord,
+} from "@/components/CalendarMonth";
+import SourceIcon from "@/components/SourceIcon";
+import { jstTodayISO } from "@/lib/dateRange";
+import { Camera } from "lucide-react";
+
+export const dynamic = "force-dynamic";
+
+export const metadata = { title: "カレンダー" };
+
+// "YYYY-MM" を {year, month(1-12)} に。未指定・不正は fallback（JST の今月）。
+function parseYearMonth(
+  ym: string | undefined,
+  fallback: { year: number; month: number },
+): { year: number; month: number } {
+  if (ym) {
+    const m = /^(\d{4})-(\d{1,2})$/.exec(ym);
+    if (m) {
+      const year = Number(m[1]);
+      const month = Number(m[2]);
+      if (month >= 1 && month <= 12) return { year, month };
+    }
+  }
+  return fallback;
+}
+
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function ymString(year: number, month: number) {
+  return `${year}-${pad(month)}`;
+}
+
+function shiftMonth(year: number, month: number, delta: number) {
+  const idx = (year * 12 + (month - 1)) + delta;
+  return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
+}
+
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ym?: string }>;
+}) {
+  const { ym } = await searchParams;
+  // 「今日」「今月」は JST 基準（サーバーの実行 TZ が UTC だと、日本の 0:00〜8:59
+  // に前日・前月扱いになってしまう）。
+  const todayStr = jstTodayISO();
+  const [todayYear, todayMonth] = todayStr.split("-").map(Number);
+  const { year, month } = parseYearMonth(ym, {
+    year: todayYear,
+    month: todayMonth,
+  });
+
+  const firstDay = `${year}-${pad(month)}-01`;
+  const lastDate = new Date(year, month, 0).getDate(); // 当月末日
+  const lastDay = `${year}-${pad(month)}-${pad(lastDate)}`;
+
+  const supabase = await createClient();
+  // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
+  const membership = await getCurrentMembership(supabase);
+  const householdId = membership?.householdId ?? null;
+  const canAdd = membership !== null && canEdit(membership.role);
+  let query = supabase
+    .from("daycare_records")
+    .select("*, record_photos(*)")
+    .gte("record_date", firstDay)
+    .lte("record_date", lastDay)
+    .order("record_date", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (householdId) query = query.or(householdScopeFilter(householdId));
+  const { data } = await query.returns<RecordWithPhotos[]>();
+
+  const records = data ?? [];
+
+  // 日付(YYYY-MM-DD) -> その日の記録
+  const byDate = new Map<string, RecordWithPhotos[]>();
+  for (const r of records) {
+    const list = byDate.get(r.record_date) ?? [];
+    list.push(r);
+    byDate.set(r.record_date, list);
+  }
+
+  // カレンダーグリッド（前後の空白セルを含む）
+  const firstWeekday = new Date(year, month - 1, 1).getDay(); // 0=日
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= lastDate; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const prev = shiftMonth(year, month, -1);
+  const next = shiftMonth(year, month, 1);
+  const isCurrentMonth = year === todayYear && month === todayMonth;
+
+  return (
+    <>
+      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
+        <div className="mb-4 flex items-center justify-between">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
+            ← 一覧へ戻る
+          </Link>
+        </div>
+
+        <div className="mb-4 flex items-center justify-between">
+          <Link
+            href={`/calendar?ym=${ymString(prev.year, prev.month)}`}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
+            aria-label="前の月"
+          >
+            ‹ 前月
+          </Link>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-foreground">
+              {year}年{month}月
+            </h1>
+            {/* 今月へのショートカット（proto 合意 / notes.md）。今月表示中は出さない。
+                素の <a>（フル遷移）にしている: CI 環境でこのリンクだけ Link の
+                クライアント遷移が確定しない事象が再現し（最小再現では起きず、
+                計装との相互作用が疑い）、月ジャンプは毎回サーバー描画なので
+                フル遷移でも体感差がないため、確実に動く方を取る。 */}
+            {!isCurrentMonth && (
+              <a
+                href={`/calendar?ym=${ymString(todayYear, todayMonth)}`}
+                className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
+              >
+                今日
+              </a>
+            )}
+          </div>
+          <Link
+            href={`/calendar?ym=${ymString(next.year, next.month)}`}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
+            aria-label="次の月"
+          >
+            翌月 ›
+          </Link>
+        </div>
+
+        {/* 月カレンダー（日タップでその日のシートが開く / UC-C01） */}
+        <CalendarMonth
+          year={year}
+          month={month}
+          cells={cells}
+          todayStr={todayStr}
+          canAdd={canAdd}
+          days={Object.fromEntries(
+            [...byDate.entries()].map(([date, rs]) => [
+              date,
+              rs.map(
+                (r): CalendarDayRecord => ({
+                  id: r.id,
+                  source: r.source,
+                  body: r.body,
+                  photoCount: r.record_photos?.length ?? 0,
+                }),
+              ),
+            ]),
+          )}
+        />
+
+        {/* この月の記録（日付ごと） */}
+        <section className="mt-8">
+          <h2 className="mb-3 text-sm font-medium text-foreground">
+            この月の記録（{records.length}件）
+          </h2>
+          {records.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+              この月の記録はありません。
+            </div>
+          ) : (
+            <ul className="space-y-4">
+              {[...byDate.entries()].map(([date, dayRecords]) => (
+                <li key={date} id={`day-${date}`} className="scroll-mt-4">
+                  <p className="mb-1.5 text-sm font-semibold text-foreground">
+                    {new Intl.DateTimeFormat("ja-JP", {
+                      month: "long",
+                      day: "numeric",
+                      weekday: "short",
+                    }).format(new Date(date))}
+                  </p>
+                  <ul className="space-y-2">
+                    {dayRecords.map((r) => (
+                      <li key={r.id}>
+                        <Link
+                          href={`/records/${r.id}`}
+                          className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm shadow-sm ring-1 ring-border transition hover:ring-border"
+                        >
+                          <span
+                            className={
+                              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
+                              (r.source === "home"
+                                ? "bg-amber-100 text-amber-900"
+                                : "bg-sky-100 text-sky-900")
+                            }
+                          >
+                            <SourceIcon source={r.source} className="h-3.5 w-3.5" />
+                            {SOURCE_LABEL[r.source]}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-foreground">
+                            {r.body.replace(/\s+/g, " ").trim() || "（本文なし）"}
+                          </span>
+                          {(r.record_photos?.length ?? 0) > 0 && (
+                            <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                              <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+                              <span className="sr-only">写真</span>
+                              {r.record_photos.length}
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </main>
+    </>
+  );
+}

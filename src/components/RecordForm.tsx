@@ -1,10 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImages } from "@/lib/imageResize";
 import { buildStoragePath } from "@/lib/storagePath";
+import { takeQuickDraft } from "@/lib/quickDraft";
 import TagInput from "@/components/TagInput";
+import {
+  ConfirmCancelButton,
+  ConfirmDialog,
+} from "@/components/FormConfirm";
 import {
   PHOTO_BUCKET,
   RECORD_SOURCES,
@@ -76,6 +81,7 @@ export default function RecordForm({
   const [source, setSource] = useState<RecordSource>(defaultSource);
 
   const formRef = useRef<HTMLFormElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -83,7 +89,24 @@ export default function RecordForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // 保存の確認ダイアログ（D33）。確認済みフラグが立っているときだけ実送信する。
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmedRef = useRef(false);
+
   const busy = processing || uploading || isPending;
+
+  // クイック記録からの下書き（本文・記録元）を取り込む（新規作成のみ。
+  // sessionStorage 経由なので URL・履歴には載らない。世帯が食い違う下書きは
+  // takeQuickDraft 側で破棄される。src/lib/quickDraft.ts）。
+  useEffect(() => {
+    if (existingRecordId) return;
+    const draft = takeQuickDraft(householdId);
+    if (!draft) return;
+    if (draft.body && bodyRef.current && !bodyRef.current.value) {
+      bodyRef.current.value = draft.body;
+    }
+    setSource(draft.source);
+  }, [existingRecordId, householdId]);
 
   // 選択画像をアップロード前に縮小・圧縮し、送信用に保持する。
   async function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -120,6 +143,13 @@ export default function RecordForm({
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return;
+    // 確認ダイアログを挟む（UC-F01）。確認後の requestSubmit で再入してくる。
+    if (!confirmedRef.current) {
+      setConfirmOpen(true);
+      return;
+    }
+    confirmedRef.current = false;
     const form = e.currentTarget;
     setError(null);
 
@@ -170,6 +200,23 @@ export default function RecordForm({
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+      {/* アクション行は上部固定（notes.md「キャンセル・保存を上部固定 = IME に隠れない」）。
+          フォーム画面は全画面モーダル型でヘッダーを出さない（HideOnFormRoute）ため、
+          セーフエリア直下に貼り付く。 */}
+      <div className="safe-pt sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-2.5 backdrop-blur">
+        <ConfirmCancelButton
+          href={cancelHref}
+          className="text-sm text-muted-foreground transition hover:text-foreground"
+        />
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-lg bg-primary px-5 py-2 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
+        >
+          {uploading ? "写真を保存中…" : isPending ? "保存中…" : submitLabel}
+        </button>
+      </div>
+
       <div>
         <span className="mb-1 block text-sm font-medium text-foreground">
           記録元
@@ -279,25 +326,8 @@ export default function RecordForm({
         </div>
       </div>
 
-      <div>
-        <label
-          htmlFor="body"
-          className="mb-1 block text-sm font-medium text-foreground"
-        >
-          {source === "home" ? "おうちでの記録" : "保育園からの記録"}
-        </label>
-        <textarea
-          id="body"
-          name="body"
-          rows={8}
-          defaultValue={defaultBody}
-          placeholder="今日の様子などを記録します"
-          className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
-        />
-      </div>
-
-      <TagInput defaultTags={defaultTags} suggestions={tagSuggestions} />
-
+      {/* 写真は上段（proto 合意 / notes.md「写真を上段へ」。長いフォームの
+          末尾まで辿らなくても、主目的の写真を先に選べる） */}
       <div>
         <label
           htmlFor="photos"
@@ -321,27 +351,46 @@ export default function RecordForm({
         </p>
       </div>
 
+      <div>
+        <label
+          htmlFor="body"
+          className="mb-1 block text-sm font-medium text-foreground"
+        >
+          {source === "home" ? "おうちでの記録" : "保育園からの記録"}
+        </label>
+        <textarea
+          ref={bodyRef}
+          id="body"
+          name="body"
+          rows={8}
+          defaultValue={defaultBody}
+          placeholder="今日の様子などを記録します"
+          className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
+        />
+      </div>
+
+      <TagInput defaultTags={defaultTags} suggestions={tagSuggestions} />
+
       {error && (
         <p className="text-sm text-red-600" role="alert">
           {error}
         </p>
       )}
 
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
-        >
-          {uploading ? "写真を保存中…" : isPending ? "保存中…" : submitLabel}
-        </button>
-        <a
-          href={cancelHref}
-          className="text-sm text-muted-foreground transition hover:text-foreground"
-        >
-          キャンセル
-        </a>
-      </div>
+      {confirmOpen && (
+        <ConfirmDialog
+          title="この内容で保存しますか？"
+          message="保存したあともいつでも編集できます。"
+          confirmLabel="保存する"
+          confirmClassName="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover"
+          onClose={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            confirmedRef.current = true;
+            formRef.current?.requestSubmit();
+          }}
+        />
+      )}
     </form>
   );
 }

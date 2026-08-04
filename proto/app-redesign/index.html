@@ -1,0 +1,3091 @@
+<title>mfmf UI/UX 再設計プロト</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%BE%3C/text%3E%3C/svg%3E" />
+<style>
+/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */
+@layer properties;
+@layer theme, base, components, utilities;
+@layer theme {
+  :root, :host {
+    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    --color-red-400: oklch(70.4% 0.191 22.216);
+    --color-red-600: oklch(57.7% 0.245 27.325);
+    --color-orange-200: oklch(90.1% 0.076 70.697);
+    --color-orange-300: oklch(83.7% 0.128 66.29);
+    --color-amber-100: oklch(96.2% 0.059 95.617);
+    --color-amber-200: oklch(92.4% 0.12 95.746);
+    --color-amber-300: oklch(87.9% 0.169 91.605);
+    --color-amber-400: oklch(82.8% 0.189 84.429);
+    --color-amber-900: oklch(41.4% 0.112 45.904);
+    --color-amber-950: oklch(27.9% 0.077 45.635);
+    --color-yellow-200: oklch(94.5% 0.129 101.54);
+    --color-lime-200: oklch(93.8% 0.127 124.321);
+    --color-green-300: oklch(87.1% 0.15 154.449);
+    --color-emerald-50: oklch(97.9% 0.021 166.113);
+    --color-emerald-200: oklch(90.5% 0.093 164.15);
+    --color-emerald-400: oklch(76.5% 0.177 163.223);
+    --color-emerald-700: oklch(50.8% 0.118 165.612);
+    --color-emerald-950: oklch(26.2% 0.051 172.552);
+    --color-teal-200: oklch(91% 0.096 180.426);
+    --color-teal-300: oklch(85.5% 0.138 181.071);
+    --color-cyan-300: oklch(86.5% 0.127 207.078);
+    --color-sky-100: oklch(95.1% 0.026 236.824);
+    --color-sky-200: oklch(90.1% 0.058 230.902);
+    --color-sky-300: oklch(82.8% 0.111 230.318);
+    --color-sky-400: oklch(74.6% 0.16 232.661);
+    --color-sky-500: oklch(68.5% 0.169 237.323);
+    --color-sky-900: oklch(39.1% 0.09 240.876);
+    --color-sky-950: oklch(29.3% 0.066 243.157);
+    --color-blue-300: oklch(80.9% 0.105 251.813);
+    --color-indigo-200: oklch(87% 0.065 274.039);
+    --color-indigo-300: oklch(78.5% 0.115 274.713);
+    --color-violet-200: oklch(89.4% 0.057 293.283);
+    --color-purple-300: oklch(82.7% 0.119 306.383);
+    --color-pink-200: oklch(89.9% 0.061 343.231);
+    --color-pink-300: oklch(82.3% 0.12 346.018);
+    --color-rose-200: oklch(89.2% 0.058 10.001);
+    --color-rose-300: oklch(81% 0.117 11.638);
+    --color-rose-500: oklch(64.5% 0.246 16.439);
+    --color-slate-200: oklch(92.9% 0.013 255.508);
+    --color-slate-300: oklch(86.9% 0.022 252.894);
+    --color-black: #000;
+    --spacing: 0.25rem;
+    --container-sm: 24rem;
+    --container-md: 28rem;
+    --container-2xl: 42rem;
+    --text-xs: 0.75rem;
+    --text-xs--line-height: calc(1 / 0.75);
+    --text-sm: 0.875rem;
+    --text-sm--line-height: calc(1.25 / 0.875);
+    --text-base: 1rem;
+    --text-base--line-height: calc(1.5 / 1);
+    --text-lg: 1.125rem;
+    --text-lg--line-height: calc(1.75 / 1.125);
+    --text-xl: 1.25rem;
+    --text-xl--line-height: calc(1.75 / 1.25);
+    --text-2xl: 1.5rem;
+    --text-2xl--line-height: calc(2 / 1.5);
+    --text-3xl: 1.875rem;
+    --text-3xl--line-height: calc(2.25 / 1.875);
+    --text-4xl: 2.25rem;
+    --text-4xl--line-height: calc(2.5 / 2.25);
+    --text-5xl: 3rem;
+    --text-5xl--line-height: 1;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --tracking-tight: -0.025em;
+    --leading-relaxed: 1.625;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --default-transition-duration: 150ms;
+    --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    --default-font-family: var(--font-sans);
+    --default-mono-font-family: var(--font-mono);
+  }
+}
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  html, :host {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    font-family: var(--default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
+    -webkit-tap-highlight-color: transparent;
+  }
+  hr {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+  abbr:where([title]) {
+    -webkit-text-decoration: underline dotted;
+    text-decoration: underline dotted;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  a {
+    color: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit;
+  }
+  b, strong {
+    font-weight: bolder;
+  }
+  code, kbd, samp, pre {
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-feature-settings: var(--default-mono-font-feature-settings, normal);
+    font-variation-settings: var(--default-mono-font-variation-settings, normal);
+    font-size: 1em;
+  }
+  small {
+    font-size: 80%;
+  }
+  sub, sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+  sub {
+    bottom: -0.25em;
+  }
+  sup {
+    top: -0.5em;
+  }
+  table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+  :-moz-focusring {
+    outline: auto;
+  }
+  progress {
+    vertical-align: baseline;
+  }
+  summary {
+    display: list-item;
+  }
+  ol, ul, menu {
+    list-style: none;
+  }
+  img, svg, video, canvas, audio, iframe, embed, object {
+    display: block;
+    vertical-align: middle;
+  }
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+  button, input, select, optgroup, textarea, ::file-selector-button {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  :where(select:is([multiple], [size])) optgroup {
+    font-weight: bolder;
+  }
+  :where(select:is([multiple], [size])) optgroup option {
+    padding-inline-start: 20px;
+  }
+  ::file-selector-button {
+    margin-inline-end: 4px;
+  }
+  ::placeholder {
+    opacity: 1;
+  }
+  @supports (not (-webkit-appearance: -apple-pay-button))  or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: currentcolor;
+      @supports (color: color-mix(in lab, red, red)) {
+        color: color-mix(in oklab, currentcolor 50%, transparent);
+      }
+    }
+  }
+  textarea {
+    resize: vertical;
+  }
+  ::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+  ::-webkit-date-and-time-value {
+    min-height: 1lh;
+    text-align: inherit;
+  }
+  ::-webkit-datetime-edit {
+    display: inline-flex;
+  }
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  ::-webkit-datetime-edit, ::-webkit-datetime-edit-year-field, ::-webkit-datetime-edit-month-field, ::-webkit-datetime-edit-day-field, ::-webkit-datetime-edit-hour-field, ::-webkit-datetime-edit-minute-field, ::-webkit-datetime-edit-second-field, ::-webkit-datetime-edit-millisecond-field, ::-webkit-datetime-edit-meridiem-field {
+    padding-block: 0;
+  }
+  ::-webkit-calendar-picker-indicator {
+    line-height: 1;
+  }
+  :-moz-ui-invalid {
+    box-shadow: none;
+  }
+  button, input:where([type="button"], [type="reset"], [type="submit"]), ::file-selector-button {
+    appearance: button;
+  }
+  ::-webkit-inner-spin-button, ::-webkit-outer-spin-button {
+    height: auto;
+  }
+  [hidden]:where(:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
+@layer utilities {
+  .visible {
+    visibility: visible;
+  }
+  .absolute {
+    position: absolute;
+  }
+  .fixed {
+    position: fixed;
+  }
+  .relative {
+    position: relative;
+  }
+  .sticky {
+    position: sticky;
+  }
+  .inset-0 {
+    inset: 0px;
+  }
+  .inset-x-0 {
+    inset-inline: 0px;
+  }
+  .top-0 {
+    top: 0px;
+  }
+  .right-4 {
+    right: calc(var(--spacing) * 4);
+  }
+  .bottom-0 {
+    bottom: 0px;
+  }
+  .bottom-\[calc\(72px_\+_env\(safe-area-inset-bottom\)\)\] {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+  .bottom-\[calc\(76px_\+_env\(safe-area-inset-bottom\)\)\] {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  .bottom-\[calc\(88px_\+_env\(safe-area-inset-bottom\)\)\] {
+    bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+  .left-1\/2 {
+    left: calc(1 / 2 * 100%);
+  }
+  .left-3 {
+    left: calc(var(--spacing) * 3);
+  }
+  .z-10 {
+    z-index: 10;
+  }
+  .z-30 {
+    z-index: 30;
+  }
+  .z-40 {
+    z-index: 40;
+  }
+  .container {
+    width: 100%;
+    @media (width >= 40rem) {
+      max-width: 40rem;
+    }
+    @media (width >= 48rem) {
+      max-width: 48rem;
+    }
+    @media (width >= 64rem) {
+      max-width: 64rem;
+    }
+    @media (width >= 80rem) {
+      max-width: 80rem;
+    }
+    @media (width >= 96rem) {
+      max-width: 96rem;
+    }
+  }
+  .mx-auto {
+    margin-inline: auto;
+  }
+  .my-4 {
+    margin-block: calc(var(--spacing) * 4);
+  }
+  .-mt-5 {
+    margin-top: calc(var(--spacing) * -5);
+  }
+  .mt-0\.5 {
+    margin-top: calc(var(--spacing) * 0.5);
+  }
+  .mt-1 {
+    margin-top: var(--spacing);
+  }
+  .mt-1\.5 {
+    margin-top: calc(var(--spacing) * 1.5);
+  }
+  .mt-2 {
+    margin-top: calc(var(--spacing) * 2);
+  }
+  .mt-3 {
+    margin-top: calc(var(--spacing) * 3);
+  }
+  .mt-4 {
+    margin-top: calc(var(--spacing) * 4);
+  }
+  .mt-6 {
+    margin-top: calc(var(--spacing) * 6);
+  }
+  .mb-1 {
+    margin-bottom: var(--spacing);
+  }
+  .mb-2 {
+    margin-bottom: calc(var(--spacing) * 2);
+  }
+  .mb-3 {
+    margin-bottom: calc(var(--spacing) * 3);
+  }
+  .mb-4 {
+    margin-bottom: calc(var(--spacing) * 4);
+  }
+  .mb-6 {
+    margin-bottom: calc(var(--spacing) * 6);
+  }
+  .mb-8 {
+    margin-bottom: calc(var(--spacing) * 8);
+  }
+  .-ml-2 {
+    margin-left: calc(var(--spacing) * -2);
+  }
+  .ml-1 {
+    margin-left: var(--spacing);
+  }
+  .ml-1\.5 {
+    margin-left: calc(var(--spacing) * 1.5);
+  }
+  .ml-2 {
+    margin-left: calc(var(--spacing) * 2);
+  }
+  .ml-auto {
+    margin-left: auto;
+  }
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .block {
+    display: block;
+  }
+  .flex {
+    display: flex;
+  }
+  .grid {
+    display: grid;
+  }
+  .hidden {
+    display: none;
+  }
+  .inline-flex {
+    display: inline-flex;
+  }
+  .aspect-square {
+    aspect-ratio: 1 / 1;
+  }
+  .h-1 {
+    height: var(--spacing);
+  }
+  .h-1\.5 {
+    height: calc(var(--spacing) * 1.5);
+  }
+  .h-3 {
+    height: calc(var(--spacing) * 3);
+  }
+  .h-3\.5 {
+    height: calc(var(--spacing) * 3.5);
+  }
+  .h-4 {
+    height: calc(var(--spacing) * 4);
+  }
+  .h-5 {
+    height: calc(var(--spacing) * 5);
+  }
+  .h-6 {
+    height: calc(var(--spacing) * 6);
+  }
+  .h-7 {
+    height: calc(var(--spacing) * 7);
+  }
+  .h-9 {
+    height: calc(var(--spacing) * 9);
+  }
+  .h-10 {
+    height: calc(var(--spacing) * 10);
+  }
+  .h-12 {
+    height: calc(var(--spacing) * 12);
+  }
+  .h-14 {
+    height: calc(var(--spacing) * 14);
+  }
+  .h-16 {
+    height: calc(var(--spacing) * 16);
+  }
+  .h-20 {
+    height: calc(var(--spacing) * 20);
+  }
+  .h-px {
+    height: 1px;
+  }
+  .max-h-\[92vh\] {
+    max-height: 92vh;
+  }
+  .min-h-screen {
+    min-height: 100vh;
+  }
+  .w-1\.5 {
+    width: calc(var(--spacing) * 1.5);
+  }
+  .w-3 {
+    width: calc(var(--spacing) * 3);
+  }
+  .w-3\.5 {
+    width: calc(var(--spacing) * 3.5);
+  }
+  .w-4 {
+    width: calc(var(--spacing) * 4);
+  }
+  .w-5 {
+    width: calc(var(--spacing) * 5);
+  }
+  .w-6 {
+    width: calc(var(--spacing) * 6);
+  }
+  .w-7 {
+    width: calc(var(--spacing) * 7);
+  }
+  .w-9 {
+    width: calc(var(--spacing) * 9);
+  }
+  .w-10 {
+    width: calc(var(--spacing) * 10);
+  }
+  .w-12 {
+    width: calc(var(--spacing) * 12);
+  }
+  .w-14 {
+    width: calc(var(--spacing) * 14);
+  }
+  .w-16 {
+    width: calc(var(--spacing) * 16);
+  }
+  .w-20 {
+    width: calc(var(--spacing) * 20);
+  }
+  .w-full {
+    width: 100%;
+  }
+  .max-w-2xl {
+    max-width: var(--container-2xl);
+  }
+  .max-w-md {
+    max-width: var(--container-md);
+  }
+  .max-w-sm {
+    max-width: var(--container-sm);
+  }
+  .min-w-0 {
+    min-width: 0px;
+  }
+  .flex-1 {
+    flex: 1;
+  }
+  .shrink-0 {
+    flex-shrink: 0;
+  }
+  .-translate-x-1\/2 {
+    --tw-translate-x: calc(calc(1 / 2 * 100%) * -1);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
+  .translate-y-0 {
+    --tw-translate-y: 0px;
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
+  .translate-y-full {
+    --tw-translate-y: 100%;
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
+  .list-disc {
+    list-style-type: disc;
+  }
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .grid-cols-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .grid-cols-7 {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .flex-col {
+    flex-direction: column;
+  }
+  .flex-wrap {
+    flex-wrap: wrap;
+  }
+  .items-baseline {
+    align-items: baseline;
+  }
+  .items-center {
+    align-items: center;
+  }
+  .justify-between {
+    justify-content: space-between;
+  }
+  .justify-center {
+    justify-content: center;
+  }
+  .gap-0\.5 {
+    gap: calc(var(--spacing) * 0.5);
+  }
+  .gap-1 {
+    gap: var(--spacing);
+  }
+  .gap-1\.5 {
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .gap-2 {
+    gap: calc(var(--spacing) * 2);
+  }
+  .gap-3 {
+    gap: calc(var(--spacing) * 3);
+  }
+  .gap-4 {
+    gap: calc(var(--spacing) * 4);
+  }
+  :where(.space-y-1\.5 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 1.5) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 1.5) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-2 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 2) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 2) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-3 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 3) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 3) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-4 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 4) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 4) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-5 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 5) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 5) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.divide-y > :not(:last-child)) {
+    --tw-divide-y-reverse: 0;
+    border-bottom-style: var(--tw-border-style);
+    border-top-style: var(--tw-border-style);
+    border-top-width: calc(1px * var(--tw-divide-y-reverse));
+    border-bottom-width: calc(1px * calc(1 - var(--tw-divide-y-reverse)));
+  }
+  :where(.divide-border > :not(:last-child)) {
+    border-color: var(--border-color);
+  }
+  .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .overflow-hidden {
+    overflow: hidden;
+  }
+  .overflow-x-auto {
+    overflow-x: auto;
+  }
+  .overflow-y-auto {
+    overflow-y: auto;
+  }
+  .rounded-2xl {
+    border-radius: var(--radius-2xl);
+  }
+  .rounded-full {
+    border-radius: calc(infinity * 1px);
+  }
+  .rounded-lg {
+    border-radius: var(--radius-lg);
+  }
+  .rounded-md {
+    border-radius: var(--radius-md);
+  }
+  .rounded-xl {
+    border-radius: var(--radius-xl);
+  }
+  .rounded-t-2xl {
+    border-top-left-radius: var(--radius-2xl);
+    border-top-right-radius: var(--radius-2xl);
+  }
+  .border {
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+  }
+  .border-2 {
+    border-style: var(--tw-border-style);
+    border-width: 2px;
+  }
+  .border-t {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 1px;
+  }
+  .border-b {
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 1px;
+  }
+  .border-dashed {
+    --tw-border-style: dashed;
+    border-style: dashed;
+  }
+  .border-border {
+    border-color: var(--border-color);
+  }
+  .bg-amber-100 {
+    background-color: var(--color-amber-100);
+  }
+  .bg-amber-400 {
+    background-color: var(--color-amber-400);
+  }
+  .bg-background {
+    background-color: var(--background);
+  }
+  .bg-black\/40 {
+    background-color: color-mix(in srgb, #000 40%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 40%, transparent);
+    }
+  }
+  .bg-border {
+    background-color: var(--border-color);
+  }
+  .bg-emerald-50 {
+    background-color: var(--color-emerald-50);
+  }
+  .bg-foreground\/70 {
+    background-color: var(--foreground);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--foreground) 70%, transparent);
+    }
+  }
+  .bg-muted {
+    background-color: var(--muted);
+  }
+  .bg-primary {
+    background-color: var(--primary);
+  }
+  .bg-sky-100 {
+    background-color: var(--color-sky-100);
+  }
+  .bg-sky-400 {
+    background-color: var(--color-sky-400);
+  }
+  .bg-surface {
+    background-color: var(--surface);
+  }
+  .bg-surface-muted {
+    background-color: var(--surface-muted);
+  }
+  .bg-surface\/80 {
+    background-color: var(--surface);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--surface) 80%, transparent);
+    }
+  }
+  .bg-surface\/90 {
+    background-color: var(--surface);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--surface) 90%, transparent);
+    }
+  }
+  .bg-linear-to-br {
+    --tw-gradient-position: to bottom right;
+    @supports (background-image: linear-gradient(in lab, red, red)) {
+      --tw-gradient-position: to bottom right in oklab;
+    }
+    background-image: linear-gradient(var(--tw-gradient-stops));
+  }
+  .from-amber-200 {
+    --tw-gradient-from: var(--color-amber-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-emerald-200 {
+    --tw-gradient-from: var(--color-emerald-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-indigo-200 {
+    --tw-gradient-from: var(--color-indigo-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-lime-200 {
+    --tw-gradient-from: var(--color-lime-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-orange-200 {
+    --tw-gradient-from: var(--color-orange-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-pink-200 {
+    --tw-gradient-from: var(--color-pink-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-rose-200 {
+    --tw-gradient-from: var(--color-rose-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-sky-200 {
+    --tw-gradient-from: var(--color-sky-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-slate-200 {
+    --tw-gradient-from: var(--color-slate-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-teal-200 {
+    --tw-gradient-from: var(--color-teal-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-violet-200 {
+    --tw-gradient-from: var(--color-violet-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .from-yellow-200 {
+    --tw-gradient-from: var(--color-yellow-200);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-amber-300 {
+    --tw-gradient-to: var(--color-amber-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-blue-300 {
+    --tw-gradient-to: var(--color-blue-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-cyan-300 {
+    --tw-gradient-to: var(--color-cyan-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-green-300 {
+    --tw-gradient-to: var(--color-green-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-indigo-300 {
+    --tw-gradient-to: var(--color-indigo-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-orange-300 {
+    --tw-gradient-to: var(--color-orange-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-pink-300 {
+    --tw-gradient-to: var(--color-pink-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-purple-300 {
+    --tw-gradient-to: var(--color-purple-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-rose-300 {
+    --tw-gradient-to: var(--color-rose-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-slate-300 {
+    --tw-gradient-to: var(--color-slate-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .to-teal-300 {
+    --tw-gradient-to: var(--color-teal-300);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .p-1 {
+    padding: var(--spacing);
+  }
+  .p-3 {
+    padding: calc(var(--spacing) * 3);
+  }
+  .p-4 {
+    padding: calc(var(--spacing) * 4);
+  }
+  .p-5 {
+    padding: calc(var(--spacing) * 5);
+  }
+  .p-6 {
+    padding: calc(var(--spacing) * 6);
+  }
+  .p-10 {
+    padding: calc(var(--spacing) * 10);
+  }
+  .px-2 {
+    padding-inline: calc(var(--spacing) * 2);
+  }
+  .px-2\.5 {
+    padding-inline: calc(var(--spacing) * 2.5);
+  }
+  .px-3 {
+    padding-inline: calc(var(--spacing) * 3);
+  }
+  .px-3\.5 {
+    padding-inline: calc(var(--spacing) * 3.5);
+  }
+  .px-4 {
+    padding-inline: calc(var(--spacing) * 4);
+  }
+  .px-5 {
+    padding-inline: calc(var(--spacing) * 5);
+  }
+  .py-0\.5 {
+    padding-block: calc(var(--spacing) * 0.5);
+  }
+  .py-1 {
+    padding-block: var(--spacing);
+  }
+  .py-1\.5 {
+    padding-block: calc(var(--spacing) * 1.5);
+  }
+  .py-2 {
+    padding-block: calc(var(--spacing) * 2);
+  }
+  .py-2\.5 {
+    padding-block: calc(var(--spacing) * 2.5);
+  }
+  .py-3 {
+    padding-block: calc(var(--spacing) * 3);
+  }
+  .py-3\.5 {
+    padding-block: calc(var(--spacing) * 3.5);
+  }
+  .py-4 {
+    padding-block: calc(var(--spacing) * 4);
+  }
+  .py-10 {
+    padding-block: calc(var(--spacing) * 10);
+  }
+  .pt-2 {
+    padding-top: calc(var(--spacing) * 2);
+  }
+  .pt-3 {
+    padding-top: calc(var(--spacing) * 3);
+  }
+  .pt-9 {
+    padding-top: calc(var(--spacing) * 9);
+  }
+  .pr-\[env\(safe-area-inset-right\)\] {
+    padding-right: env(safe-area-inset-right);
+  }
+  .pb-1 {
+    padding-bottom: var(--spacing);
+  }
+  .pb-1\.5 {
+    padding-bottom: calc(var(--spacing) * 1.5);
+  }
+  .pb-16 {
+    padding-bottom: calc(var(--spacing) * 16);
+  }
+  .pb-32 {
+    padding-bottom: calc(var(--spacing) * 32);
+  }
+  .pb-\[calc\(1\.25rem_\+_env\(safe-area-inset-bottom\)\)\] {
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+  }
+  .pb-\[env\(safe-area-inset-bottom\)\] {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pl-5 {
+    padding-left: calc(var(--spacing) * 5);
+  }
+  .pl-\[env\(safe-area-inset-left\)\] {
+    padding-left: env(safe-area-inset-left);
+  }
+  .text-center {
+    text-align: center;
+  }
+  .text-left {
+    text-align: left;
+  }
+  .text-2xl {
+    font-size: var(--text-2xl);
+    line-height: var(--tw-leading, var(--text-2xl--line-height));
+  }
+  .text-3xl {
+    font-size: var(--text-3xl);
+    line-height: var(--tw-leading, var(--text-3xl--line-height));
+  }
+  .text-4xl {
+    font-size: var(--text-4xl);
+    line-height: var(--tw-leading, var(--text-4xl--line-height));
+  }
+  .text-5xl {
+    font-size: var(--text-5xl);
+    line-height: var(--tw-leading, var(--text-5xl--line-height));
+  }
+  .text-base {
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
+  }
+  .text-lg {
+    font-size: var(--text-lg);
+    line-height: var(--tw-leading, var(--text-lg--line-height));
+  }
+  .text-sm {
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+  }
+  .text-xl {
+    font-size: var(--text-xl);
+    line-height: var(--tw-leading, var(--text-xl--line-height));
+  }
+  .text-xs {
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+  }
+  .text-\[10px\] {
+    font-size: 10px;
+  }
+  .leading-relaxed {
+    --tw-leading: var(--leading-relaxed);
+    line-height: var(--leading-relaxed);
+  }
+  .font-bold {
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+  }
+  .font-medium {
+    --tw-font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-medium);
+  }
+  .font-normal {
+    --tw-font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-normal);
+  }
+  .font-semibold {
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+  }
+  .tracking-tight {
+    --tw-tracking: var(--tracking-tight);
+    letter-spacing: var(--tracking-tight);
+  }
+  .whitespace-pre-wrap {
+    white-space: pre-wrap;
+  }
+  .text-amber-900 {
+    color: var(--color-amber-900);
+  }
+  .text-background {
+    color: var(--background);
+  }
+  .text-emerald-700 {
+    color: var(--color-emerald-700);
+  }
+  .text-foreground {
+    color: var(--foreground);
+  }
+  .text-muted-foreground {
+    color: var(--muted-foreground);
+  }
+  .text-muted-foreground\/50 {
+    color: var(--muted-foreground);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
+    }
+  }
+  .text-primary {
+    color: var(--primary);
+  }
+  .text-primary-foreground {
+    color: var(--primary-foreground);
+  }
+  .text-red-600 {
+    color: var(--color-red-600);
+  }
+  .text-rose-500 {
+    color: var(--color-rose-500);
+  }
+  .text-sky-500 {
+    color: var(--color-sky-500);
+  }
+  .text-sky-900 {
+    color: var(--color-sky-900);
+  }
+  .underline-offset-2 {
+    text-underline-offset: 2px;
+  }
+  .accent-\[var\(--primary\)\] {
+    accent-color: var(--primary);
+  }
+  .shadow-lg {
+    --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 4px 6px -4px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .shadow-sm {
+    --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-1 {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-2 {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-border {
+    --tw-ring-color: var(--border-color);
+  }
+  .ring-primary {
+    --tw-ring-color: var(--primary);
+  }
+  .backdrop-blur {
+    --tw-backdrop-blur: blur(8px);
+    -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+    backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+  }
+  .transition-colors {
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .transition-transform {
+    transition-property: transform, translate, scale, rotate;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .duration-300 {
+    --tw-duration: 300ms;
+    transition-duration: 300ms;
+  }
+  .outline-none {
+    --tw-outline-style: none;
+    outline-style: none;
+  }
+  @media (hover: hover) {
+    .hover\:bg-border:hover {
+      background-color: var(--border-color);
+    }
+    .hover\:bg-primary-hover:hover {
+      background-color: var(--primary-hover);
+    }
+    .hover\:bg-surface-muted:hover {
+      background-color: var(--surface-muted);
+    }
+    .hover\:underline:hover {
+      text-decoration-line: underline;
+    }
+  }
+  .focus\:border-foreground:focus {
+    border-color: var(--foreground);
+  }
+  .focus\:ring-1:focus {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .focus\:ring-foreground:focus {
+    --tw-ring-color: var(--foreground);
+  }
+  .disabled\:opacity-50:disabled {
+    opacity: 50%;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .motion-reduce\:transition-none {
+      transition-property: none;
+    }
+  }
+  @media (width >= 40rem) {
+    .sm\:grid-cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  @media (prefers-color-scheme: dark) {
+    .dark\:bg-amber-950 {
+      background-color: var(--color-amber-950);
+    }
+    .dark\:bg-emerald-950 {
+      background-color: var(--color-emerald-950);
+    }
+    .dark\:bg-sky-950 {
+      background-color: var(--color-sky-950);
+    }
+    .dark\:text-amber-300 {
+      color: var(--color-amber-300);
+    }
+    .dark\:text-emerald-400 {
+      color: var(--color-emerald-400);
+    }
+    .dark\:text-red-400 {
+      color: var(--color-red-400);
+    }
+    .dark\:text-sky-300 {
+      color: var(--color-sky-300);
+    }
+  }
+}
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #0f172a;
+  --primary-hover: #334155;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #0f172a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1220;
+    --foreground: #e2e8f0;
+    --surface: #111827;
+    --surface-muted: #1f2937;
+    --border-color: #334155;
+    --muted: #475569;
+    --muted-foreground: #94a3b8;
+    --primary: #e2e8f0;
+    --primary-hover: #cbd5e1;
+    --primary-foreground: #0f172a;
+    --skeleton-base: #1f2937;
+    --skeleton-shine: rgba(71, 85, 105, 0.6);
+    --focus-ring: #e2e8f0;
+  }
+}
+html {
+  color-scheme: light dark;
+}
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-px {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+.safe-pt {
+  padding-top: env(safe-area-inset-top);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 60;
+}
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.18);
+}
+.skeleton {
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient( 90deg, var(--skeleton-base) 0%, var(--skeleton-shine) 50%, var(--skeleton-base) 100% );
+  @supports (color: color-mix(in lab, red, red)) {
+    background-image: linear-gradient( 90deg, color-mix(in srgb, var(--skeleton-base) 100%, transparent) 0%, var(--skeleton-shine) 50%, color-mix(in srgb, var(--skeleton-base) 100%, transparent) 100% );
+  }
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@property --tw-translate-x {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-translate-y {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-translate-z {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-space-y-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-divide-y-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-border-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
+@property --tw-gradient-position {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-gradient-from {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #0000;
+}
+@property --tw-gradient-via {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #0000;
+}
+@property --tw-gradient-to {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #0000;
+}
+@property --tw-gradient-stops {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-gradient-via-stops {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-gradient-from-position {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+@property --tw-gradient-via-position {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 50%;
+}
+@property --tw-gradient-to-position {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-leading {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-font-weight {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-tracking {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-inset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-ring-inset {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-offset-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --tw-ring-offset-color {
+  syntax: "*";
+  inherits: false;
+  initial-value: #fff;
+}
+@property --tw-ring-offset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-backdrop-blur {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-brightness {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-contrast {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-grayscale {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-hue-rotate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-invert {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-opacity {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-saturate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-sepia {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-duration {
+  syntax: "*";
+  inherits: false;
+}
+@layer properties {
+  @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
+    *, ::before, ::after, ::backdrop {
+      --tw-translate-x: 0;
+      --tw-translate-y: 0;
+      --tw-translate-z: 0;
+      --tw-space-y-reverse: 0;
+      --tw-divide-y-reverse: 0;
+      --tw-border-style: solid;
+      --tw-gradient-position: initial;
+      --tw-gradient-from: #0000;
+      --tw-gradient-via: #0000;
+      --tw-gradient-to: #0000;
+      --tw-gradient-stops: initial;
+      --tw-gradient-via-stops: initial;
+      --tw-gradient-from-position: 0%;
+      --tw-gradient-via-position: 50%;
+      --tw-gradient-to-position: 100%;
+      --tw-leading: initial;
+      --tw-font-weight: initial;
+      --tw-tracking: initial;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-color: initial;
+      --tw-shadow-alpha: 100%;
+      --tw-inset-shadow: 0 0 #0000;
+      --tw-inset-shadow-color: initial;
+      --tw-inset-shadow-alpha: 100%;
+      --tw-ring-color: initial;
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-inset-ring-color: initial;
+      --tw-inset-ring-shadow: 0 0 #0000;
+      --tw-ring-inset: initial;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-backdrop-blur: initial;
+      --tw-backdrop-brightness: initial;
+      --tw-backdrop-contrast: initial;
+      --tw-backdrop-grayscale: initial;
+      --tw-backdrop-hue-rotate: initial;
+      --tw-backdrop-invert: initial;
+      --tw-backdrop-opacity: initial;
+      --tw-backdrop-saturate: initial;
+      --tw-backdrop-sepia: initial;
+      --tw-duration: initial;
+    }
+  }
+}
+
+/* ===== 提案トークン（採用時は globals.css の値を差し替えるだけ） ===== */
+:root {
+  --primary: #c2410c;          /* 提案: ブランド色（暖色オレンジ）。現行は slate-900。白文字と 5.2:1 (WCAG AA) */
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #fb923c;
+    --primary-hover: #fdba74;
+    --primary-foreground: #431407;
+  }
+}
+</style>
+
+<svg hidden aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <symbol id="i-house" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></symbol>
+    <symbol id="i-images" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 22H4a2 2 0 0 1-2-2V6"/><path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18"/><circle cx="12" cy="8" r="2"/><rect width="16" height="16" x="6" y="2" rx="2"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-paw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-school" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 22v-4a2 2 0 1 0-4 0v4"/><path d="m18 10 3.447 1.724a1 1 0 0 1 .553.894V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7.382a1 1 0 0 1 .553-.894L6 10"/><path d="M18 5v17"/><path d="m4 6 7.106-3.553a2 2 0 0 1 1.788 0L20 6"/><path d="M6 5v17"/></symbol>
+    <symbol id="i-home-src" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+  </defs>
+</svg>
+
+<div id="app" class="min-h-screen bg-background text-foreground">
+
+<!-- ============================================================ -->
+<!-- イントロ（プロト説明） -->
+<!-- ============================================================ -->
+<section data-screen="intro">
+  <main class="safe-px mx-auto flex min-h-screen max-w-2xl flex-col justify-center py-10">
+    <div class="mb-6 flex items-center gap-3">
+      <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><svg class="h-7 w-7"><use href="#i-paw"/></svg></span>
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">mfmf 再設計プロト</h1>
+        <p class="text-sm text-muted-foreground">全画面 UI/UX 刷新の提案</p>
+      </div>
+    </div>
+    <div class="space-y-4">
+      <div class="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+        <h2 class="mb-2 text-base font-semibold">提案の柱</h2>
+        <ul class="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+          <li><strong class="text-foreground">ボトムタブバー</strong> — ホーム / カレンダー / <strong class="text-foreground">中央の記録ボタン</strong> / アルバム / メニュー（<strong class="text-foreground">案A で合意済み</strong>）</li>
+          <li><strong class="text-foreground">メニュー画面を新設</strong> — 体重・ペット・設定・ヘルプへの迷子を解消</li>
+          <li><strong class="text-foreground">ブランド色</strong> — 近黒 → 暖色オレンジ（ダークモード対応）</li>
+          <li>ホームは<strong class="text-foreground">日付グループのタイムライン</strong>、検索は折りたたみ</li>
+          <li>カレンダーは<strong class="text-foreground">日タップで下からシート</strong></li>
+          <li>設定は 1 本の長大ページ → カード分割</li>
+        </ul>
+      </div>
+      <div class="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+        <h2 class="mb-3 text-base font-semibold">実機で確かめたいこと</h2>
+        <ul class="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+          <li>タブバーが親指で届くか。中央「＋」の押しやすさ</li>
+          <li>タブバーとホームインジケータの重なり</li>
+          <li>オレンジの primary が明・暗両方で見やすいか</li>
+          <li>メニュー経由の 体重 / 設定 への到達が自然か</li>
+        </ul>
+        <p class="mt-3 text-xs text-muted-foreground">ダークモードは端末の設定に追従します。左下の「プロト設定」からナビ案の切替・0件表示を試せます。</p>
+      </div>
+      <button onclick="go('home')" class="w-full rounded-xl bg-primary px-5 py-3.5 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">触ってみる</button>
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <button onclick="go('login')" class="rounded-lg border border-border bg-surface px-4 py-2.5 font-medium hover:bg-surface-muted">ログイン画面</button>
+        <button onclick="go('onboarding')" class="rounded-lg border border-border bg-surface px-4 py-2.5 font-medium hover:bg-surface-muted">オンボーディング</button>
+        <button onclick="go('guest')" class="rounded-lg border border-border bg-surface px-4 py-2.5 font-medium hover:bg-surface-muted">ゲスト画面</button>
+        <button onclick="openForm(false)" class="rounded-lg border border-border bg-surface px-4 py-2.5 font-medium hover:bg-surface-muted">記録フォーム</button>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- ホーム（記録一覧 → タイムライン化） -->
+<!-- ============================================================ -->
+<section data-screen="home" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-3">
+      <div class="flex items-center gap-2">
+        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground"><svg class="h-4 w-4"><use href="#i-paw"/></svg></span>
+        <span class="text-base font-semibold tracking-tight">mfmf</span>
+        <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">佐藤家</span>
+      </div>
+      <button id="search-toggle" onclick="toggleSearch()" aria-label="検索と絞り込み" aria-expanded="false" aria-controls="search-panel" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-search"/></svg></button>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
+
+    <!-- 検索（アイコンで展開。現行の常時表示カードを置き換え） -->
+    <div id="search-panel" hidden class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <div class="flex gap-2">
+        <input id="search-kw" type="search" placeholder="本文・タグを検索" onkeydown="if(event.key==='Enter'){searchApply();this.blur()}" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
+        <button onclick="searchApply()" class="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">検索</button>
+        <button onclick="searchClear()" class="shrink-0 rounded-lg border border-border px-4 py-2 text-sm font-medium">クリア</button>
+      </div>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <label class="text-xs text-muted-foreground">開始日
+          <input id="search-from" type="date" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+        <label class="text-xs text-muted-foreground">終了日
+          <input id="search-to" type="date" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+      </div>
+      <label class="mt-3 block text-xs text-muted-foreground">並び替え
+        <select onchange="sortTimeline(this.value)" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+          <option value="date-desc">日付が新しい順</option>
+          <option value="date-asc">日付が古い順</option>
+          <option value="weight-desc">体重が重い順</option>
+          <option value="weight-asc">体重が軽い順</option>
+        </select></label>
+    </div>
+
+    <!-- 絞り込みチップ（記録元セレクト → セグメント化） -->
+    <div id="home-filters" class="flex gap-2 overflow-x-auto pb-1" data-empty-hide>
+      <button data-filter="all" onclick="homeFilter(this)" class="shrink-0 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground">すべて</button>
+      <button data-filter="school" onclick="homeFilter(this)" class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">🏫 保育園</button>
+      <button data-filter="home" onclick="homeFilter(this)" class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">🏠 おうち</button>
+      <button data-filter="tag:ボール遊び" onclick="homeFilter(this)" class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">#ボール遊び</button>
+      <button data-filter="tag:トリミング" onclick="homeFilter(this)" class="shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">#トリミング</button>
+    </div>
+
+    <!-- 空状態（プロト設定で切替） -->
+    <div data-empty-show hidden class="rounded-2xl border-2 border-dashed border-border p-10 text-center">
+      <span class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-surface-muted text-muted-foreground"><svg class="h-7 w-7"><use href="#i-paw"/></svg></span>
+      <p class="font-medium">まだ記録がありません</p>
+      <p class="mt-1 text-sm text-muted-foreground">下の「＋」から今日の様子を残してみましょう</p>
+      <button data-editor-only onclick="openQuick()" class="mt-4 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">はじめての記録</button>
+    </div>
+
+    <!-- 日付グループのタイムライン -->
+    <div id="timeline" data-empty-hide class="space-y-5">
+      <div data-group>
+        <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>今日</span><span class="text-xs font-normal text-muted-foreground">8月3日（月）</span></h2>
+        <ul class="space-y-3">
+          <li data-src="school" data-tags="ボール遊び" data-date="2026-08-03" data-author="さくら保育園"><a href="#" onclick="showDetail(0);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+            <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-amber-200 to-orange-300 text-3xl">🐕</span>
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3 w-3"><use href="#i-school"/></svg>保育園</span>
+                <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium">3.20 kg</span>
+              </span>
+              <span class="mt-1 line-clamp-2 block text-sm">園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。</span>
+              <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span>#ボール遊び</span><span class="inline-flex items-center gap-0.5"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>2枚</span></span>
+            </span>
+          </a></li>
+          <li data-src="home" data-tags="" data-date="2026-08-03" data-author="佐藤 花子"><a href="#" onclick="showDetail(1);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>
+              </span>
+              <span class="mt-1 line-clamp-2 block text-sm">夜ごはん完食。散歩は 30 分、いつもより元気だった。</span>
+            </span>
+          </a></li>
+        </ul>
+      </div>
+      <div data-group>
+        <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>昨日</span><span class="text-xs font-normal text-muted-foreground">8月2日（日）</span></h2>
+        <ul class="space-y-3">
+          <li data-src="home" data-tags="" data-date="2026-08-02" data-author="佐藤 花子"><a href="#" onclick="showDetail(2);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+            <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-sky-200 to-indigo-300 text-3xl">🌳</span>
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>
+              </span>
+              <span class="mt-1 line-clamp-2 block text-sm">公園までロング散歩。帰りに足を洗うのを嫌がらなくなってきた。</span>
+              <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span class="inline-flex items-center gap-0.5"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>2枚</span></span>
+            </span>
+          </a></li>
+        </ul>
+      </div>
+      <div data-group>
+        <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>8月1日（土）</span></h2>
+        <ul class="space-y-3">
+          <li data-src="home" data-tags="トリミング" data-date="2026-08-01" data-author="佐藤 太郎"><a href="#" onclick="showDetail(3);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+            <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-rose-200 to-pink-300 text-3xl">✂️</span>
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>
+                <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium">3.25 kg</span>
+              </span>
+              <span class="mt-1 line-clamp-2 block text-sm">トリミングでさっぱり。少し緊張していたけど最後はご機嫌。</span>
+              <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span>#トリミング</span><span class="inline-flex items-center gap-0.5"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>1枚</span></span>
+            </span>
+          </a></li>
+        </ul>
+      </div>
+      <div data-group>
+        <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>7月30日（木）</span></h2>
+        <ul class="space-y-3">
+          <li data-src="school" data-tags="" data-date="2026-07-30" data-author="さくら保育園"><a href="#" onclick="showDetail(4);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+            <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-emerald-200 to-teal-300 text-3xl">💤</span>
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3 w-3"><use href="#i-school"/></svg>保育園</span>
+              </span>
+              <span class="mt-1 line-clamp-2 block text-sm">お友達のマロンちゃんと仲良く遊べました。お昼寝はいつもより長め。</span>
+              <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span class="inline-flex items-center gap-0.5"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>2枚</span></span>
+            </span>
+          </a></li>
+        </ul>
+      </div>
+      <!-- ページ番号ナビ → 「もっと見る」に置き換え -->
+      <div id="more-records" hidden data-group>
+        <h2 class="mb-2 flex items-baseline gap-2 text-sm font-semibold"><span>7月28日（火）</span></h2>
+        <ul class="space-y-3">
+          <li data-src="school" data-tags="" data-date="2026-07-28" data-author="さくら保育園"><a href="#" onclick="showDetail(5);go('record-detail');return false" class="flex gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+            <span class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-orange-200 to-amber-300 text-3xl">🍚</span>
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3 w-3"><use href="#i-school"/></svg>保育園</span>
+              </span>
+              <span class="mt-1 line-clamp-2 block text-sm">初めてのおやつタイム。少し警戒してから完食しました。</span>
+            </span>
+          </a></li>
+        </ul>
+      </div>
+      <button id="more-btn" onclick="loadMore()" class="w-full rounded-xl border border-border bg-surface py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-muted">もっと見る（全 42 件）</button>
+      <div id="no-results" hidden class="rounded-2xl border-2 border-dashed border-border p-10 text-center">
+        <p class="font-medium">条件に合う記録がありません</p>
+        <p class="mt-1 text-sm text-muted-foreground">検索条件やチップを変えてみてください</p>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- カレンダー -->
+<!-- ============================================================ -->
+<section data-screen="calendar" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-2">
+      <button aria-label="前月" onclick="toast('月の移動はプロト対象外です（2026年8月固定）')" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
+      <h1 class="text-base font-semibold">2026年8月</h1>
+      <div class="flex items-center gap-1">
+        <button onclick="toast('今日は 8月3日（月）です')" class="rounded-full px-3 py-1.5 text-sm font-medium text-primary hover:bg-surface-muted">今日</button>
+        <button aria-label="翌月" onclick="toast('月の移動はプロト対象外です（2026年8月固定）')" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-right"/></svg></button>
+      </div>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
+    <div class="grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground">
+      <span class="py-1 text-rose-500">日</span><span class="py-1">月</span><span class="py-1">火</span><span class="py-1">水</span><span class="py-1">木</span><span class="py-1">金</span><span class="py-1 text-sky-500">土</span>
+    </div>
+    <div class="grid grid-cols-7 gap-1">
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+      <button onclick="openDay(1)" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm shadow-sm ring-1 ring-border">1<span data-empty-hide class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
+      <button onclick="openDay(2)" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm shadow-sm ring-1 ring-border">2<span data-empty-hide class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
+      <button onclick="openDay(3)" class="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-surface text-sm font-bold shadow-sm ring-2 ring-primary">3<span data-empty-hide class="flex gap-0.5"><i class="h-1.5 w-1.5 rounded-full bg-sky-400"></i><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i></span></button>
+      <button onclick="openDay(4)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">4</button>
+      <button onclick="openDay(5)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">5</button>
+      <button onclick="openDay(6)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">6</button>
+      <button onclick="openDay(7)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">7</button>
+      <button onclick="openDay(8)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">8</button>
+      <button onclick="openDay(9)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">9</button>
+      <button onclick="openDay(10)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">10</button>
+      <button onclick="openDay(11)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">11</button>
+      <button onclick="openDay(12)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">12</button>
+      <button onclick="openDay(13)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">13</button>
+      <button onclick="openDay(14)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">14</button>
+      <button onclick="openDay(15)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">15</button>
+      <button onclick="openDay(16)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">16</button>
+      <button onclick="openDay(17)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">17</button>
+      <button onclick="openDay(18)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">18</button>
+      <button onclick="openDay(19)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">19</button>
+      <button onclick="openDay(20)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">20</button>
+      <button onclick="openDay(21)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">21</button>
+      <button onclick="openDay(22)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">22</button>
+      <button onclick="openDay(23)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">23</button>
+      <button onclick="openDay(24)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">24</button>
+      <button onclick="openDay(25)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">25</button>
+      <button onclick="openDay(26)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">26</button>
+      <button onclick="openDay(27)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">27</button>
+      <button onclick="openDay(28)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">28</button>
+      <button onclick="openDay(29)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">29</button>
+      <button onclick="openDay(30)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">30</button>
+      <button onclick="openDay(31)" class="flex h-14 items-center justify-center rounded-xl text-sm text-muted-foreground transition-colors hover:bg-surface-muted">31</button>
+    </div>
+    <div data-empty-hide class="flex items-center gap-4 text-xs text-muted-foreground">
+      <span class="inline-flex items-center gap-1.5"><i class="h-1.5 w-1.5 rounded-full bg-sky-400"></i>保育園</span>
+      <span class="inline-flex items-center gap-1.5"><i class="h-1.5 w-1.5 rounded-full bg-amber-400"></i>おうち</span>
+      <span class="ml-auto">日付をタップで詳細</span>
+    </div>
+    <div data-empty-hide class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <h2 class="mb-2 text-sm font-semibold">この月の記録（4件）</h2>
+      <p class="text-sm text-muted-foreground">日付をタップすると、その日の記録が下からのシートで開きます（現行のページ内アンカージャンプを置き換え）。</p>
+    </div>
+    <div data-empty-show hidden class="rounded-2xl border-2 border-dashed border-border p-10 text-center">
+      <p class="font-medium">この月の記録はありません</p>
+      <p class="mt-1 text-sm text-muted-foreground">日付をタップして記録を残せます</p>
+    </div>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- アルバム（ギャラリー） -->
+<!-- ============================================================ -->
+<section data-screen="gallery" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-3">
+      <h1 class="text-base font-semibold">アルバム</h1>
+      <span data-empty-hide class="text-xs text-muted-foreground">142 枚</span>
+      <span data-empty-show hidden class="text-xs text-muted-foreground">0 枚</span>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-5 py-4 pb-32">
+    <div data-empty-show hidden class="rounded-2xl border-2 border-dashed border-border p-10 text-center">
+      <p class="font-medium">まだ写真がありません</p>
+      <p class="mt-1 text-sm text-muted-foreground">記録に写真を付けるとここに並びます</p>
+    </div>
+    <div data-empty-hide>
+      <h2 class="mb-2 text-sm font-semibold text-muted-foreground">2026年8月</h2>
+      <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-amber-200 to-orange-300 text-4xl">🐕</button>
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-sky-200 to-indigo-300 text-4xl">🌳</button>
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-rose-200 to-pink-300 text-4xl">✂️</button>
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-emerald-200 to-teal-300 text-4xl">🎾</button>
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-violet-200 to-purple-300 text-4xl">🐾</button>
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-orange-200 to-amber-300 text-4xl">🍚</button>
+      </div>
+    </div>
+    <div data-empty-hide>
+      <h2 class="mb-2 text-sm font-semibold text-muted-foreground">2026年7月</h2>
+      <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-teal-200 to-cyan-300 text-4xl">💤</button>
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-pink-200 to-rose-300 text-4xl">🐶</button>
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-indigo-200 to-blue-300 text-4xl">🛁</button>
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-lime-200 to-green-300 text-4xl">🌿</button>
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-yellow-200 to-amber-300 text-4xl">☀️</button>
+        <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-slate-200 to-slate-300 text-4xl">📸</button>
+      </div>
+      <p class="mt-3 text-xs text-muted-foreground">月ごとの見出しを追加（現行は全件フラット）。タップで既存のライトボックスが開き「記録を見る →」も従来どおり。</p>
+    </div>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- メニュー（新設） -->
+<!-- ============================================================ -->
+<section data-screen="menu" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center py-3">
+      <h1 class="text-base font-semibold">メニュー</h1>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
+    <!-- プロフィール -->
+    <button onclick="go('settings-account')" class="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 text-left shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted">
+      <span class="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">花</span>
+      <span class="min-w-0 flex-1">
+        <span class="block font-semibold">佐藤 花子</span>
+        <span class="block truncate text-xs text-muted-foreground">hanako@example.com ・ 佐藤家（オーナー）</span>
+      </span>
+      <svg class="h-5 w-5 shrink-0 text-muted-foreground"><use href="#i-chevron-right"/></svg>
+    </button>
+
+    <!-- 記録データ -->
+    <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+      <button onclick="go('pets')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-muted">
+        <svg class="h-5 w-5 text-muted-foreground"><use href="#i-paw"/></svg><span class="flex-1 text-sm font-medium">ペット</span>
+        <span class="text-xs text-muted-foreground">モカ</span>
+        <svg class="h-5 w-5 text-muted-foreground"><use href="#i-chevron-right"/></svg>
+      </button>
+      <div class="border-t border-border"></div>
+      <button onclick="go('weight')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-muted">
+        <svg class="h-5 w-5 text-muted-foreground"><use href="#i-scale"/></svg><span class="flex-1 text-sm font-medium">体重の推移</span>
+        <span class="text-xs text-muted-foreground">3.20 kg</span>
+        <svg class="h-5 w-5 text-muted-foreground"><use href="#i-chevron-right"/></svg>
+      </button>
+    </div>
+
+    <!-- 世帯 -->
+    <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+      <button onclick="go('settings-household')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-muted">
+        <svg class="h-5 w-5 text-muted-foreground"><use href="#i-users"/></svg><span class="flex-1 text-sm font-medium">世帯の設定</span>
+        <span class="text-xs text-muted-foreground">メンバー・招待</span>
+        <svg class="h-5 w-5 text-muted-foreground"><use href="#i-chevron-right"/></svg>
+      </button>
+    </div>
+
+    <!-- サポート -->
+    <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+      <button onclick="toast('使い方ガイドは現行ページを流用します（プロト対象外）')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-muted">
+        <svg class="h-5 w-5 text-muted-foreground"><use href="#i-help"/></svg><span class="flex-1 text-sm font-medium">使い方ガイド</span>
+        <svg class="h-5 w-5 text-muted-foreground"><use href="#i-chevron-right"/></svg>
+      </button>
+      <div class="border-t border-border"></div>
+      <button onclick="toast('既存のフィードバック画面へ遷移します（プロト対象外）')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-muted">
+        <svg class="h-5 w-5 text-muted-foreground"><use href="#i-message"/></svg><span class="flex-1 text-sm font-medium">ご意見・不具合を送る</span>
+        <svg class="h-5 w-5 text-muted-foreground"><use href="#i-chevron-right"/></svg>
+      </button>
+    </div>
+
+    <button class="flex w-full items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-3.5 text-sm font-medium text-red-600 shadow-sm ring-1 ring-border transition-colors hover:bg-surface-muted dark:text-red-400">
+      <svg class="h-4 w-4"><use href="#i-logout"/></svg>ログアウト
+    </button>
+    <p class="text-center text-xs text-muted-foreground">全画面右下に浮いていた「ご意見・不具合」ボタンはここへ移動</p>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- 体重 -->
+<!-- ============================================================ -->
+<section data-screen="weight" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center gap-1 py-2">
+      <button onclick="go('menu')" aria-label="戻る" class="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
+      <h1 class="text-base font-semibold">体重の推移</h1>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
+    <div id="wt-ranges" class="flex gap-2">
+      <button data-range="1m" onclick="weightRange(this)" class="rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground">1ヶ月</button>
+      <button data-range="3m" onclick="weightRange(this)" class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">3ヶ月</button>
+      <button data-range="1y" onclick="weightRange(this)" class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">1年</button>
+      <button data-range="all" onclick="weightRange(this)" class="rounded-full bg-surface px-3.5 py-1.5 text-sm font-medium ring-1 ring-border">全期間</button>
+    </div>
+    <div data-empty-show hidden class="rounded-2xl border-2 border-dashed border-border p-10 text-center">
+      <p class="font-medium">まだ体重の記録がありません</p>
+      <p class="mt-1 text-sm text-muted-foreground">記録に体重を入力するとグラフになります</p>
+    </div>
+    <div data-empty-hide class="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+      <p class="text-xs text-muted-foreground">最新の体重（8月3日）</p>
+      <p class="mt-1 flex items-baseline gap-1"><span class="text-3xl font-bold tracking-tight">3.20</span><span class="text-sm text-muted-foreground">kg</span>
+        <span id="wt-delta" class="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">+0.15 kg / 1ヶ月</span></p>
+      <svg viewBox="0 0 320 160" class="mt-4 w-full text-primary" role="img" aria-label="体重の推移グラフ">
+        <line x1="0" y1="30" x2="320" y2="30" stroke="var(--border-color)" stroke-width="1"/>
+        <line x1="0" y1="80" x2="320" y2="80" stroke="var(--border-color)" stroke-width="1"/>
+        <line x1="0" y1="130" x2="320" y2="130" stroke="var(--border-color)" stroke-width="1"/>
+        <text x="4" y="26" font-size="10" fill="var(--muted-foreground)">3.3</text>
+        <text x="4" y="126" font-size="10" fill="var(--muted-foreground)">3.0</text>
+        <polyline id="wt-line" points="20,110 80,95 140,100 200,70 260,55 300,45" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <g id="wt-dots"></g>
+        <text id="wt-x0" x="20" y="150" font-size="10" fill="var(--muted-foreground)">7/1</text>
+        <text id="wt-x1" x="284" y="150" font-size="10" fill="var(--muted-foreground)">8/3</text>
+      </svg>
+    </div>
+    <div data-empty-hide class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+      <a href="#" onclick="showDetail(0);go('record-detail');return false" class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-muted">
+        <span class="text-sm">8月3日（月）<span class="ml-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300">保育園</span></span>
+        <span class="font-semibold">3.20 kg</span>
+      </a>
+      <div class="border-t border-border"></div>
+      <a href="#" onclick="showDetail(3);go('record-detail');return false" class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-muted">
+        <span class="text-sm">8月1日（土）<span class="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300">おうち</span></span>
+        <span class="font-semibold">3.25 kg</span>
+      </a>
+      <div class="border-t border-border"></div>
+      <a href="#" onclick="showDetail(6);go('record-detail');return false" class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-muted">
+        <span class="text-sm">7月20日（月）<span class="ml-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300">保育園</span></span>
+        <span class="font-semibold">3.10 kg</span>
+      </a>
+    </div>
+    <p class="text-xs text-muted-foreground">期間の切替チップとグラフの primary 色トークン化を追加（現行は青の固定色・全期間のみ）。</p>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- ペット -->
+<!-- ============================================================ -->
+<section data-screen="pets" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center gap-1 py-2">
+      <button onclick="go('menu')" aria-label="戻る" class="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
+      <h1 class="text-base font-semibold">ペット</h1>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <div class="flex items-center gap-4">
+        <span class="flex h-16 w-16 items-center justify-center rounded-full bg-linear-to-br from-amber-200 to-orange-300 text-3xl">🐩</span>
+        <div class="min-w-0 flex-1">
+          <p id="pet-name" class="text-lg font-semibold">モカ</p>
+          <p id="pet-meta" class="text-sm text-muted-foreground">トイプードル ・ 2023年5月生まれ（3歳）</p>
+        </div>
+        <button data-editor-only onclick="openSheet('sheet-pet')" aria-label="モカを編集" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-pencil"/></svg></button>
+      </div>
+      <div class="mt-3 flex gap-2 border-t border-border pt-3">
+        <button onclick="go('weight')" class="inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-3 py-1.5 text-xs font-medium"><svg class="h-3.5 w-3.5"><use href="#i-scale"/></svg>体重 3.20 kg</button>
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-3 py-1.5 text-xs font-medium"><svg class="h-3.5 w-3.5"><use href="#i-camera"/></svg>写真 142 枚</span>
+      </div>
+    </div>
+    <button data-editor-only class="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border py-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-muted">
+      <svg class="h-4 w-4"><use href="#i-plus"/></svg>ペットを追加
+    </button>
+    <p class="text-xs text-muted-foreground">現行の「常時展開の編集フォーム」→ カード表示＋鉛筆アイコンで編集シート（誤操作を防ぎ一覧が見やすく）。</p>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- 世帯の設定 -->
+<!-- ============================================================ -->
+<section data-screen="settings-household" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center gap-1 py-2">
+      <button onclick="go('menu')" aria-label="戻る" class="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
+      <h1 class="text-base font-semibold">世帯の設定</h1>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <div class="flex items-center gap-3">
+        <span class="flex h-12 w-12 items-center justify-center rounded-full bg-linear-to-br from-orange-200 to-amber-300 text-xl">🏠</span>
+        <div class="flex-1">
+          <p class="font-semibold">佐藤家</p>
+          <p class="text-xs text-muted-foreground">あなたの権限: オーナー</p>
+        </div>
+        <div class="flex gap-2">
+          <button data-editor-only class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">画像を変更</button>
+          <button data-editor-only class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">名前を変更</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <h2 class="mb-1 text-sm font-semibold">世帯を切り替え</h2>
+      <div class="divide-y divide-border">
+        <div class="flex items-center gap-3 py-3">
+          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-linear-to-br from-orange-200 to-amber-300 text-base">🏠</span>
+          <div class="min-w-0 flex-1"><p class="text-sm font-medium">佐藤家</p><p class="text-xs text-muted-foreground">オーナー</p></div>
+          <span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">表示中</span>
+        </div>
+        <div class="flex items-center gap-3 py-3">
+          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-linear-to-br from-sky-200 to-indigo-300 text-base">🏡</span>
+          <div class="min-w-0 flex-1"><p class="text-sm font-medium">実家</p><p class="text-xs text-muted-foreground">閲覧者</p></div>
+          <button onclick="toast('世帯を切り替えました（モックのため表示は 佐藤家 のまま）')" class="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-muted">この世帯を表示</button>
+        </div>
+      </div>
+      <p class="mt-1 text-xs text-muted-foreground">複数世帯に所属している場合のみ表示（UC-H08 を維持）</p>
+    </div>
+
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <h2 class="mb-1 text-sm font-semibold">メンバー</h2>
+      <div class="divide-y divide-border">
+        <div class="flex items-center gap-3 py-3">
+          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">花</span>
+          <div class="min-w-0 flex-1"><p class="text-sm font-medium">佐藤 花子（あなた）</p><p class="truncate text-xs text-muted-foreground">hanako@example.com</p></div>
+          <span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">オーナー</span>
+        </div>
+        <div data-member-row class="flex items-center gap-3 py-3">
+          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-sm font-bold">太</span>
+          <div class="min-w-0 flex-1"><p class="text-sm font-medium">佐藤 太郎</p><p class="truncate text-xs text-muted-foreground">taro@example.com</p></div>
+          <button data-editor-only onclick="cycleRole()" class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium hover:bg-border"><span id="role-pill-label">編集者</span><svg class="h-3 w-3"><use href="#i-chevron-right"/></svg></button>
+          <button data-editor-only onclick="removeMemberRow(this)" class="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-surface-muted dark:text-red-400">削除</button>
+        </div>
+      </div>
+      <p class="mt-1 text-xs text-muted-foreground">権限バッジをタップして変更（現行のセレクト＋「変更」ボタンを置き換え）</p>
+    </div>
+
+    <div data-editor-only class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <h2 class="mb-3 text-sm font-semibold">招待</h2>
+      <div class="grid grid-cols-2 gap-2">
+        <button class="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground">メンバーを招待</button>
+        <button class="rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-surface-muted">ゲストを招待</button>
+      </div>
+      <div class="mt-3 rounded-xl bg-surface-muted p-3">
+        <div class="flex items-center justify-between">
+          <div class="min-w-0"><p class="truncate text-sm font-medium">jiji@example.com</p><p class="text-xs text-muted-foreground">閲覧者として招待中 ・ 8月10日まで有効</p></div>
+          <button onclick="copyInvite(this)" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium"><svg class="h-3.5 w-3.5"><use href="#i-copy"/></svg><span>リンクをコピー</span></button>
+        </div>
+      </div>
+      <p class="mt-2 text-xs text-muted-foreground">招待リンクは「コピー」ボタンで共有（現行はパス文字列の表示のみ）</p>
+    </div>
+
+    <div data-editor-only class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <h2 class="mb-1 text-sm font-semibold">外部ゲスト（保育園・シッター）</h2>
+      <div class="flex items-center justify-between py-2">
+        <div><p class="text-sm font-medium">さくら保育園</p><p class="text-xs text-muted-foreground">モカ ・ 8月1日〜8月31日 ・ 記入可</p></div>
+        <button class="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400">失効</button>
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <h2 class="mb-2 text-sm font-semibold text-red-600 dark:text-red-400">危険な操作</h2>
+      <div class="space-y-2">
+        <button class="w-full rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-surface-muted dark:text-red-400">この世帯から退出する</button>
+        <button data-editor-only class="w-full rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground" disabled>世帯を削除する（メンバーが残っています）</button>
+      </div>
+    </div>
+    <p class="text-xs text-muted-foreground">現行の 1 枚 621 行ページを機能別カードに分割。メニュー直下に昇格（現行はアカウント設定の奥）。</p>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- アカウント設定 -->
+<!-- ============================================================ -->
+<section data-screen="settings-account" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center gap-1 py-2">
+      <button onclick="go('menu')" aria-label="戻る" class="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
+      <h1 class="text-base font-semibold">アカウント設定</h1>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <div class="flex items-center gap-4">
+        <span class="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">花</span>
+        <button class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">画像を変更</button>
+      </div>
+      <div class="mt-4 space-y-3">
+        <label class="block text-xs font-medium text-muted-foreground">表示名
+          <input value="佐藤 花子" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" /></label>
+        <label class="block text-xs font-medium text-muted-foreground">記入者の初期値
+          <input value="はなこ" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" /></label>
+        <button class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground">保存する</button>
+      </div>
+    </div>
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <h2 class="mb-3 text-sm font-semibold">パスワードを変更</h2>
+      <div class="space-y-3">
+        <input type="password" placeholder="新しいパスワード" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
+        <input type="password" placeholder="新しいパスワード（確認）" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
+        <button class="rounded-lg border border-border px-5 py-2 text-sm font-medium hover:bg-surface-muted">更新する</button>
+      </div>
+    </div>
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <p class="text-sm">hanako@example.com</p>
+      <p class="mt-0.5 text-xs text-muted-foreground">ログイン中のアカウント</p>
+    </div>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- 記録詳細 -->
+<!-- ============================================================ -->
+<section data-screen="record-detail" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center gap-1 py-2">
+      <button onclick="go('home')" aria-label="戻る" class="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-6 w-6"><use href="#i-chevron-left"/></svg></button>
+      <h1 id="det-title" class="flex-1 text-base font-semibold">8月3日（月）</h1>
+      <button data-editor-only onclick="openForm(true)" class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-muted">編集</button>
+      <button data-editor-only onclick="openSheet('sheet-more')" aria-label="その他の操作" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-more"/></svg></button>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-32">
+    <div id="det-badges" class="flex flex-wrap items-center gap-2">
+      <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span>
+      <span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 3.20 kg</span>
+      <span class="text-xs text-muted-foreground">記入: さくら保育園</span>
+    </div>
+    <article id="det-body" class="whitespace-pre-wrap rounded-2xl bg-surface p-5 text-sm leading-relaxed shadow-sm ring-1 ring-border">園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。
+
+お迎えのときは少し眠そうでしたが、帰り際にしっぽをたくさん振ってくれました。</article>
+    <div id="det-photos" class="grid grid-cols-2 gap-1.5">
+      <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-amber-200 to-orange-300 text-5xl">🐕</button>
+      <button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-emerald-200 to-teal-300 text-5xl">🎾</button>
+    </div>
+    <div id="det-tags" class="flex flex-wrap gap-1.5">
+      <a href="#" onclick="go('home');return false" class="rounded-full bg-surface px-3 py-1 text-xs font-medium ring-1 ring-border">#ボール遊び</a>
+    </div>
+    <div id="det-share" class="flex items-center justify-between rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <div><p class="text-sm font-medium">ゲストに共有</p><p class="text-xs text-muted-foreground">さくら保育園が閲覧できます</p></div>
+      <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">共有中</span>
+    </div>
+    <nav id="det-nav" class="flex items-center justify-between border-t border-border pt-3 text-sm">
+      <a href="#" onclick="showDetail(1);return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground"><svg class="h-4 w-4"><use href="#i-chevron-left"/></svg>8月2日の記録</a>
+      <span class="text-muted-foreground/50">次の記録なし</span>
+    </nav>
+    <p class="text-xs text-muted-foreground">削除は右上「…」メニューへ移動（現行はページ最下部の赤リンク）。前後の記録への移動を新設。</p>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- 記録フォーム（新規・編集） -->
+<!-- ============================================================ -->
+<section data-screen="record-new" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-2">
+      <button onclick="openCancelConfirm('main')" class="rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted">キャンセル</button>
+      <h1 id="form-title" class="text-base font-semibold">記録を追加</h1>
+      <button onclick="openSaveConfirm('main')" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-16">
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <div class="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1">
+        <button id="form-src-home" data-seg onclick="segPick(this)" aria-pressed="true" class="rounded-lg bg-surface py-2 text-sm font-semibold shadow-sm">🏠 おうち</button>
+        <button id="form-src-school" data-seg onclick="segPick(this)" aria-pressed="false" class="rounded-lg py-2 text-sm font-medium text-muted-foreground">🏫 保育園</button>
+      </div>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <label class="block text-xs font-medium text-muted-foreground">ペット
+          <select class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"><option>モカ</option></select></label>
+        <label class="block text-xs font-medium text-muted-foreground">日付
+          <input id="form-date" type="date" value="2026-08-03" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+      </div>
+    </div>
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <p class="mb-2 text-xs font-medium text-muted-foreground">写真</p>
+      <div class="grid grid-cols-4 gap-1.5">
+        <button class="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border text-muted-foreground"><svg class="h-6 w-6"><use href="#i-camera"/></svg><span class="text-[10px] font-medium">追加</span></button>
+        <span class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br from-amber-200 to-orange-300 text-3xl">🐕</span>
+      </div>
+      <p class="mt-2 text-xs text-muted-foreground">送信前に長辺 1600px へ自動圧縮（従来どおり）</p>
+    </div>
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <label class="block text-xs font-medium text-muted-foreground">今日の様子
+        <textarea id="form-body" rows="6" placeholder="ごはん・散歩・体調など" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"></textarea></label>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <label class="block text-xs font-medium text-muted-foreground">記入者
+          <input id="form-author" value="はなこ" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+        <label class="block text-xs font-medium text-muted-foreground">体重（kg）
+          <input id="form-weight" inputmode="decimal" placeholder="3.20" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+      </div>
+      <div class="mt-3">
+        <p class="text-xs font-medium text-muted-foreground">タグ</p>
+        <div id="form-tags" class="mt-1.5 flex flex-wrap gap-1.5"></div>
+      </div>
+    </div>
+    <p class="text-xs text-muted-foreground">保存はキーボードに隠れない上部固定（iOS 定石）。写真を上段に昇格。編集も同じ画面。</p>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- ログイン -->
+<!-- ============================================================ -->
+<section data-screen="login" hidden>
+  <main class="safe-px mx-auto flex min-h-screen max-w-sm flex-col justify-center py-10">
+    <div class="mb-8 text-center">
+      <span class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><svg class="h-9 w-9"><use href="#i-paw"/></svg></span>
+      <h1 class="text-2xl font-bold tracking-tight">mfmf</h1>
+      <p class="mt-1 text-sm text-muted-foreground">家族でつなぐ、ペットの毎日</p>
+    </div>
+    <div class="rounded-2xl bg-surface p-6 shadow-sm ring-1 ring-border">
+      <button class="flex w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-surface-muted">
+        <span class="text-base">G</span> Google でログイン
+      </button>
+      <div class="my-4 flex items-center gap-3 text-xs text-muted-foreground"><span class="h-px flex-1 bg-border"></span>または<span class="h-px flex-1 bg-border"></span></div>
+      <div class="space-y-3">
+        <input type="email" placeholder="メールアドレス" class="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
+        <input type="password" placeholder="パスワード" class="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
+        <button onclick="go('home')" class="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">ログイン</button>
+      </div>
+      <div class="mt-4 flex justify-between text-xs">
+        <a href="#" class="font-medium text-muted-foreground underline-offset-2 hover:underline">パスワードをお忘れの方</a>
+        <a href="#" class="font-medium text-primary underline-offset-2 hover:underline">新規登録</a>
+      </div>
+    </div>
+    <p class="mt-6 text-center text-xs text-muted-foreground">構成は現行のまま。ブランド色とロゴ・キャッチコピーで「らしさ」を追加。</p>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- オンボーディング -->
+<!-- ============================================================ -->
+<section data-screen="onboarding" hidden>
+  <main class="safe-px mx-auto flex min-h-screen max-w-md flex-col justify-center py-10">
+    <div class="mb-6 text-center">
+      <span class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><svg class="h-9 w-9"><use href="#i-paw"/></svg></span>
+      <h1 class="text-2xl font-bold tracking-tight">mfmf へようこそ</h1>
+      <p class="mt-2 text-sm text-muted-foreground">まず「世帯」をつくると、家族を招待して<br />いっしょに記録を残せるようになります</p>
+    </div>
+    <div class="rounded-2xl bg-surface p-6 shadow-sm ring-1 ring-border">
+      <label class="block text-xs font-medium text-muted-foreground">世帯の名前（あとから変更できます）
+        <input placeholder="例: 佐藤家" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" /></label>
+      <button onclick="toast('つづいてペットを登録します');go('pets')" class="mt-4 w-full rounded-xl bg-primary px-4 py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">世帯を作成してはじめる</button>
+    </div>
+    <div class="mt-4 rounded-2xl bg-surface-muted p-4 text-sm text-muted-foreground">
+      招待を受けている方は、届いた<strong class="text-foreground">招待リンク</strong>を開くだけで参加できます。ここで世帯を作る必要はありません。
+    </div>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- ゲスト（保育園・シッター） -->
+<!-- ============================================================ -->
+<section data-screen="guest" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-3">
+      <div class="flex items-center gap-2">
+        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground"><svg class="h-4 w-4"><use href="#i-paw"/></svg></span>
+        <span class="text-base font-semibold tracking-tight">mfmf</span>
+        <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">ゲスト</span>
+      </div>
+      <button aria-label="ログアウト" onclick="go('login')" class="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-logout"/></svg></button>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-16">
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <div class="flex items-center gap-3">
+        <span class="flex h-12 w-12 items-center justify-center rounded-full bg-linear-to-br from-amber-200 to-orange-300 text-2xl">🐩</span>
+        <div class="flex-1"><p class="font-semibold">モカ</p><p class="text-xs text-muted-foreground">お預かり期間: 8月1日〜8月31日 ・ 記入できます</p></div>
+      </div>
+      <button onclick="go('guest-record-new')" class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"><svg class="h-4 w-4"><use href="#i-plus"/></svg>今日の記録を追加</button>
+    </div>
+    <div>
+      <h2 class="mb-2 text-sm font-semibold text-muted-foreground">これまでの記録</h2>
+      <ul class="space-y-3">
+        <li class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+          <div class="flex items-center gap-1.5">
+            <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3 w-3"><use href="#i-school"/></svg>保育園</span>
+            <span class="text-xs text-muted-foreground">8月3日（月）・ あなたの記入</span>
+          </div>
+          <p class="mt-1.5 text-sm">園庭でボール遊びをたくさんしました。お昼ごはんは完食。</p>
+        </li>
+        <li class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+          <div class="flex items-center gap-1.5">
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>
+            <span class="text-xs text-muted-foreground">8月1日（土）・ 佐藤 太郎 ・ 共有された記録</span>
+          </div>
+          <p class="mt-1.5 text-sm">トリミングでさっぱり。少し緊張していたけど最後はご機嫌。</p>
+        </li>
+      </ul>
+    </div>
+    <p class="text-xs text-muted-foreground">写真は共有されません。「記録を追加」を最上部の大ボタンに（現行は右上の小ボタン）。タブバーは出しません。</p>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- ゲスト記録フォーム（写真・タグなし = 現行 D8 を踏襲） -->
+<!-- ============================================================ -->
+<section data-screen="guest-record-new" hidden>
+  <header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <div class="safe-px mx-auto flex max-w-2xl items-center justify-between py-2">
+      <button onclick="openCancelConfirm('guest')" class="rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted">キャンセル</button>
+      <h1 class="text-base font-semibold">記録を追加</h1>
+      <button onclick="openSaveConfirm('guest')" class="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">保存</button>
+    </div>
+  </header>
+  <main class="safe-px mx-auto max-w-2xl space-y-4 py-4 pb-16">
+    <p class="text-sm text-muted-foreground">モカ の記録（お預かり期間: 8月1日〜8月31日）</p>
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <div class="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1">
+        <button data-seg onclick="segPick(this)" aria-pressed="true" class="rounded-lg bg-surface py-2 text-sm font-semibold shadow-sm">🏫 保育園</button>
+        <button data-seg onclick="segPick(this)" aria-pressed="false" class="rounded-lg py-2 text-sm font-medium text-muted-foreground">🏠 おうち</button>
+      </div>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <label class="block text-xs font-medium text-muted-foreground">日付
+          <input id="guest-date" type="date" value="2026-08-03" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+        <label class="block text-xs font-medium text-muted-foreground">体重（kg）
+          <input inputmode="decimal" placeholder="3.20" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+      </div>
+      <p class="mt-1.5 text-xs text-muted-foreground">お預かり期間内の日付のみ選べます</p>
+    </div>
+    <div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <label class="block text-xs font-medium text-muted-foreground">今日の様子
+        <textarea rows="6" placeholder="ごはん・あそび・体調など" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"></textarea></label>
+      <label class="mt-3 block text-xs font-medium text-muted-foreground">記入者
+        <input value="さくら保育園" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+    </div>
+    <p class="text-xs text-muted-foreground">ゲストは写真・タグを使えません（現行仕様どおり）。保存・キャンセルはゲストのホームへ戻ります。</p>
+  </main>
+</section>
+
+</div><!-- /#app -->
+
+<!-- ============================================================ -->
+<!-- タブバー（案A: 5スロット・中央记録） -->
+<!-- ============================================================ -->
+<nav id="tabbar" hidden class="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur">
+  <div id="tabgrid" class="mx-auto grid max-w-2xl grid-cols-5">
+    <button data-tab="home" onclick="go('home')" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-muted-foreground">
+      <svg class="h-6 w-6"><use href="#i-house"/></svg>ホーム</button>
+    <button data-tab="calendar" onclick="go('calendar')" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-muted-foreground">
+      <svg class="h-6 w-6"><use href="#i-calendar"/></svg>カレンダー</button>
+    <button id="tab-center" onclick="openQuick()" aria-label="記録を追加" class="relative">
+      <span class="absolute left-1/2 top-0 -mt-5 -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover">
+        <svg class="h-7 w-7"><use href="#i-plus"/></svg></span>
+      <span class="block pb-1.5 pt-9 text-center text-[10px] font-medium text-muted-foreground">記録</span>
+    </button>
+    <button data-tab="gallery" onclick="go('gallery')" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-muted-foreground">
+      <svg class="h-6 w-6"><use href="#i-images"/></svg>アルバム</button>
+    <button data-tab="menu" onclick="go('menu')" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-muted-foreground">
+      <svg class="h-6 w-6"><use href="#i-menu"/></svg>メニュー</button>
+  </div>
+</nav>
+
+<!-- FAB（案B: 4タブ＋右下FAB） -->
+<button id="fab" hidden onclick="openQuick()" aria-label="記録を追加" class="fixed right-4 bottom-[calc(72px_+_env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover">
+  <svg class="h-7 w-7"><use href="#i-plus"/></svg>
+</button>
+
+<!-- ============================================================ -->
+<!-- クイック記録シート（中央「＋」から） -->
+<!-- ============================================================ -->
+<div id="sheet-quick" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="クイック記録">
+  <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-quick')"></div>
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="text-base font-semibold">サッと記録 <span id="qs-date" class="ml-1 text-xs font-normal text-muted-foreground">8月3日（月）</span></h2>
+      <button onclick="closeSheet('sheet-quick')" aria-label="閉じる" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1">
+      <button data-seg onclick="segPick(this)" aria-pressed="true" class="rounded-lg bg-surface py-2 text-sm font-semibold shadow-sm">🏠 おうち</button>
+      <button data-seg onclick="segPick(this)" aria-pressed="false" class="rounded-lg py-2 text-sm font-medium text-muted-foreground">🏫 保育園</button>
+    </div>
+    <div id="qs-chips" class="mb-3 flex flex-wrap gap-1.5">
+      <button data-chip="ごはん完食" onclick="qsChip(this)" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">ごはん完食</button>
+      <button data-chip="散歩" onclick="qsChip(this)" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">散歩</button>
+      <button data-chip="うんち◎" onclick="qsChip(this)" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">うんち◎</button>
+      <button data-chip="元気" onclick="qsChip(this)" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">元気</button>
+      <button data-chip="お昼寝" onclick="qsChip(this)" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">お昼寝</button>
+      <button id="qs-note-btn" onclick="qsNoteShow()" class="rounded-full bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-border">＋ ひとこと</button>
+    </div>
+    <input id="qs-note-input" hidden placeholder="ひとことを追加" oninput="qsPreview()" class="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" />
+    <p id="qs-preview" class="mb-3 rounded-lg bg-surface-muted px-3 py-2 text-sm text-muted-foreground">チップをタップして記録をつくる</p>
+    <button id="qs-save" onclick="qsSave()" disabled class="w-full rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-50">保存する</button>
+    <button onclick="closeSheet('sheet-quick');openFormFromQuick()" class="mt-2 w-full py-2 text-center text-sm font-medium text-primary">写真つきでくわしく記録する →</button>
+  </div>
+</div>
+
+<!-- 日別シート(カレンダー) -->
+<div id="sheet-day" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="この日の記録">
+  <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-day')"></div>
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="text-base font-semibold"><span id="day-title">8月3日（月）</span>の記録</h2>
+      <button onclick="closeSheet('sheet-day')" aria-label="閉じる" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-x"/></svg></button>
+    </div>
+    <ul id="day-list" class="space-y-2"></ul>
+    <button data-editor-only onclick="closeSheet('sheet-day');openSheet('sheet-quick')" class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-surface-muted"><svg class="h-4 w-4"><use href="#i-plus"/></svg>この日の記録を追加</button>
+  </div>
+</div>
+
+<!-- 記録詳細の「…」メニュー -->
+<div id="sheet-more" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="その他の操作">
+  <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-more')"></div>
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <div class="overflow-hidden rounded-xl bg-surface-muted">
+      <button onclick="closeSheet('sheet-more');openForm(true)" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-pencil"/></svg>編集する</button>
+      <div class="border-t border-border"></div>
+      <button onclick="toggleShare()" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium"><svg class="h-5 w-5 text-muted-foreground"><use href="#i-users"/></svg><span id="more-share-label">ゲスト共有を解除</span></button>
+      <div class="border-t border-border"></div>
+      <button onclick="closeSheet('sheet-more')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium text-red-600 dark:text-red-400"><svg class="h-5 w-5"><use href="#i-trash"/></svg>この記録を削除する</button>
+    </div>
+    <button onclick="closeSheet('sheet-more')" class="mt-2 w-full rounded-xl bg-surface py-3 text-sm font-medium ring-1 ring-border">キャンセル</button>
+  </div>
+</div>
+
+<!-- ペット編集シート -->
+<div id="sheet-pet" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="ペットを編集">
+  <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-pet')"></div>
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="text-base font-semibold">モカを編集</h2>
+      <button onclick="closeSheet('sheet-pet')" aria-label="閉じる" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"><svg class="h-5 w-5"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="space-y-3">
+      <label class="block text-xs font-medium text-muted-foreground">名前
+        <input id="pet-input-name" value="モカ" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground" /></label>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="block text-xs font-medium text-muted-foreground">種類
+          <input id="pet-input-species" value="トイプードル" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+        <label class="block text-xs font-medium text-muted-foreground">誕生日
+          <input id="pet-input-birth" type="date" value="2023-05-10" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+      </div>
+      <button onclick="petSave()" class="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground">更新する</button>
+      <button class="w-full py-2 text-center text-sm font-medium text-red-600 dark:text-red-400">このペットを削除する</button>
+    </div>
+  </div>
+</div>
+
+<!-- プロト設定シート -->
+<div id="sheet-proto" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="プロト設定">
+  <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-proto')"></div>
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <h2 class="mb-3 text-base font-semibold">プロト設定（検証用）</h2>
+    <div class="space-y-3 text-sm">
+      <div class="rounded-xl bg-surface-muted p-3">
+        <p class="mb-2 text-xs font-medium text-muted-foreground">ナビゲーション案</p>
+        <div class="grid grid-cols-2 gap-1 rounded-lg bg-surface p-1 ring-1 ring-border">
+          <button id="nav-a-btn" onclick="setNav('a')" class="rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground">案A: 中央＋ ✓採用</button>
+          <button id="nav-b-btn" onclick="setNav('b')" class="rounded-md py-2 text-sm font-medium text-muted-foreground">案B: 右下FAB</button>
+        </div>
+        <p class="mt-2 text-xs text-muted-foreground">案A（中央の記録ボタン）で合意済み（2026-08-03 / D33）。案B は比較参照用に残しています</p>
+      </div>
+      <label class="flex items-center justify-between rounded-xl bg-surface-muted p-3">
+        <span class="font-medium">記録 0 件の状態を表示<span class="block text-xs font-normal text-muted-foreground">ホーム・アルバム・カレンダー・体重に反映</span></span>
+        <input id="empty-toggle" type="checkbox" onchange="setEmpty(this.checked)" class="h-5 w-5 accent-[var(--primary)]" />
+      </label>
+      <label class="flex items-center justify-between rounded-xl bg-surface-muted p-3">
+        <span class="font-medium">閲覧者（viewer）として表示<span class="block text-xs font-normal text-muted-foreground">記録作成の導線（中央＋ / FAB）を隠します</span></span>
+        <input id="viewer-toggle" type="checkbox" onchange="setViewer(this.checked)" class="h-5 w-5 accent-[var(--primary)]" />
+      </label>
+      <button onclick="closeSheet('sheet-proto');go('intro')" class="w-full rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-surface-muted">提案の説明にもどる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 記録フォームの確認ダイアログ -->
+<div id="sheet-form-cancel" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="編集を破棄の確認">
+  <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-form-cancel')"></div>
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <h2 class="mb-1 text-base font-semibold">編集をやめますか？</h2>
+    <p class="mb-3 text-sm text-muted-foreground">入力した内容は保存されません。</p>
+    <button onclick="confirmCancelYes()" class="w-full rounded-xl bg-surface py-3 text-sm font-medium text-red-600 ring-1 ring-border dark:text-red-400">破棄してもどる</button>
+    <button onclick="closeSheet('sheet-form-cancel')" class="mt-2 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground">編集を続ける</button>
+  </div>
+</div>
+
+<div id="sheet-form-save" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true" aria-label="保存の確認">
+  <div class="absolute inset-0 bg-black/40" onclick="closeSheet('sheet-form-save')"></div>
+  <div tabindex="-1" data-sheet-panel class="absolute inset-x-0 bottom-0 mx-auto max-h-[92vh] max-w-2xl translate-y-full overflow-y-auto rounded-t-2xl bg-surface p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-lg transition-transform duration-300 motion-reduce:transition-none">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <h2 class="mb-1 text-base font-semibold">この内容で保存しますか？</h2>
+    <p class="mb-3 text-sm text-muted-foreground">保存したあともいつでも編集できます。</p>
+    <button onclick="confirmSaveYes()" class="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground">保存する</button>
+    <button onclick="closeSheet('sheet-form-save')" class="mt-2 w-full rounded-xl bg-surface py-3 text-sm font-medium ring-1 ring-border">もどる</button>
+  </div>
+</div>
+
+<!-- トースト -->
+<div id="toast" hidden class="fixed left-1/2 bottom-[calc(88px_+_env(safe-area-inset-bottom))] z-40 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg" role="status">残しました</div>
+
+<!-- プロト設定チップ -->
+<button id="proto-chip" onclick="openSheet('sheet-proto')" class="fixed left-3 bottom-[calc(76px_+_env(safe-area-inset-bottom))] z-30 rounded-full bg-foreground/70 px-2.5 py-1 text-[10px] font-medium text-background backdrop-blur">プロト設定</button>
+
+<script>
+(function () {
+  var TAB_SCREENS = { home: "home", calendar: "calendar", gallery: "gallery", menu: "menu", weight: "menu", pets: "menu", "settings-household": "menu", "settings-account": "menu", "record-detail": "home" };
+  var CHROME_SCREENS = ["home", "calendar", "gallery", "menu", "weight", "pets", "settings-household", "settings-account", "record-detail"];
+  var TODAY_LABEL = "8月3日（月）";
+  var navVariant = "a";
+  var current = "intro";
+  var emptyMode = false;
+  var formEdit = false;
+  var selectedDay = 3;
+  var currentDetail = 0;
+  var moreLoaded = false;
+  var viewerMode = false;
+
+  window.go = function (id) {
+    document.querySelectorAll("[data-screen]").forEach(function (s) { s.hidden = s.getAttribute("data-screen") !== id; });
+    current = id;
+    updateChrome();
+    window.scrollTo(0, 0);
+  };
+
+  function updateChrome() {
+    var showChrome = CHROME_SCREENS.indexOf(current) !== -1;
+    document.getElementById("tabbar").hidden = !showChrome;
+    var listScreen = current === "home" || current === "calendar" || current === "gallery";
+    var centerVisible = navVariant === "a" && !viewerMode;
+    var center = document.getElementById("tab-center");
+    var grid = document.getElementById("tabgrid");
+    center.hidden = !centerVisible;
+    grid.classList.toggle("grid-cols-5", centerVisible);
+    grid.classList.toggle("grid-cols-4", !centerVisible);
+    document.getElementById("fab").hidden = !(showChrome && navVariant === "b" && !viewerMode && listScreen);
+    var active = TAB_SCREENS[current];
+    document.querySelectorAll("[data-tab]").forEach(function (b) {
+      var on = b.getAttribute("data-tab") === active;
+      b.classList.toggle("text-primary", on);
+      b.classList.toggle("text-muted-foreground", !on);
+      if (on) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
+  }
+
+  /* ---- シート（背景 inert + パネルへフォーカス移動。トランジションは Tailwind の translate-y ユーティリティ） ---- */
+  var sheetTriggers = {};
+  var sheetTimers = {};
+  function anySheetOpen() {
+    return document.querySelectorAll('[role="dialog"]:not(.hidden)').length > 0;
+  }
+  function setBackgroundInert(on) {
+    ["app", "tabbar", "fab", "proto-chip"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.inert = on;
+    });
+    document.body.style.overflow = on ? "hidden" : "";
+  }
+  window.openSheet = function (id) {
+    var el = document.getElementById(id);
+    var panel = el.querySelector("[data-sheet-panel]");
+    clearTimeout(sheetTimers[id]);
+    /* シート内の要素から別シートを開いたときは、元のシートのトリガーを引き継ぐ */
+    var act = document.activeElement;
+    var dlg = act && act.closest ? act.closest('[role="dialog"]') : null;
+    sheetTriggers[id] = dlg && sheetTriggers[dlg.id] ? sheetTriggers[dlg.id] : act;
+    el.hidden = false;
+    el.classList.remove("hidden");
+    setBackgroundInert(true);
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      panel.classList.remove("translate-y-full");
+      panel.classList.add("translate-y-0");
+      panel.focus();
+    }); });
+  };
+  window.closeSheet = function (id) {
+    var el = document.getElementById(id);
+    var panel = el.querySelector("[data-sheet-panel]");
+    panel.classList.remove("translate-y-0");
+    panel.classList.add("translate-y-full");
+    clearTimeout(sheetTimers[id]);
+    sheetTimers[id] = setTimeout(function () {
+      el.classList.add("hidden");
+      if (!anySheetOpen()) {
+        setBackgroundInert(false);
+        var t = sheetTriggers[id];
+        if (t && document.contains(t) && !t.closest("[hidden]")) t.focus();
+      }
+    }, 300);
+  };
+
+  window.setViewer = function (on) {
+    viewerMode = on;
+    document.querySelectorAll("[data-editor-only]").forEach(function (el) { el.hidden = on; });
+    updateChrome();
+  };
+
+  window.setNav = function (v) {
+    navVariant = v;
+    var a = document.getElementById("nav-a-btn"), b = document.getElementById("nav-b-btn");
+    [[a, v === "a"], [b, v === "b"]].forEach(function (pair) {
+      pair[0].classList.toggle("bg-primary", pair[1]);
+      pair[0].classList.toggle("text-primary-foreground", pair[1]);
+      pair[0].classList.toggle("font-semibold", pair[1]);
+      pair[0].classList.toggle("text-muted-foreground", !pair[1]);
+    });
+    updateChrome();
+  };
+
+  window.setEmpty = function (on) {
+    emptyMode = on;
+    document.querySelectorAll("[data-empty-hide]").forEach(function (el) { el.hidden = on; });
+    document.querySelectorAll("[data-empty-show]").forEach(function (el) { el.hidden = !on; });
+    document.getElementById("no-results").hidden = true;
+    if (on) {
+      document.getElementById("more-records").hidden = true;
+      document.getElementById("more-btn").hidden = true;
+    } else {
+      applyHomeFilters();
+    }
+  };
+
+  window.toggleSearch = function () {
+    var p = document.getElementById("search-panel");
+    p.hidden = !p.hidden;
+    document.getElementById("search-toggle").setAttribute("aria-expanded", p.hidden ? "false" : "true");
+  };
+
+  /* ---- トースト ---- */
+  var toastTimer = null;
+  window.toast = function (text) {
+    var t = document.getElementById("toast");
+    t.textContent = text;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 2200);
+  };
+
+  /* ---- チップ/セグメントの選択スタイル ---- */
+  var SEG_ON = ["bg-surface", "font-semibold", "shadow-sm"];
+  var SEG_OFF = ["font-medium", "text-muted-foreground"];
+  window.segPick = function (btn) {
+    btn.parentElement.querySelectorAll("[data-seg]").forEach(function (b) {
+      var on = b === btn;
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      SEG_ON.forEach(function (c) { b.classList.toggle(c, on); });
+      SEG_OFF.forEach(function (c) { b.classList.toggle(c, !on); });
+    });
+  };
+  var CHIP_ON = ["bg-primary", "text-primary-foreground"];
+  var CHIP_OFF = ["bg-surface", "ring-1", "ring-border"];
+  function chipState(btn, on) {
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    CHIP_ON.forEach(function (c) { btn.classList.toggle(c, on); });
+    CHIP_OFF.forEach(function (c) { btn.classList.toggle(c, !on); });
+  }
+
+  /* ---- ホームの絞り込み（チップ + 検索キーワード + 期間を合成） ---- */
+  var chipFilter = "all";
+  var keyword = "";
+  var dateFrom = "";
+  var dateTo = "";
+  function applyHomeFilters() {
+    if (emptyMode) return;
+    /* 検索/絞り込み中は未読込の記録も対象にする（本番はページングの前に検索が効くため） */
+    var filtersActive = chipFilter !== "all" || keyword !== "" || dateFrom !== "" || dateTo !== "";
+    var includeMore = moreLoaded || filtersActive;
+    var visible = 0;
+    document.querySelectorAll("li[data-src]").forEach(function (li) {
+      var ok = true;
+      if (chipFilter !== "all") {
+        if (chipFilter.indexOf("tag:") === 0) ok = (li.getAttribute("data-tags") || "").split(" ").indexOf(chipFilter.slice(4)) !== -1;
+        else ok = li.getAttribute("data-src") === chipFilter;
+      }
+      if (ok && keyword) ok = li.textContent.indexOf(keyword) !== -1 || (li.getAttribute("data-author") || "").indexOf(keyword) !== -1;
+      var d = li.getAttribute("data-date") || "";
+      if (ok && dateFrom) ok = d >= dateFrom;
+      if (ok && dateTo) ok = d <= dateTo;
+      li.hidden = !ok;
+      if (ok && (includeMore || !li.closest("#more-records"))) visible++;
+    });
+    document.querySelectorAll("[data-group]").forEach(function (g) {
+      if (g.id === "more-records" && !includeMore) { g.hidden = true; return; }
+      g.hidden = !g.querySelector("li[data-src]:not([hidden])");
+    });
+    document.getElementById("more-btn").hidden = moreLoaded || filtersActive;
+    document.getElementById("no-results").hidden = visible > 0;
+  }
+  window.homeFilter = function (btn) {
+    chipFilter = btn.getAttribute("data-filter");
+    document.querySelectorAll("#home-filters [data-filter]").forEach(function (b) { chipState(b, b === btn); });
+    applyHomeFilters();
+  };
+  window.searchApply = function () {
+    keyword = document.getElementById("search-kw").value.trim();
+    dateFrom = document.getElementById("search-from").value;
+    dateTo = document.getElementById("search-to").value;
+    applyHomeFilters();
+  };
+  window.sortTimeline = function (v) {
+    if (v.indexOf("weight") === 0) { toast("体重順の並び替えは実装時に対応（モックは日付順のみ）"); return; }
+    var container = document.getElementById("timeline");
+    var groups = Array.prototype.slice.call(container.querySelectorAll("[data-group]"));
+    groups.sort(function (a, b) {
+      var da = (a.querySelector("li[data-date]") || {}).getAttribute ? a.querySelector("li[data-date]").getAttribute("data-date") : "";
+      var db = (b.querySelector("li[data-date]") || {}).getAttribute ? b.querySelector("li[data-date]").getAttribute("data-date") : "";
+      return v === "date-asc" ? (da < db ? -1 : 1) : (da < db ? 1 : -1);
+    });
+    var anchor = document.getElementById("more-btn");
+    groups.forEach(function (g) { container.insertBefore(g, anchor); });
+  };
+  window.searchClear = function () {
+    document.getElementById("search-kw").value = "";
+    document.getElementById("search-from").value = "";
+    document.getElementById("search-to").value = "";
+    keyword = ""; dateFrom = ""; dateTo = "";
+    applyHomeFilters();
+  };
+
+  /* ---- もっと見る ---- */
+  window.loadMore = function () {
+    moreLoaded = true;
+    applyHomeFilters();
+    toast("残りの記録を読み込みました（モックは 1 件）");
+  };
+
+  /* ---- クイック記録（chips-first / D32 準拠。保存で状態をリセット） ---- */
+  function qsReset() {
+    document.querySelectorAll("#qs-chips [data-chip]").forEach(function (b) { chipState(b, false); });
+    var note = document.getElementById("qs-note-input");
+    note.value = "";
+    note.hidden = true;
+    var segs = document.querySelectorAll("#sheet-quick [data-seg]");
+    if (segs.length) segPick(segs[0]);
+    qsPreview();
+  }
+  window.openQuick = function () {
+    selectedDay = 3;
+    document.getElementById("qs-date").textContent = TODAY_LABEL;
+    openSheet("sheet-quick");
+  };
+  window.qsChip = function (btn) {
+    chipState(btn, !btn.classList.contains("bg-primary"));
+    qsPreview();
+  };
+  window.qsNoteShow = function () {
+    var input = document.getElementById("qs-note-input");
+    input.hidden = false;
+    input.focus();
+  };
+  window.qsPreview = function () {
+    var parts = [];
+    document.querySelectorAll("#qs-chips [data-chip].bg-primary").forEach(function (b) { parts.push(b.getAttribute("data-chip")); });
+    var note = document.getElementById("qs-note-input").value.trim();
+    if (note) parts.push(note);
+    var p = document.getElementById("qs-preview");
+    p.textContent = parts.length ? parts.join("、") : "チップをタップして記録をつくる";
+    document.getElementById("qs-save").disabled = parts.length === 0;
+  };
+  window.qsSave = function () {
+    closeSheet("sheet-quick");
+    qsReset();
+    toast("残しました");
+  };
+  /* 「くわしく記録する」への乗り換え時は下書きを引き継ぐ */
+  window.openFormFromQuick = function () {
+    var parts = [];
+    document.querySelectorAll("#qs-chips [data-chip].bg-primary").forEach(function (b) { parts.push(b.getAttribute("data-chip")); });
+    var note = document.getElementById("qs-note-input").value.trim();
+    if (note) parts.push(note);
+    var seg = document.querySelector('#sheet-quick [data-seg][aria-pressed="true"]');
+    var school = seg && seg.textContent.indexOf("保育園") !== -1;
+    openForm(false);
+    if (parts.length) document.getElementById("form-body").value = parts.join("、");
+    if (school) segPick(document.getElementById("form-src-school"));
+    qsReset();
+  };
+
+  /* ---- カレンダーの日別シート ---- */
+  function badgeHtml(src) {
+    if (src === "school") {
+      return '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3 w-3"><use href="#i-school"/></svg>保育園</span>';
+    }
+    return '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3 w-3"><use href="#i-home-src"/></svg>おうち</span>';
+  }
+  var DAY_DATA = {
+    1: { rows: [{ src: "home", text: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。", det: 3 }] },
+    2: { rows: [{ src: "home", text: "公園までロング散歩。足を洗うのを嫌がらなくなってきた。", det: 2 }] },
+    3: { rows: [
+      { src: "school", text: "園庭でボール遊びをたくさんしました。", det: 0 },
+      { src: "home", text: "夜ごはん完食。散歩は 30 分。", det: 1 }
+    ] }
+  };
+  function dayLabel(day) {
+    var wd = ["土", "日", "月", "火", "水", "木", "金"][(day - 1) % 7];
+    return "8月" + day + "日（" + wd + "）";
+  }
+  window.openDay = function (day) {
+    selectedDay = day;
+    var label = dayLabel(day);
+    var rows = emptyMode ? [] : ((DAY_DATA[day] || {}).rows || []);
+    document.getElementById("day-title").textContent = label;
+    document.getElementById("qs-date").textContent = label;
+    var list = document.getElementById("day-list");
+    if (!rows.length) {
+      list.innerHTML = '<li class="rounded-xl bg-surface-muted p-3 text-sm text-muted-foreground">この日の記録はありません</li>';
+    } else {
+      list.innerHTML = rows.map(function (r) {
+        var det = typeof r.det === "number" ? "showDetail(" + r.det + ");" : "";
+        return '<li><a href="#" onclick="closeSheet(\'sheet-day\');' + det + 'go(\'record-detail\');return false" class="flex items-center gap-3 rounded-xl bg-surface-muted p-3">' +
+          badgeHtml(r.src) +
+          '<span class="min-w-0 flex-1 truncate text-sm">' + r.text + '</span>' +
+          '<svg class="h-4 w-4 shrink-0 text-muted-foreground"><use href="#i-chevron-right"/></svg></a></li>';
+      }).join("");
+    }
+    openSheet("sheet-day");
+  };
+
+  /* ---- 記録詳細（タイムラインの全モック記録に対応。新しい順） ---- */
+  function photoTile(grad, emoji) {
+    return '<button class="flex aspect-square items-center justify-center rounded-xl bg-linear-to-br ' + grad + ' text-5xl">' + emoji + "</button>";
+  }
+  function tagChip(name) {
+    return '<a href="#" onclick="go(\'home\');return false" class="rounded-full bg-surface px-3 py-1 text-xs font-medium ring-1 ring-border">#' + name + "</a>";
+  }
+  function detBadges(d) {
+    var b = d.src === "school"
+      ? '<span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-300"><svg class="h-3.5 w-3.5"><use href="#i-school"/></svg>保育園</span>'
+      : '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300"><svg class="h-3.5 w-3.5"><use href="#i-home-src"/></svg>おうち</span>';
+    if (d.weight) b += '<span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">体重 ' + d.weight + ' kg</span>';
+    b += '<span class="text-xs text-muted-foreground">記入: ' + d.author + '</span>';
+    return b;
+  }
+  function fmtDate(dateStr) {
+    var dt = new Date(dateStr + "T00:00:00");
+    return (dt.getMonth() + 1) + "月" + dt.getDate() + "日（" + ["日", "月", "火", "水", "木", "金", "土"][dt.getDay()] + "）";
+  }
+  var DETAIL = [
+    { title: "8月3日（月）", navLabel: "8月3日（保育園）", src: "school", weight: "3.20", date: "2026-08-03", share: true, author: "さくら保育園",
+      body: "園庭でボール遊びをたくさんしました。お昼ごはんは完食、お昼寝も 1 時間ぐっすり。\n\nお迎えのときは少し眠そうでしたが、帰り際にしっぽをたくさん振ってくれました。",
+      photos: photoTile("from-amber-200 to-orange-300", "🐕") + photoTile("from-emerald-200 to-teal-300", "🎾"),
+      tagNames: ["ボール遊び"] },
+    { title: "8月3日（月）", navLabel: "8月3日（おうち）", src: "home", weight: "", date: "2026-08-03", share: false, author: "佐藤 花子",
+      body: "夜ごはん完食。散歩は 30 分、いつもより元気だった。",
+      photos: "", tagNames: [] },
+    { title: "8月2日（日）", navLabel: "8月2日", src: "home", weight: "", date: "2026-08-02", share: false, author: "佐藤 花子",
+      body: "公園までロング散歩。帰りに足を洗うのを嫌がらなくなってきた。\n\n水飲みはいつもどおり。夜はぐっすり。",
+      photos: photoTile("from-sky-200 to-indigo-300", "🌳") + photoTile("from-pink-200 to-rose-300", "🐶"),
+      tagNames: [] },
+    { title: "8月1日（土）", navLabel: "8月1日", src: "home", weight: "3.25", date: "2026-08-01", share: true, author: "佐藤 太郎",
+      body: "トリミングでさっぱり。少し緊張していたけど最後はご機嫌。",
+      photos: photoTile("from-rose-200 to-pink-300", "✂️"),
+      tagNames: ["トリミング"] },
+    { title: "7月30日（木）", navLabel: "7月30日", src: "school", weight: "", date: "2026-07-30", share: true, author: "さくら保育園",
+      body: "お友達のマロンちゃんと仲良く遊べました。お昼寝はいつもより長め。",
+      photos: photoTile("from-emerald-200 to-teal-300", "💤") + photoTile("from-violet-200 to-purple-300", "🐾"),
+      tagNames: [] },
+    { title: "7月28日（火）", navLabel: "7月28日", src: "school", weight: "", date: "2026-07-28", share: true, author: "さくら保育園",
+      body: "初めてのおやつタイム。少し警戒してから完食しました。",
+      photos: photoTile("from-orange-200 to-amber-300", "🍚"),
+      tagNames: [] },
+    { title: "7月20日（月）", navLabel: "7月20日", src: "school", weight: "3.10", date: "2026-07-20", share: false, author: "さくら保育園",
+      body: "身体測定の日。体重 3.10kg、落ち着いて測れました。",
+      photos: "", tagNames: [] }
+  ];
+  window.showDetail = function (i) {
+    currentDetail = i;
+    var d = DETAIL[i];
+    document.getElementById("det-title").textContent = d.title;
+    document.getElementById("det-badges").innerHTML = detBadges(d);
+    document.getElementById("det-body").textContent = d.body;
+    document.getElementById("det-photos").innerHTML = d.photos;
+    document.getElementById("det-photos").hidden = !d.photos;
+    document.getElementById("det-tags").innerHTML = (d.tagNames || []).map(tagChip).join("");
+    document.getElementById("det-share").hidden = !d.share;
+    document.getElementById("more-share-label").textContent = d.share ? "ゲスト共有を解除" : "ゲストに共有";
+    var older = DETAIL[i + 1], newer = DETAIL[i - 1];
+    var prev = older
+      ? '<a href="#" onclick="showDetail(' + (i + 1) + ');return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground"><svg class="h-4 w-4"><use href="#i-chevron-left"/></svg>' + older.navLabel + "の記録</a>"
+      : '<span class="text-muted-foreground/50">前の記録なし</span>';
+    var next = newer
+      ? '<a href="#" onclick="showDetail(' + (i - 1) + ');return false" class="inline-flex items-center gap-1 font-medium text-muted-foreground">' + newer.navLabel + 'の記録<svg class="h-4 w-4"><use href="#i-chevron-right"/></svg></a>'
+      : '<span class="text-muted-foreground/50">次の記録なし</span>';
+    document.getElementById("det-nav").innerHTML = prev + next;
+    window.scrollTo(0, 0);
+  };
+
+  window.toggleShare = function () {
+    var d = DETAIL[currentDetail];
+    d.share = !d.share;
+    showDetail(currentDetail);
+    closeSheet("sheet-more");
+    toast(d.share ? "ゲストに共有しました" : "共有を解除しました");
+  };
+
+  /* ---- 体重の期間切替 ---- */
+  var WEIGHT = {
+    "1m": { points: "20,110 80,95 140,100 200,70 260,55 300,45", x0: "7/1", delta: "+0.15 kg / 1ヶ月" },
+    "3m": { points: "20,120 60,112 100,105 140,98 180,100 220,70 260,55 300,45", x0: "5/3", delta: "+0.30 kg / 3ヶ月" },
+    "1y": { points: "20,135 60,125 100,118 140,105 180,95 220,80 260,60 300,45", x0: "2025/8", delta: "+0.55 kg / 1年" },
+    "all": { points: "20,145 60,130 100,115 140,100 180,90 220,75 260,58 300,45", x0: "2023/6", delta: "+0.85 kg / 全期間" }
+  };
+  function drawWeight(key) {
+    var d = WEIGHT[key];
+    document.getElementById("wt-line").setAttribute("points", d.points);
+    document.getElementById("wt-x0").textContent = d.x0;
+    document.getElementById("wt-delta").textContent = d.delta;
+    var pts = d.points.split(" ").map(function (p) { return p.split(","); });
+    var dots = document.getElementById("wt-dots");
+    dots.innerHTML = pts.map(function (p, i) {
+      var r = i === pts.length - 1 ? 4.5 : 3.5;
+      return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + r + '" fill="currentColor"/>';
+    }).join("");
+  }
+  window.weightRange = function (btn) {
+    document.querySelectorAll("#wt-ranges [data-range]").forEach(function (b) { chipState(b, b === btn); });
+    drawWeight(btn.getAttribute("data-range"));
+  };
+
+  /* ---- 招待リンクのコピー（失敗時はその旨を表示） ---- */
+  window.copyInvite = function (btn) {
+    var label = btn.querySelector("span:last-child");
+    var show = function (text) {
+      label.textContent = text;
+      setTimeout(function () { label.textContent = "リンクをコピー"; }, 1800);
+    };
+    var url = "https://mfmf.example.com/invite/mock-token";
+    var legacy = function () {
+      var ta = document.createElement("textarea");
+      ta.value = url;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      show(ok ? "コピーしました" : "コピーできませんでした");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { show("コピーしました"); }, legacy);
+    } else {
+      legacy();
+    }
+  };
+
+  /* ---- 記録フォーム（新規 / 編集を 1 画面で。編集は表示中の記録から複写、新規は選択中の日付） ---- */
+  function formTagsRender(names) {
+    var html = (names || []).map(function (n) {
+      return '<span class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium">#' + n + ' <svg class="h-3 w-3"><use href="#i-x"/></svg></span>';
+    }).join("");
+    html += '<button class="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground">＋ トリミング</button>' +
+      '<button class="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground">＋ 通院</button>';
+    document.getElementById("form-tags").innerHTML = html;
+  }
+  window.openForm = function (edit) {
+    formEdit = !!edit;
+    document.getElementById("form-title").textContent = formEdit ? "記録を編集" : "記録を追加";
+    var body = document.getElementById("form-body");
+    var weight = document.getElementById("form-weight");
+    var date = document.getElementById("form-date");
+    var author = document.getElementById("form-author");
+    if (formEdit) {
+      var d = DETAIL[currentDetail];
+      body.value = d.body;
+      weight.value = d.weight;
+      date.value = d.date;
+      author.value = d.author;
+      formTagsRender(d.tagNames);
+      segPick(document.getElementById(d.src === "school" ? "form-src-school" : "form-src-home"));
+    } else {
+      body.value = "";
+      weight.value = "";
+      author.value = "はなこ";
+      formTagsRender([]);
+      date.value = "2026-08-" + (selectedDay < 10 ? "0" : "") + selectedDay;
+      segPick(document.getElementById("form-src-home"));
+    }
+    go("record-new");
+  };
+  window.formClose = function () {
+    go(formEdit ? "record-detail" : "home");
+  };
+  /* キャンセル/保存は確認ダイアログを挟む（実機合意 2026-08-03） */
+  var confirmCtx = "main";
+  window.openCancelConfirm = function (ctx) {
+    confirmCtx = ctx;
+    openSheet("sheet-form-cancel");
+  };
+  window.openSaveConfirm = function (ctx) {
+    confirmCtx = ctx;
+    openSheet("sheet-form-save");
+  };
+  window.confirmCancelYes = function () {
+    closeSheet("sheet-form-cancel");
+    if (confirmCtx === "guest") go("guest");
+    else formClose();
+  };
+  window.confirmSaveYes = function () {
+    closeSheet("sheet-form-save");
+    if (confirmCtx === "guest") {
+      var gd = document.getElementById("guest-date").value;
+      if (gd && (gd < "2026-08-01" || gd > "2026-08-31")) {
+        toast("お預かり期間外の日付は選べません（8月1日〜31日）");
+        return;
+      }
+      go("guest");
+      toast("残しました（モック）");
+    } else {
+      formSave();
+    }
+  };
+  window.formSave = function () {
+    if (formEdit) {
+      var d = DETAIL[currentDetail];
+      d.body = document.getElementById("form-body").value;
+      d.weight = document.getElementById("form-weight").value.trim();
+      d.date = document.getElementById("form-date").value || d.date;
+      d.author = document.getElementById("form-author").value.trim() || d.author;
+      d.src = document.getElementById("form-src-school").getAttribute("aria-pressed") === "true" ? "school" : "home";
+      d.title = fmtDate(d.date);
+      var link = document.querySelector('li[data-src] a[onclick*="showDetail(' + currentDetail + ');"]');
+      if (link) {
+        var li = link.closest("li");
+        li.setAttribute("data-src", d.src);
+        var ex = link.querySelector(".line-clamp-2");
+        if (ex) ex.textContent = d.body.split("\n")[0];
+      }
+      showDetail(currentDetail);
+      go("record-detail");
+      toast("更新しました");
+    } else {
+      go("home");
+      toast("残しました（モック）");
+    }
+  };
+  window.removeMemberRow = function (btn) {
+    btn.closest("[data-member-row]").remove();
+    toast("メンバーを削除しました（モック）");
+  };
+  window.petSave = function () {
+    var name = document.getElementById("pet-input-name").value.trim() || "モカ";
+    var species = document.getElementById("pet-input-species").value.trim();
+    var birth = document.getElementById("pet-input-birth").value;
+    document.getElementById("pet-name").textContent = name;
+    var meta = species || "種類未設定";
+    if (birth) {
+      var dt = new Date(birth + "T00:00:00");
+      meta += " ・ " + dt.getFullYear() + "年" + (dt.getMonth() + 1) + "月生まれ";
+    }
+    document.getElementById("pet-meta").textContent = meta;
+    closeSheet("sheet-pet");
+    toast("更新しました");
+  };
+  window.cycleRole = function () {
+    var el = document.getElementById("role-pill-label");
+    var next = { "編集者": "閲覧者", "閲覧者": "オーナー", "オーナー": "編集者" };
+    el.textContent = next[el.textContent] || "編集者";
+    toast("権限を「" + el.textContent + "」に変更しました（モック）");
+  };
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      document.querySelectorAll('[role="dialog"]:not(.hidden)').forEach(function (el) { window.closeSheet(el.id); });
+    }
+  });
+
+  document.querySelectorAll("#home-filters [data-filter], #qs-chips [data-chip], #wt-ranges [data-range]").forEach(function (b) {
+    b.setAttribute("aria-pressed", b.classList.contains("bg-primary") ? "true" : "false");
+  });
+  drawWeight("1m");
+  showDetail(0);
+  go("intro");
+})();
+</script>

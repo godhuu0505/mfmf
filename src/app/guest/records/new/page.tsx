@@ -4,10 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/household";
 import { listActiveGuestGrants } from "@/lib/guest";
 import { getCurrentProfile } from "@/lib/profile";
-import SubmitButton from "@/components/SubmitButton";
+import {
+  ConfirmCancelButton,
+  ConfirmSubmitButton,
+} from "@/components/FormConfirm";
 import { PawPrint } from "lucide-react";
 import { createGuestRecord } from "@/app/guest/actions";
 import { RECORD_SOURCES, SOURCE_LABEL } from "@/types/database";
+import { jstTodayISO } from "@/lib/dateRange";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +44,7 @@ export default async function GuestNewRecordPage({
   // 指定ペット（クエリ）を優先。無効・未指定なら先頭の担当ペット。
   const grant = grants.find((g) => g.petId === pet) ?? grants[0];
   const profile = await getCurrentProfile();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = jstTodayISO();
 
   return (
     <>
@@ -177,18 +181,14 @@ export default async function GuestNewRecordPage({
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <SubmitButton
-              pendingLabel="保存中…"
-              className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
-            >
+            {/* 保存・キャンセルとも確認を挟む（UC-F01。世帯側の RecordForm と同じ振る舞い） */}
+            <ConfirmSubmitButton className="rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60">
               保存する
-            </SubmitButton>
-            <Link
+            </ConfirmSubmitButton>
+            <ConfirmCancelButton
               href="/guest"
               className="text-sm text-muted-foreground transition hover:text-foreground"
-            >
-              キャンセル
-            </Link>
+            />
           </div>
         </form>
       </main>

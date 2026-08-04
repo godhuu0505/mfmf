@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
+import { jstTodayISO } from "@/lib/dateRange";
+import { saveQuickDraft } from "@/lib/quickDraft";
 import type { RecordSource } from "@/types/database";
 
 // クイック記録の定型チップ（proto/quick-record 合意時の語彙 / D32）。
@@ -18,16 +20,11 @@ const CHIPS = [
   "ごきげん",
 ];
 
-// 今日の日付（端末ローカル）。record_date は日付のみを持つ。
-function todayISO(): string {
-  const d = new Date();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
+// 表示・保存とも JST の「今日」（record_date は日付のみを持つ。
+// 一覧の「今日/昨日」見出しも Asia/Tokyo 基準なので揃える）。
 function formatToday(): string {
   return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -59,7 +56,8 @@ export default function QuickRecordSheet({
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  const fabRef = useRef<HTMLButtonElement>(null);
+  // タブバー中央ボタン等、シートを開いた要素。閉じたらここへフォーカスを戻す。
+  const triggerRef = useRef<HTMLElement | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const noteInputRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,6 +77,32 @@ export default function QuickRecordSheet({
       });
     };
   }, [open]);
+
+  // 他タブでの世帯切替（UC-H08 → HouseholdSyncRefresher の refresh）で
+  // householdId が変わったら、開いていた下書きは破棄して閉じる。見えている
+  // 下書きのまま保存すると、気づかないうちに別世帯へ記録してしまうため。
+  const prevHouseholdRef = useRef(householdId);
+  useEffect(() => {
+    if (prevHouseholdRef.current === householdId) return;
+    prevHouseholdRef.current = householdId;
+    setOpen(false);
+    resetSheet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [householdId]);
+
+  // タブバーの中央「＋」（AppTabBar）からのイベントで開く（D33 で FAB を廃止）。
+  // 発火元の要素を覚えておき、閉じたらそこへフォーカスを戻す。
+  useEffect(() => {
+    const onOpen = () => {
+      if (document.activeElement instanceof HTMLElement) {
+        triggerRef.current = document.activeElement;
+      }
+      openSheet();
+    };
+    window.addEventListener("mfmf:quick-record-open", onOpen);
+    return () => window.removeEventListener("mfmf:quick-record-open", onOpen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Escape で閉じる（キーボード/スイッチ利用者の脱出路）
   useEffect(() => {
@@ -100,8 +124,10 @@ export default function QuickRecordSheet({
 
   function closeSheet() {
     setOpen(false);
-    // モーダルを閉じたらフォーカスを開いた場所（FAB）へ戻す
-    requestAnimationFrame(() => fabRef.current?.focus({ preventScroll: true }));
+    // モーダルを閉じたらフォーカスを開いた場所（タブバーの中央ボタン等）へ戻す
+    requestAnimationFrame(() =>
+      triggerRef.current?.focus({ preventScroll: true }),
+    );
   }
 
   // ユーザー操作（X・背景・Escape）による閉じる。保存中は無効にする —— 閉じて
@@ -124,10 +150,21 @@ export default function QuickRecordSheet({
     );
   }
 
+  // 「写真つきでくわしく記録する →」（proto 合意の導線）。クイックの下書き
+  // （チップ・ひとこと・記録元）を sessionStorage で /records/new に引き継ぐ
+  // （本文はプライベートなメモなので URL・履歴・ログに載せない）。
+  function openDetailedForm() {
+    if (isPending) return;
+    saveQuickDraft({ body, source, householdId });
+    closeSheet();
+    resetSheet();
+    router.push("/records/new");
+  }
+
   function save() {
     if (!body || isPending) return;
     const fd = new FormData();
-    fd.set("record_date", todayISO());
+    fd.set("record_date", jstTodayISO());
     fd.set("source", source);
     fd.set("author", defaultAuthor);
     fd.set("body", body);
@@ -152,21 +189,8 @@ export default function QuickRecordSheet({
 
   return (
     <>
-      {/* FAB: クイック記録の入口（親指の届く右下・セーフエリア回避）。
-          右下最下段は全画面共通の FeedbackWidget が使っているため、その真上に積む
-          （重ねると FeedbackWidget がクリックを横取りする。E2E UC-Q01〜Q05 で検出）。 */}
-      <button
-        ref={fabRef}
-        type="button"
-        onClick={openSheet}
-        aria-haspopup="dialog"
-        data-quick-record-bg
-        className="fixed right-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+3.5rem)] z-40 flex h-14 items-center gap-2 rounded-full bg-primary pl-4 pr-5 text-sm font-medium text-primary-foreground shadow-lg transition hover:bg-primary-hover"
-      >
-        <Plus className="h-5 w-5" aria-hidden="true" />
-        クイック記録
-      </button>
-
+      {/* 入口はタブバー中央の「＋」（AppTabBar → mfmf:quick-record-open イベント）。
+          D33 で FAB は廃止した。 */}
       {/* 背景 */}
       <div
         onClick={dismissSheet}
@@ -317,6 +341,15 @@ export default function QuickRecordSheet({
           >
             {isPending ? "保存中…" : "保存する"}
           </button>
+
+          <button
+            type="button"
+            onClick={openDetailedForm}
+            disabled={isPending}
+            className="mt-2 w-full py-2 text-center text-sm font-medium text-primary transition hover:text-primary-hover disabled:opacity-40"
+          >
+            写真つきでくわしく記録する →
+          </button>
         </div>
       </div>
 
@@ -324,7 +357,7 @@ export default function QuickRecordSheet({
       <div
         role="status"
         className={
-          "pointer-events-none fixed left-1/2 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+7.5rem)] z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg transition-opacity duration-300 " +
+          "pointer-events-none fixed left-1/2 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg transition-opacity duration-300 " +
           (toast ? "opacity-100" : "opacity-0")
         }
       >

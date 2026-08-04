@@ -13,8 +13,18 @@ export type GalleryImage = {
   caption?: string;
 };
 
-type Props = {
+export type GalleryGroup = {
+  /** 見出し（例: 2026年8月） */
+  label: string;
   images: GalleryImage[];
+};
+
+type Props = {
+  /** フラット表示。groups と排他（groups があればそちらが優先） */
+  images?: GalleryImage[];
+  /** 見出しつきグループ表示（アルバムの月見出し）。ライトボックスは
+      グループをまたいで全画像を連続で辿れる。 */
+  groups?: GalleryGroup[];
   /** サムネのグリッド列数（Tailwind クラス） */
   gridClassName?: string;
 };
@@ -22,25 +32,27 @@ type Props = {
 // 写真サムネのグリッド + 拡大表示（ライトボックス）。
 // スワイプ / 矢印キー / Esc / 背景クリックで操作できる。
 // 署名付き URL は親から渡された値をそのまま表示するだけ（SW にはキャッシュしない方針を維持）。
-export default function PhotoGallery({ images, gridClassName }: Props) {
+export default function PhotoGallery({ images, groups, gridClassName }: Props) {
+  // ライトボックスの添字は常に「全画像を通した通し番号」。
+  const flat = groups ? groups.flatMap((g) => g.images) : (images ?? []);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const touchStartX = useRef<number | null>(null);
 
   const close = useCallback(() => setOpenIndex(null), []);
   const show = useCallback(
-    (i: number) => setOpenIndex(((i % images.length) + images.length) % images.length),
-    [images.length],
+    (i: number) => setOpenIndex(((i % flat.length) + flat.length) % flat.length),
+    [flat.length],
   );
   const next = useCallback(() => {
     setOpenIndex((cur) =>
-      cur === null ? cur : (cur + 1) % images.length,
+      cur === null ? cur : (cur + 1) % flat.length,
     );
-  }, [images.length]);
+  }, [flat.length]);
   const prev = useCallback(() => {
     setOpenIndex((cur) =>
-      cur === null ? cur : (cur - 1 + images.length) % images.length,
+      cur === null ? cur : (cur - 1 + flat.length) % flat.length,
     );
-  }, [images.length]);
+  }, [flat.length]);
 
   // キーボード操作と背景スクロール抑止
   useEffect(() => {
@@ -59,32 +71,56 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
     };
   }, [openIndex, close, next, prev]);
 
-  if (images.length === 0) return null;
+  if (flat.length === 0) return null;
 
-  const current = openIndex !== null ? images[openIndex] : null;
+  const current = openIndex !== null ? flat[openIndex] : null;
+
+  // サムネのグリッド。offset は通し番号の起点（グループ表示用）。
+  const grid = (imgs: GalleryImage[], offset: number) => (
+    <div className={gridClassName ?? "grid grid-cols-2 gap-2 sm:grid-cols-3"}>
+      {imgs.map((img, i) => (
+        <button
+          key={img.id}
+          type="button"
+          onClick={() => show(offset + i)}
+          className="relative aspect-square overflow-hidden rounded-xl bg-surface-muted transition hover:opacity-90"
+          aria-label="写真を拡大表示"
+        >
+          <Image
+            src={img.url}
+            alt={img.caption ?? ""}
+            fill
+            sizes="(max-width:640px) 50vw, 200px"
+            className="object-cover"
+            unoptimized
+          />
+        </button>
+      ))}
+    </div>
+  );
+
+  let offset = 0;
 
   return (
     <>
-      <div className={gridClassName ?? "grid grid-cols-2 gap-2 sm:grid-cols-3"}>
-        {images.map((img, i) => (
-          <button
-            key={img.id}
-            type="button"
-            onClick={() => show(i)}
-            className="relative aspect-square overflow-hidden rounded-xl bg-surface-muted transition hover:opacity-90"
-            aria-label="写真を拡大表示"
-          >
-            <Image
-              src={img.url}
-              alt={img.caption ?? ""}
-              fill
-              sizes="(max-width:640px) 50vw, 200px"
-              className="object-cover"
-              unoptimized
-            />
-          </button>
-        ))}
-      </div>
+      {groups ? (
+        <div className="space-y-6">
+          {groups.map((g) => {
+            const start = offset;
+            offset += g.images.length;
+            return (
+              <section key={g.label} aria-label={g.label}>
+                <h2 className="mb-2 text-sm font-semibold text-foreground">
+                  {g.label}
+                </h2>
+                {grid(g.images, start)}
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        grid(flat, 0)
+      )}
 
       {current && (
         <div
@@ -109,7 +145,7 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
         >
           <div className="flex items-center justify-between p-4 text-white">
             <span className="text-sm text-white/70">
-              {openIndex! + 1} / {images.length}
+              {openIndex! + 1} / {flat.length}
             </span>
             <button
               type="button"
@@ -126,7 +162,7 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
             className="relative flex flex-1 items-center justify-center px-2"
             onClick={(e) => e.stopPropagation()}
           >
-            {images.length > 1 && (
+            {flat.length > 1 && (
               <button
                 type="button"
                 onClick={prev}
@@ -146,7 +182,7 @@ export default function PhotoGallery({ images, gridClassName }: Props) {
                 unoptimized
               />
             </div>
-            {images.length > 1 && (
+            {flat.length > 1 && (
               <button
                 type="button"
                 onClick={next}

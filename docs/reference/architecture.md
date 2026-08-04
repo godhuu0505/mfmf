@@ -10,7 +10,7 @@
 | テーブル・列・RLS・Storage ポリシー | [`supabase/migrations/`](../../supabase/migrations/)（連番 SQL） |
 | DB の型 | [`src/types/database.ts`](../../src/types/database.ts) |
 | 認可ヘルパーの使い分け | [`CLAUDE.md`](../../CLAUDE.md) セキュリティ節 ／ [`src/lib/household.ts`](../../src/lib/household.ts) |
-| ユーザー視点の機能一覧 | アプリ内 `/help`（[`src/app/help/page.tsx`](../../src/app/help/page.tsx)） |
+| ユーザー視点の機能一覧 | アプリ内 `/help`（[`src/app/(app)/help/page.tsx`](../../src/app/(app)/help/page.tsx)） |
 | 設計の「なぜ」・却下した案 | [explanation/decisions.md](../explanation/decisions.md) |
 
 ## 技術スタック

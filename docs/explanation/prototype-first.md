@@ -126,7 +126,7 @@ mfmf は PWA で、価値は「スマホで片手で、片手間に記録でき�
 | 事実 | 置き場所 A | 置き場所 B | 結果 |
 | --- | --- | --- | --- |
 | 画面一覧 | `CLAUDE.md`（正確だった） | `architecture.md`（5 画面欠落） | 片方が腐った |
-| 機能一覧 | `docs/reference/features.md` → **削除済み** | アプリ内 `/help`（`src/app/help/page.tsx`, 233 行）に一本化 | 片方が腐った |
+| 機能一覧 | `docs/reference/features.md` → **削除済み** | アプリ内 `/help`（`src/app/(app)/help/page.tsx`, 233 行）に一本化 | 片方が腐った |
 | データモデル | `architecture.md` の表 → **削除済み** | `supabase/migrations/`（31 本）に一本化 | 片方が腐った |
 
 **二重管理されているものは、必ずどちらかが腐る。** 例外なくそうなっていた。

@@ -8,6 +8,7 @@ import {
   type DaycareRecord,
   type RecordSource,
 } from "@/types/database";
+import FeedbackWidget from "@/components/FeedbackWidget";
 import SourceIcon from "@/components/SourceIcon";
 import { LogOut, PawPrint, Scale } from "lucide-react";
 
@@ -159,6 +160,12 @@ export default async function GuestPage() {
             </section>
           );
         })}
+
+        {/* ゲストはメニュー画面に到達しないため、フィードバックの入口をここに置く
+            （D33 でフローティングボタンを廃止した際の導線維持） */}
+        <div className="mt-6 overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+          <FeedbackWidget variant="row" />
+        </div>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
           写真やその他のペット・世帯の情報は共有されません。

@@ -35,8 +35,8 @@ vi.mock("@/lib/supabase/server", async () => {
   return { createClient: async () => getServerClient() };
 });
 
-import { updatePetAvatar } from "@/app/pets/actions";
-import { updateHouseholdAvatar, updateUserAvatar } from "@/app/settings/actions";
+import { updatePetAvatar } from "@/app/(app)/pets/actions";
+import { updateHouseholdAvatar, updateUserAvatar } from "@/app/(app)/settings/actions";
 import { buildAvatarPath } from "@/lib/storagePath";
 import { AVATAR_BUCKET } from "@/types/database";
 

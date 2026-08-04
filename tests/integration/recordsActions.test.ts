@@ -59,7 +59,7 @@ import {
   deleteRecord,
   setRecordGuestVisible,
   updateRecord,
-} from "@/app/records/actions";
+} from "@/app/(app)/records/actions";
 
 const seed: SeedIds = JSON.parse(readFileSync(SEED_FILE, "utf8"));
 
