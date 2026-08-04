@@ -1,0 +1,49 @@
+# CI の ui-screenshots アーティファクト（zz-screenshots.spec.ts の出力）を
+# 指定ブランチの docs/screenshots/app-redesign/ にコミットする。
+# UI 変更 PR にキャプチャを貼る運用（CLAUDE.md「Git / PR」）の取得手段。
+# アーティファクトの実体は Azure Blob にあり、開発環境によっては直接
+# ダウンロードできないため、ランナー上でコミットまで済ませる。
+name: Commit UI screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "ui-screenshots アーティファクトを生成した CI の run id"
+        required: true
+      branch:
+        description: "コミット先ブランチ（PR の head ブランチ）"
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ui-screenshots
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: docs/screenshots/app-redesign
+
+      # キャプチャは毎 run 画素が揺れる（動的データ）ので、そのまま CI を回すと
+      # 無駄回りする。docs のみの変更でもあるため [skip ci] を付ける。
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/app-redesign
+          if git diff --cached --quiet; then
+            echo "No screenshot changes to commit."
+            exit 0
+          fi
+          git commit -m "docs: UI キャプチャを更新（CI run ${{ inputs.run_id }} の ui-screenshots）[skip ci]"
+          git push origin "HEAD:${{ inputs.branch }}"
