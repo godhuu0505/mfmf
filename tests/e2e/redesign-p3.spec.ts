@@ -103,8 +103,9 @@ test("UC-C02: カレンダーの「今日」で今月に戻れる", async ({ pag
     page.getByRole("heading", { name: prevMonth }),
   ).toBeVisible();
   await page.getByRole("link", { name: "今日" }).click();
-  await page.waitForURL((url) => url.pathname === "/calendar" && !url.searchParams.has("ym"));
   await expect(
     page.getByRole("heading", { name: thisMonth }),
   ).toBeVisible();
+  // 今月に戻ったのでショートカットは消える
+  await expect(page.getByRole("link", { name: "今日" })).not.toBeVisible();
 });

@@ -115,10 +115,11 @@ export default async function CalendarPage({
             <h1 className="text-lg font-bold text-foreground">
               {year}年{month}月
             </h1>
-            {/* 今月へのショートカット（proto 合意 / notes.md）。今月表示中は出さない */}
+            {/* 今月へのショートカット（proto 合意 / notes.md）。今月表示中は出さない。
+                前月/翌月と同じ「?ym= 付きの遷移」に揃える（クエリ除去の遷移にしない） */}
             {!isCurrentMonth && (
               <Link
-                href="/calendar"
+                href={`/calendar?ym=${ymString(now.getFullYear(), now.getMonth() + 1)}`}
                 className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
               >
                 今日
