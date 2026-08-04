@@ -74,6 +74,9 @@ jobs:
       - uses: supabase/setup-cli@v2
         with:
           version: latest
+        env:
+          # 匿名 API のレートリミットで release 解決が失敗することがあるため認証して叩く
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       # supabase start でローカルスタックを起動し、supabase/migrations/*.sql を順に適用する。
       - name: Start Supabase (apply migrations)
@@ -121,6 +124,9 @@ jobs:
       - uses: supabase/setup-cli@v2
         with:
           version: latest
+        env:
+          # 匿名 API のレートリミットで release 解決が失敗することがあるため認証して叩く
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Start Supabase (apply migrations)
         run: supabase start
