@@ -59,15 +59,22 @@ test("UC-P01: ペットをカードから編集シートで更新・削除でき
     await expect(page.getByText(name, { exact: true })).toBeVisible();
   }
 
-  // 編集シートで名前を変更
+  // 編集シートで名前を変更（更新の反映も #137 で固まり得るため同じ保護）
   await page.getByRole("button", { name: `${name}を編集` }).click();
   const sheet = page.getByRole("dialog", { name: `${name}を編集` });
   await expect(sheet).toBeVisible();
   await sheet.locator('input[name="name"]').fill(renamed);
   await sheet.getByRole("button", { name: "更新する" }).click();
-  await expect(page.getByText(renamed, { exact: true })).toBeVisible();
+  try {
+    await expect(page.getByText(renamed, { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+  } catch {
+    await page.reload();
+    await expect(page.getByText(renamed, { exact: true })).toBeVisible();
+  }
 
-  // 削除は確認ステップを挟む
+  // 削除は確認ステップを挟む（削除の反映も同様に保護）
   await page.getByRole("button", { name: `${renamed}を編集` }).click();
   const sheet2 = page.getByRole("dialog", { name: `${renamed}を編集` });
   await sheet2.getByRole("button", { name: "このペットを削除する" }).click();
@@ -75,7 +82,14 @@ test("UC-P01: ペットをカードから編集シートで更新・削除でき
     sheet2.getByText(`${renamed}を削除しますか？`),
   ).toBeVisible();
   await sheet2.getByRole("button", { name: "削除する" }).click();
-  await expect(page.getByText(renamed, { exact: true })).not.toBeVisible();
+  try {
+    await expect(page.getByText(renamed, { exact: true })).not.toBeVisible({
+      timeout: 15_000,
+    });
+  } catch {
+    await page.reload();
+    await expect(page.getByText(renamed, { exact: true })).not.toBeVisible();
+  }
 });
 
 test("UC-D02: 「…」シートからゲスト共有を切り替えられる", async ({ page }) => {

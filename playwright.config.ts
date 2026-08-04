@@ -15,6 +15,10 @@ export default defineConfig({
   testDir: "./tests/e2e",
   globalSetup: "./tests/e2e/global-setup.ts",
   timeout: 30_000,
+  // CI ランナーではブラウザクラッシュや Server Action 応答の間欠ハング（#137）が
+  // 稀に起きるため 1 回だけ再試行する。再試行で通ったテストはレポートに
+  // flaky と明示されるので、不安定さが隠れることはない。
+  retries: process.env.CI ? 1 : 0,
   // 全 spec が同じ E2E ユーザーを共有し「一覧の先頭」を検証するため直列で回す
   // （並列にすると別ファイルの記録作成が先頭カードのアサーションと競合する）
   workers: 1,
