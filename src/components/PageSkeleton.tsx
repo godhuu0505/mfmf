@@ -1,15 +1,10 @@
 // 詳細・サブページ共通の中立的なローディング骨組み。
-// ヘッダー風バー + いくつかのブロックで体感速度を上げる。
+// ヘッダー/タブバーは (app)/layout.tsx が持ち続けるので、ここでは描かない
+// （骨組みに含めると遷移中だけヘッダーが二重になる）。
 export default function PageSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">読み込み中</span>
-      <div className="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
-        <div className="safe-px mx-auto flex max-w-2xl items-center justify-between py-3">
-          <div className="skeleton h-7 w-24 rounded-lg" />
-          <div className="skeleton h-5 w-28 rounded-lg" />
-        </div>
-      </div>
       <main className="mx-auto max-w-2xl px-4 py-6">
         <div className="skeleton mb-4 h-6 w-40 rounded-lg" />
         <div className="space-y-3">

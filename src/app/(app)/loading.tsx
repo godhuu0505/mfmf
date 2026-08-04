@@ -1,17 +1,11 @@
 // ルート遷移中のフォールバック表示（一覧のスケルトン）。
 // 体感速度を上げるため、実レイアウトに近い骨組みを表示する。
+// ヘッダー/タブバーは (app)/layout.tsx が持ち続けるので、ここでは描かない
+// （骨組みに含めると遷移中だけヘッダーが二重になる）。
 export default function Loading() {
   return (
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">読み込み中</span>
-      {/* ヘッダー風のバー */}
-      <div className="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
-        <div className="safe-px mx-auto flex max-w-2xl items-center justify-between py-3">
-          <div className="skeleton h-7 w-24 rounded-lg" />
-          <div className="skeleton h-5 w-28 rounded-lg" />
-        </div>
-      </div>
-
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
           <div className="skeleton h-6 w-28 rounded-lg" />

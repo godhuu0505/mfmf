@@ -104,6 +104,9 @@ jobs:
   e2e:
     name: E2E + VRT (Playwright)
     runs-on: ubuntu-latest
+    # UI キャプチャを PR ブランチへコミットするため（下の Commit UI screenshots）
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -165,6 +168,34 @@ jobs:
           path: test-results/screenshots/
           retention-days: 7
           if-no-files-found: ignore
+
+      # UI に触れる同一リポジトリ PR では、キャプチャを PR ブランチへ自動コミットする
+      # （CLAUDE.md「Git / PR」のキャプチャ添付運用。アーティファクトの実体ホストへ
+      # 到達できない開発環境でも取得できるように、ランナー上で完結させる）。
+      # [skip ci] 付きなのでこのコミットで CI は再実行されない。
+      - name: Commit UI screenshots to PR branch
+        if: >-
+          success() && github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git fetch origin "${{ github.base_ref }}" "${{ github.head_ref }}"
+          if ! git diff --name-only "origin/${{ github.base_ref }}...origin/${{ github.head_ref }}" \
+            | grep -qE '^(src/|public/)'; then
+            echo "UI に触れない PR のためスキップ"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "${{ github.head_ref }}" "origin/${{ github.head_ref }}"
+          mkdir -p docs/screenshots/app-redesign
+          cp test-results/screenshots/*.png docs/screenshots/app-redesign/
+          git add docs/screenshots/app-redesign
+          if git diff --cached --quiet; then
+            echo "キャプチャに変化なし"
+            exit 0
+          fi
+          git commit -m "docs: UI キャプチャを更新（CI zz-screenshots）[skip ci]"
+          git push origin "HEAD:${{ github.head_ref }}"
 
       - name: Stop Supabase
         if: always()
