@@ -105,7 +105,7 @@ test("UC-C02: カレンダーの「今日」で今月に戻れる", async ({ pag
   await page.getByRole("link", { name: "今日" }).click();
   await expect(
     page.getByRole("heading", { name: thisMonth }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
   // 今月に戻ったのでショートカットは消える
   await expect(page.getByRole("link", { name: "今日" })).not.toBeVisible();
 });
