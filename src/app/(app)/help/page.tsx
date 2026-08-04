@@ -6,6 +6,7 @@ import {
   CircleHelp,
   House,
   Images,
+  Menu as MenuIcon,
   MessageCircle,
   PawPrint,
   School,
@@ -94,23 +95,33 @@ export default async function HelpPage() {
               作られています。
             </p>
             <p className={pClass}>
-              画面上部のヘッダーから、ギャラリー
-              <Images className={inlineIcon} aria-hidden="true" /> / カレンダー
-              <CalendarDays className={inlineIcon} aria-hidden="true" /> / ペット
-              <PawPrint className={inlineIcon} aria-hidden="true" /> / ヘルプ
-              <CircleHelp className={inlineIcon} aria-hidden="true" /> / 設定
-              <Settings className={inlineIcon} aria-hidden="true" /> に移動できます。
+              画面下のタブバーから、ホーム
+              <House className={inlineIcon} aria-hidden="true" /> / カレンダー
+              <CalendarDays className={inlineIcon} aria-hidden="true" /> / アルバム
+              <Images className={inlineIcon} aria-hidden="true" /> / メニュー
+              <MenuIcon className={inlineIcon} aria-hidden="true" /> に移動できます。
+              中央のオレンジの「＋」がクイック記録です。ペット
+              <PawPrint className={inlineIcon} aria-hidden="true" /> / 体重 / 設定
+              <Settings className={inlineIcon} aria-hidden="true" /> / ヘルプ
+              <CircleHelp className={inlineIcon} aria-hidden="true" />{" "}
+              はメニューの中にあります。
             </p>
           </section>
 
           <section id="records" className={sectionClass}>
             <h2 className={h2Class}>記録を追加する</h2>
             <p className={pClass}>
-              一覧画面の「＋ 新規」ボタン、または{" "}
+              タブバー中央の「＋」を押すと<strong>クイック記録</strong>が開きます。
+              「ごはん完食」「さんぽ」などのチップを選ぶだけで、文字入力なしで
+              その日の記録を 1 件残せます。
+            </p>
+            <p className={pClass}>
+              写真を付けたり日付・体重まで書きたいときは、クイック記録の
+              「写真つきでくわしく記録する →」から記録フォーム（
               <Link href="/records/new" className={inlineLink}>
                 /records/new
-              </Link>{" "}
-              から追加できます。
+              </Link>
+              ）に進みます（選んだチップは引き継がれます）。
             </p>
             <ul className={ulClass}>
               <li>
@@ -138,7 +149,9 @@ export default async function HelpPage() {
               </li>
             </ul>
             <p className={pClass}>
-              作成した記録は一覧から開き、右上の「編集」「削除」で変更・削除できます。
+              作成した記録は一覧から開き、詳細画面右上の「…」（その他の操作）から
+              編集・ゲストへの共有・削除ができます。保存やキャンセルの際は
+              確認ダイアログが出るので、書きかけの内容をうっかり失うことはありません。
             </p>
           </section>
 
@@ -205,9 +218,12 @@ export default async function HelpPage() {
             <h2 className={h2Class}>困ったとき</h2>
             <ul className={ulClass}>
               <li>
-                画面の右下にある「
+                <Link href="/menu" className={inlineLink}>
+                  メニュー
+                </Link>
+                の「
                 <MessageCircle className={inlineIcon} aria-hidden="true" />{" "}
-                ご意見・不具合」ボタンから、不具合や要望を送れます。
+                ご意見・不具合」から、不具合や要望を送れます。
                 内容はアプリの管理者にだけ届きます。
               </li>
               <li>
