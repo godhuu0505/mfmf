@@ -209,9 +209,11 @@ jobs:
           else
             git checkout -B screenshots-work "$HEAD_SHA"
           fi
+          # 改名・削除されたキャプチャが残らないよう、作り直してから今回の分を置く
+          rm -rf docs/screenshots/app-redesign
           mkdir -p docs/screenshots/app-redesign
           cp test-results/screenshots/*.png docs/screenshots/app-redesign/
-          git add docs/screenshots/app-redesign
+          git add -A docs/screenshots/app-redesign
           if git diff --cached --quiet; then
             echo "キャプチャに変化なし"
             exit 0

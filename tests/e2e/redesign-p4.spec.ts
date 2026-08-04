@@ -161,10 +161,12 @@ test("アルバム: 「アルバム」の名称と月見出しのグループで
   await expect(
     page.getByRole("heading", { name: "アルバム", exact: true }),
   ).toBeVisible();
-  const now = new Date();
+  // 記録日はアプリ側で JST 基準（CI ランナーは UTC なので合わせる）
+  const jstToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+  }).format(new Date());
+  const [y, m] = jstToday.split("-").map(Number);
   await expect(
-    page.getByRole("heading", {
-      name: `${now.getFullYear()}年${now.getMonth() + 1}月`,
-    }),
+    page.getByRole("heading", { name: `${y}年${m}月` }),
   ).toBeVisible();
 });

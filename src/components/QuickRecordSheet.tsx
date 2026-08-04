@@ -78,6 +78,18 @@ export default function QuickRecordSheet({
     };
   }, [open]);
 
+  // 他タブでの世帯切替（UC-H08 → HouseholdSyncRefresher の refresh）で
+  // householdId が変わったら、開いていた下書きは破棄して閉じる。見えている
+  // 下書きのまま保存すると、気づかないうちに別世帯へ記録してしまうため。
+  const prevHouseholdRef = useRef(householdId);
+  useEffect(() => {
+    if (prevHouseholdRef.current === householdId) return;
+    prevHouseholdRef.current = householdId;
+    setOpen(false);
+    resetSheet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [householdId]);
+
   // タブバーの中央「＋」（AppTabBar）からのイベントで開く（D33 で FAB を廃止）。
   // 発火元の要素を覚えておき、閉じたらそこへフォーカスを戻す。
   useEffect(() => {

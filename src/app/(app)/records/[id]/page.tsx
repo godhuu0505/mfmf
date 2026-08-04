@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { canEdit, getCurrentMembership, householdScopeFilter } from "@/lib/household";
 import { withSignedUrls } from "@/lib/photos";
@@ -53,8 +53,12 @@ export default async function RecordDetailPage({
   // いずれの経路でも RLS が一次防衛線。写真・タグは親記録経由でスコープされる。
   const membership = await getCurrentMembership(supabase);
   const householdId = membership?.householdId ?? null;
-  // viewer には編集系 UI を出さない（UC-A06）。編集モードの URL 直叩きも閲覧へ倒す。
+  // viewer には編集系 UI を出さない（UC-A06）。編集モードの URL 直叩きは
+  // クエリなしの閲覧 URL へリダイレクトする —— クローム（タブバー/ヘッダー）の
+  // 表示判定は ?edit=1 を見るため、拒否した編集要求の URL のまま閲覧を出すと
+  // ナビゲーションだけ消えてしまう。
   const readOnly = membership !== null && !canEdit(membership.role);
+  if (isEdit && readOnly) redirect(`/records/${id}`);
   const isEditable = isEdit && !readOnly;
 
   let recordQuery = supabase.from("daycare_records").select("*").eq("id", id);

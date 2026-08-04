@@ -94,19 +94,12 @@ export default async function GalleryPage() {
             記録に写真を追加すると、ここにまとまって表示されます。
           </div>
         ) : (
-          <div className="space-y-6">
-            {monthGroups.map((g) => (
-              <section key={g.ym} aria-label={g.label}>
-                <h2 className="mb-2 text-sm font-semibold text-foreground">
-                  {g.label}
-                </h2>
-                <PhotoGallery
-                  images={g.images}
-                  gridClassName="grid grid-cols-3 gap-1.5 sm:grid-cols-4"
-                />
-              </section>
-            ))}
-          </div>
+          // ライトボックスは月をまたいで連続で辿れるよう、単一の PhotoGallery に
+          // groups で渡す（月ごとに分けると境界で往来が途切れる）
+          <PhotoGallery
+            groups={monthGroups.map((g) => ({ label: g.label, images: g.images }))}
+            gridClassName="grid grid-cols-3 gap-1.5 sm:grid-cols-4"
+          />
         )}
       </main>
     </>

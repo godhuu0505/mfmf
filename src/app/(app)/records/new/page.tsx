@@ -50,6 +50,9 @@ export default async function NewRecordPage({
         <h1 className="mb-6 text-xl font-bold text-foreground">記録を追加</h1>
 
         <RecordForm
+          // 他タブで世帯が切り替わったら（layout の refresh 経由で householdId が
+          // 変わる）フォームを作り直し、書きかけの下書きを別世帯へ保存させない
+          key={householdId}
           action={createRecord}
           ownerId={user.id}
           householdId={householdId}
