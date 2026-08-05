@@ -71,7 +71,11 @@ jobs:
 
       - uses: supabase/setup-cli@v2
         with:
-          version: latest
+          # version: latest にすると起動のたびに GitHub API で最新 release を解決し、
+          # ランナー共有 IP の匿名レートリミットに当たって CI が落ちることがある
+          # （認証トークンはアクション側が自前の env で上書きするため渡せない）。
+          # バージョンは固定し、上げるときはここを書き換える。
+          version: 2.111.0
 
       - name: Link Supabase project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"

@@ -111,10 +111,15 @@ CSS は Tailwind CLI に `@source` でその HTML を渡して生成し、本番
 - PR は lint / typecheck / build の CI（`.github/workflows/ci.yml`）を通す。
 - **UI に変更が入る PR には、変更後のスクリーンショットを必ず貼る**（どの画面がどう変わるかを
   レビュアーが差分コードなしで判断できるように）。キャプチャは CI の E2E が生成する
-  `tests/e2e/zz-screenshots.spec.ts` の出力を CI が `screenshots/<headブランチ>`
-  ブランチへ自動コミットするので、そのコミット SHA の raw URL で PR 本文/コメントから
-  参照する（PR ブランチ自体には積まない。head がチェックなしのコミットになるため）。
+  `tests/e2e/zz-screenshots.spec.ts` の出力を、CI 成功後に `screenshots.yml`
+  （`workflow_run`）が `screenshots/<headブランチ>` ブランチへ自動コミットするので、
+  そのコミット SHA の raw URL で PR 本文/コメントから参照する（PR ブランチ自体には
+  積まない。head がチェックなしのコミットになるため）。
   失敗時の一次情報は `playwright-report` アーティファクト。
+  **`ci.yml` に `contents: write` 等の昇格権限を足さないこと** —— `ci.yml` は
+  `deploy-production.yml` から `workflow_call` で再利用されており、呼び出し側
+  （`contents: read`）より強い権限を要求すると main への push で run が起動できず
+  本番デプロイが止まる。書き込みが要るものは別ワークフローに分ける。
 
 ## DB スキーマ変更
 
