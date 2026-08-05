@@ -22,6 +22,12 @@ test("スクリーンショット一式（ライト）", async ({ page }) => {
   await login(page);
   await shot(page, "home");
 
+  // 検索パネルは既定で畳まれている（UC-H01）ので、開いた状態も撮る ——
+  // 期間の 開始日 / 終了日 はここにしか出ず、畳んだ home だけでは
+  // レビュアーが変更を確認できない
+  await page.getByRole("button", { name: "検索・絞り込み" }).click();
+  await shot(page, "home-filters");
+
   await page.goto("/calendar");
   await shot(page, "calendar");
   // 記録のある日のシート
