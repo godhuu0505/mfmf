@@ -94,8 +94,10 @@ export default async function PetsPage() {
                               className={inputClass}
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
+                          {/* 誕生日（日付入力）が縮まない環境では 2 列に収まらないので、
+                              入らなければ折り返す flex にする（RecordFilters と同じ理由）。 */}
+                          <div className="flex flex-wrap gap-3">
+                            <div className="flex-1 basis-40">
                               <label className={labelClass}>
                                 種類
                                 <span className="ml-1 text-xs font-normal text-muted-foreground">
@@ -110,7 +112,7 @@ export default async function PetsPage() {
                                 className={inputClass}
                               />
                             </div>
-                            <div>
+                            <div className="flex-1 basis-40">
                               <label className={labelClass}>
                                 誕生日
                                 <span className="ml-1 text-xs font-normal text-muted-foreground">

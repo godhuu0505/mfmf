@@ -132,9 +132,12 @@ export default function RecordFilters({
         </select>
       </label>
 
-      {/* 期間 */}
-      <div className="grid grid-cols-2 gap-2">
-        <label className="block">
+      {/* 期間。grid の固定 2 列ではなく「入らなければ折り返す」flex にする ——
+          日付入力が幅指定どおりに縮まない環境（iOS Safari の固有幅。globals.css で
+          解除しているが、下限が残っても列からはみ出して重なることがないように）でも
+          縦積みになるだけで済む。 */}
+      <div className="flex flex-wrap gap-2">
+        <label className="block flex-1 basis-40">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">
             開始日
           </span>
@@ -146,7 +149,7 @@ export default function RecordFilters({
             className="w-full rounded-lg border border-border bg-surface px-2 py-2 text-sm text-foreground focus:border-muted-foreground focus:outline-none"
           />
         </label>
-        <label className="block">
+        <label className="block flex-1 basis-40">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">
             終了日
           </span>

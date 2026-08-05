@@ -141,6 +141,18 @@ body:has([data-app-tabbar]) main {
   }
 }
 
+/* iOS Safari の `input[type="date"]` はネイティブ表示（menulist 系の見た目）を持ち、
+   日付テキスト分の**固有幅を下限**にするため `width: 100%` を指定しても親より小さく
+   ならない。実測（iPhone 16 Pro / 402px 幅）では 1 つ 187px あり、2 列に並べると
+   隣の列へはみ出して入力欄同士が重なった（記録一覧の検索パネルの 開始日 / 終了日）。
+   ネイティブ表示を外して下限を解除する。枠線・背景・余白は各入力の Tailwind クラス
+   側で付けているので、見た目はそのまま。 */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+
 /* キーボード操作時のフォーカスを明確にする（a11y） */
 :focus-visible {
   outline: 2px solid var(--focus-ring);
