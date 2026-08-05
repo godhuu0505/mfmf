@@ -147,6 +147,74 @@ Drive 連携は**土台だけ既にある**。ゼロからではない。
 
 ---
 
+## Google フォトはどうか
+
+「画像なら Drive より Photos では」は自然な発想だが、**2025-03-31 の API 変更で Photos は
+"保管庫" として使えなくなった**。使いどころは変わって、**入口（取り込み）専用**になる。
+
+出典: [Updates to the Google Photos APIs](https://developers.google.com/photos/support/updates) /
+[API limits and quotas](https://developers.google.com/photos/overview/api-limits-quotas) /
+[Authorization scopes](https://developers.google.com/photos/overview/authorization)
+
+### 2025-03-31 に何が変わったか
+
+- `photoslibrary.readonly` / `photoslibrary.sharing` / `photoslibrary` の**3 スコープが廃止**
+- Library API は **アプリが作ったアイテムしか見えない**（`readonly.appcreateddata`）。
+  ユーザーが既に持っている写真はアプリから一切見えない
+- **共有アルバム API は 403** を返す（share / unshare / join / leave / list）。
+  → **世帯で共有アルバムを作る、はもう API でできない**
+- ユーザーのライブラリから選ばせたいときは新しい **Picker API** を使う
+
+### レートリミットが Drive と桁違いに厳しい
+
+| | Google フォト Library API | Google ドライブ API |
+| --- | --- | --- |
+| 一般リクエスト | **10,000 / 日 / プロジェクト** | 1,000,000 units / **分** / プロジェクト |
+| メディアのバイト取得 | **75,000 / 日 / プロジェクト** | 325,000 units / **分** / **ユーザー** |
+| 単位 | **日次・プロジェクト共有** | 分次・ユーザーごとにも枠がある |
+
+**「日次」かつ「プロジェクト共有」**なのが効く。ユーザーが増えても枠は増えない。
+さらに **`baseUrl`（表示 URL）は 60 分で失効**するので、写真を出すたびに
+`mediaItems` の再取得（＝ 10,000/日 の枠を消費）が要る。
+アルバムを開くだけで枠が減っていく構造で、**表示に使うと詰む**。
+
+一方 **Picker API の枠は分次で桁違いに緩い**（一般 100,000/分、バイト取得 1,000,000/分）。
+つまり Google の設計思想として **Photos は「選んで取り込む」ための API** で、
+「置いて読み続ける」ための API ではなくなった。
+
+### OAuth 検証（審査）が要る
+
+現状 mfmf が使っている `drive.file` は**非センシティブ**で、同意画面へのスコープ登録も
+審査も要らない（`docs/guides/google-drive-setup.md` 1-3 に記載のとおり）。
+一方 Photos は「**Google Photos APIs にアクセスするアプリは OAuth 検証をパスする必要がある**」と
+明記されている（[legacy authorization](https://developers.google.com/photos/library/legacy/guides/authorization)）。
+家族向けの ¥0 アプリに審査を通す工程を足すかは、それ自体が判断事項。
+
+> Picker の `photospicker.mediaitems.readonly` が非センシティブ扱いかは**未確認**。
+> `drive.file` と同じ「ユーザーが選んだものだけ」型なので非センシティブの可能性が高いが、
+> 断定できる一次情報が見つからなかった。**Cloud Console の同意画面でスコープを追加すると
+> センシティブか否かが表示される**ので、そこで確かめるのが確実。
+
+### 容量は Drive と同じ枠
+
+2021 年以降、Google フォトの写真も**同じ 15GB の Google アカウント枠**を食う。
+Photos に置いても容量は 1 バイトも得しない。案 B（Drive）に対する優位は無い。
+
+### では Photos の使いどころは
+
+**保管は Drive、体験は Photos** の役割分担にする。
+
+1. **入口（採用したい）**: 記録フォームに「**Google フォトから選ぶ**」（Picker API）。
+   端末のカメラロールに無い写真 —— すでにフォトへ自動バックアップ済みの写真 —— を
+   記録に付けられる。選んだ瞬間にバイトを取り込んで Drive / Supabase に入れるので、
+   **以降フォトを叩き続けることはない**（＝日次クオータを消費し続けない）
+2. **出口（任意・後回し）**: `photoslibrary.appendonly` で「フォトにも追加する」。
+   記録の写真がユーザーのライブラリに入り、思い出・検索・顔グループに乗る。
+   ただし **OAuth 検証が要るのはこれ**。第 1 段では出さない判断もありうる
+3. **表示には使わない**（10,000/日・`baseUrl` 60 分失効のため）
+
+---
+
 ## もう一つの軸: 誰のドライブに入れるか（[D10](../../docs/explanation/phase-3-5-use-cases.md) の未決事項）
 
 ドライブは**個人**のもの、mfmf は**世帯**のもの。ここが最大のねじれで、3 案のどれを選んでも決着が要る。
@@ -183,6 +251,10 @@ Drive 連携は**土台だけ既にある**。ゼロからではない。
 案 C（毎回選ぶ）は既定として採らない。**設定画面での 1 回きりの選択**にすれば、
 案 C が持っていた「自分で決めたい」は満たせる。
 
+**Google フォトは案 B と併存させる**（二者択一ではない）。保管は Drive、
+入口に Picker（「Google フォトから選ぶ」）、出口に `appendonly`（「フォトにも追加」）。
+ただし出口は OAuth 検証が要るので第 2 段以降。
+
 ## 未決事項
 
 - **サムネ生成をどこでやるか**。`imageResize.ts` は既にブラウザで縮小しているので、
@@ -195,3 +267,8 @@ Drive 連携は**土台だけ既にある**。ゼロからではない。
   後から世帯側でドライブへ移すかどうか
 - **アプリ側で写真を削除したとき、ドライブの原本も消すか**。既定は「消さない」を推す
   （ドライブは利用者のものなので、アプリが勝手に消すのは驚きになる）
+- **Picker の `photospicker.mediaitems.readonly` がセンシティブスコープか**（上記）。
+  非センシティブなら「Google フォトから選ぶ」は審査なしで入れられる
+- **Picker で選んだ写真の扱い**。Picker のセッションは一時的なので、選んだ瞬間に
+  バイトを取り込む必要がある。取り込みはブラウザ（`fetch` + Drive へ直アップロード）か
+  サーバー経由か（Vercel の 4.5MB 制限があるのでブラウザ側が本命）

@@ -262,6 +262,9 @@
   .mb-1\.5 {
     margin-bottom: calc(var(--spacing) * 1.5);
   }
+  .mb-2 {
+    margin-bottom: calc(var(--spacing) * 2);
+  }
   .mb-3 {
     margin-bottom: calc(var(--spacing) * 3);
   }
@@ -1354,11 +1357,16 @@ input[type="date"] {
       </div>
       <div class="mt-4">
         <span class="mb-1 block text-sm font-medium text-foreground">写真を追加（複数選択可）</span>
+        <div class="mb-2 grid grid-cols-2 gap-2">
+          <button type="button" class="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">端末から選ぶ</button>
+          <button type="button" class="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">Google フォトから選ぶ</button>
+        </div>
         <div class="grid grid-cols-3 gap-2">
           ${photoBox("🐕")}${photoBox("🌳")}
           <div class="flex aspect-square items-center justify-center rounded-lg border border-dashed border-border text-2xl text-muted-foreground">＋</div>
         </div>
         <p class="mt-1.5 text-xs text-muted-foreground">2枚を最適化しました（4.8 MB → 640 KB / -87%）</p>
+        ${note("「Google フォトから選ぶ」= Picker API。端末に無い写真（すでにフォトへバックアップ済みの写真）を記録に付けられる。選んだ瞬間にアプリ側へ取り込むので、以降フォトを叩き続けることはない。")}
         ${destination}
       </div>
       <div class="mt-4">
@@ -1448,6 +1456,19 @@ input[type="date"] {
         ${progress}
       `)}
       ${card(scope, "mt-3")}
+      ${card(
+        `<div class="flex items-center justify-between gap-3">
+           <p class="text-sm font-medium text-foreground">Google フォトにも追加する</p>
+           <input type="checkbox" class="h-5 w-9 rounded-full border-border" />
+         </div>
+         <p class="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+           オンにすると、記録に付けた写真がフォトのライブラリにも入ります（思い出・検索に乗る）。
+           <strong class="font-medium text-foreground">表示には使いません</strong> ——
+           フォトの Library API は 10,000 リクエスト/日（プロジェクト全体）で、表示 URL も 60 分で失効するため。
+         </p>
+         ${note("⚠️ このトグルを入れると OAuth 検証（審査）が必要になります。drive.file だけなら不要。第 1 段では出さない案もあります。")}`,
+        "mt-3",
+      )}
       ${card(
         `<p class="text-sm font-medium text-foreground">連携を解除すると</p>
          <ul class="mt-2 space-y-1 text-xs leading-relaxed text-muted-foreground">
