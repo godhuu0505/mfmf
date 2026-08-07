@@ -22,6 +22,7 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [guides/verify-backend.md](./guides/verify-backend.md) — デプロイ済みアプリと Supabase バックエンドの動作確認。
 - [guides/feedback-to-issues.md](./guides/feedback-to-issues.md) — ご意見・不具合フォームの内容を非公開リポへ Issue 化する運用。
 - [guides/sentry.md](./guides/sentry.md) — Sentry でエラーモニタリング / Web Vitals の p75 を有効化する（任意）。
+- [guides/field-research-kit.md](./guides/field-research-kit.md) — 事業のペイン仮説を実測に変えるための調査手順（質問票・記録シート・撤退基準）。
 
 ## リファレンス（reference/）
 
@@ -35,6 +36,10 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [explanation/prototype-first.md](./explanation/prototype-first.md) — 新機能の画面を静的プロトタイプ＋Artifact で決める理由（2026-07-30 に実コード案から方針転換した経緯と実測データ）。
 - [explanation/roadmap.md](./explanation/roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
 - [explanation/phase-3-5-use-cases.md](./explanation/phase-3-5-use-cases.md) — Phase 3.5（家族・権限・サインアップ・共有）のユースケース・バックログ（受け入れ条件・決定ログ・未決事項）。
+- [explanation/business-strategy.md](./explanation/business-strategy.md) — 事業戦略（ユーザー獲得・収益モデル・法規制ゲート・デバイス構想）。
+- [explanation/market-analysis.md](./explanation/market-analysis.md) — 日本市場のマーケティング分析（3C・5F・SWOT・バリューチェーン・KSF・自己批判）。
+- [explanation/strategy-zero-based.md](./explanation/strategy-zero-based.md) — アプリを前提にしないゼロベース再検討（事業形態の選択・KSF の再特定・90日の検証設計）。
+- [explanation/pet-market-research.md](./explanation/pet-market-research.md) — ペット市場の分解・再統合と、飼い主／ブリーダー／ペット自身のペイン仮説18本（出典つき）。
 
 ## アーカイブ（archive/）
 
