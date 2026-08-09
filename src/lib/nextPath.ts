@@ -28,3 +28,9 @@ export function sanitizeNextPath(
   if (/[\u0000-\u001f\u007f]/.test(raw)) return fallback;
   return raw;
 }
+
+// 認証まわりの画面同士（/login ↔ /signup ↔ /forgot-password）のリンクに戻り先を
+// 引き継ぐ。どれか 1 本でも落とすと、そこを経由した人だけ招待に戻れなくなる。
+export function withNext(path: string, next: string): string {
+  return next === "/" ? path : `${path}?next=${encodeURIComponent(next)}`;
+}

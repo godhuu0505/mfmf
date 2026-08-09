@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeNextPath } from "@/lib/nextPath";
+import { sanitizeNextPath, withNext } from "@/lib/nextPath";
 
 describe("sanitizeNextPath", () => {
   it("サイト内の絶対パスはそのまま通す（招待リンクの deep link）", () => {
@@ -25,5 +25,20 @@ describe("sanitizeNextPath", () => {
   it("制御文字入りのパスは弾く", () => {
     expect(sanitizeNextPath("/\n/evil.example")).toBe("/");
     expect(sanitizeNextPath("/\t/evil.example")).toBe("/");
+  });
+});
+
+describe("withNext", () => {
+  it("戻り先が無いときはパスをそのまま返す", () => {
+    expect(withNext("/login", "/")).toBe("/login");
+  });
+
+  it("戻り先をクエリに載せる（エンコードする）", () => {
+    expect(withNext("/login", "/invite/abc123")).toBe(
+      "/login?next=%2Finvite%2Fabc123",
+    );
+    expect(withNext("/signup", "/records/1?edit=1")).toBe(
+      "/signup?next=%2Frecords%2F1%3Fedit%3D1",
+    );
   });
 });

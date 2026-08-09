@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { sanitizeNextPath } from "@/lib/nextPath";
+import { sanitizeNextPath, withNext } from "@/lib/nextPath";
 
 // Drive 連携のため drive.file スコープを要求する。
 // drive.file は「アプリが作成・選択したファイルのみ」アクセスでき、
@@ -170,11 +170,7 @@ export default function LoginForm({ signupEnabled }: Props) {
       <div className="space-y-1 text-center text-xs">
         <p>
           <Link
-            href={
-              next === "/"
-                ? "/forgot-password"
-                : `/forgot-password?next=${encodeURIComponent(next)}`
-            }
+            href={withNext("/forgot-password", next)}
             className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
             パスワードをお忘れの方
@@ -184,9 +180,7 @@ export default function LoginForm({ signupEnabled }: Props) {
           <p className="text-muted-foreground">
             アカウントをお持ちでない方は{" "}
             <Link
-              href={
-                next === "/" ? "/signup" : `/signup?next=${encodeURIComponent(next)}`
-              }
+              href={withNext("/signup", next)}
               className="font-medium text-foreground underline-offset-2 hover:underline"
             >
               新規登録

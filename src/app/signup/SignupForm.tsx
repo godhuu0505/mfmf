@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { sanitizeNextPath } from "@/lib/nextPath";
+import { sanitizeNextPath, withNext } from "@/lib/nextPath";
 import { keepPostLoginNext } from "@/lib/keepPostLoginNext";
 
 const inputClass =
@@ -30,6 +30,14 @@ export default function SignupForm() {
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [agreed, setAgreed] = useState(false);
+  // 招待リンク等からの戻り先。登録時に貼り直すほか、ログイン導線にも引き継ぐ。
+  const [next, setNext] = useState("/");
+
+  useEffect(() => {
+    setNext(
+      sanitizeNextPath(new URLSearchParams(window.location.search).get("next")),
+    );
+  }, []);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,9 +63,6 @@ export default function SignupForm() {
 
     // 招待リンクから来た場合の戻り先を貼り直す（確認メールの往復に耐えるように。
     // 寿命の起点を「登録した時刻」にして確認リンクの有効期限と揃える）。
-    const next = sanitizeNextPath(
-      new URLSearchParams(window.location.search).get("next"),
-    );
     await keepPostLoginNext(next);
 
     const supabase = createClient();
@@ -208,7 +213,7 @@ export default function SignupForm() {
       <p className="text-center text-xs text-muted-foreground">
         すでにアカウントをお持ちの方は{" "}
         <Link
-          href="/login"
+          href={withNext("/login", next)}
           className="font-medium text-foreground underline-offset-2 hover:underline"
         >
           ログイン

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { sanitizeNextPath } from "@/lib/nextPath";
+import { sanitizeNextPath, withNext } from "@/lib/nextPath";
 import { keepPostLoginNext } from "@/lib/keepPostLoginNext";
 
 const inputClass =
@@ -92,11 +92,7 @@ export default function ForgotPasswordPage() {
 
           <p className="text-center text-xs">
             <Link
-              href={
-                next === "/"
-                  ? "/login"
-                  : `/login?next=${encodeURIComponent(next)}`
-              }
+              href={withNext("/login", next)}
               className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
             >
               ログインへ戻る
