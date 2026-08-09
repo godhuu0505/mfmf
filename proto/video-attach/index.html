@@ -1421,8 +1421,17 @@ input[type="date"] {
   // 写真は本番と同じ方針（長辺1600px / JPEG q0.8）で実際に縮小する。
   // 表示するサイズが実測値になるので、合計サイズの体感がぶれない。
   async function resizePhoto(file) {
-    // 本番と同じく GIF / SVG は触らない（キャンバスに載せると GIF がコマ止めになる）
-    if (file.type === "image/gif" || file.type === "image/svg+xml") {
+    // 本番と同じく GIF / SVG は触らない（キャンバスに載せると GIF がコマ止めになる）。
+    // type が空のまま拡張子で受け入れた経路があるので、拡張子でも見る。
+    if (
+      file.type === "image/gif" ||
+      file.type === "image/svg+xml" ||
+      /\.(gif|svg)$/i.test(file.name)
+    ) {
+      return { size: file.size, url: URL.createObjectURL(file) };
+    }
+    // 本番の resizeImage() と同じく、API が無い環境では元ファイルのまま通す
+    if (typeof createImageBitmap !== "function") {
       return { size: file.size, url: URL.createObjectURL(file) };
     }
     const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => null);
@@ -1589,6 +1598,9 @@ input[type="date"] {
     playingId = null;
   }
 
+  const playerNote = (item) =>
+    `${item.name} ・ ${fmtDur(item.duration)} ・ ${fmtBytes(item.after ?? item.size)}`;
+
   function renderDetail(ready) {
     const grid = $("[data-detail-grid]");
     $("[data-detail-empty]").hidden = ready.length > 0;
@@ -1615,6 +1627,13 @@ input[type="date"] {
         ? "写真・動画"
         : `写真・動画（写真${ready.filter((i) => i.kind === "photo").length}枚 / 動画${ready.filter((i) => i.kind === "video").length}本）`;
 
+    // 画質を変えると見積もりサイズが変わる。開いたままのプレーヤーの表示も追従させる
+    // （720p / 1080p を比べている最中に古い値が残ると比較にならない）。
+    if (playingId != null) {
+      const cur = ready.find((i) => i.id === playingId);
+      if (cur) $("[data-detail-note]").textContent = playerNote(cur);
+    }
+
     $$("[data-open]", grid).forEach((b) =>
       b.addEventListener("click", () => {
         const item = ready.find((i) => i.id === Number(b.dataset.open));
@@ -1622,8 +1641,7 @@ input[type="date"] {
         const v = $("[data-detail-video]");
         v.src = item.url;
         $("[data-detail-player]").hidden = false;
-        $("[data-detail-note]").textContent =
-          `${item.name} ・ ${fmtDur(item.duration)} ・ ${fmtBytes(item.after ?? item.size)}`;
+        $("[data-detail-note]").textContent = playerNote(item);
         playingId = item.id;
         v.play().catch(() => {});
       }),
