@@ -40,9 +40,15 @@ export default function LoginForm({ signupEnabled }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // コールバックから ?error=... で戻ってきた場合のメッセージ表示
+  // 招待リンク等からの戻り先。パスワード再設定へ回る場合も落とさないよう、
+  // /forgot-password のリンクにも引き継ぐ（SSR では window を読めないので effect で）。
+  const [next, setNext] = useState("/");
+
+  // マウント時に URL から戻り先と、コールバックからの ?error=... を読む。
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get("error");
+    const params = new URLSearchParams(window.location.search);
+    setNext(sanitizeNextPath(params.get("next")));
+    const code = params.get("error");
     if (code) {
       setError(ERROR_MESSAGES[code] ?? ERROR_MESSAGES.oauth);
     }
@@ -164,7 +170,11 @@ export default function LoginForm({ signupEnabled }: Props) {
       <div className="space-y-1 text-center text-xs">
         <p>
           <Link
-            href="/forgot-password"
+            href={
+              next === "/"
+                ? "/forgot-password"
+                : `/forgot-password?next=${encodeURIComponent(next)}`
+            }
             className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
             パスワードをお忘れの方

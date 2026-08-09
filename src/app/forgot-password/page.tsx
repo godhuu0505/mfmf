@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { refreshPostLoginNext } from "@/app/forgot-password/actions";
 
 const inputClass =
   "w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground";
@@ -17,6 +18,11 @@ export default function ForgotPasswordPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+
+    // 招待リンクなどの戻り先はここで貼り直す（メールの往復に耐えるように）。
+    await refreshPostLoginNext(
+      new URLSearchParams(window.location.search).get("next") ?? "/",
+    );
 
     const supabase = createClient();
     // 再設定リンク → /auth/callback で code をセッションへ交換 → /reset-password。
