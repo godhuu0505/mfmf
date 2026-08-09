@@ -502,6 +502,9 @@
   .grid-cols-7 {
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }
+  .grid-cols-\[3rem_repeat\(7\,1fr\)\] {
+    grid-template-columns: 3rem repeat(7,1fr);
+  }
   .flex-col {
     flex-direction: column;
   }

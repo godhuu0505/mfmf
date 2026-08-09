@@ -507,6 +507,9 @@
   .grid-cols-7 {
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }
+  .grid-cols-\[3rem_repeat\(7\,1fr\)\] {
+    grid-template-columns: 3rem repeat(7,1fr);
+  }
   .flex-col {
     flex-direction: column;
   }
@@ -1494,12 +1497,12 @@ input[type="date"] {
         <div id="assignBoard" class="hidden safe-px mb-3 space-y-2"></div>
         <div class="overflow-x-auto">
           <div class="min-w-[46rem] px-1">
-            <div id="weekHead" class="grid border-b border-border bg-background" style="grid-template-columns: 3rem repeat(7, 1fr)"></div>
-            <div id="allDayBand" class="grid border-b border-border" style="grid-template-columns: 3rem repeat(7, 1fr)"></div>
+            <div id="weekHead" class="grid grid-cols-[3rem_repeat(7,1fr)] border-b border-border bg-background"></div>
+            <div id="allDayBand" class="grid grid-cols-[3rem_repeat(7,1fr)] border-b border-border"></div>
             <!-- 見出しを残したまま時間軸だけ縦に送る（sticky は overflow-x-auto の
                  中では効かず、スクロールすると曜日が消えてしまう） -->
             <div class="max-h-[58dvh] overflow-y-auto pt-2">
-              <div id="timeGrid" class="relative grid" style="grid-template-columns: 3rem repeat(7, 1fr)"></div>
+              <div id="timeGrid" class="relative grid grid-cols-[3rem_repeat(7,1fr)]"></div>
             </div>
           </div>
         </div>
@@ -1807,9 +1810,14 @@ const min = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 const dayNum = (d) => Number(d.slice(8, 10));
 
 function versionsOf(w) { return RULES[w] || []; }
-function latestRule(w) {
+// 直近の版。type が null のものは「ここから先はルールなし」の墓標
+function latestVersion(w) {
   const v = versionsOf(w);
   return v.length ? v[v.length - 1] : null;
+}
+function latestRule(w) {
+  const r = latestVersion(w);
+  return r && r.type ? r : null;
 }
 // その日に効く版 = since がその日以前で、いちばん新しいもの
 function ruleFor(d) {
@@ -1818,7 +1826,7 @@ function ruleFor(d) {
     if (r.since && d < r.since) continue;
     if (!best || (r.since || "") >= (best.since || "")) best = r;
   }
-  return best;
+  return best && best.type ? best : null;
 }
 function putRuleVersion(w, r) {
   const list = RULES[w] || (RULES[w] = []);
@@ -2585,28 +2593,31 @@ function renderRules() {
 }
 function cycleRule(w) {
   const cycle = [...TYPES.map((t) => t.id), null];
-  const cur = latestRule(w);
-  const next = cycle[(cycle.indexOf(cur ? cur.type : null) + 1) % cycle.length];
+  const lv = latestVersion(w);
+  const next = cycle[(cycle.indexOf(lv ? lv.type : null) + 1) % cycle.length];
   if (next === null) {
-    // 「なし」はこの曜日のルールを全部外す（ユーザーの明示操作なので過去の版も畳む）
-    delete RULES[w];
+    if (!lv) return;
+    // 版ごと消すと since より前の日のルールまで巻き添えになるので、
+    // 「ここから先はなし」を日付つきの墓標として積む
+    const since = [TODAY, lv.since || ""].sort().pop();
+    putRuleVersion(w, { type: null, since });
     render();
-    toast("この曜日のルールを外しました");
+    toast("今日以降、この曜日のルールを外しました");
     return;
   }
   const t = type(next);
   const keep = {};
-  for (const [k] of t.roles) if (cur?.who?.[k]) keep[k] = cur.who[k];
+  for (const [k] of t.roles) if (lv?.who?.[k]) keep[k] = lv.who[k];
   // 時刻は「触ったかどうか」を旗で持つ。既定値との一致で推測すると、
   // たまたま別の種類の既定と同じ時刻にしたときに勝手に上書きされる
   const r = {
     type: next, who: keep,
-    start: cur && cur.timeDirty ? cur.start : t.start,
-    end: cur && cur.timeDirty ? cur.end : t.end,
-    since: cur?.since,
-    timeDirty: !!(cur && cur.timeDirty),
+    start: lv && lv.timeDirty ? lv.start : t.start,
+    end: lv && lv.timeDirty ? lv.end : t.end,
+    since: lv?.since,
+    timeDirty: !!(lv && lv.timeDirty),
   };
-  if (cur) RULES[w][RULES[w].length - 1] = r; else putRuleVersion(w, r);
+  if (lv) RULES[w][RULES[w].length - 1] = r; else putRuleVersion(w, r);
   render();
 }
 function cycleWho(w, key) {
