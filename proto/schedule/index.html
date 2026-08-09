@@ -1502,21 +1502,21 @@ input[type="date"] {
           <h1 class="text-base font-bold">2026年8月</h1>
           <span class="px-2 py-1 text-sm text-muted-foreground/40" aria-hidden="true">9月 ›</span>
         </div>
-        <div class="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1 text-sm">
-          <button type="button" id="tabMonth" onclick="setCalView('month')" class="rounded-lg py-1.5 font-medium transition">月</button>
-          <button type="button" id="tabWeek" onclick="setCalView('week')" class="rounded-lg py-1.5 font-medium transition">週</button>
+        <div role="tablist" aria-label="カレンダーの表示" class="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1 text-sm">
+          <button type="button" id="tabMonth" role="tab" aria-controls="calMonth" onclick="setCalView('month')" class="rounded-lg py-1.5 font-medium transition">月</button>
+          <button type="button" id="tabWeek" role="tab" aria-controls="calWeek" onclick="setCalView('week')" class="rounded-lg py-1.5 font-medium transition">週</button>
         </div>
       </div>
 
       <!-- 月表示（Google カレンダー風のチップ） -->
-      <div id="calMonth" class="safe-px">
+      <div id="calMonth" role="tabpanel" aria-labelledby="tabMonth" class="safe-px">
         <div class="grid grid-cols-7 text-center" id="monthHead"></div>
         <div class="grid grid-cols-7 overflow-hidden rounded-xl border border-border" id="monthGrid"></div>
         <p id="legend" class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"></p>
       </div>
 
       <!-- 週表示（時間割） -->
-      <div id="calWeek" class="hidden">
+      <div id="calWeek" role="tabpanel" aria-labelledby="tabWeek" class="hidden">
         <div class="safe-px mb-2 flex items-center justify-between text-xs text-muted-foreground">
           <span>8/9（日）〜 8/15（土）</span>
           <button type="button" onclick="toggleAssignBoard()" id="assignToggle" class="rounded-lg border border-border px-2.5 py-1.5 font-medium text-foreground transition hover:bg-surface-muted">担当をまとめて決める</button>
@@ -2495,6 +2495,25 @@ function renderSheet() {
     h += `</div>`;
   }
 
+  // その日のほかの行。月セルが記録だけの日でも、タップした記録へ辿り着けるように
+  // （予定エディタは planOn の 1 件しか扱わないので、ここが唯一の入口になる）
+  const others = itemsOn(d).filter((x) => x.id !== (p && p.id));
+  if (others.length) {
+    h += `<section class="space-y-2 border-t border-border pt-4">
+      <h3 class="text-xs font-bold text-muted-foreground">この日のほかの記録・予定</h3>
+      ${others.map((x) => {
+        const t2 = type(x.type);
+        return `<button type="button" onclick="openDay('${d}','${x.id}')"
+          class="flex w-full items-center gap-2 rounded-xl bg-surface-muted px-3 py-2.5 text-left text-sm transition hover:bg-muted">
+          <span class="shrink-0">${t2.emoji}</span>
+          <span class="w-20 shrink-0 text-xs tabular-nums text-muted-foreground">${x.untimed ? "時刻なし" : `${x.start}〜${x.end}`}</span>
+          <span class="min-w-0 flex-1 truncate">${esc(x.body) || t2.label}</span>
+          ${statusBadge(x.status)}
+        </button>`;
+      }).join("")}
+    </section>`;
+  }
+
   $("sheetBody").innerHTML = h;
 }
 function draft() {
@@ -3007,6 +3026,8 @@ function render() {
   renderTabs();
   $("tabMonth").className = "rounded-lg py-1.5 font-medium transition " + (calView === "month" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground");
   $("tabWeek").className = "rounded-lg py-1.5 font-medium transition " + (calView === "week" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground");
+  $("tabMonth").setAttribute("aria-selected", String(calView === "month"));
+  $("tabWeek").setAttribute("aria-selected", String(calView === "week"));
   $("calMonth").classList.toggle("hidden", calView !== "month");
   $("calWeek").classList.toggle("hidden", calView !== "week");
   renderMonth();
