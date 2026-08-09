@@ -120,6 +120,11 @@ mfmf は今、**起きたこと（記録）**しか持っていない。ここ�
 - 2026-08-09（日）を「今日」とした 2026 年 8 月**のみ**（月の移動はモックしていない）
 - 週表示は 8/9（日）〜8/15（土）固定
 - `fetch` なし。データは JS の固定配列（`ITEMS` / `RULES` / `MEMBERS`）
+- 週の時間割のブロックだけ `style` に座標（`top` / `height` / `left` / `width`）を持つ。
+  これはデータから計算する値でクラスにできず、本番でも React の `style={{ top }}` になる
+  ——「見た目を決める inline style は書かない」の例外として
+  [`prototype` skill](../../.claude/skills/prototype/SKILL.md) に明記した。
+  色・余白・角丸などはすべて Tailwind クラス
 - アイコンは lucide の同じ形を SVG で直書き（実装時は `lucide-react` に戻す）
 - **このファイルに `<!doctype html>` は書かない。** Artifact が publish 時に
   `<!doctype html><head>…</head><body>` で包むため、こちら側に書くと重複する

@@ -1292,6 +1292,36 @@ input[type="date"] {
     scroll-behavior: auto !important;
   }
 }
+:root[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+}
+:root[data-theme="dark"] {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --surface: #111827;
+  --surface-muted: #1f2937;
+  --border-color: #334155;
+  --muted: #475569;
+  --muted-foreground: #94a3b8;
+  --primary: #fb923c;
+  --primary-hover: #fdba74;
+  --primary-foreground: #431407;
+  --skeleton-base: #1f2937;
+  --skeleton-shine: rgba(71, 85, 105, 0.6);
+  --focus-ring: #fb923c;
+}
 @property --tw-translate-x {
   syntax: "*";
   inherits: false;

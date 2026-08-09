@@ -49,7 +49,13 @@ proto/<slug>/
 
 **本番と同じ Tailwind クラス名を使うこと。** これが効くのは、
 実装時のマークアップ移植が `class` → `className` の機械変換で済むからです。
-独自のクラス名や inline style を使うと、その利点が消えます。
+独自のクラス名や、見た目を決める inline style（色・余白・角丸など）を使うと、
+その利点が消えます。
+
+例外は**データから計算する座標**（時間割のブロックの `top` / `height` など）。
+これはクラスで表せず、本番でも React の `style={{ top }}` になるので、
+`style` に置いても移植性は落ちません。逆に言うと、`style` に書いてよいのは
+「実装でも `style` になるもの」だけです。
 
 データは JS の固定配列でモックする。API は呼ばない（`fetch` を書かない）。
 0 件・1 件・200 件のように**極端な状態を切り替えられる**ようにしておくと、
@@ -76,6 +82,10 @@ EOF
 # globals.css の @source not 行より後ろ（トークン・ダークモード・セーフエリア等）を全部取り込む。
 # 行番号指定（sed -n '3,50p'）は globals.css が伸びると黙って途中で切れるので使わない（一度踏んだ）。
 sed '1,/^@source not/d' src/app/globals.css >> .proto-tmp.css
+# globals.css の明暗トークンは prefers-color-scheme にしか無い。Artifact のテーマ
+# 切替（:root[data-theme]）にも同じ値を配らないと、トークンと dark: の片方だけが
+# 切り替わって配色が混ざる。
+node scripts/proto-theme-tokens.mjs >> .proto-tmp.css
 npx @tailwindcss/cli -i .proto-tmp.css -o proto/<slug>/proto.css
 rm .proto-tmp.css
 ```
@@ -160,7 +170,8 @@ UC: 保育園から帰ったあと、ごはんの記録を 3 タップで残す
 - **プロトに認証・認可を実装する** —— 確認したいのは画面であって認可ではない
 - **プロトのために本体コードを触る** —— 触ったら、それは実装であってプロトではない
 - **プロトを綺麗に書く** —— 捨てる前提ではないが、育てる前提でもない。合意に必要な分だけ
-- **独自のクラス名や inline style を使う** —— 実装時の移植性が消える
+- **独自のクラス名や、見た目を決める inline style を使う** —— 実装時の移植性が消える
+  （データから計算する座標だけは例外。上記「本番と同じ Tailwind クラス名を使うこと」）
 
 ## 背景・根拠
 

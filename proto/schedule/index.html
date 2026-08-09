@@ -1297,6 +1297,36 @@ input[type="date"] {
     scroll-behavior: auto !important;
   }
 }
+:root[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+}
+:root[data-theme="dark"] {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --surface: #111827;
+  --surface-muted: #1f2937;
+  --border-color: #334155;
+  --muted: #475569;
+  --muted-foreground: #94a3b8;
+  --primary: #fb923c;
+  --primary-hover: #fdba74;
+  --primary-foreground: #431407;
+  --skeleton-base: #1f2937;
+  --skeleton-shine: rgba(71, 85, 105, 0.6);
+  --focus-ring: #fb923c;
+}
 @property --tw-translate-x {
   syntax: "*";
   inherits: false;
@@ -1505,23 +1535,6 @@ input[type="date"] {
 }
 </style>
 <!-- proto.css:end -->
-<style>
-  /* プロト専用。本番のトークンは prefers-color-scheme だけを見るが、Artifact の
-     ビューアは明暗を data-theme で明示することがあるため、そこにも同じ値を配る。
-     実装時にこのブロックは持ち込まない（本番はシステム設定に追従する）。 */
-  :root[data-theme="light"] {
-    --background: #f8fafc; --foreground: #0f172a; --surface: #ffffff;
-    --surface-muted: #f1f5f9; --border-color: #e2e8f0; --muted: #cbd5e1;
-    --muted-foreground: #475569; --primary: #c2410c; --primary-hover: #9a3412;
-    --primary-foreground: #ffffff; --focus-ring: #c2410c;
-  }
-  :root[data-theme="dark"] {
-    --background: #0b1220; --foreground: #e2e8f0; --surface: #111827;
-    --surface-muted: #1f2937; --border-color: #334155; --muted: #475569;
-    --muted-foreground: #94a3b8; --primary: #fb923c; --primary-hover: #fdba74;
-    --primary-foreground: #431407; --focus-ring: #fb923c;
-  }
-</style>
 
 <div class="min-h-dvh bg-background text-foreground">
   <header data-proto-bg class="sticky top-0 z-30 safe-pt border-b border-border bg-surface/90 backdrop-blur">
@@ -2637,12 +2650,14 @@ function renderSheet() {
       <p class="mb-2 text-xs font-bold text-muted-foreground">時間</p>
       <div class="flex items-center gap-2">
         <input type="time" id="start" ${ro ? "disabled" : ""} value="${p.start}" onchange="setTime('start', this.value)"
-          aria-label="開始時刻" class="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm tabular-nums" />
+          aria-label="開始時刻" aria-describedby="timeError" aria-invalid="${!!timeProblem(p)}"
+          class="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm tabular-nums" />
         <span class="shrink-0 text-sm text-muted-foreground">〜</span>
         <input type="time" id="end" ${ro ? "disabled" : ""} value="${p.end}" onchange="setTime('end', this.value)"
-          aria-label="終了時刻" class="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm tabular-nums" />
+          aria-label="終了時刻" aria-describedby="timeError" aria-invalid="${!!timeProblem(p)}"
+          class="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm tabular-nums" />
       </div>
-      <p id="timeError" class="mt-1 text-xs text-rose-600 ${timeProblem(p) ? "" : "hidden"}">${esc(timeProblem(p) || "終了は開始より後にしてください")}</p>
+      <p id="timeError" role="alert" class="mt-1 text-xs text-rose-600 ${timeProblem(p) ? "" : "hidden"}">${esc(timeProblem(p) || "終了は開始より後にしてください")}</p>
     </div>`;
   }
 
@@ -2776,6 +2791,8 @@ function showTimeProblem(p) {
   const el = $("timeError");
   if (bad) el.textContent = bad;
   el.classList.toggle("hidden", !bad);
+  // どの欄が不正なのかを読み上げに伝える（描き直しでも同じ値になる）
+  for (const id of ["start", "end"]) $(id)?.setAttribute("aria-invalid", String(!!bad));
 }
 function setWho(key, mid) {
   const p = draft();
