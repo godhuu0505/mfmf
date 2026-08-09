@@ -143,8 +143,19 @@ test("UC-M03: /settings/account でアバターが 512px に縮小して直接�
   });
   expect(contentType).toContain("image/jpeg");
 
+  // 4. ヘッダーのアカウントアイコンにも同じ画像が出る（頭文字のままにならない）
+  const headerAvatar = page.locator(
+    'header button[aria-label="アカウントメニュー"] img',
+  );
+  await expect(headerAvatar).toBeVisible();
+  expect(
+    await headerAvatar.evaluate((el) => (el as HTMLImageElement).currentSrc),
+  ).toContain("/storage/v1/object/sign/");
+
   // 後始末: 削除して初期状態へ戻す（削除経路も UI から一度通す）
   await page.getByRole("button", { name: "画像を削除" }).click();
   await expect(page.getByRole("button", { name: "画像を選ぶ" })).toBeVisible();
   await expect(page.locator('main img[alt="あなたのアバター"]')).toHaveCount(0);
+  // ヘッダーも頭文字表示に戻る（Google 画像を持たない E2E ユーザー）
+  await expect(headerAvatar).toHaveCount(0);
 });

@@ -2,18 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { LogOut, MessageSquare, Settings, UserRound } from "lucide-react";
+import { LogOut, MessageSquare, Settings } from "lucide-react";
 import LogoutConfirmDialog from "@/components/LogoutConfirmDialog";
+import UserAvatar from "@/components/UserAvatar";
 
 // ヘッダー右側のアカウントアイコン。押下で小さなメニューを開き、
 // 「アカウント設定」「送信したフィードバック」「ログアウト」を選べる。
 // ログアウトだけは確認ダイアログを挟んでから /auth/signout に POST する。
+// アイコンの中身（画像 or 頭文字）は AppHeader が解決して渡す。
 export default function AccountMenu({
   email,
   displayName,
+  avatarUrl,
+  initial,
 }: {
   email: string | null;
   displayName: string | null;
+  avatarUrl: string | null;
+  initial: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -42,7 +48,6 @@ export default function AccountMenu({
   }, [menuOpen]);
 
   const label = displayName || email || "アカウント";
-  const initial = (displayName || email || "").trim().charAt(0).toUpperCase();
 
   return (
     <div className="relative" ref={containerRef}>
@@ -53,13 +58,14 @@ export default function AccountMenu({
         aria-expanded={menuOpen}
         aria-label="アカウントメニュー"
         title="アカウント"
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-sm font-semibold text-foreground ring-1 ring-border transition hover:bg-muted"
+        className="flex h-9 w-9 items-center justify-center rounded-full transition hover:opacity-90"
       >
-        {initial ? (
-          <span aria-hidden="true">{initial}</span>
-        ) : (
-          <UserRound className="h-5 w-5" aria-hidden="true" />
-        )}
+        <UserAvatar
+          url={avatarUrl}
+          initial={initial}
+          size={36}
+          className="bg-surface-muted text-sm font-semibold text-foreground ring-1 ring-border"
+        />
       </button>
 
       {menuOpen && (

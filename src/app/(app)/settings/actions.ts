@@ -88,6 +88,8 @@ export async function updateUserAvatar(formData: FormData) {
 
   revalidatePath("/settings/account");
   revalidatePath("/settings");
+  // ヘッダーのアカウントアイコンとメニュー画面のプロフィールにも反映する。
+  revalidatePath("/", "layout");
 }
 
 // パスワードを変更する。確認入力との一致と最小文字数を検証する。

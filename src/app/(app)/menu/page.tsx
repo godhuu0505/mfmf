@@ -1,19 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  ChevronRight,
-  CircleHelp,
-  PawPrint,
-  Scale,
-  UserRound,
-  Users,
-} from "lucide-react";
+import { ChevronRight, CircleHelp, PawPrint, Scale, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership, type HouseholdRole } from "@/lib/household";
 import { hasActiveGuestGrant } from "@/lib/guest";
+import { getUserAvatarData } from "@/lib/userAvatar";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import MenuLogoutItem from "@/components/MenuLogoutItem";
+import UserAvatar from "@/components/UserAvatar";
 
 export const metadata: Metadata = { title: "メニュー" };
 export const dynamic = "force-dynamic";
@@ -42,7 +37,7 @@ export default async function MenuPage() {
   const [{ data: profile }, { data: household }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("display_name")
+      .select("display_name, avatar_path")
       .eq("owner_id", user.id)
       .maybeSingle(),
     supabase
@@ -52,8 +47,8 @@ export default async function MenuPage() {
       .maybeSingle(),
   ]);
 
-  const displayName = profile?.display_name || user.email || "アカウント";
-  const initial = displayName.trim().charAt(0).toUpperCase();
+  const avatar = await getUserAvatarData(user, profile);
+  const displayName = avatar.label || "アカウント";
   const householdLine = household?.name
     ? `${household.name}（${ROLE_LABEL[membership.role]}）`
     : ROLE_LABEL[membership.role];
@@ -78,9 +73,12 @@ export default async function MenuPage() {
           href="/settings/account"
           className="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border transition hover:bg-surface-muted"
         >
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">
-            {initial || <UserRound className="h-6 w-6" aria-hidden="true" />}
-          </span>
+          <UserAvatar
+            url={avatar.url}
+            initial={avatar.initial}
+            size={48}
+            className="bg-primary text-lg font-bold text-primary-foreground"
+          />
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold text-foreground">
               {displayName}

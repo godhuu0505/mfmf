@@ -1,13 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import { getUserAvatarData } from "@/lib/userAvatar";
 import AccountMenu from "@/components/AccountMenu";
 
 // 共通ヘッダー。主要ナビはボトムタブバー（AppTabBar / D33）に移したため、
 // ここはロゴとアカウントメニューだけの薄い帯。
 // タブバー等のアプリクロームは (app)/layout.tsx が描画する。
 export default async function AppHeader() {
-  // アバターに表示名/メールの頭文字を出すため、現在のユーザーと表示名を取得する。
+  // アカウントアイコン（アプリ内アバター > Google の画像 > 頭文字）を出すため、
+  // 現在のユーザーとプロフィールを取得する。
   const supabase = await createClient();
   const {
     data: { user },
@@ -15,10 +17,11 @@ export default async function AppHeader() {
   const { data: profile } = user
     ? await supabase
         .from("profiles")
-        .select("display_name")
+        .select("display_name, avatar_path")
         .eq("owner_id", user.id)
         .maybeSingle()
     : { data: null };
+  const avatar = await getUserAvatarData(user, profile);
 
   return (
     <header className="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
@@ -40,6 +43,8 @@ export default async function AppHeader() {
         <AccountMenu
           email={user?.email ?? null}
           displayName={profile?.display_name ?? null}
+          avatarUrl={avatar.url}
+          initial={avatar.initial}
         />
       </div>
     </header>

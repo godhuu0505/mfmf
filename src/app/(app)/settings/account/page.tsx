@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/household";
 import { getCurrentProfile } from "@/lib/profile";
 import { createAvatarSignedUrl } from "@/lib/avatars";
+import { getOAuthAvatarUrl } from "@/lib/userAvatar";
 import AvatarUploader from "@/components/AvatarUploader";
 import { ProfileForm, PasswordForm } from "@/app/(app)/settings/SettingsForms";
 import { updateUserAvatar } from "@/app/(app)/settings/actions";
@@ -53,6 +54,7 @@ export default async function AccountSettingsPage() {
             <AvatarUploader
               scopeId={user.id}
               currentUrl={avatarUrl}
+              fallbackUrl={getOAuthAvatarUrl(user)}
               action={updateUserAvatar}
               alt="あなたのアバター"
               label="アバター画像"
