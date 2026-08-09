@@ -249,9 +249,6 @@
   .top-0 {
     top: 0px;
   }
-  .top-14 {
-    top: calc(var(--spacing) * 14);
-  }
   .right-1 {
     right: var(--spacing);
   }
@@ -272,9 +269,6 @@
   }
   .left-3 {
     left: calc(var(--spacing) * 3);
-  }
-  .z-10 {
-    z-index: 10;
   }
   .z-30 {
     z-index: 30;
@@ -398,6 +392,9 @@
   }
   .h-24 {
     height: calc(var(--spacing) * 24);
+  }
+  .max-h-\[58dvh\] {
+    max-height: 58dvh;
   }
   .max-h-\[88dvh\] {
     max-height: 88dvh;
@@ -1497,9 +1494,13 @@ input[type="date"] {
         <div id="assignBoard" class="hidden safe-px mb-3 space-y-2"></div>
         <div class="overflow-x-auto">
           <div class="min-w-[46rem] px-1">
-            <div id="weekHead" class="sticky top-14 z-10 grid border-b border-border bg-background" style="grid-template-columns: 3rem repeat(7, 1fr)"></div>
+            <div id="weekHead" class="grid border-b border-border bg-background" style="grid-template-columns: 3rem repeat(7, 1fr)"></div>
             <div id="allDayBand" class="grid border-b border-border" style="grid-template-columns: 3rem repeat(7, 1fr)"></div>
-            <div id="timeGrid" class="relative grid" style="grid-template-columns: 3rem repeat(7, 1fr)"></div>
+            <!-- 見出しを残したまま時間軸だけ縦に送る（sticky は overflow-x-auto の
+                 中では効かず、スクロールすると曜日が消えてしまう） -->
+            <div class="max-h-[58dvh] overflow-y-auto pt-2">
+              <div id="timeGrid" class="relative grid" style="grid-template-columns: 3rem repeat(7, 1fr)"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1660,7 +1661,7 @@ input[type="date"] {
         <span class="rounded-full border border-border px-3 py-1.5 text-sm">ごきげん</span>
       </div>
       <button type="button" onclick="closeQuick(); toast('（プロトでは記録フォームは省略）')" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">保存する</button>
-      <button type="button" onclick="closeQuick(); go('calendar'); openDay(TODAY)"
+      <button type="button" onclick="closeQuick(); openNextFreeDay()"
         class="mt-2 w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
         これからの予定を入れる →
       </button>
@@ -1947,7 +1948,20 @@ function monthChip(x) {
 }
 
 // ───────── 週表示（時間割） ─────────
-const H_START = 7, H_END = 21, ROW = 48;
+const ROW = 48;
+// 時間軸の範囲。既定は 07:00〜21:00 だが、その外の予定があれば広げる
+// （固定だと 22:00 の予定が枠の下に消え、06:00 の予定は位置がずれる）
+function weekBounds() {
+  let s = 7 * 60, e = 21 * 60;
+  for (const ds of weekDays()) {
+    for (const x of itemsOn(ds)) {
+      if (x.status === "skipped") continue;
+      s = Math.min(s, Math.floor(min(x.start) / 60) * 60);
+      e = Math.max(e, Math.ceil(min(x.end) / 60) * 60);
+    }
+  }
+  return [Math.max(0, s / 60), Math.min(24, Math.max(e / 60, s / 60 + 1))];
+}
 function weekDays() {
   return ["2026-08-09", "2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14", "2026-08-15"];
 }
@@ -1972,6 +1986,7 @@ function renderWeek() {
     }).join("");
 
   // 時間軸 + 予定ブロック
+  const [H_START, H_END] = weekBounds();
   let gutter = `<div class="relative" style="height:${(H_END - H_START) * ROW}px">`;
   for (let hgt = H_START; hgt < H_END; hgt++) {
     gutter += `<div class="absolute right-1 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground" style="top:${(hgt - H_START) * ROW}px">${String(hgt).padStart(2, "0")}:00</div>`;
@@ -1987,8 +2002,11 @@ function renderWeek() {
     const blocks = list.map((x) => {
       const t = type(x.type);
       const c = C[t.color];
-      const top = Math.max(0, (min(x.start) - H_START * 60) / 60 * ROW);
-      const hgt2 = Math.max(22, (min(x.end) - min(x.start)) / 60 * ROW);
+      // レンジ外にはみ出さないよう、両端を切り詰めてから高さを出す
+      const s0 = Math.max(min(x.start), H_START * 60);
+      const e0 = Math.min(min(x.end), H_END * 60);
+      const top = (s0 - H_START * 60) / 60 * ROW;
+      const hgt2 = Math.max(22, (e0 - s0) / 60 * ROW);
       const done = x.status === "done";
       const who = t.roles.map(([k]) => (x.who || {})[k]).filter(Boolean);
       return `<button type="button" onclick="openDay('${ds}')"
@@ -2092,6 +2110,7 @@ function openDay(d) {
   DRAFT_BASE = cur ? { fromRule: !!cur.fromRule, sig: sig(cur) } : null;
   $("sheetTitle").textContent = fmt(d);
   renderSheet();
+  $("sheet").scrollTop = 0; // 前に開いた日の位置が残らないように
   $("sheet").classList.remove("invisible", "translate-y-full");
   $("backdrop").classList.remove("pointer-events-none", "opacity-0");
   document.body.style.overflow = "hidden";
@@ -2233,7 +2252,8 @@ function renderSheet() {
       h += `<button type="button" onclick="unskip()" class="w-full rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">予定に戻す</button>`;
     }
     if (p) {
-      h += `<button type="button" onclick="clearPlan()" class="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">この日の予定を消す</button>`;
+      h += `<button type="button" onclick="clearPlan()" class="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
+        ${p.status === "done" ? "この記録を削除する（写真ごと）" : "この日の予定を消す"}</button>`;
     }
     h += `</div>`;
   }
@@ -2262,8 +2282,12 @@ function setType(id) {
 function setTime(which, v) {
   const p = draft();
   p[which] = v;
-  const bad = min(p.end) <= min(p.start);
-  $("timeError").classList.toggle("hidden", !bad);
+  // 片方だけ消すと min("") が 0 になり、不正な予定が通ってしまう
+  const blank = !p.start || !p.end;
+  const bad = blank || min(p.end) <= min(p.start);
+  const el = $("timeError");
+  el.textContent = blank ? "開始と終了の時刻を入れてください。" : "終了は開始より後にしてください。";
+  el.classList.toggle("hidden", !bad);
 }
 function setWho(key, mid) {
   const p = draft();
@@ -2288,6 +2312,7 @@ function commit(x) {
 function savePlan() {
   const p = DRAFT;
   if (!p) return;
+  if (!p.start || !p.end) { toast("開始と終了の時刻を入れてください"); return; }
   if (min(p.end) <= min(p.start)) { toast("終了は開始より後にしてください"); return; }
   const repeat = !!p.repeat;
   // ルール由来のまま何も変えていないなら、例外として実体化させない
@@ -2322,11 +2347,12 @@ function unskip() {
 }
 function clearPlan() {
   const d = openDate;
+  const wasDone = DRAFT && DRAFT.status === "done";
   ITEMS = ITEMS.filter((x) => x.date !== d);
   if (ruleFor(d)) CANCELLED.add(d);
   closeSheet();
   render();
-  toast("この日の予定を消しました");
+  toast(wasDone ? "記録を削除しました" : "この日の予定を消しました");
 }
 function restoreRule() {
   CANCELLED.delete(openDate);
@@ -2472,7 +2498,9 @@ function renderRules() {
       const r = RULES[w];
       return `<td class="py-1 text-[10px] tabular-nums text-muted-foreground">${r ? `${r.start}<br>${r.end}` : "·"}</td>`;
     }).join("") + `</tr>`;
-  for (const [key, label] of [["drop", "送り"], ["pick", "お迎え"], ["care", "みる人"]]) {
+  // care の呼び名は種類ごとに違う（おうち=みる人 / 通院=連れて行く）ので、
+  // 曜日をまたぐこの行では総称にする
+  for (const [key, label] of [["drop", "送り"], ["pick", "お迎え"], ["care", "担当"]]) {
     if (!order.some((w) => RULES[w] && type(RULES[w].type).roles.some(([k]) => k === key))) continue;
     h += `<tr class="border-b border-border last:border-0"><td class="py-2 text-xs font-medium text-muted-foreground">${label}</td>`;
     h += order.map((w) => {
@@ -2501,11 +2529,15 @@ function cycleRule(w) {
     const keep = {};
     for (const [k] of type(next).roles) if (RULES[w]?.who?.[k]) keep[k] = RULES[w].who[k];
     const t = type(next);
+    const prev = RULES[w];
+    const prevT = prev ? type(prev.type) : null;
+    // 時刻を触っていなければ、新しい種類の既定時刻に合わせる（日の編集と同じ挙動）
+    const untouched = !prev || (prev.start === prevT.start && prev.end === prevT.end);
     RULES[w] = {
       type: next, who: keep,
-      start: RULES[w]?.start || t.start,
-      end: RULES[w]?.end || t.end,
-      since: RULES[w]?.since,
+      start: untouched ? t.start : prev.start,
+      end: untouched ? t.end : prev.end,
+      since: prev?.since,
     };
   }
   render();
@@ -2553,6 +2585,22 @@ function openQuick() {
 function closeQuick() {
   $("qrSheet").classList.add("invisible", "translate-y-full");
   $("qrBackdrop").classList.add("pointer-events-none", "opacity-0");
+}
+// 今日がもう記録ずみ／見送りなら、その日の編集ではなく次に予定を入れられる日を開く
+function nextOpenDay() {
+  for (let d = dayNum(TODAY); d <= 31; d++) {
+    const ds = `2026-08-${String(d).padStart(2, "0")}`;
+    const list = itemsOn(ds);
+    if (!list.length || list[0].status === "planned") return ds;
+  }
+  return null;
+}
+function openNextFreeDay() {
+  go("calendar");
+  const ds = nextOpenDay();
+  if (!ds) { toast("この先の日はすべて記録ずみです。日付をタップして編集してください"); return; }
+  openDay(ds);
+  if (ds !== TODAY) toast(`${fmt(ds)}を開きました`);
 }
 function openInvite(memberId) {
   if (isViewer()) return;
