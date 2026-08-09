@@ -2163,12 +2163,22 @@ function weekDays() {
 }
 // 時間が重なるブロックを横に並べる。同じ列に全幅で重ねると、
 // 後から描いたものが前のものを完全に隠してしまう
-const MIN_BLOCK_MIN = 22 / ROW * 60; // ブロックの最小高さ（22px）を分に直したもの
-function layoutDay(list) {
-  // 12:00〜12:05 のような短い予定も画面上は 22px を占めるので、
-  // 実時間だけで重なりを見ると、隣り合う短い予定が視覚的に重なってしまう
-  const endOf = (x) => Math.max(min(x.end), min(x.start) + MIN_BLOCK_MIN);
-  const sorted = list.slice().sort((a, b) => min(a.start) - min(b.start) || min(a.end) - min(b.end));
+const MIN_BLOCK_PX = 22; // ブロックの最小高さ
+// 画面上でブロックが占める位置。実時間ではなくこちらで重なりを見る:
+// 12:00〜12:05 のような短い予定は最小高さで膨らみ、23:55〜23:59 は枠の下端で
+// 止まるため、実時間では重ならない 2 件が画面では重なることがある
+function geomOf(x, H_START, H_END) {
+  const gridH = (H_END - H_START) * ROW;
+  const s0 = Math.max(min(x.start), H_START * 60);
+  const e0 = Math.min(min(x.end), H_END * 60);
+  const hgt = Math.min(gridH, Math.max(MIN_BLOCK_PX, (e0 - s0) / 60 * ROW));
+  const top = Math.max(0, Math.min((s0 - H_START * 60) / 60 * ROW, gridH - hgt));
+  return { top, hgt, bottom: top + hgt };
+}
+function layoutDay(list, H_START, H_END) {
+  const sorted = list
+    .map((x) => ({ x, g: geomOf(x, H_START, H_END) }))
+    .sort((a, b) => a.g.top - b.g.top || a.g.bottom - b.g.bottom);
   const out = [];
   let cluster = [];
   let clusterEnd = -1;
@@ -2176,20 +2186,20 @@ function layoutDay(list) {
     if (!cluster.length) return;
     const colEnds = [];
     const placed = [];
-    for (const x of cluster) {
-      let c = colEnds.findIndex((end) => min(x.start) >= end);
+    for (const q of cluster) {
+      let c = colEnds.findIndex((end) => q.g.top >= end);
       if (c === -1) { c = colEnds.length; colEnds.push(0); }
-      colEnds[c] = endOf(x);
-      placed.push({ x, col: c });
+      colEnds[c] = q.g.bottom;
+      placed.push({ x: q.x, g: q.g, col: c });
     }
     for (const q of placed) out.push({ ...q, total: colEnds.length });
     cluster = [];
     clusterEnd = -1;
   };
-  for (const x of sorted) {
-    if (cluster.length && min(x.start) >= clusterEnd) flush();
-    cluster.push(x);
-    clusterEnd = Math.max(clusterEnd, endOf(x));
+  for (const q of sorted) {
+    if (cluster.length && q.g.top >= clusterEnd) flush();
+    cluster.push(q);
+    clusterEnd = Math.max(clusterEnd, q.g.bottom);
   }
   flush();
   return out;
@@ -2231,17 +2241,10 @@ function renderWeek() {
     for (let hgt = H_START; hgt < H_END; hgt++) {
       lines += `<div class="absolute inset-x-0 border-t border-border" style="top:${(hgt - H_START) * ROW}px"></div>`;
     }
-    const blocks = layoutDay(list).map(({ x, col, total }) => {
+    const blocks = layoutDay(list, H_START, H_END).map(({ x, g, col, total }) => {
       const t = type(x.type);
       const c = C[t.color];
-      // レンジ外にはみ出さないよう、両端を切り詰めてから高さを出す
-      const s0 = Math.max(min(x.start), H_START * 60);
-      const e0 = Math.min(min(x.end), H_END * 60);
-      const gridH = (H_END - H_START) * ROW;
-      const hgt2 = Math.min(gridH, Math.max(22, (e0 - s0) / 60 * ROW));
-      // 23:55〜23:59 のような短い予定は最小高さ 22px が枠の下へはみ出す。
-      // 下端で止める（列は overflow を切っていないので、そのままだと重なる）
-      const top = Math.min((s0 - H_START * 60) / 60 * ROW, gridH - hgt2);
+      const { top, hgt: hgt2 } = g; // 枠内に収めた位置。列の割り当てもこの位置で決めている
       const done = x.status === "done";
       const who = t.roles.map(([k]) => (x.who || {})[k]).filter(Boolean);
       return `<button type="button" onclick="openDay('${ds}','${x.id}')"
@@ -2534,7 +2537,7 @@ function renderSheet() {
         ${MEMBERS.map((m) => {
           const on = (p.who || {})[key] === m.id;
           return `<button type="button" ${ro ? "disabled" : ""} onclick="setWho('${key}','${m.id}')"
-            aria-pressed="${on}" aria-label="${label}は${m.name}"
+            data-who="${key}:${m.id}" aria-pressed="${on}" aria-label="${label}は${m.name}"
             class="flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs transition
             ${on ? `bg-surface font-bold shadow-sm ring-2 ${m.ring}` : "text-muted-foreground hover:bg-surface"} ${ro ? "opacity-50" : ""}">
             ${avatar(m.id, "sm")}${m.name}</button>`;
@@ -2654,6 +2657,8 @@ function setWho(key, mid) {
   const p = draft();
   p.who[key] = p.who[key] === mid ? null : mid;
   renderSheet();
+  // 描き直すとフォーカスが外れる。送り → お迎えと続けて選べるように戻す
+  document.querySelector(`[data-who="${key}:${mid}"]`)?.focus({ preventScroll: true });
 }
 function applyPreset(i) {
   const ps = PRESETS[i];
@@ -2703,7 +2708,11 @@ function savePlan() {
 // 「これから毎週◯曜も同じにする」の適用。commit() は repeat を捨てるので、
 // 保存・完了・見送りのどの経路からでもここを通す
 function applyRepeat(p) {
-  putRuleVersion(dow(p.date), {
+  const w = dow(p.date);
+  // 「これから毎週」と言った以上、その日より後から効く古い版は畳む。
+  // 残すと 8/13 で作り直したルールが 8/20 で前の版に戻ってしまう
+  RULES[w] = versionsOf(w).filter((r) => !r.since || r.since < p.date);
+  putRuleVersion(w, {
     type: p.type, start: p.start, end: p.end, who: { ...p.who },
     since: p.date, timeDirty: !!p.timeDirty,
   });
@@ -2833,7 +2842,7 @@ function renderDone() {
       <input id="doneNote" value="${esc(dd.note)}" oninput="DONE_DRAFT.note = this.value; renderDonePreview()"
         placeholder="例: おやつをぜんぶ食べました" class="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm" />
     </div>
-    <button type="button" onclick="donePhoto()" class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">
+    <button type="button" data-done-photo onclick="donePhoto()" class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">
       ${svg("camera", "h-4 w-4")}写真を追加${dd.photos ? `（${dd.photos} 枚）` : ""}</button>
     <p id="donePreview" class="rounded-xl bg-surface-muted px-3 py-2.5 text-sm ${body ? "" : "text-muted-foreground"}">${esc(body) || "まだ何も選んでいません"}</p>
     <button type="button" onclick="confirmDone()" class="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700">
@@ -2854,7 +2863,13 @@ function doneChip(c) {
   // 描き直すとフォーカスが外れる。複数選ぶたびに先頭から辿り直させない
   document.querySelector(`[data-chip="${c}"]`)?.focus({ preventScroll: true });
 }
-function donePhoto() { DONE_DRAFT.photos += 1; renderDone(); toast("（プロト）写真を 1 枚追加しました"); }
+function donePhoto() {
+  DONE_DRAFT.photos += 1;
+  renderDone();
+  // 描き直すとフォーカスが外れる。2 枚目からダイアログを辿り直させない
+  document.querySelector("[data-done-photo]")?.focus({ preventScroll: true });
+  toast("（プロト）写真を 1 枚追加しました");
+}
 function confirmDone() {
   const dd = DONE_DRAFT;
   const p = draft();
