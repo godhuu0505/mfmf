@@ -1608,6 +1608,7 @@ function toggleEmpty() {
     RULES = JSON.parse(JSON.stringify(FIXTURE_RULES));
   }
   CANCELLED = new Set();
+  WEEK_DRAFT = null; // 消えた予定を週ボードの下書きだけが持ち続けてしまう
   render();
 }
 function fmt(d) {
@@ -2096,6 +2097,11 @@ function renderWeek() {
     const p = (WEEK_DRAFT && WEEK_DRAFT[ds]) || planFor(ds);
     const label = fmt(ds);
     if (!p) {
+      if (ro) {
+        return `<div class="flex w-full items-center gap-3 rounded-xl border border-dashed border-border px-3 py-3 text-sm">
+          <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
+          <span class="min-w-0 flex-1 text-muted-foreground">予定なし</span></div>`;
+      }
       return `<button type="button" onclick="openDay('${ds}')" class="flex w-full items-center gap-3 rounded-xl border border-dashed border-border px-3 py-3 text-left text-sm transition hover:bg-surface-muted">
         <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
         <span class="min-w-0 flex-1 text-muted-foreground">予定なし</span>
