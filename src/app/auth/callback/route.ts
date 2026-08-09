@@ -12,9 +12,13 @@ export async function GET(request: NextRequest) {
   // 戻り先は ?next=（パスワード再設定リンク等）を優先し、無ければ middleware が
   // 置いた Cookie を使う（Google OAuth は redirectTo が完全一致の許可リストのため
   // クエリを足せない / src/lib/nextPath.ts）。どちらもサイト内パスのみ許可する。
-  const next = sanitizeNextPath(
-    searchParams.get("next") ?? request.cookies.get(POST_LOGIN_NEXT_COOKIE)?.value,
-  );
+  const cookieNext = request.cookies.get(POST_LOGIN_NEXT_COOKIE)?.value;
+  const queryNext = searchParams.get("next");
+  const next = sanitizeNextPath(queryNext ?? cookieNext);
+  // クエリが勝った（= パスワード再設定リンクなど、認証フローの途中）ときは
+  // Cookie を消さない。招待リンク → ログイン →「パスワードをお忘れの方」と
+  // 回った場合、元の招待は Cookie にしか残っていないため。
+  const consumedCookie = !queryNext;
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=oauth`);
@@ -40,6 +44,6 @@ export async function GET(request: NextRequest) {
   }
 
   const response = NextResponse.redirect(`${origin}${next}`);
-  response.cookies.delete(POST_LOGIN_NEXT_COOKIE);
+  if (consumedCookie) response.cookies.delete(POST_LOGIN_NEXT_COOKIE);
   return response;
 }

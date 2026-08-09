@@ -90,10 +90,12 @@ export async function updateSession(request: NextRequest) {
   // メール/パスワードログインは ?next= だけを見てクライアントで遷移するため、
   // 消さないと Cookie が最大 10 分残り、その間に別アカウントで Google OAuth を
   // 始めると /auth/callback が古い行き先（前の招待）へ飛ばしてしまう。
-  // /auth/* は callback 自身が Cookie を読むので触らない。
+  // /auth/* は callback 自身が、/reset-password は更新後の行き先として
+  // Cookie を読むので触らない（回復セッションで到達＝ログイン済みになる）。
   if (
     user &&
     !pathname.startsWith("/auth") &&
+    pathname !== "/reset-password" &&
     request.cookies.has(POST_LOGIN_NEXT_COOKIE)
   ) {
     supabaseResponse.cookies.delete(POST_LOGIN_NEXT_COOKIE);
