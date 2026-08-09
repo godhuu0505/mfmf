@@ -14,6 +14,7 @@
       "Courier New", monospace;
     --color-amber-50: oklch(98.7% 0.022 95.277);
     --color-amber-500: oklch(76.9% 0.188 70.08);
+    --color-amber-700: oklch(55.5% 0.163 48.998);
     --color-amber-900: oklch(41.4% 0.112 45.904);
     --color-emerald-50: oklch(97.9% 0.021 166.113);
     --color-emerald-100: oklch(95% 0.052 163.051);
@@ -26,9 +27,11 @@
     --color-sky-100: oklch(95.1% 0.026 236.824);
     --color-sky-400: oklch(74.6% 0.16 232.661);
     --color-sky-500: oklch(68.5% 0.169 237.323);
+    --color-sky-700: oklch(50% 0.134 242.749);
     --color-sky-900: oklch(39.1% 0.09 240.876);
     --color-violet-50: oklch(96.9% 0.016 293.756);
     --color-violet-500: oklch(60.6% 0.25 292.717);
+    --color-violet-700: oklch(49.1% 0.27 292.581);
     --color-violet-900: oklch(38% 0.189 293.745);
     --color-rose-50: oklch(96.9% 0.015 12.422);
     --color-rose-100: oklch(94.1% 0.03 12.58);
@@ -36,11 +39,12 @@
     --color-rose-400: oklch(71.2% 0.194 13.428);
     --color-rose-500: oklch(64.5% 0.246 16.439);
     --color-rose-600: oklch(58.6% 0.253 17.585);
+    --color-rose-700: oklch(51.4% 0.222 16.935);
     --color-rose-800: oklch(45.5% 0.188 13.697);
     --color-rose-900: oklch(41% 0.159 10.272);
     --color-slate-50: oklch(98.4% 0.003 247.858);
     --color-slate-400: oklch(70.4% 0.04 256.788);
-    --color-slate-500: oklch(55.4% 0.046 257.417);
+    --color-slate-700: oklch(37.2% 0.044 257.287);
     --color-slate-900: oklch(20.8% 0.042 265.755);
     --color-black: #000;
     --color-white: #fff;
@@ -693,6 +697,9 @@
   .bg-amber-500 {
     background-color: var(--color-amber-500);
   }
+  .bg-amber-700 {
+    background-color: var(--color-amber-700);
+  }
   .bg-background {
     background-color: var(--background);
   }
@@ -713,6 +720,9 @@
   }
   .bg-emerald-600 {
     background-color: var(--color-emerald-600);
+  }
+  .bg-emerald-700 {
+    background-color: var(--color-emerald-700);
   }
   .bg-foreground {
     background-color: var(--foreground);
@@ -741,6 +751,9 @@
   .bg-rose-600 {
     background-color: var(--color-rose-600);
   }
+  .bg-rose-700 {
+    background-color: var(--color-rose-700);
+  }
   .bg-sky-50 {
     background-color: var(--color-sky-50);
   }
@@ -750,14 +763,17 @@
   .bg-sky-500 {
     background-color: var(--color-sky-500);
   }
+  .bg-sky-700 {
+    background-color: var(--color-sky-700);
+  }
   .bg-slate-50 {
     background-color: var(--color-slate-50);
   }
   .bg-slate-400 {
     background-color: var(--color-slate-400);
   }
-  .bg-slate-500 {
-    background-color: var(--color-slate-500);
+  .bg-slate-700 {
+    background-color: var(--color-slate-700);
   }
   .bg-surface {
     background-color: var(--surface);
@@ -782,6 +798,9 @@
   }
   .bg-violet-500 {
     background-color: var(--color-violet-500);
+  }
+  .bg-violet-700 {
+    background-color: var(--color-violet-700);
   }
   .p-0\.5 {
     padding: calc(var(--spacing) * 0.5);
@@ -1628,7 +1647,7 @@ input[type="date"] {
 
   <!-- ═══════════ 予定シート ═══════════ -->
   <div id="backdrop" onclick="closeSheet()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
-  <div id="sheet" role="dialog" aria-modal="true" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+  <div id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
     <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <div class="mb-3 flex items-center justify-between gap-2">
@@ -1642,11 +1661,11 @@ input[type="date"] {
 
   <!-- ═══════════ 完了（記録にする）シート ═══════════ -->
   <div id="doneBackdrop" onclick="closeDone()" class="pointer-events-none fixed inset-0 z-[60] bg-black/40 opacity-0 transition-opacity duration-300"></div>
-  <div id="doneSheet" role="dialog" aria-modal="true" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-[70] max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+  <div id="doneSheet" role="dialog" aria-modal="true" aria-labelledby="doneTitle" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-[70] max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
     <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <div class="mb-1 flex items-center justify-between">
-        <h2 class="text-base font-bold">記録にする</h2>
+        <h2 id="doneTitle" class="text-base font-bold">記録にする</h2>
         <button type="button" onclick="closeDone()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
       </div>
       <p id="doneSummary" class="mb-3 text-xs text-muted-foreground"></p>
@@ -1656,11 +1675,11 @@ input[type="date"] {
 
   <!-- ═══════════ クイック記録シート ═══════════ -->
   <div id="qrBackdrop" onclick="closeQuick()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
-  <div id="qrSheet" role="dialog" aria-modal="true" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+  <div id="qrSheet" role="dialog" aria-modal="true" aria-labelledby="qrTitle" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
     <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-base font-bold">クイック記録</h2>
+        <h2 id="qrTitle" class="text-base font-bold">クイック記録</h2>
         <button type="button" onclick="closeQuick()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
       </div>
       <div id="qrTodayPlan" class="mb-3"></div>
@@ -1681,7 +1700,7 @@ input[type="date"] {
 
   <!-- ═══════════ 招待シート ═══════════ -->
   <div id="invBackdrop" onclick="closeInvite()" class="pointer-events-none fixed inset-0 z-[60] bg-black/40 opacity-0 transition-opacity duration-300"></div>
-  <div id="invSheet" role="dialog" aria-modal="true" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-[70] translate-y-full rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+  <div id="invSheet" role="dialog" aria-modal="true" aria-labelledby="invTitle" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-[70] translate-y-full rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
     <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <h2 id="invTitle" class="mb-1 text-base font-bold">家族を招待する</h2>
@@ -1752,14 +1771,16 @@ const TYPES = [
   { id: "outing",  emoji: "✈️", label: "おでかけ",   color: "rose",    start: "10:00", end: "16:00", roles: [] },
   { id: "other",   emoji: "📌", label: "その他",     color: "slate",   start: "10:00", end: "11:00", roles: [] },
 ];
-// Tailwind に拾わせるため、クラス名はすべて素の文字列で書く
+// Tailwind に拾わせるため、クラス名はすべて素の文字列で書く。
+// solid（記録ずみ）は白文字を載せるので 700 まで濃くする（500 だと 10px の
+// ラベルが読めない）
 const C = {
-  sky:     { solid: "bg-sky-500 text-white",     soft: "bg-sky-50 text-sky-900 border-sky-500",         dot: "bg-sky-500",     ring: "border-sky-500" },
-  amber:   { solid: "bg-amber-500 text-white",   soft: "bg-amber-50 text-amber-900 border-amber-500",   dot: "bg-amber-500",   ring: "border-amber-500" },
-  emerald: { solid: "bg-emerald-500 text-white", soft: "bg-emerald-50 text-emerald-900 border-emerald-500", dot: "bg-emerald-500", ring: "border-emerald-500" },
-  violet:  { solid: "bg-violet-500 text-white",  soft: "bg-violet-50 text-violet-900 border-violet-500", dot: "bg-violet-500",  ring: "border-violet-500" },
-  rose:    { solid: "bg-rose-500 text-white",    soft: "bg-rose-50 text-rose-900 border-rose-500",       dot: "bg-rose-500",    ring: "border-rose-500" },
-  slate:   { solid: "bg-slate-500 text-white",   soft: "bg-slate-50 text-slate-900 border-slate-400",    dot: "bg-slate-400",   ring: "border-slate-400" },
+  sky:     { solid: "bg-sky-700 text-white",     soft: "bg-sky-50 text-sky-900 border-sky-500",         dot: "bg-sky-500",     ring: "border-sky-500" },
+  amber:   { solid: "bg-amber-700 text-white",   soft: "bg-amber-50 text-amber-900 border-amber-500",   dot: "bg-amber-500",   ring: "border-amber-500" },
+  emerald: { solid: "bg-emerald-700 text-white", soft: "bg-emerald-50 text-emerald-900 border-emerald-500", dot: "bg-emerald-500", ring: "border-emerald-500" },
+  violet:  { solid: "bg-violet-700 text-white",  soft: "bg-violet-50 text-violet-900 border-violet-500", dot: "bg-violet-500",  ring: "border-violet-500" },
+  rose:    { solid: "bg-rose-700 text-white",    soft: "bg-rose-50 text-rose-900 border-rose-500",       dot: "bg-rose-500",    ring: "border-rose-500" },
+  slate:   { solid: "bg-slate-700 text-white",   soft: "bg-slate-50 text-slate-900 border-slate-400",    dot: "bg-slate-400",   ring: "border-slate-400" },
 };
 
 // 出来事は 1 本の配列。status で「予定」「記録（完了）」「見送り」を表す。
@@ -2242,10 +2263,14 @@ function renderAssignBoard() {
     </div>`;
   }).join("");
 
+  // 行の描画と同じ「下書きを載せた今の予定」から集める。
+  // 下書き（担当だけの delta）をそのまま予定として扱うと type が無く、
+  // 保育園の送り迎えしか見ないため care の未連携を取りこぼす
   const unlinked = [...new Set(days.flatMap((ds) => {
-    const x = (ASSIGN_DRAFT && ASSIGN_DRAFT[ds]) || planOn(ds);
-    if (!x || x.status === "skipped") return [];
-    return type(x.type).roles.map(([k]) => (x.who || {})[k]).filter(Boolean);
+    const base = planOn(ds);
+    if (!base || base.status === "skipped") return [];
+    const who = { ...(base.who || {}), ...((ASSIGN_DRAFT || {})[ds] || {}) };
+    return type(base.type).roles.map(([k]) => who[k]).filter(Boolean);
   }))].map(member).filter((m) => m && m.link !== "linked");
 
   $("assignBoard").innerHTML = rows +
@@ -2258,18 +2283,21 @@ function renderAssignBoard() {
         ${dirty ? "保存する（未保存の変更あり）" : "保存する"}</button>
     </div>`);
 }
+// 下書きは「触った担当だけ」を持つ。base.who ごと写し取ると、
+// 触っていない担当（例: お迎え）を後からルールで変えても、保存時に古い値で
+// 巻き戻してしまう
 function assignSet(ds, k, mid) {
   if (isViewer()) return;
   const base = planOn(ds);
   if (!base || base.status === "skipped") return;
   if (!ASSIGN_DRAFT) ASSIGN_DRAFT = {};
-  const who = ASSIGN_DRAFT[ds] || (ASSIGN_DRAFT[ds] = { ...(base.who || {}) });
-  who[k] = who[k] === mid ? null : mid;
-  // 元の値に戻したら下書きから外す（見た目が変わっていないのに保存でき、
-  // その日がルール由来から手入力の例外に化けるのを防ぐ）
-  const keys = type(base.type).roles.map(([r]) => r);
-  const same = keys.every((r) => (who[r] || null) === ((base.who || {})[r] || null));
-  if (same) delete ASSIGN_DRAFT[ds];
+  const delta = ASSIGN_DRAFT[ds] || (ASSIGN_DRAFT[ds] = {});
+  const current = k in delta ? delta[k] : (base.who || {})[k] || null;
+  const next = current === mid ? null : mid;
+  // 元の値に戻したらその項目を下書きから外す
+  if (next === ((base.who || {})[k] || null)) delete delta[k];
+  else delta[k] = next;
+  if (Object.keys(delta).length === 0) delete ASSIGN_DRAFT[ds];
   if (ASSIGN_DRAFT && Object.keys(ASSIGN_DRAFT).length === 0) ASSIGN_DRAFT = null;
   renderAssignBoard();
 }
@@ -2277,10 +2305,11 @@ function assignSave() {
   if (!ASSIGN_DRAFT) return;
   let saved = 0;
   for (const [ds, who] of Object.entries(ASSIGN_DRAFT)) {
-    const base = planOn(ds); // 保存の瞬間の予定に載せる（下書きは担当だけ）
+    const base = planOn(ds); // 保存の瞬間の予定に、触った担当だけを載せる
     if (!base || base.status === "skipped") continue;
+    const merged = { ...(base.who || {}), ...who };
     const next = {};
-    for (const [k] of type(base.type).roles) if (who[k]) next[k] = who[k];
+    for (const [k] of type(base.type).roles) if (merged[k]) next[k] = merged[k];
     const existing = ITEMS.find((y) => y.id === base.id);
     if (existing) existing.who = next;
     else ITEMS.push({ ...base, who: next, id: "n" + seq++, fromRule: undefined, overridesRule: true, created: seqCreated++ });
@@ -2858,9 +2887,9 @@ function renderFamily() {
 let QR = { chips: [], source: "home", note: "", noteOpen: false };
 function renderQuick() {
   $("qrBody").innerHTML = `
-    <div class="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1 text-sm">
+    <div role="radiogroup" aria-label="記録元" class="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1 text-sm">
       ${[["home", "おうち"], ["daycare", "保育園"]].map(([id, label]) =>
-        `<button type="button" onclick="QR.source='${id}'; renderQuick()"
+        `<button type="button" role="radio" aria-checked="${QR.source === id}" onclick="QR.source='${id}'; renderQuick()"
           class="rounded-lg py-1.5 font-medium transition ${QR.source === id ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground"}">${label}</button>`).join("")}
     </div>
     <div class="flex flex-wrap gap-2">
