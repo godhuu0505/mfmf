@@ -1683,7 +1683,7 @@ input[type="date"] {
       <div class="mb-3 flex items-center justify-between gap-2">
         <h2 id="sheetTitle" class="min-w-0 flex-1 truncate text-base font-bold"></h2>
         <span id="sheetStatus"></span>
-        <button type="button" onclick="requestCloseSheet()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
+        <button id="sheetClose" type="button" onclick="requestCloseSheet()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
       </div>
       <div id="sheetBody" class="space-y-4"></div>
     </div>
@@ -2075,7 +2075,7 @@ function renderTabs() {
   row.className = "mx-auto grid max-w-3xl " + (ro ? "grid-cols-4" : "grid-cols-5");
   row.innerHTML = TABS.filter((t) => !(ro && t.key === "__plus")).map((t) => {
     if (t.key === "__plus") {
-      return `<button type="button" onclick="openQuick()" aria-label="クイック記録" aria-haspopup="dialog" class="relative">
+      return `<button type="button" data-tab="__plus" onclick="openQuick()" aria-label="クイック記録" aria-haspopup="dialog" class="relative">
         <span class="absolute left-1/2 top-0 -mt-5 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:bg-primary-hover">${svg("plus", "h-7 w-7")}</span>
         <span class="block pb-1.5 pt-9 text-center text-[10px] font-medium text-muted-foreground">記録</span></button>`;
     }
@@ -2097,7 +2097,8 @@ function go(s) {
   const wasTab = document.activeElement?.dataset?.tab || null;
   render();
   // タブバーは innerHTML を作り直すので、押したタブへフォーカスを戻す
-  if (wasTab) document.querySelector(`[data-tab="${s}"], [data-tab="${wasTab}"]`)?.focus({ preventScroll: true });
+  // 行き先のタブを優先する（セレクタを並べると DOM 順で拾ってしまう）
+  if (wasTab) (document.querySelector(`[data-tab="${s}"]`) || document.querySelector(`[data-tab="${wasTab}"]`))?.focus({ preventScroll: true });
   // 画面内のリンク（メニュー › 毎週の予定ルール、‹ メニュー など）から移ったときは
   // 押した要素が hidden の中に取り残される。移った先の画面へフォーカスを送る
   else $("screen-" + s).focus({ preventScroll: true });
@@ -2620,7 +2621,7 @@ function renderSheet() {
         ${p ? (p.status === "done" ? "変更を保存する" : "予定を保存する") : "どう過ごすか選んでください"}</button>`;
     if (p && p.status === "planned") {
       h += `<div class="flex gap-2">
-        <button type="button" onclick="openDone()" class="flex-1 rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950">
+        <button type="button" data-done-open onclick="openDone()" class="flex-1 rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950">
           ${svg("check", "mr-1 inline h-4 w-4")}完了して記録にする</button>
         <button type="button" onclick="skipPlan()" class="rounded-xl border border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">見送り</button>
       </div>`;
@@ -2829,7 +2830,15 @@ function openDone() {
   CONFIRM_CLOSE_DONE = false;
   $("doneSummary").textContent = `${fmt(p.date)}・${t.emoji} ${t.label}` + (p.untimed ? "" : `・${p.start}〜${p.end}`);
   renderDone();
-  rememberTrigger("doneSheet");
+  // ホームや ＋ シートからは openDay() → openDone() と続けて呼ぶので、そのまま覚えると
+  // 「日別シートの下に隠れて押せなくなったボタン」が戻り先になる。
+  // 日別シートの中から開いたときだけその要素を覚え、それ以外はシート側の要素を戻り先にする
+  if (document.activeElement instanceof HTMLElement && $("sheet").contains(document.activeElement)) {
+    rememberTrigger("doneSheet");
+  } else {
+    const sel = ["#sheet [data-done-open]", "#sheetClose"];
+    setTrigger("doneSheet", document.querySelector(sel[0]) || $("sheetClose"), sel);
+  }
   $("doneSheet").scrollTop = 0; // 前に開いた分の位置が残らないように
   $("doneSheet").classList.remove("invisible", "translate-y-full");
   $("doneBackdrop").classList.remove("pointer-events-none", "opacity-0");
