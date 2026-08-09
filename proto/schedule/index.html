@@ -1989,7 +1989,9 @@ function restoreTrigger(id) {
       if (fresh) break;
     }
     const back = el && document.contains(el) && el.offsetParent ? el : null;
-    (fresh || back)?.focus({ preventScroll: true });
+    // どれも見つからないとき（描き直しでボタンごと消えたときなど）は、
+    // せめて今いる画面へ。フォーカスが body に落ちると読み上げが先頭へ戻る
+    (fresh || back || $("screen-" + screen))?.focus({ preventScroll: true });
   });
 }
 // Esc は一番上に開いているシートを閉じる
@@ -2440,8 +2442,11 @@ function openDay(d, id) {
   OPEN_SIG = cur ? sig(cur) : "none";
   CONFIRM_CLOSE = false;
   $("sheetTitle").textContent = fmt(d);
+  // シートを開いたまま別の行へ切り替える場合、押した行は renderSheet() で消えている。
+  // 覚え直すと最初にシートを開いた要素（カレンダーの日）を見失う
+  const switching = !$("sheet").classList.contains("invisible");
   renderSheet();
-  rememberTrigger("sheet");
+  if (!switching) rememberTrigger("sheet");
   $("sheet").scrollTop = 0; // 前に開いた日の位置が残らないように
   $("sheet").classList.remove("invisible", "translate-y-full");
   $("backdrop").classList.remove("pointer-events-none", "opacity-0");
@@ -2550,7 +2555,7 @@ function renderSheet() {
     <p id="typeLabel" class="mb-2 text-xs font-bold text-muted-foreground">どう過ごす？</p>
     <div role="radiogroup" aria-labelledby="typeLabel" class="grid grid-cols-3 gap-2">
       ${TYPES.map((x) => `
-        <button type="button" role="radio" aria-checked="${!!(p && p.type === x.id)}" ${ro ? "disabled" : ""} onclick="setType('${x.id}')"
+        <button type="button" role="radio" data-type="${x.id}" aria-checked="${!!(p && p.type === x.id)}" ${ro ? "disabled" : ""} onclick="setType('${x.id}')"
           class="flex flex-col items-center gap-1 rounded-xl border py-2.5 text-xs transition
           ${p && p.type === x.id ? "border-primary bg-primary/10 font-bold text-primary" : "border-border bg-surface hover:bg-surface-muted"}
           ${ro ? "opacity-50" : ""}">
@@ -2689,6 +2694,8 @@ function setType(id) {
   // 勝手に上書きされてしまうので、触ったかどうかは旗で持つ
   if (!p.timeDirty) { p.start = type(id).start; p.end = type(id).end; }
   renderSheet();
+  // 描き直すとフォーカスが外れる。選んだ種類のまま時間・担当へ進めるように戻す
+  document.querySelector(`[data-type="${id}"]`)?.focus({ preventScroll: true });
 }
 function setTime(which, v) {
   const p = draft();
