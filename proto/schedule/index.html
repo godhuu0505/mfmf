@@ -2416,10 +2416,7 @@ function savePlan() {
   }
   commit(p);
   if (repeat) {
-    putRuleVersion(dow(p.date), {
-      type: p.type, start: p.start, end: p.end, who: { ...p.who },
-      since: p.date, timeDirty: !!p.timeDirty,
-    });
+    applyRepeat(p);
     toast("予定と毎週のルールを保存しました");
   } else {
     toast(p.status === "done" ? "記録を保存しました" : "予定を保存しました");
@@ -2427,15 +2424,25 @@ function savePlan() {
   closeSheet();
   render();
 }
+// 「これから毎週◯曜も同じにする」の適用。commit() は repeat を捨てるので、
+// 保存・完了・見送りのどの経路からでもここを通す
+function applyRepeat(p) {
+  putRuleVersion(dow(p.date), {
+    type: p.type, start: p.start, end: p.end, who: { ...p.who },
+    since: p.date, timeDirty: !!p.timeDirty,
+  });
+}
 function skipPlan() {
   const p = draft();
   const bad = timeProblem(p);
   if (bad) { toast(bad); return; }
+  const repeat = !!p.repeat;
   p.status = "skipped";
   commit(p);
+  if (repeat) applyRepeat(p); // この日は見送りでも、以降のルールは設定どおりにする
   closeSheet();
   render();
-  toast("見送りにしました");
+  toast(repeat ? "見送りにして、毎週のルールを保存しました" : "見送りにしました");
 }
 function unskip() {
   const p = draft();
@@ -2545,12 +2552,7 @@ function confirmDone() {
   p.status = "done";
   const repeat = !!p.repeat; // 完了の経路でもチェックを尊重する
   commit(p);
-  if (repeat) {
-    putRuleVersion(dow(p.date), {
-      type: p.type, start: p.start, end: p.end, who: { ...p.who },
-      since: p.date, timeDirty: !!p.timeDirty,
-    });
-  }
+  if (repeat) applyRepeat(p);
   closeDone();
   closeSheet();
   render();
