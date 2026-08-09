@@ -1789,6 +1789,7 @@ input[type="date"] {
       <p class="mt-1 text-[10px] text-muted-foreground">毎週のルールは下地として常に効いています。</p>
     </div>
     <label class="flex items-center gap-2"><input type="checkbox" id="cfgEmpty" onchange="toggleEmpty()">予定が 0 件の状態</label>
+    <label class="flex items-center gap-2"><input type="checkbox" id="cfgDense" onchange="toggleDense()">記録が多い状態（200 件）</label>
     <label class="flex items-center gap-2"><input type="checkbox" id="cfgViewer" onchange="render()">viewer（編集不可）</label>
   </div>
 
@@ -1906,6 +1907,7 @@ const member = (id) => MEMBERS.find((m) => m.id === id);
 const type = (id) => TYPES.find((t) => t.id === id) || TYPES[0];
 const dow = (d) => new Date(d + "T00:00:00").getDay();
 const isEmpty = () => $("cfgEmpty").checked;
+const isDense = () => $("cfgDense").checked;
 const isViewer = () => $("cfgViewer").checked;
 const min = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 const dayNum = (d) => Number(d.slice(8, 10));
@@ -2177,7 +2179,42 @@ function assignDiscard() {
   render();
   toast("未保存の変更を捨てました");
 }
+// 記録が 200 件ある状態。月の「他 N 件」・日別シートの一覧・さいきんの記録が
+// 詰まったときに読めるかを実機で確かめるため（prototype skill の「200 件」）
+function denseItems() {
+  const out = JSON.parse(JSON.stringify(FIXTURE_ITEMS));
+  const kinds = ["daycare", "home", "family", "clinic", "outing", "other"];
+  let n = 0;
+  for (let d = 1; d <= 31 && n < 200; d++) {
+    const date = `2026-08-${String(d).padStart(2, "0")}`;
+    for (let i = 0; i < 7 && n < 200; i++) {
+      const t = type(kinds[(d + i) % kinds.length]);
+      const h = 7 + i * 2;
+      out.push({
+        id: "big" + n, date, type: t.id,
+        // 記録なので時刻は持たせない（クイック記録と同じ扱い）
+        untimed: true, start: "", end: "",
+        who: {}, note: "", status: "done",
+        body: `${t.label}のきろく ${i + 1}`, chips: [], freeNote: "",
+        photos: n % 3 === 0 ? 1 : 0,
+        // 記録は曜日ルールの予定を消さない（詰まった日を作りたいので残す）
+        overridesRule: false,
+      });
+      n++;
+    }
+  }
+  out.forEach((x, i) => { x.created = i; });
+  return out;
+}
+function toggleDense() {
+  if (isDense()) { $("cfgEmpty").checked = false; ITEMS = denseItems(); RULES = JSON.parse(JSON.stringify(FIXTURE_RULES)); }
+  else { ITEMS = JSON.parse(JSON.stringify(FIXTURE_ITEMS)); RULES = JSON.parse(JSON.stringify(FIXTURE_RULES)); }
+  CANCELLED = new Set();
+  ASSIGN_DRAFT = null;
+  render();
+}
 function toggleEmpty() {
+  if (isEmpty()) $("cfgDense").checked = false; // 0 件と 200 件は同時に選べない
   // 「予定が 0 件」＝これからの予定が無い状態。すでにある履歴（記録ずみ・見送り）は
   // 残す（消すと新規アカウントの状態になってしまい、確かめたい状態と違う）
   if (isEmpty()) {
@@ -2567,7 +2604,8 @@ function discardSheet() {
   CONFIRM_CLOSE = false;
   const go2 = PENDING_SWITCH;
   PENDING_SWITCH = null;
-  if (go2) openDay(go2.d, go2.id); // 切り替え先があればそのまま開く
+  if (go2 && go2.restore) doRestoreRule(go2.d);
+  else if (go2) openDay(go2.d, go2.id); // 切り替え先があればそのまま開く
   else closeSheet();
 }
 function closeSheet() {
@@ -2590,11 +2628,11 @@ function renderSheet() {
 
   if (CONFIRM_CLOSE) {
     h += `<div id="confirmClose" role="alert" tabindex="-1" class="space-y-2 rounded-xl border border-border bg-surface-muted p-3 outline-none">
-      <p class="text-sm font-medium">${PENDING_SWITCH ? "編集をやめて、そちらを開きますか？" : "編集をやめますか？"}</p>
+      <p class="text-sm font-medium">${!PENDING_SWITCH ? "編集をやめますか？" : PENDING_SWITCH.restore ? "編集をやめて、毎週のルールに戻しますか？" : "編集をやめて、そちらを開きますか？"}</p>
       <p class="text-xs text-muted-foreground">保存していない変更は失われます。</p>
       <div class="flex gap-2">
         <button type="button" onclick="CONFIRM_CLOSE = false; PENDING_SWITCH = null; backFromConfirm(renderSheet)" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">編集に戻る</button>
-        <button type="button" onclick="discardSheet()" class="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background">${PENDING_SWITCH ? "開く" : "やめる"}</button>
+        <button type="button" onclick="discardSheet()" class="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background">${!PENDING_SWITCH ? "やめる" : PENDING_SWITCH.restore ? "戻す" : "開く"}</button>
       </div>
     </div>`;
   }
@@ -2899,8 +2937,22 @@ function clearPlan() {
   toast(wasDone ? "記録を削除しました" : "この日の予定を消しました");
 }
 function restoreRule() {
-  CANCELLED.delete(openDate);
-  openDay(openDate);
+  const d = openDate;
+  // 打ち消しを戻すと、いま書きかけの内容は捨てられる（ルール由来の予定に戻る）
+  if (sheetDirty()) {
+    rememberConfirmReturn("#sheetClose");
+    PENDING_SWITCH = { d, id: null, restore: true };
+    CONFIRM_CLOSE = true;
+    renderSheet();
+    $("sheet").scrollTop = 0;
+    focusConfirm("confirmClose");
+    return;
+  }
+  doRestoreRule(d);
+}
+function doRestoreRule(d) {
+  CANCELLED.delete(d);
+  openDay(d);
   toast("毎週のルールに戻しました");
 }
 
@@ -3380,5 +3432,8 @@ function render() {
     el.dataset.done = "1";
   });
 }
+// Artifact は publish 時に <html> を組み立てるので、こちらから指定できるのは実行時だけ。
+// 指定しないと、端末の既定言語で日本語が読み上げられる
+document.documentElement.lang = "ja";
 go("calendar");
 </script>
