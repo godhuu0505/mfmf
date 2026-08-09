@@ -948,7 +948,7 @@ input[type="date"] {
               class="shrink-0 text-xs text-muted-foreground transition hover:text-foreground">閉じる</button>
           </div>
           <ul data-error-list class="mt-1 space-y-1 text-sm text-foreground"></ul>
-          <p class="mt-2 text-xs text-muted-foreground">
+          <p data-trim-hint hidden class="mt-2 text-xs text-muted-foreground">
             長すぎる動画は、写真アプリで前後を切ってから選び直せます
             （iPhone: 編集 → 黄色い枠をドラッグ / Android: フォト → 編集 → トリミング）。
           </p>
@@ -1055,6 +1055,8 @@ input[type="date"] {
 (() => {
   // ---- 上限（プロトで動かして決める） ----
   const MAX_ITEMS = 10; // 1記録の写真＋動画の合計
+  // 1ファイルの受け入れ上限。Supabase Free のハード上限がここなので、これ以上は上げられない。
+  const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
   const state = { cap: 30, maxVideos: 3, quality: 720, tab: "form", items: [] };
 
   // 保存時のビットレート想定（映像+音声, Mbps）と、写真1枚の実測目安
@@ -1147,14 +1149,14 @@ input[type="date"] {
     state.items = state.items.filter((it) => {
       if (it.kind !== "video") return true;
       if (it.duration > state.cap + 0.5) {
-        dropped.push(`${it.name} — ${fmtDurJa(it.duration)}（上限 ${state.cap}秒 を超えました）`);
-        release(it);
+        dropped.push({ msg: `${it.name} — ${fmtDurJa(it.duration)}（上限 ${state.cap}秒 を超えました）`, duration: true });
+        forget(it);
         return false;
       }
       kept += 1;
       if (kept > state.maxVideos) {
-        dropped.push(`${it.name} — 動画は${state.maxVideos}本までになりました`);
-        release(it);
+        dropped.push({ msg: `${it.name} — 動画は${state.maxVideos}本までになりました` });
+        forget(it);
         return false;
       }
       // 画質を変えたら見積もりサイズを取り直す
@@ -1166,17 +1168,21 @@ input[type="date"] {
   }
 
   // ---- エラー表示 ----
-  function addErrors(lines) {
+  // errors は {msg, duration?} の配列。トリミングの案内は「長さで弾いたとき」だけ出す
+  // （11件目・本数超過・対応外にトリミングを勧めても意味が通らない）。
+  function addErrors(errors) {
     const ul = $("[data-error-list]");
-    lines.forEach((line) => {
+    errors.forEach((e) => {
       const li = document.createElement("li");
-      li.textContent = line;
+      li.textContent = e.msg;
       ul.appendChild(li);
+      if (e.duration) $("[data-trim-hint]").hidden = false;
     });
     $("[data-media-errors]").hidden = false;
   }
   $("[data-clear-errors]").addEventListener("click", () => {
     $("[data-error-list]").innerHTML = "";
+    $("[data-trim-hint]").hidden = true;
     $("[data-media-errors]").hidden = true;
   });
 
@@ -1186,6 +1192,13 @@ input[type="date"] {
   function release(item) {
     if (item.url) URL.revokeObjectURL(item.url);
     item.url = null;
+  }
+
+  // 取り除くときは、その動画を再生中なら詳細のプレーヤーも閉じる。
+  // 閉じ忘れると、フォームでは弾いた動画が「見る」で鳴り続ける。
+  function forget(item) {
+    if (playingId === item.id) closeDetailPlayer();
+    release(item);
   }
 
   function classify(file) {
@@ -1201,22 +1214,34 @@ input[type="date"] {
     const files = Array.from(fileList);
     if (files.length === 0) return;
     const errors = [];
+    const queue = [];
 
+    // 1. 選択ぶんを先に全部受け付ける。1本目の動画の変換を待ってから 2 件目を足すと、
+    //    その間カウンタが実際より少なく見え、＋タイルから別の選択で枠を取られてしまう。
     for (const file of files) {
       const kind = classify(file);
       if (!kind) {
-        errors.push(`${file.name} — 写真でも動画でもないようです`);
+        errors.push({ msg: `${file.name} — 写真でも動画でもないようです` });
         continue;
       }
-      if (state.items.length >= MAX_ITEMS) {
-        errors.push(`${file.name} — 合計${MAX_ITEMS}件までです`);
+      if (state.items.length + queue.length >= MAX_ITEMS) {
+        errors.push({ msg: `${file.name} — 合計${MAX_ITEMS}件までです` });
         continue;
       }
-      if (kind === "video" && videos().length >= state.maxVideos) {
-        errors.push(`${file.name} — 動画は${state.maxVideos}本までです`);
-        continue;
+      if (kind === "video") {
+        const queued = queue.filter((q) => q.kind === "video").length;
+        if (videos().length + queued >= state.maxVideos) {
+          errors.push({ msg: `${file.name} — 動画は${state.maxVideos}本までです` });
+          continue;
+        }
+        if (file.size > MAX_VIDEO_BYTES) {
+          errors.push({
+            msg: `${file.name} — ${fmtBytes(file.size)}。1ファイル ${MAX_VIDEO_BYTES / 1024 / 1024}MB までです`,
+          });
+          continue;
+        }
       }
-      const item = {
+      queue.push({
         id: ++seq,
         kind,
         name: file.name || (kind === "video" ? "動画" : "写真"),
@@ -1228,13 +1253,20 @@ input[type="date"] {
         duration: null,
         status: "pending",
         progress: 0,
-      };
-      state.items.push(item);
-      renderAll();
-      await processItem(item, errors);
+      });
     }
 
-    if (errors.length) addErrors(errors);
+    state.items.push(...queue);
+    renderAll();
+    if (errors.length) addErrors(errors.splice(0));
+
+    // 2. 受け付けたぶんを順に処理する（端末の再エンコードは並列にしても速くならない）
+    for (const item of queue) {
+      if (!alive(item)) continue; // 待っている間に削除されたもの
+      const n = errors.length;
+      await processItem(item, errors);
+      if (errors.length > n) addErrors(errors.splice(n));
+    }
     renderAll();
   }
 
@@ -1264,12 +1296,15 @@ input[type="date"] {
     item.duration = meta.duration;
 
     if (meta.duration == null) {
-      errors.push(`${item.name} — 読み込めませんでした（対応していない形式かもしれません）`);
+      errors.push({ msg: `${item.name} — 読み込めませんでした（対応していない形式かもしれません）` });
       drop(item);
       return;
     }
     if (meta.duration > state.cap + 0.5) {
-      errors.push(`${item.name} — ${fmtDurJa(meta.duration)}。${state.cap}秒までにしてください`);
+      errors.push({
+        msg: `${item.name} — ${fmtDurJa(meta.duration)}。${state.cap}秒までにしてください`,
+        duration: true,
+      });
       drop(item);
       return;
     }
@@ -1283,7 +1318,7 @@ input[type="date"] {
   }
 
   function drop(item) {
-    release(item);
+    forget(item);
     const i = state.items.indexOf(item);
     if (i >= 0) state.items.splice(i, 1);
     renderAll();
@@ -1322,6 +1357,11 @@ input[type="date"] {
       c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
       const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.8));
       if (!blob) return { size: file.size, url: URL.createObjectURL(file) };
+      // 本番の resizeImage() と同じ判断: 縮小していないのに圧縮後が大きいなら元を使う
+      // （src/lib/imageResize.ts）。ここを外すと合計サイズが実際より膨らんで見える。
+      if (scale === 1 && blob.size >= file.size) {
+        return { size: file.size, url: URL.createObjectURL(file) };
+      }
       return { size: blob.size, url: URL.createObjectURL(blob) };
     } finally {
       bmp.close?.();
@@ -1445,12 +1485,16 @@ input[type="date"] {
     // カウンタとサマリ
     const ready = state.items.filter((i) => i.status === "ready");
     $("[data-counter]").textContent = `${state.items.length} / ${MAX_ITEMS}`;
+    // before は処理中のものも含めた元サイズ。after は確定したものだけで、
+    // 処理中の件数を添える（枚数だけ増えて 0KB のままだと容量の感覚が掴めない）。
+    const pending = state.items.length - ready.length;
+    const before = state.items.reduce((s, i) => s + i.size, 0);
     const total = ready.reduce((s, i) => s + (i.after ?? i.size), 0);
-    const before = ready.reduce((s, i) => s + i.size, 0);
     $("[data-media-summary]").textContent =
       state.items.length === 0
         ? `写真も動画もまとめて選べます（動画は1本 ${state.cap}秒 / ${state.maxVideos}本まで）。`
-        : `写真${photos().length}枚・動画${videos().length}本 ・ ${fmtBytes(before)} → ${fmtBytes(total)}`;
+        : `写真${photos().length}枚・動画${videos().length}本 ・ ${fmtBytes(before)} → ${fmtBytes(total)}` +
+          (pending > 0 ? `（ほか${pending}件を処理中）` : "");
 
     renderDetail(ready);
     renderList(ready);
