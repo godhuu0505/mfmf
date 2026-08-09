@@ -300,6 +300,9 @@
   .h-16 {
     height: calc(var(--spacing) * 16);
   }
+  .h-full {
+    height: 100%;
+  }
   .max-h-\[85vh\] {
     max-height: 85vh;
   }
@@ -479,6 +482,9 @@
   }
   .bg-surface-muted {
     background-color: var(--surface-muted);
+  }
+  .object-cover {
+    object-fit: cover;
   }
   .p-0\.5 {
     padding: calc(var(--spacing) * 0.5);
@@ -1055,8 +1061,10 @@ input[type="date"] {
 (() => {
   // ---- 上限（プロトで動かして決める） ----
   const MAX_ITEMS = 10; // 1記録の写真＋動画の合計
-  // 1ファイルの受け入れ上限。Supabase Free のハード上限がここなので、これ以上は上げられない。
-  const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+  // 1オブジェクトの受け入れ上限。Supabase Free のハード上限がここなので、これ以上は上げられない。
+  // 写真にも同じ上限がかかる（デコードできず元ファイルのまま通す経路がある）。
+  const MAX_OBJECT_MB = 50;
+  const MAX_OBJECT_BYTES = MAX_OBJECT_MB * 1024 * 1024;
   const state = { cap: 30, maxVideos: 3, quality: 720, tab: "form", items: [] };
 
   // 保存時のビットレート想定（映像+音声, Mbps）と、写真1枚の実測目安
@@ -1081,6 +1089,16 @@ input[type="date"] {
     return t >= 60 ? `${Math.floor(t / 60)}分${t % 60}秒` : `${t}秒`;
   };
   const estVideoBytes = (sec) => (sec * BITRATE[state.quality] * 1e6) / 8;
+
+  // ファイル名は入力由来。innerHTML に混ぜる前に必ず通す
+  // （`clip" onpointerenter="…` のような名前で属性を作られる）。
+  const esc = (s) =>
+    String(s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+    );
+  // サムネ。inline style を使わない（実装時に class → className の機械変換で済ませるため）
+  const thumbImg = (src) =>
+    src ? `<img src="${src}" alt="" class="absolute inset-0 h-full w-full object-cover" />` : "";
 
   const videos = () => state.items.filter((i) => i.kind === "video");
   const photos = () => state.items.filter((i) => i.kind === "photo");
@@ -1218,6 +1236,9 @@ input[type="date"] {
 
     // 1. 選択ぶんを先に全部受け付ける。1本目の動画の変換を待ってから 2 件目を足すと、
     //    その間カウンタが実際より少なく見え、＋タイルから別の選択で枠を取られてしまう。
+    //    動画は**枠を取る前に長さを検査する**（メタデータ読みは一瞬で、変換とは別物）。
+    //    ダメな動画に先に枠を取らせると、後ろの正しい動画まで本数上限で弾かれて、
+    //    結局どちらも残らない。
     for (const file of files) {
       const kind = classify(file);
       if (!kind) {
@@ -1228,20 +1249,14 @@ input[type="date"] {
         errors.push({ msg: `${file.name} — 合計${MAX_ITEMS}件までです` });
         continue;
       }
-      if (kind === "video") {
-        const queued = queue.filter((q) => q.kind === "video").length;
-        if (videos().length + queued >= state.maxVideos) {
-          errors.push({ msg: `${file.name} — 動画は${state.maxVideos}本までです` });
-          continue;
-        }
-        if (file.size > MAX_VIDEO_BYTES) {
-          errors.push({
-            msg: `${file.name} — ${fmtBytes(file.size)}。1ファイル ${MAX_VIDEO_BYTES / 1024 / 1024}MB までです`,
-          });
-          continue;
-        }
+      if (file.size > MAX_OBJECT_BYTES) {
+        errors.push({
+          msg: `${file.name} — ${fmtBytes(file.size)}。1ファイル ${MAX_OBJECT_MB}MB までです`,
+        });
+        continue;
       }
-      queue.push({
+
+      const item = {
         id: ++seq,
         kind,
         name: file.name || (kind === "video" ? "動画" : "写真"),
@@ -1253,7 +1268,34 @@ input[type="date"] {
         duration: null,
         status: "pending",
         progress: 0,
-      });
+      };
+
+      if (kind === "video") {
+        const meta = await readVideoMeta(file);
+        if (meta.duration == null) {
+          URL.revokeObjectURL(meta.url);
+          errors.push({ msg: `${file.name} — 読み込めませんでした（対応していない形式かもしれません）` });
+          continue;
+        }
+        if (meta.duration > state.cap + 0.5) {
+          URL.revokeObjectURL(meta.url);
+          errors.push({
+            msg: `${file.name} — ${fmtDurJa(meta.duration)}。${state.cap}秒までにしてください`,
+            duration: true,
+          });
+          continue;
+        }
+        const queued = queue.filter((q) => q.kind === "video").length;
+        if (videos().length + queued >= state.maxVideos) {
+          URL.revokeObjectURL(meta.url);
+          errors.push({ msg: `${file.name} — 動画は${state.maxVideos}本までです` });
+          continue;
+        }
+        item.url = meta.url;
+        item.duration = meta.duration;
+      }
+
+      queue.push(item);
     }
 
     state.items.push(...queue);
@@ -1279,6 +1321,15 @@ input[type="date"] {
     if (item.kind === "photo") {
       const out = await resizePhoto(item.file);
       if (!alive(item)) { if (out.url) URL.revokeObjectURL(out.url); return; }
+      // デコードできず元ファイルのまま返る経路がある。その場合は上限を超えうる。
+      if (out.size > MAX_OBJECT_BYTES) {
+        URL.revokeObjectURL(out.url);
+        errors.push({
+          msg: `${item.name} — ${fmtBytes(out.size)}。1ファイル ${MAX_OBJECT_MB}MB までです`,
+        });
+        drop(item);
+        return;
+      }
       item.after = out.size;
       item.url = out.url;
       item.thumb = out.url;
@@ -1289,29 +1340,11 @@ input[type="date"] {
       return;
     }
 
-    // --- 動画 ---
-    const meta = await readVideoMeta(item.file);
-    if (!alive(item)) { if (meta.url) URL.revokeObjectURL(meta.url); return; }
-    item.url = meta.url;
-    item.duration = meta.duration;
-
-    if (meta.duration == null) {
-      errors.push({ msg: `${item.name} — 読み込めませんでした（対応していない形式かもしれません）` });
-      drop(item);
-      return;
-    }
-    if (meta.duration > state.cap + 0.5) {
-      errors.push({
-        msg: `${item.name} — ${fmtDurJa(meta.duration)}。${state.cap}秒までにしてください`,
-        duration: true,
-      });
-      drop(item);
-      return;
-    }
-
+    // --- 動画（長さの検査は受け付け時に済んでいる） ---
     await convert(item);
     if (!alive(item)) return;
-    item.after = Math.min(item.size, estVideoBytes(item.duration));
+    // 必ず H.264 へ再エンコードするので、出力サイズは元サイズではなくビットレートで決まる
+    item.after = estVideoBytes(item.duration);
     item.status = "ready";
     renderAll();
     grabVideoThumb(item);
@@ -1347,6 +1380,10 @@ input[type="date"] {
   // 写真は本番と同じ方針（長辺1600px / JPEG q0.8）で実際に縮小する。
   // 表示するサイズが実測値になるので、合計サイズの体感がぶれない。
   async function resizePhoto(file) {
+    // 本番と同じく GIF / SVG は触らない（キャンバスに載せると GIF がコマ止めになる）
+    if (file.type === "image/gif" || file.type === "image/svg+xml") {
+      return { size: file.size, url: URL.createObjectURL(file) };
+    }
     const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => null);
     if (!bmp) return { size: file.size, url: URL.createObjectURL(file) };
     try {
@@ -1376,7 +1413,9 @@ input[type="date"] {
       v.muted = true;
       let settled = false;
       const done = (dur) => { if (!settled) { settled = true; resolve({ url, duration: dur }); } };
-      v.onloadedmetadata = () => done(isFinite(v.duration) ? v.duration : null);
+      // 長さ 0（空・途中で切れたファイル）は再生できないので弾く
+      v.onloadedmetadata = () =>
+        done(isFinite(v.duration) && v.duration > 0 ? v.duration : null);
       v.onerror = () => done(null);
       // 保険。短すぎると「大きい動画を選んだだけ」で対応外扱いになる
       setTimeout(() => done(isFinite(v.duration) && v.duration > 0 ? v.duration : null), 15000);
@@ -1414,11 +1453,9 @@ input[type="date"] {
   // ---- 描画 ----
   function tile(item) {
     const busy = item.status !== "ready";
-    const bg = item.thumb
-      ? `background-image:url(${item.thumb});background-size:cover;background-position:center`
-      : "";
     return `
-      <div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted" style="${bg}">
+      <div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted">
+        ${thumbImg(item.thumb)}
         ${busy ? '<div class="skeleton absolute inset-0"></div>' : ""}
         ${
           busy
@@ -1433,12 +1470,9 @@ input[type="date"] {
             ? `<span class="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ ${fmtDur(item.duration)}</span>`
             : ""
         }
-        ${
-          !busy
-            ? `<button type="button" data-remove="${item.id}" aria-label="${item.name} を削除"
-                 class="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white transition hover:bg-black/80">✕</button>`
-            : ""
-        }
+        <!-- 処理中も消せる。60秒の動画で 30 秒待たされる間に取り消せないのは辛い -->
+        <button type="button" data-remove="${item.id}" aria-label="${esc(item.name)} を${busy ? "取り消す" : "削除"}"
+          class="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white transition hover:bg-black/80">✕</button>
       </div>`;
   }
 
@@ -1519,8 +1553,8 @@ input[type="date"] {
       .map(
         (i) => `
         <button type="button" data-open="${i.id}"
-          class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted"
-          style="${i.thumb ? `background-image:url(${i.thumb});background-size:cover;background-position:center` : ""}">
+          class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted">
+          ${thumbImg(i.thumb)}
           ${
             i.kind === "video"
               ? `<span class="absolute inset-0 flex items-center justify-center">
@@ -1578,8 +1612,8 @@ input[type="date"] {
         const dur = typeof r.dur === "number" ? fmtDur(r.dur) : r.dur;
         return `
       <article class="flex gap-3 rounded-xl border border-border bg-surface p-3">
-        <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted"
-          style="${r.thumb ? `background-image:url(${r.thumb});background-size:cover;background-position:center` : ""}">
+        <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted">
+          ${thumbImg(r.thumb)}
           ${r.videos > 0 ? `<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ ${dur ?? ""}</span>` : ""}
         </div>
         <div class="min-w-0">
@@ -1594,8 +1628,8 @@ input[type="date"] {
     // ギャラリー: 今つくっている記録のぶんを先頭に、残りはダミー
     const cells = ready
       .map(
-        (i) => `<div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted"
-          style="${i.thumb ? `background-image:url(${i.thumb});background-size:cover;background-position:center` : ""}">
+        (i) => `<div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted">
+          ${thumbImg(i.thumb)}
           ${i.kind === "video" ? '<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶</span>' : ""}
         </div>`,
       )

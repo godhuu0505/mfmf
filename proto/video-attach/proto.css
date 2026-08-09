@@ -296,6 +296,9 @@
   .h-16 {
     height: calc(var(--spacing) * 16);
   }
+  .h-full {
+    height: 100%;
+  }
   .max-h-\[85vh\] {
     max-height: 85vh;
   }
@@ -475,6 +478,9 @@
   }
   .bg-surface-muted {
     background-color: var(--surface-muted);
+  }
+  .object-cover {
+    object-fit: cover;
   }
   .p-0\.5 {
     padding: calc(var(--spacing) * 0.5);
