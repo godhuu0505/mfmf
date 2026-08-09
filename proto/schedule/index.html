@@ -32,9 +32,11 @@
     --color-violet-900: oklch(38% 0.189 293.745);
     --color-rose-50: oklch(96.9% 0.015 12.422);
     --color-rose-100: oklch(94.1% 0.03 12.58);
+    --color-rose-300: oklch(81% 0.117 11.638);
     --color-rose-400: oklch(71.2% 0.194 13.428);
     --color-rose-500: oklch(64.5% 0.246 16.439);
     --color-rose-600: oklch(58.6% 0.253 17.585);
+    --color-rose-800: oklch(45.5% 0.188 13.697);
     --color-rose-900: oklch(41% 0.159 10.272);
     --color-slate-50: oklch(98.4% 0.003 247.858);
     --color-slate-400: oklch(70.4% 0.04 256.788);
@@ -664,6 +666,9 @@
   .border-primary {
     border-color: var(--primary);
   }
+  .border-rose-300 {
+    border-color: var(--color-rose-300);
+  }
   .border-rose-500 {
     border-color: var(--color-rose-500);
   }
@@ -732,6 +737,9 @@
   }
   .bg-rose-500 {
     background-color: var(--color-rose-500);
+  }
+  .bg-rose-600 {
+    background-color: var(--color-rose-600);
   }
   .bg-sky-50 {
     background-color: var(--color-sky-50);
@@ -969,6 +977,9 @@
   }
   .text-rose-600 {
     color: var(--color-rose-600);
+  }
+  .text-rose-800 {
+    color: var(--color-rose-800);
   }
   .text-rose-900 {
     color: var(--color-rose-900);
@@ -1655,7 +1666,7 @@ input[type="date"] {
       <div id="qrTodayPlan" class="mb-3"></div>
       <p class="mb-2 text-xs text-muted-foreground">2026年8月9日(日)</p>
       <div id="qrBody" class="space-y-3"></div>
-      <button type="button" onclick="quickSave()" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">保存する</button>
+      <button id="qrSave" type="button" onclick="quickSave()" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">保存する</button>
       <!-- 本番の導線（写真つき）は残したまま、予定への受け皿を下に足す -->
       <button type="button" onclick="closeQuick(); toast('（プロトでは記録フォームは省略）')"
         class="mt-2 w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
@@ -1794,6 +1805,7 @@ let openDate = null;
 let DRAFT = null;
 let DRAFT_BASE = null;
 let DONE_DRAFT = null;
+let CONFIRM_DELETE = false; // 記録削除の確認state
 let ASSIGN_DRAFT = null;
 let assignOpen = false;
 let seq = 100;
@@ -1855,7 +1867,8 @@ function itemsOn(d) {
   const list = r
     ? [...saved, { id: "rule:" + d, date: d, type: r.type, start: r.start, end: r.end, who: { ...r.who }, note: "", status: "planned", body: "", photos: 0, fromRule: true, timeDirty: !!r.timeDirty }]
     : [...saved];
-  return list.sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+  // 時刻なしの記録は先頭にまとめる
+  return list.sort((a, b) => (a.untimed ? 0 : 1) - (b.untimed ? 0 : 1) || (a.start || "").localeCompare(b.start || ""));
 }
 // その日の「予定」。編集シートや担当ボードが扱う 1 件。
 // 予定を経ない記録（overridesRule === false）はここに出さない。
@@ -1882,6 +1895,25 @@ function esc(v) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 // 開いているシートが 1 つでもあれば背面を固定する
+// シートを開いた要素を覚えておき、閉じたらそこへフォーカスを戻す（UC-Q05）
+const TRIGGERS = {};
+function rememberTrigger(id) {
+  TRIGGERS[id] = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+}
+function restoreTrigger(id) {
+  const el = TRIGGERS[id];
+  TRIGGERS[id] = null;
+  if (el && document.contains(el)) requestAnimationFrame(() => el.focus({ preventScroll: true }));
+}
+// Esc は一番上に開いているシートを閉じる
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const open = (id) => !$(id).classList.contains("invisible");
+  if (open("invSheet")) return closeInvite();
+  if (open("doneSheet")) return closeDone();
+  if (open("qrSheet")) return closeQuick();
+  if (open("sheet")) return closeSheet();
+});
 function syncScrollLock() {
   const open = ["sheet", "doneSheet", "qrSheet", "invSheet"]
     .some((id) => !$(id).classList.contains("invisible"));
@@ -2012,7 +2044,7 @@ function monthChip(x) {
     ? `<span class="h-2 w-2 shrink-0 rounded-full ${c.dot}"></span>`
     : `<span class="h-2 w-2 shrink-0 rounded-full border-[1.5px] ${c.ring}"></span>`;
   return `<span class="flex items-center gap-1 rounded px-0.5 text-[10px] ${faint}">
-    ${dot}<span class="hidden shrink-0 tabular-nums text-muted-foreground sm:inline">${x.start}</span><span class="truncate">${t.label}</span>
+    ${dot}${x.untimed ? "" : `<span class="hidden shrink-0 tabular-nums text-muted-foreground sm:inline">${x.start}</span>`}<span class="truncate">${t.label}</span>
     ${x.photos ? `<span class="shrink-0 text-muted-foreground">${svg("camera", "inline h-2.5 w-2.5")}</span>` : ""}
   </span>`;
 }
@@ -2025,7 +2057,7 @@ function weekBounds() {
   let s = 7 * 60, e = 21 * 60;
   for (const ds of weekDays()) {
     for (const x of itemsOn(ds)) {
-      if (x.status === "skipped") continue;
+      if (x.status === "skipped" || x.untimed) continue;
       s = Math.min(s, Math.floor(min(x.start) / 60) * 60);
       e = Math.max(e, Math.ceil(min(x.end) / 60) * 60);
     }
@@ -2082,9 +2114,10 @@ function renderWeek() {
   // 終日（このプロトでは「見送り」だけ上のバンドに出す）
   $("allDayBand").innerHTML = `<div class="py-1 pr-1 text-right text-[10px] text-muted-foreground">終日</div>` +
     days.map((ds) => {
-      const sk = itemsOn(ds).filter((x) => x.status === "skipped");
+      // 時刻を持たないもの（見送り・クイック記録）は上のバンドに出す
+      const sk = itemsOn(ds).filter((x) => x.status === "skipped" || x.untimed);
       return `<div class="min-h-6 border-l border-border p-0.5">
-        ${sk.map((x) => `<button type="button" onclick="openDay('${ds}','${x.id}')" class="block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] text-muted-foreground line-through">${type(x.type).label}</button>`).join("")}
+        ${sk.map((x) => `<button type="button" onclick="openDay('${ds}','${x.id}')" class="block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] ${x.status === "skipped" ? "text-muted-foreground line-through" : "text-foreground"}">${type(x.type).emoji}${esc(x.body) || type(x.type).label}</button>`).join("")}
       </div>`;
     }).join("");
 
@@ -2097,7 +2130,7 @@ function renderWeek() {
   gutter += `</div>`;
 
   const cols = days.map((ds) => {
-    const list = itemsOn(ds).filter((x) => x.status !== "skipped");
+    const list = itemsOn(ds).filter((x) => x.status !== "skipped" && !x.untimed);
     let lines = "";
     for (let hgt = H_START; hgt < H_END; hgt++) {
       lines += `<div class="absolute inset-x-0 border-t border-border" style="top:${(hgt - H_START) * ROW}px"></div>`;
@@ -2217,6 +2250,7 @@ function assignSave() {
 // ───────── 予定シート ─────────
 function openDay(d, id) {
   openDate = d;
+  CONFIRM_DELETE = false;
   // id を渡されたらその行を開く（さいきんの記録から、予定ではなく記録を開くため）
   const cur = (id && itemsOn(d).find((x) => x.id === id)) || planOn(d);
   DRAFT = cur ? JSON.parse(JSON.stringify(cur)) : null;
@@ -2224,6 +2258,7 @@ function openDay(d, id) {
   DRAFT_BASE = cur ? { fromRule: !!cur.fromRule, sig: sig(cur) } : null;
   $("sheetTitle").textContent = fmt(d);
   renderSheet();
+  rememberTrigger("sheet");
   $("sheet").scrollTop = 0; // 前に開いた日の位置が残らないように
   $("sheet").classList.remove("invisible", "translate-y-full");
   $("backdrop").classList.remove("pointer-events-none", "opacity-0");
@@ -2233,6 +2268,7 @@ function closeSheet() {
   $("sheet").classList.add("invisible", "translate-y-full");
   $("backdrop").classList.add("pointer-events-none", "opacity-0");
   syncScrollLock();
+  restoreTrigger("sheet");
   openDate = null;
   DRAFT = null;
   DRAFT_BASE = null;
@@ -2295,7 +2331,9 @@ function renderSheet() {
   </div>`;
 
   // ── 時間 ──
-  if (p) {
+  if (p && p.untimed) {
+    h += `<p class="rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">この記録は時刻を持ちません（クイック記録）。</p>`;
+  } else if (p) {
     h += `<div>
       <p class="mb-2 text-xs font-bold text-muted-foreground">時間</p>
       <div class="flex items-center gap-2">
@@ -2363,8 +2401,21 @@ function renderSheet() {
       h += `<button type="button" onclick="unskip()" class="w-full rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">予定に戻す</button>`;
     }
     if (p) {
-      h += `<button type="button" onclick="clearPlan()" class="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
-        ${p.status === "done" ? "この記録を削除する（写真ごと）" : "この日の予定を消す"}</button>`;
+      if (p.status === "done" && CONFIRM_DELETE) {
+        // 記録と写真は元に戻せない。本番の RecordActionsSheet と同じく確認をはさむ
+        h += `<div class="space-y-2 rounded-xl border border-rose-300 bg-rose-50 p-3">
+          <p class="text-sm font-medium text-rose-900">この記録を削除しますか？</p>
+          <p class="text-xs text-rose-800">本文と写真 ${p.photos || 0} 枚も一緒に消えます。元に戻せません。</p>
+          <div class="flex gap-2">
+            <button type="button" onclick="CONFIRM_DELETE = false; renderSheet()" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">やめる</button>
+            <button type="button" onclick="clearPlan()" class="flex-1 rounded-lg bg-rose-600 py-2.5 text-sm font-bold text-white">削除する</button>
+          </div>
+        </div>`;
+      } else {
+        h += `<button type="button" onclick="${p.status === "done" ? "CONFIRM_DELETE = true; renderSheet()" : "clearPlan()"}"
+          class="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
+          ${p.status === "done" ? "この記録を削除する（写真ごと）" : "この日の予定を消す"}</button>`;
+      }
     }
     h += `</div>`;
   }
@@ -2496,6 +2547,7 @@ function restoreRule() {
 
 // ───────── 完了 → 記録にする ─────────
 function timeProblem(p) {
+  if (p.untimed) return null; // 時刻を持たない記録は検証しない
   if (!p.start || !p.end) return "開始と終了の時刻を入れてください";
   if (min(p.end) <= min(p.start)) return "終了は開始より後にしてください";
   return null;
@@ -2514,8 +2566,9 @@ function openDone() {
     photos: p.photos || 0,
   };
   const t = type(p.type);
-  $("doneSummary").textContent = `${fmt(p.date)}・${t.emoji} ${t.label}・${p.start}〜${p.end}`;
+  $("doneSummary").textContent = `${fmt(p.date)}・${t.emoji} ${t.label}` + (p.untimed ? "" : `・${p.start}〜${p.end}`);
   renderDone();
+  rememberTrigger("doneSheet");
   $("doneSheet").scrollTop = 0; // 前に開いた分の位置が残らないように
   $("doneSheet").classList.remove("invisible", "translate-y-full");
   $("doneBackdrop").classList.remove("pointer-events-none", "opacity-0");
@@ -2525,6 +2578,7 @@ function closeDone() {
   $("doneSheet").classList.add("invisible", "translate-y-full");
   $("doneBackdrop").classList.add("pointer-events-none", "opacity-0");
   syncScrollLock();
+  restoreTrigger("doneSheet");
   DONE_DRAFT = null;
 }
 function renderDone() {
@@ -2605,7 +2659,7 @@ function renderHome() {
         <span class="text-3xl">${t.emoji}</span>
         <div class="min-w-0 flex-1">
           <p class="font-bold">${t.label}</p>
-          <p class="text-xs tabular-nums text-muted-foreground">${x.start}〜${x.end}${x.note ? "・" + esc(x.note) : ""}</p>
+          <p class="text-xs tabular-nums text-muted-foreground">${x.untimed ? "時刻なし" : `${x.start}〜${x.end}`}${x.note ? "・" + esc(x.note) : ""}</p>
         </div>
       </div>
       ${t.roles.length ? `<div class="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
@@ -2780,6 +2834,11 @@ function qrPreview() {
   if (!el) return;
   el.textContent = body || "チップを選ぶか、ひとことを書いてください";
   el.className = "rounded-xl bg-surface-muted px-3 py-2.5 text-sm " + (body ? "" : "text-muted-foreground");
+  // 本番と同じく、内容が空のあいだは保存を押せない
+  const save = $("qrSave");
+  save.disabled = !body;
+  save.className = "mt-3 w-full rounded-xl py-3 text-sm font-bold transition " +
+    (body ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "bg-surface-muted text-muted-foreground");
 }
 function qrChip(c) {
   QR.chips = QR.chips.includes(c) ? QR.chips.filter((x) => x !== c) : [...QR.chips, c];
@@ -2790,7 +2849,10 @@ function quickSave() {
   const body = qrBody();
   if (!body) { toast("チップを選ぶか、ひとことを書いてください"); return; }
   ITEMS.push({
-    id: "q" + seq++, date: TODAY, type: QR.source, start: "12:00", end: "13:00",
+    id: "q" + seq++, date: TODAY, type: QR.source,
+    // クイック記録は日付・記録元・本文しか取らない。時刻をでっち上げると
+    // 週表示で「正午に 1 時間」あったことになってしまう
+    untimed: true, start: "", end: "",
     who: {}, note: "", status: "done", body, chips: [...QR.chips], freeNote: QR.note.trim(),
     photos: 0, created: seqCreated++,
     overridesRule: false, // 予定を経ない記録。曜日ルールの予定は残す
@@ -2801,6 +2863,7 @@ function quickSave() {
   toast("記録しました");
 }
 function openQuick() {
+  rememberTrigger("qrSheet");
   renderQuick();
   const x = planOn(TODAY);
   $("qrTodayPlan").innerHTML = x && x.status === "planned"
@@ -2819,6 +2882,7 @@ function closeQuick() {
   $("qrSheet").classList.add("invisible", "translate-y-full");
   $("qrBackdrop").classList.add("pointer-events-none", "opacity-0");
   syncScrollLock();
+  restoreTrigger("qrSheet");
 }
 // 今日がもう記録ずみ／見送りなら、その日の編集ではなく次に予定を入れられる日を開く
 function nextOpenDay() {
@@ -2838,6 +2902,7 @@ function openNextFreeDay() {
 }
 function openInvite(memberId) {
   if (isViewer()) return;
+  rememberTrigger("invSheet");
   const m = memberId ? member(memberId) : null;
   $("invTitle").textContent = m ? `${m.name} を招待する` : "家族を招待する";
   $("invBody").textContent = m
@@ -2851,6 +2916,7 @@ function closeInvite() {
   $("invSheet").classList.add("invisible", "translate-y-full");
   $("invBackdrop").classList.add("pointer-events-none", "opacity-0");
   syncScrollLock();
+  restoreTrigger("invSheet");
 }
 
 function render() {
