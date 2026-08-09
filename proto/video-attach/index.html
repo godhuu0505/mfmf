@@ -1,4 +1,4 @@
-<title>mfmf 動画の保存 プロト</title>
+<title>mfmf 写真/動画の保存 プロト</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%A5%3C/text%3E%3C/svg%3E" />
 <style id="proto-css">
@@ -24,8 +24,6 @@
     --text-lg--line-height: calc(1.75 / 1.125);
     --text-2xl: 1.5rem;
     --text-2xl--line-height: calc(2 / 1.5);
-    --text-3xl: 1.875rem;
-    --text-3xl--line-height: calc(2.25 / 1.875);
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
     --leading-relaxed: 1.625;
@@ -221,11 +219,11 @@
   .top-0 {
     top: 0px;
   }
+  .top-1 {
+    top: var(--spacing);
+  }
   .right-1 {
     right: var(--spacing);
-  }
-  .right-2 {
-    right: calc(var(--spacing) * 2);
   }
   .bottom-0 {
     bottom: 0px;
@@ -233,11 +231,8 @@
   .bottom-1 {
     bottom: var(--spacing);
   }
-  .bottom-2 {
-    bottom: calc(var(--spacing) * 2);
-  }
-  .z-10 {
-    z-index: 10;
+  .left-1 {
+    left: var(--spacing);
   }
   .z-20 {
     z-index: 20;
@@ -259,9 +254,6 @@
   }
   .mt-2 {
     margin-top: calc(var(--spacing) * 2);
-  }
-  .mt-3 {
-    margin-top: calc(var(--spacing) * 3);
   }
   .mt-4 {
     margin-top: calc(var(--spacing) * 4);
@@ -287,9 +279,6 @@
   .hidden {
     display: none;
   }
-  .inline-block {
-    display: inline-block;
-  }
   .inline-flex {
     display: inline-flex;
   }
@@ -302,17 +291,14 @@
   .h-1 {
     height: var(--spacing);
   }
-  .h-2 {
-    height: calc(var(--spacing) * 2);
+  .h-6 {
+    height: calc(var(--spacing) * 6);
+  }
+  .h-9 {
+    height: calc(var(--spacing) * 9);
   }
   .h-16 {
     height: calc(var(--spacing) * 16);
-  }
-  .h-full {
-    height: 100%;
-  }
-  .max-h-72 {
-    max-height: calc(var(--spacing) * 72);
   }
   .max-h-\[85vh\] {
     max-height: 85vh;
@@ -320,17 +306,17 @@
   .min-h-screen {
     min-height: 100vh;
   }
-  .w-0 {
-    width: 0px;
+  .w-6 {
+    width: calc(var(--spacing) * 6);
+  }
+  .w-9 {
+    width: calc(var(--spacing) * 9);
   }
   .w-10 {
     width: calc(var(--spacing) * 10);
   }
   .w-16 {
     width: calc(var(--spacing) * 16);
-  }
-  .w-40 {
-    width: calc(var(--spacing) * 40);
   }
   .w-full {
     width: 100%;
@@ -353,8 +339,8 @@
   .grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .flex-wrap {
-    flex-wrap: wrap;
+  .flex-col {
+    flex-direction: column;
   }
   .items-baseline {
     align-items: baseline;
@@ -362,17 +348,28 @@
   .items-center {
     align-items: center;
   }
+  .items-start {
+    align-items: flex-start;
+  }
   .justify-between {
     justify-content: space-between;
   }
   .justify-center {
     justify-content: center;
   }
+  .gap-1 {
+    gap: var(--spacing);
+  }
   .gap-2 {
     gap: calc(var(--spacing) * 2);
   }
   .gap-3 {
     gap: calc(var(--spacing) * 3);
+  }
+  :where(.space-y-1 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(var(--spacing) * var(--tw-space-y-reverse));
+    margin-block-end: calc(var(--spacing) * calc(1 - var(--tw-space-y-reverse)));
   }
   :where(.space-y-3 > :not(:last-child)) {
     --tw-space-y-reverse: 0;
@@ -483,9 +480,6 @@
   .bg-surface-muted {
     background-color: var(--surface-muted);
   }
-  .object-cover {
-    object-fit: cover;
-  }
   .p-0\.5 {
     padding: calc(var(--spacing) * 0.5);
   }
@@ -498,9 +492,6 @@
   .px-1 {
     padding-inline: var(--spacing);
   }
-  .px-1\.5 {
-    padding-inline: calc(var(--spacing) * 1.5);
-  }
   .px-3 {
     padding-inline: calc(var(--spacing) * 3);
   }
@@ -510,12 +501,6 @@
   .px-5 {
     padding-inline: calc(var(--spacing) * 5);
   }
-  .px-6 {
-    padding-inline: calc(var(--spacing) * 6);
-  }
-  .py-0\.5 {
-    padding-block: calc(var(--spacing) * 0.5);
-  }
   .py-1\.5 {
     padding-block: calc(var(--spacing) * 1.5);
   }
@@ -524,12 +509,6 @@
   }
   .py-2\.5 {
     padding-block: calc(var(--spacing) * 2.5);
-  }
-  .py-3 {
-    padding-block: calc(var(--spacing) * 3);
-  }
-  .py-4 {
-    padding-block: calc(var(--spacing) * 4);
   }
   .py-6 {
     padding-block: calc(var(--spacing) * 6);
@@ -556,10 +535,6 @@
     font-size: var(--text-2xl);
     line-height: var(--tw-leading, var(--text-2xl--line-height));
   }
-  .text-3xl {
-    font-size: var(--text-3xl);
-    line-height: var(--tw-leading, var(--text-3xl--line-height));
-  }
   .text-lg {
     font-size: var(--text-lg);
     line-height: var(--tw-leading, var(--text-lg--line-height));
@@ -574,6 +549,10 @@
   }
   .text-\[10px\] {
     font-size: 10px;
+  }
+  .leading-none {
+    --tw-leading: 1;
+    line-height: 1;
   }
   .leading-relaxed {
     --tw-leading: var(--leading-relaxed);
@@ -612,26 +591,17 @@
     transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
     transition-duration: var(--tw-duration, var(--default-transition-duration));
   }
-  .transition-all {
-    transition-property: all;
-    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
-    transition-duration: var(--tw-duration, var(--default-transition-duration));
-  }
-  .duration-200 {
-    --tw-duration: 200ms;
-    transition-duration: 200ms;
-  }
   .outline-none {
     --tw-outline-style: none;
     outline-style: none;
   }
   @media (hover: hover) {
-    .hover\:bg-black\/75:hover {
-      background-color: color-mix(in srgb, #000 75%, transparent);
+    .hover\:bg-black\/80:hover {
+      background-color: color-mix(in srgb, #000 80%, transparent);
     }
     @supports (color: color-mix(in lab, red, red)) {
-      .hover\:bg-black\/75:hover {
-        background-color: color-mix(in oklab, var(--color-black) 75%, transparent);
+      .hover\:bg-black\/80:hover {
+        background-color: color-mix(in oklab, var(--color-black) 80%, transparent);
       }
     }
     .hover\:bg-primary-hover:hover {
@@ -639,6 +609,9 @@
     }
     .hover\:bg-surface-muted:hover {
       background-color: var(--surface-muted);
+    }
+    .hover\:text-foreground:hover {
+      color: var(--foreground);
     }
   }
   .focus\:border-muted-foreground:focus {
@@ -820,10 +793,6 @@ input[type="date"] {
   syntax: "*";
   inherits: false;
 }
-@property --tw-duration {
-  syntax: "*";
-  inherits: false;
-}
 @property --tw-shadow {
   syntax: "*";
   inherits: false;
@@ -905,7 +874,6 @@ input[type="date"] {
       --tw-backdrop-opacity: initial;
       --tw-backdrop-saturate: initial;
       --tw-backdrop-sepia: initial;
-      --tw-duration: initial;
       --tw-shadow: 0 0 #0000;
       --tw-shadow-color: initial;
       --tw-shadow-alpha: 100%;
@@ -927,16 +895,15 @@ input[type="date"] {
 </style>
 
 <div class="mx-auto min-h-screen max-w-md">
-  <!-- ヘッダー -->
   <header class="safe-pt sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
     <div class="safe-px flex items-center justify-between gap-3 py-2.5">
       <div>
-        <p class="text-sm font-semibold text-foreground">動画の保存</p>
+        <p class="text-sm font-semibold text-foreground">写真 / 動画の保存</p>
         <p class="text-xs text-muted-foreground">プロトタイプ / 保存はされません</p>
       </div>
       <button type="button" data-open-settings
         class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-surface-muted">
-        上限 <span data-cap-label>30秒</span>
+        上限を試す
       </button>
     </div>
     <div class="safe-px pb-2">
@@ -950,7 +917,7 @@ input[type="date"] {
 
   <main class="safe-px pb-24 pt-4">
 
-    <!-- ============ タブ1: 記録フォーム ============ -->
+    <!-- ============ 記録フォーム ============ -->
     <section data-panel="form" class="space-y-5">
       <div class="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
         <span class="text-sm text-muted-foreground">キャンセル</span>
@@ -963,102 +930,28 @@ input[type="date"] {
           class="rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground" />
       </div>
 
+      <!-- ▼ 写真と動画をひとつの欄にまとめた -->
       <div>
-        <span class="mb-1 block text-sm font-medium text-foreground">写真を追加（複数選択可）</span>
-        <div class="flex items-center gap-3 rounded-lg border border-dashed border-border px-3 py-3">
-          <span class="rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-foreground">ファイルを選択</span>
-          <span class="text-sm text-muted-foreground">既存のまま（変更なし）</span>
-        </div>
-        <p class="mt-1.5 text-xs text-muted-foreground">アップロード時に自動で縮小・圧縮します（長辺 1600px）。</p>
-      </div>
-
-      <!-- ▼ 新規: 動画 -->
-      <div>
-        <div class="mb-1 flex items-baseline justify-between gap-2">
-          <span class="text-sm font-medium text-foreground">動画を追加</span>
-          <span class="text-xs text-muted-foreground">1記録に1本まで</span>
+        <div class="mb-1.5 flex items-baseline justify-between gap-2">
+          <span class="text-sm font-medium text-foreground">写真 / 動画を追加</span>
+          <span class="text-xs text-muted-foreground" data-counter>0 / 10</span>
         </div>
 
-        <!-- 空 -->
-        <div data-vstate="empty" class="rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-center">
-          <p class="text-3xl" aria-hidden="true">🎥</p>
-          <p class="mt-2 text-sm text-muted-foreground">
-            <span data-cap-label>30秒</span>までの短い動画を1本つけられます
-          </p>
-          <label class="mt-3 inline-block cursor-pointer rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover">
-            動画を選ぶ
-            <input type="file" accept="video/*" data-video-input class="sr-only" />
-          </label>
-          <p class="mt-2 text-xs text-muted-foreground">iPhone / Android どちらの形式でも大丈夫です</p>
-        </div>
+        <div data-media-grid class="grid grid-cols-3 gap-2"></div>
 
-        <!-- 確認中 -->
-        <div data-vstate="checking" hidden class="rounded-lg border border-border bg-surface px-4 py-6 text-center">
-          <div class="skeleton mx-auto h-2 w-40 rounded-full"></div>
-          <p class="mt-3 text-sm text-muted-foreground">動画を確認しています…</p>
-        </div>
+        <p class="mt-2 text-xs text-muted-foreground" aria-live="polite" data-media-summary></p>
 
-        <!-- 長すぎ -->
-        <div data-vstate="toolong" hidden class="rounded-lg border border-red-600/40 bg-surface px-4 py-4">
-          <p class="text-sm font-medium text-red-600">動画が長すぎます</p>
-          <p class="mt-1 text-sm text-foreground">
-            選んだ動画は <b data-actual-dur>1分12秒</b> です。<span data-cap-label>30秒</span>までにしてください。
-          </p>
+        <div data-media-errors hidden class="mt-2 rounded-lg border border-red-600/40 bg-surface px-3 py-2.5">
+          <div class="flex items-start justify-between gap-2">
+            <p class="text-sm font-medium text-red-600">追加できなかったファイル</p>
+            <button type="button" data-clear-errors
+              class="shrink-0 text-xs text-muted-foreground transition hover:text-foreground">閉じる</button>
+          </div>
+          <ul data-error-list class="mt-1 space-y-1 text-sm text-foreground"></ul>
           <p class="mt-2 text-xs text-muted-foreground">
-            写真アプリで前後を切ってから選び直せます（iPhone: 編集 → 黄色い枠をドラッグ / Android: フォト → 編集 → トリミング）。
+            長すぎる動画は、写真アプリで前後を切ってから選び直せます
+            （iPhone: 編集 → 黄色い枠をドラッグ / Android: フォト → 編集 → トリミング）。
           </p>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <label class="cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-              別の動画を選ぶ
-              <input type="file" accept="video/*" data-video-input class="sr-only" />
-            </label>
-            <button type="button" data-video-reset
-              class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">やめる</button>
-          </div>
-        </div>
-
-        <!-- 対応外 -->
-        <div data-vstate="unsupported" hidden class="rounded-lg border border-red-600/40 bg-surface px-4 py-4">
-          <p class="text-sm font-medium text-red-600">この動画は読み込めませんでした</p>
-          <p class="mt-1 text-sm text-foreground">形式が対応していない可能性があります。別の動画を選んでください。</p>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <label class="cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-              別の動画を選ぶ
-              <input type="file" accept="video/*" data-video-input class="sr-only" />
-            </label>
-            <button type="button" data-video-reset
-              class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">やめる</button>
-          </div>
-        </div>
-
-        <!-- 変換中 -->
-        <div data-vstate="converting" hidden class="rounded-lg border border-border bg-surface px-4 py-4">
-          <p class="text-sm font-medium text-foreground">動画を準備しています…</p>
-          <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-surface-muted">
-            <div data-progress class="h-full w-0 rounded-full bg-primary transition-all duration-200"></div>
-          </div>
-          <p class="mt-2 text-xs text-muted-foreground" aria-live="polite">
-            <span data-progress-label>0%</span> ・ この端末の中で処理しています（まだ送信していません）
-          </p>
-          <button type="button" data-video-reset
-            class="mt-3 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">やめる</button>
-        </div>
-
-        <!-- 完了 -->
-        <div data-vstate="ready" hidden class="overflow-hidden rounded-lg border border-border bg-surface">
-          <video data-preview controls playsinline preload="metadata" class="block max-h-72 w-full bg-black"></video>
-          <div class="px-4 py-3">
-            <p class="text-sm font-medium text-foreground" data-ready-name>IMG_0421.MOV</p>
-            <p class="mt-0.5 text-xs text-muted-foreground" data-ready-meta>0:12 ・ 24.3 MB → 3.1 MB</p>
-            <div class="mt-3 flex flex-wrap gap-2">
-              <label class="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">
-                差し替える
-                <input type="file" accept="video/*" data-video-input class="sr-only" />
-              </label>
-              <button type="button" data-video-reset
-                class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-surface-muted">削除する</button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1069,47 +962,37 @@ input[type="date"] {
       </div>
     </section>
 
-    <!-- ============ タブ2: 記録詳細 ============ -->
+    <!-- ============ 記録詳細 ============ -->
     <section data-panel="detail" hidden class="space-y-4">
       <div>
         <p class="text-xs text-muted-foreground">2026年8月9日（日）</p>
         <h1 class="text-lg font-semibold text-foreground">保育園からの記録</h1>
       </div>
 
-      <!-- 動画カード: タップするまで読み込まない（通信量対策） -->
-      <div class="overflow-hidden rounded-xl border border-border bg-surface">
-        <div data-detail-poster class="relative flex aspect-video w-full items-center justify-center bg-surface-muted">
-          <img data-detail-thumb alt="" hidden class="absolute inset-0 h-full w-full object-cover" />
-          <button type="button" data-detail-play hidden
-            class="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-black/60 text-2xl text-white backdrop-blur transition hover:bg-black/75">▶</button>
-          <p data-detail-empty class="relative z-10 px-6 text-center text-sm text-muted-foreground">
-            この記録に動画はありません
-          </p>
-          <span data-detail-dur hidden class="absolute bottom-2 right-2 z-10 rounded bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">0:12</span>
-        </div>
-        <video data-detail-video hidden controls playsinline preload="none" class="block aspect-video w-full bg-black"></video>
-        <p class="px-4 py-2 text-xs text-muted-foreground" data-detail-note>
-          「記録する」タブで動画を選ぶと、ここに出ます。
-        </p>
+      <div data-detail-player hidden class="overflow-hidden rounded-xl border border-border bg-surface">
+        <video data-detail-video controls playsinline preload="none" class="block aspect-video w-full bg-black"></video>
+        <p class="px-4 py-2 text-xs text-muted-foreground" data-detail-note></p>
       </div>
 
       <div>
-        <p class="mb-1.5 text-sm font-medium text-foreground">写真</p>
-        <div class="grid grid-cols-3 gap-2">
-          <div class="aspect-square rounded-lg bg-surface-muted"></div>
-          <div class="aspect-square rounded-lg bg-surface-muted"></div>
-          <div class="aspect-square rounded-lg bg-surface-muted"></div>
-        </div>
+        <p class="mb-1.5 text-sm font-medium text-foreground" data-detail-heading>写真・動画</p>
+        <div data-detail-grid class="grid grid-cols-3 gap-2"></div>
+        <p data-detail-empty class="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+          この記録に写真・動画はありません
+        </p>
+        <p class="mt-1.5 text-xs text-muted-foreground">
+          動画はタップするまで読み込みません（開くまで通信しません）。
+        </p>
       </div>
 
       <p class="text-sm leading-relaxed text-foreground">
-        今日はお友だちとよく走り回っていました。おやつも完食です。動画はボール遊びの様子です。
+        今日はお友だちとよく走り回っていました。おやつも完食です。
       </p>
     </section>
 
-    <!-- ============ タブ3: 一覧 ============ -->
+    <!-- ============ 一覧 ============ -->
     <section data-panel="list" hidden class="space-y-4">
-      <p class="text-xs text-muted-foreground">動画がある記録には ▶ が付きます。</p>
+      <p class="text-xs text-muted-foreground">動画を含む記録には ▶ が付きます。</p>
       <div data-list class="space-y-3"></div>
 
       <div class="pt-2">
@@ -1125,15 +1008,25 @@ input[type="date"] {
     <div class="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <p class="text-sm font-semibold text-foreground">上限を試す</p>
-      <p class="mt-0.5 text-xs text-muted-foreground">この設定はプロト用です。実機で「何秒あれば足りるか」を確かめてください。</p>
+      <p class="mt-0.5 text-xs text-muted-foreground">実機で「足りるか」「入れすぎないか」を確かめてください。</p>
 
       <div class="mt-4">
-        <span class="mb-1.5 block text-sm font-medium text-foreground">動画の最長</span>
+        <span class="mb-1.5 block text-sm font-medium text-foreground">動画1本の最長</span>
         <div class="inline-flex w-full rounded-lg border border-border p-0.5">
           <button type="button" data-cap="15" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">15秒</button>
           <button type="button" data-cap="30" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">30秒</button>
           <button type="button" data-cap="60" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">60秒</button>
         </div>
+      </div>
+
+      <div class="mt-4">
+        <span class="mb-1.5 block text-sm font-medium text-foreground">1記録の動画の本数</span>
+        <div class="inline-flex w-full rounded-lg border border-border p-0.5">
+          <button type="button" data-maxvideos="1" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">1本</button>
+          <button type="button" data-maxvideos="3" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">3本</button>
+          <button type="button" data-maxvideos="10" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">10本</button>
+        </div>
+        <p class="mt-1.5 text-xs text-muted-foreground">写真＋動画で合計10件までは共通。そのうち動画を何本まで許すか。</p>
       </div>
 
       <div class="mt-4">
@@ -1147,7 +1040,8 @@ input[type="date"] {
       <div class="mt-4 rounded-lg bg-surface-muted p-3">
         <p class="text-sm text-foreground" data-budget></p>
         <p class="mt-1 text-xs text-muted-foreground">
-          無料枠 1GB のうち動画に 500MB を充てた場合の概算です。写真・DB で残りを使います。
+          無料枠 1GB のうち写真・動画に 800MB を充てた場合の概算です。
+          「最大まで入れた記録」ばかりではないので、実際はもっと入ります。
         </p>
       </div>
 
@@ -1159,25 +1053,35 @@ input[type="date"] {
 
 <script>
 (() => {
-  // ---- 状態（プロト用。実データは無い） ----
-  const state = { cap: 30, quality: 720, tab: "form", picked: null };
-  // 保存時のビットレート想定（映像+音声, Mbps）
+  // ---- 上限（プロトで動かして決める） ----
+  const MAX_ITEMS = 10; // 1記録の写真＋動画の合計
+  const state = { cap: 30, maxVideos: 3, quality: 720, tab: "form", items: [] };
+
+  // 保存時のビットレート想定（映像+音声, Mbps）と、写真1枚の実測目安
   const BITRATE = { 720: 2.0, 1080: 4.5 };
-  const BUDGET_BYTES = 500 * 1024 * 1024;
+  const PHOTO_BYTES = 300 * 1024; // 長辺1600px / JPEG q0.8 のおおよその実測
+  const MEDIA_BUDGET = 800 * 1024 * 1024;
+
+  // 端末側の再エンコードにかかる実時間の目安（動画の長さ × これ）。
+  // ここが一瞬で終わると「待てるか」を確かめられないので長さに比例させる。
+  const CONVERT_SPEED = 0.5;
+  const MIN_CONVERT_MS = 2000;
+  const PHOTO_PROCESS_MS = 350;
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-
   const fmtBytes = (b) =>
     b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`;
   const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  // 先に整数秒へ丸めてから分秒へ分ける（`Math.round(s % 60)` だと 59.6 秒が
-  // 「1分60秒」になる）。エラー文の文言はこのプロトの確認対象なので正しく出す。
+  // 先に整数秒へ丸めてから分秒に割る（`Math.round(s % 60)` だと 59.6 秒が「1分60秒」になる）
   const fmtDurJa = (s) => {
     const t = Math.round(s);
     return t >= 60 ? `${Math.floor(t / 60)}分${t % 60}秒` : `${t}秒`;
   };
-  const estBytes = (sec) => (sec * BITRATE[state.quality] * 1e6) / 8;
+  const estVideoBytes = (sec) => (sec * BITRATE[state.quality] * 1e6) / 8;
+
+  const videos = () => state.items.filter((i) => i.kind === "video");
+  const photos = () => state.items.filter((i) => i.kind === "photo");
 
   // ---- タブ ----
   function setTab(tab) {
@@ -1190,14 +1094,13 @@ input[type="date"] {
       b.setAttribute("aria-pressed", String(on));
     });
     $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== tab));
-    // hidden にしても <video> は鳴り続けるので、詳細から離れたら止める。
-    if (tab !== "detail") $("[data-detail-video]").pause();
-    if (tab !== "form") $("[data-preview]").pause();
+    // hidden にしても <video> は鳴り続けるので、離れたら止める
+    if (tab !== "detail") closeDetailPlayer();
     window.scrollTo({ top: 0 });
   }
   $$("[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
 
-  // ---- 設定シート ----
+  // ---- 設定 ----
   function segment(attr, value) {
     $$(`[${attr}]`).forEach((b) => {
       const on = b.getAttribute(attr) === String(value);
@@ -1209,181 +1112,250 @@ input[type="date"] {
   }
   function renderSettings() {
     segment("data-cap", state.cap);
+    segment("data-maxvideos", state.maxVideos);
     segment("data-quality", state.quality);
-    $$("[data-cap-label]").forEach((el) => (el.textContent = `${state.cap}秒`));
-    const per = estBytes(state.cap);
-    const count = Math.floor(BUDGET_BYTES / per);
-    const weeks = (count / 52).toFixed(1);
+    // 「上限まで入れた記録」1件あたりの最大サイズ
+    const perRecord =
+      state.maxVideos * estVideoBytes(state.cap) +
+      Math.max(0, MAX_ITEMS - state.maxVideos) * PHOTO_BYTES;
+    const count = Math.floor(MEDIA_BUDGET / perRecord);
     $("[data-budget]").textContent =
-      `${state.cap}秒 / ${state.quality}p ≒ ${fmtBytes(per)}。500MB で約 ${count} 本（週1本なら約 ${weeks} 年）。`;
+      `上限まで入れた記録 1件 ≒ ${fmtBytes(perRecord)}` +
+      `（動画${state.maxVideos}本 × ${state.cap}秒 + 写真${MAX_ITEMS - state.maxVideos}枚）。` +
+      `800MB で約 ${count} 記録。`;
   }
   $$("[data-cap]").forEach((b) =>
-    b.addEventListener("click", () => {
-      state.cap = Number(b.dataset.cap);
-      renderSettings();
-      if (state.picked) evaluate(state.picked);
-    }),
+    b.addEventListener("click", () => { state.cap = Number(b.dataset.cap); onLimitsChanged(); }),
+  );
+  $$("[data-maxvideos]").forEach((b) =>
+    b.addEventListener("click", () => { state.maxVideos = Number(b.dataset.maxvideos); onLimitsChanged(); }),
   );
   $$("[data-quality]").forEach((b) =>
-    b.addEventListener("click", () => {
-      state.quality = Number(b.dataset.quality);
-      renderSettings();
-      if (state.picked) evaluate(state.picked);
-    }),
+    b.addEventListener("click", () => { state.quality = Number(b.dataset.quality); onLimitsChanged(); }),
   );
   $("[data-open-settings]").addEventListener("click", () => ($("[data-settings]").hidden = false));
   $$("[data-close-settings]").forEach((b) =>
     b.addEventListener("click", () => ($("[data-settings]").hidden = true)),
   );
 
-  // ---- 動画欄 ----
-  function showV(name) {
-    $$("[data-vstate]").forEach((el) => (el.hidden = el.dataset.vstate !== name));
+  // 上限を変えたら、すでに入っているものを検査し直す。
+  // 上限超えになった動画はその場で外す（残したままだと「上限を試す」意味がなくなる）。
+  function onLimitsChanged() {
+    renderSettings();
+    const dropped = [];
+    let kept = 0;
+    state.items = state.items.filter((it) => {
+      if (it.kind !== "video") return true;
+      if (it.duration > state.cap + 0.5) {
+        dropped.push(`${it.name} — ${fmtDurJa(it.duration)}（上限 ${state.cap}秒 を超えました）`);
+        release(it);
+        return false;
+      }
+      kept += 1;
+      if (kept > state.maxVideos) {
+        dropped.push(`${it.name} — 動画は${state.maxVideos}本までになりました`);
+        release(it);
+        return false;
+      }
+      // 画質を変えたら見積もりサイズを取り直す
+      it.after = Math.min(it.size, estVideoBytes(it.duration));
+      return true;
+    });
+    if (dropped.length) addErrors(dropped);
+    renderAll();
   }
 
-  let objectUrl = null;
-  let timer = null;
-  let thumbJob = 0; // サムネ生成の世代番号（grabThumb / clearAttachmentViews）
+  // ---- エラー表示 ----
+  function addErrors(lines) {
+    const ul = $("[data-error-list]");
+    lines.forEach((line) => {
+      const li = document.createElement("li");
+      li.textContent = line;
+      ul.appendChild(li);
+    });
+    $("[data-media-errors]").hidden = false;
+  }
+  $("[data-clear-errors]").addEventListener("click", () => {
+    $("[data-error-list]").innerHTML = "";
+    $("[data-media-errors]").hidden = true;
+  });
 
-  // 「見る」「一覧」に出ている添付の見た目を、添付ゼロの状態へ戻す。
-  // 中途半端に消すと、消したはずの動画が残って見えて空の状態を確かめられない。
-  function clearAttachmentViews() {
-    thumbJob++; // 進行中のサムネ生成を無効化する（後から書き戻させない）
-    const dv = $("[data-detail-video]");
-    dv.pause();
-    dv.removeAttribute("src");
-    dv.hidden = true;
-    $("[data-detail-poster]").hidden = false;
-    $("[data-detail-thumb]").hidden = true;
-    $("[data-detail-thumb]").removeAttribute("src");
-    $("[data-detail-play]").hidden = true;
-    $("[data-detail-empty]").hidden = false;
-    $("[data-detail-dur]").hidden = true;
-    $("[data-detail-note]").textContent = "「記録する」タブで動画を選ぶと、ここに出ます。";
-    $$("[data-list-thumb='new']").forEach((el) => (el.style.backgroundImage = ""));
-    $$("[data-new-badge]").forEach((el) => (el.hidden = true));
-    $("[data-new-meta]").textContent = "写真3枚";
+  // ---- ファイルの取り込み ----
+  let seq = 0;
+
+  function release(item) {
+    if (item.url) URL.revokeObjectURL(item.url);
+    item.url = null;
   }
 
-  function stopConversion() {
-    if (timer) { clearInterval(timer); timer = null; }
+  function classify(file) {
+    if (file.type.startsWith("image/")) return "photo";
+    if (file.type.startsWith("video/")) return "video";
+    // iOS から来る .mov などで type が空になることがあるので拡張子でも見る
+    if (/\.(mov|mp4|m4v|3gp|webm|avi|mkv)$/i.test(file.name)) return "video";
+    if (/\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file.name)) return "photo";
+    return null;
   }
 
-  function reset() {
-    stopConversion();
-    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-    state.picked = null;
-    $("[data-preview]").pause();
-    $("[data-preview]").removeAttribute("src");
-    $$("[data-video-input]").forEach((i) => (i.value = ""));
-    clearAttachmentViews();
-    showV("empty");
-  }
-  $$("[data-video-reset]").forEach((b) => b.addEventListener("click", reset));
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+    const errors = [];
 
-  // メタデータ（長さ）を読む。プロトなので実際の変換はせず進捗だけ再現する。
-  function readMeta(file) {
+    for (const file of files) {
+      const kind = classify(file);
+      if (!kind) {
+        errors.push(`${file.name} — 写真でも動画でもないようです`);
+        continue;
+      }
+      if (state.items.length >= MAX_ITEMS) {
+        errors.push(`${file.name} — 合計${MAX_ITEMS}件までです`);
+        continue;
+      }
+      if (kind === "video" && videos().length >= state.maxVideos) {
+        errors.push(`${file.name} — 動画は${state.maxVideos}本までです`);
+        continue;
+      }
+      const item = {
+        id: ++seq,
+        kind,
+        name: file.name || (kind === "video" ? "動画" : "写真"),
+        file,
+        size: file.size,
+        after: null,
+        url: null,
+        thumb: null,
+        duration: null,
+        status: "pending",
+        progress: 0,
+      };
+      state.items.push(item);
+      renderAll();
+      await processItem(item, errors);
+    }
+
+    if (errors.length) addErrors(errors);
+    renderAll();
+  }
+
+  const alive = (item) => state.items.includes(item);
+
+  async function processItem(item, errors) {
+    item.status = "processing";
+    renderAll();
+
+    if (item.kind === "photo") {
+      const out = await resizePhoto(item.file);
+      if (!alive(item)) { if (out.url) URL.revokeObjectURL(out.url); return; }
+      item.after = out.size;
+      item.url = out.url;
+      item.thumb = out.url;
+      await wait(PHOTO_PROCESS_MS);
+      if (!alive(item)) return;
+      item.status = "ready";
+      renderAll();
+      return;
+    }
+
+    // --- 動画 ---
+    const meta = await readVideoMeta(item.file);
+    if (!alive(item)) { if (meta.url) URL.revokeObjectURL(meta.url); return; }
+    item.url = meta.url;
+    item.duration = meta.duration;
+
+    if (meta.duration == null) {
+      errors.push(`${item.name} — 読み込めませんでした（対応していない形式かもしれません）`);
+      drop(item);
+      return;
+    }
+    if (meta.duration > state.cap + 0.5) {
+      errors.push(`${item.name} — ${fmtDurJa(meta.duration)}。${state.cap}秒までにしてください`);
+      drop(item);
+      return;
+    }
+
+    await convert(item);
+    if (!alive(item)) return;
+    item.after = Math.min(item.size, estVideoBytes(item.duration));
+    item.status = "ready";
+    renderAll();
+    grabVideoThumb(item);
+  }
+
+  function drop(item) {
+    release(item);
+    const i = state.items.indexOf(item);
+    if (i >= 0) state.items.splice(i, 1);
+    renderAll();
+  }
+
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // 実装では WebCodecs で MP4(H.264/AAC) へ再エンコードする。ここは擬似だが、
+  // 待ち時間だけは長さに比例させて実機で体感できるようにしてある。
+  function convert(item) {
+    return new Promise((resolve) => {
+      const totalMs = Math.max(MIN_CONVERT_MS, item.duration * CONVERT_SPEED * 1000);
+      const tick = 100;
+      let elapsed = 0;
+      item.progress = 0;
+      const timer = setInterval(() => {
+        if (!alive(item)) { clearInterval(timer); resolve(); return; }
+        elapsed += tick;
+        item.progress = Math.min(100, (elapsed / totalMs) * 100);
+        renderProgress(item, Math.ceil((totalMs - elapsed) / 1000));
+        if (item.progress >= 100) { clearInterval(timer); resolve(); }
+      }, tick);
+    });
+  }
+
+  // 写真は本番と同じ方針（長辺1600px / JPEG q0.8）で実際に縮小する。
+  // 表示するサイズが実測値になるので、合計サイズの体感がぶれない。
+  async function resizePhoto(file) {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => null);
+    if (!bmp) return { size: file.size, url: URL.createObjectURL(file) };
+    try {
+      const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(bmp.width * scale));
+      c.height = Math.max(1, Math.round(bmp.height * scale));
+      c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+      const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.8));
+      if (!blob) return { size: file.size, url: URL.createObjectURL(file) };
+      return { size: blob.size, url: URL.createObjectURL(blob) };
+    } finally {
+      bmp.close?.();
+    }
+  }
+
+  function readVideoMeta(file) {
     return new Promise((resolve) => {
       const url = URL.createObjectURL(file);
       const v = document.createElement("video");
       v.preload = "metadata";
       v.muted = true;
-      const done = (dur) => { resolve({ url, duration: dur }); };
+      let settled = false;
+      const done = (dur) => { if (!settled) { settled = true; resolve({ url, duration: dur }); } };
       v.onloadedmetadata = () => done(isFinite(v.duration) ? v.duration : null);
       v.onerror = () => done(null);
-      // 保険のタイムアウト。短すぎると「大きい動画を選んだだけ」で対応外扱いになり、
-      // このプロトが確かめたい実機の選択フローが壊れる（先に resolve すると
-      // 後から来る loadedmetadata では取り返せない）。余裕をもって 15 秒。
+      // 保険。短すぎると「大きい動画を選んだだけ」で対応外扱いになる
       setTimeout(() => done(isFinite(v.duration) && v.duration > 0 ? v.duration : null), 15000);
       v.src = url;
     });
   }
 
-  function evaluate(picked) {
-    const { duration } = picked;
-    // 変換中に上限を下げたときも通る。走っている変換を止めないと、
-    // 上限超えの動画がそのまま finish() で「保存できます」になってしまう。
-    stopConversion();
-    if (duration == null) { clearAttachmentViews(); showV("unsupported"); return; }
-    if (duration > state.cap + 0.5) {
-      $("[data-actual-dur]").textContent = fmtDurJa(duration);
-      clearAttachmentViews();
-      showV("toolong");
-      return;
-    }
-    convert(picked);
-  }
-
-  // 実装では端末側の再エンコードに実時間がかかる（720p でおおむね再生時間の半分程度）。
-  // ここが一瞬で終わると「待てるかどうか」を確かめられないので、長さに比例させる。
-  const CONVERT_SPEED = 0.5; // 実時間 ≒ 動画の長さ × これ
-  const MIN_CONVERT_MS = 3000;
-
-  function convert(picked) {
-    const { duration } = picked;
-    showV("converting");
-    const totalMs = Math.max(MIN_CONVERT_MS, duration * CONVERT_SPEED * 1000);
-    const tick = 100;
-    let elapsed = 0;
-    // 前回の 100% が残っていると、再変換の頭で 100% → 数% へ巻き戻って見える。
-    stopConversion();
-    $("[data-progress]").style.width = "0%";
-    $("[data-progress-label]").textContent = "0%";
-    timer = setInterval(() => {
-      elapsed += tick;
-      const p = Math.min(100, (elapsed / totalMs) * 100);
-      const left = Math.ceil((totalMs - elapsed) / 1000);
-      $("[data-progress]").style.width = `${p}%`;
-      $("[data-progress-label]").textContent =
-        p >= 100 ? "100%" : `${Math.round(p)}% ・ 残り約${left}秒`;
-      if (p >= 100) {
-        stopConversion();
-        finish(picked);
-      }
-    }, tick);
-  }
-
-  function finish({ file, url, duration }) {
-    const after = Math.min(file.size, estBytes(duration));
-    $("[data-preview]").src = url;
-    $("[data-ready-name]").textContent = file.name || "動画";
-    $("[data-ready-meta]").textContent =
-      `${fmtDur(duration)} ・ ${fmtBytes(file.size)} → ${fmtBytes(after)}`;
-    showV("ready");
-
-    // 「見る」タブ・一覧にも同じ動画を反映して、再生の見え方を確かめられるようにする
-    $("[data-detail-video]").src = url;
-    $("[data-detail-play]").hidden = false;
-    $("[data-detail-empty]").hidden = true;
-    $("[data-detail-dur]").hidden = false;
-    $("[data-detail-dur]").textContent = fmtDur(duration);
-    $("[data-detail-note]").textContent =
-      `タップすると再生します（${fmtBytes(after)} / 開くまで通信しません）`;
-    // 一覧のバッジも実際の長さに合わせる（サムネだけ変わって 0:12 のままだと
-    // ▶ バッジの見え方を確かめる材料にならない）。
-    $$("[data-new-badge]").forEach((el) => {
-      el.hidden = false;
-      if (el.textContent.includes(":")) el.textContent = `▶ ${fmtDur(duration)}`;
-    });
-    $("[data-new-meta]").textContent = "写真3枚 ・ 動画1本";
-    grabThumb(url);
-  }
-
-  // 1フレーム目をサムネにする（実装でも poster として別途保存する想定）。
-  // デコードは非同期なので、遅れて返ってきたコールバックが「もう消した動画」や
-  // 「差し替え前の動画」のコマを書き戻さないよう、世代番号（thumbJob）で無効化する。
-  function grabThumb(url) {
-    const job = ++thumbJob;
+  // 1フレーム目をサムネにする（実装では poster として別途 Storage に保存する想定）。
+  // 遅れて返ったコールバックが、消した動画のコマを書き戻さないよう alive() で見張る。
+  function grabVideoThumb(item) {
     const v = document.createElement("video");
     v.preload = "metadata";
     v.muted = true;
     v.playsInline = true;
-    v.src = url;
+    v.src = item.url;
     v.onloadeddata = () => {
-      if (job !== thumbJob) return; // 世代が進んでいる = このコマはもう要らない
+      if (!alive(item)) return;
       try {
-        // 4K の動画をそのままキャンバスに載せると 30MB 超のピクセルバッファを確保して
-        // メインスレッドで data URL に焼くことになる。表示は数百 px なので長辺 640 に縮める。
+        // 4K をそのままキャンバスに載せると 30MB 超のバッファを確保してしまう
         const MAX = 640;
         const vw = v.videoWidth || 640;
         const vh = v.videoHeight || 360;
@@ -1392,84 +1364,209 @@ input[type="date"] {
         c.width = Math.max(1, Math.round(vw * scale));
         c.height = Math.max(1, Math.round(vh * scale));
         c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
-        const data = c.toDataURL("image/jpeg", 0.7);
-        const thumb = $("[data-detail-thumb]");
-        thumb.src = data;
-        thumb.hidden = false;
-        // 反映するのは「今つけた1本」の枠だけ。全部に配ると、過去の記録まで
-        // 同じ動画に見えて「写真と別々の動画が混ざった一覧」を確かめられない。
-        $$("[data-list-thumb='new']").forEach((el) => {
-          el.style.backgroundImage = `url(${data})`;
-          el.style.backgroundSize = "cover";
-          el.style.backgroundPosition = "center";
-        });
+        item.thumb = c.toDataURL("image/jpeg", 0.7);
+        renderAll();
       } catch (_) { /* プロトなので失敗は無視 */ }
     };
     v.currentTime = 0.1;
   }
 
-  $$("[data-video-input]").forEach((input) =>
-    input.addEventListener("change", async (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      showV("checking");
-      // 差し替えの場合、新しい動画が通るとは限らない。古い URL を revoke する前に
-      // 表示を落としておかないと、「見る」に revoke 済みの前の動画が残る。
-      stopConversion();
-      clearAttachmentViews();
-      // await 中に上限/画質を切り替えると evaluate(state.picked) が走る。
-      // 古い選択を残したままだと、revoke 済みの前の動画で変換が始まってしまう。
-      state.picked = null;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      const { url, duration } = await readMeta(file);
-      objectUrl = url;
-      state.picked = { file, url, duration };
-      evaluate(state.picked);
-    }),
-  );
+  // ---- 描画 ----
+  function tile(item) {
+    const busy = item.status !== "ready";
+    const bg = item.thumb
+      ? `background-image:url(${item.thumb});background-size:cover;background-position:center`
+      : "";
+    return `
+      <div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted" style="${bg}">
+        ${busy ? '<div class="skeleton absolute inset-0"></div>' : ""}
+        ${
+          busy
+            ? `<div class="absolute inset-0 flex flex-col items-center justify-center gap-1 px-1 text-center">
+                 <span class="text-xs font-medium text-foreground">${item.kind === "video" ? "変換中" : "最適化中"}</span>
+                 ${item.kind === "video" ? `<span class="text-[10px] text-muted-foreground" data-prog="${item.id}">${Math.round(item.progress)}%</span>` : ""}
+               </div>`
+            : ""
+        }
+        ${
+          item.kind === "video" && !busy
+            ? `<span class="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ ${fmtDur(item.duration)}</span>`
+            : ""
+        }
+        ${
+          !busy
+            ? `<button type="button" data-remove="${item.id}" aria-label="${item.name} を削除"
+                 class="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white transition hover:bg-black/80">✕</button>`
+            : ""
+        }
+      </div>`;
+  }
 
-  // ---- 詳細: タップして初めて再生 ----
-  $("[data-detail-play]").addEventListener("click", () => {
+  function addTile() {
+    const full = state.items.length >= MAX_ITEMS;
+    if (full) {
+      return `<div class="flex aspect-square items-center justify-center rounded-lg border border-dashed border-border px-1 text-center text-[10px] text-muted-foreground">
+        ${MAX_ITEMS}件まで
+      </div>`;
+    }
+    return `
+      <label class="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border transition hover:bg-surface-muted">
+        <span class="text-2xl leading-none text-muted-foreground" aria-hidden="true">＋</span>
+        <span class="px-1 text-center text-[10px] text-muted-foreground">写真 / 動画</span>
+        <input type="file" accept="image/*,video/*" multiple data-media-input class="sr-only" />
+      </label>`;
+  }
+
+  function renderProgress(item, secLeft) {
+    const el = $(`[data-prog="${item.id}"]`);
+    if (el) el.textContent = `${Math.round(item.progress)}% ・ 残り約${secLeft}秒`;
+  }
+
+  function renderAll() {
+    // フォームのグリッド
+    $("[data-media-grid]").innerHTML = state.items.map(tile).join("") + addTile();
+    $$("[data-media-input]").forEach((input) =>
+      input.addEventListener("change", (e) => {
+        // value を戻すと FileList が空になるので、先に配列へ写しておく
+        const files = Array.from(e.target.files ?? []);
+        e.target.value = "";
+        handleFiles(files);
+      }),
+    );
+    $$("[data-remove]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const item = state.items.find((i) => i.id === Number(b.dataset.remove));
+        if (!item) return;
+        if (playingId === item.id) closeDetailPlayer();
+        drop(item);
+      }),
+    );
+
+    // カウンタとサマリ
+    const ready = state.items.filter((i) => i.status === "ready");
+    $("[data-counter]").textContent = `${state.items.length} / ${MAX_ITEMS}`;
+    const total = ready.reduce((s, i) => s + (i.after ?? i.size), 0);
+    const before = ready.reduce((s, i) => s + i.size, 0);
+    $("[data-media-summary]").textContent =
+      state.items.length === 0
+        ? `写真も動画もまとめて選べます（動画は1本 ${state.cap}秒 / ${state.maxVideos}本まで）。`
+        : `写真${photos().length}枚・動画${videos().length}本 ・ ${fmtBytes(before)} → ${fmtBytes(total)}`;
+
+    renderDetail(ready);
+    renderList(ready);
+  }
+
+  // ---- 詳細（写真と動画が混ざった見え方） ----
+  let playingId = null;
+
+  function closeDetailPlayer() {
     const v = $("[data-detail-video]");
-    if (!v.getAttribute("src")) return; // 添付が無いときは再生ボタン自体を出していない
-    $("[data-detail-poster]").hidden = true;
-    v.hidden = false;
-    v.play().catch(() => {});
-  });
+    v.pause();
+    v.removeAttribute("src");
+    $("[data-detail-player]").hidden = true;
+    playingId = null;
+  }
 
-  // ---- 一覧（固定データ） ----
-  // `newest` の1件だけが「今つけた動画」。他の動画つき記録は別の動画のつもりで、
-  // サムネも長さも変えない（混ざった見え方を確かめるため）。
+  function renderDetail(ready) {
+    const grid = $("[data-detail-grid]");
+    $("[data-detail-empty]").hidden = ready.length > 0;
+    grid.hidden = ready.length === 0;
+    grid.innerHTML = ready
+      .map(
+        (i) => `
+        <button type="button" data-open="${i.id}"
+          class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted"
+          style="${i.thumb ? `background-image:url(${i.thumb});background-size:cover;background-position:center` : ""}">
+          ${
+            i.kind === "video"
+              ? `<span class="absolute inset-0 flex items-center justify-center">
+                   <span class="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-sm text-white">▶</span>
+                 </span>
+                 <span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">${fmtDur(i.duration)}</span>`
+              : ""
+          }
+        </button>`,
+      )
+      .join("");
+    $("[data-detail-heading]").textContent =
+      ready.length === 0
+        ? "写真・動画"
+        : `写真・動画（写真${ready.filter((i) => i.kind === "photo").length}枚 / 動画${ready.filter((i) => i.kind === "video").length}本）`;
+
+    $$("[data-open]", grid).forEach((b) =>
+      b.addEventListener("click", () => {
+        const item = ready.find((i) => i.id === Number(b.dataset.open));
+        if (!item || item.kind !== "video") return; // 写真の拡大表示はプロトの対象外
+        const v = $("[data-detail-video]");
+        v.src = item.url;
+        $("[data-detail-player]").hidden = false;
+        $("[data-detail-note]").textContent =
+          `${item.name} ・ ${fmtDur(item.duration)} ・ ${fmtBytes(item.after ?? item.size)}`;
+        playingId = item.id;
+        v.play().catch(() => {});
+      }),
+    );
+  }
+
+  // ---- 一覧（固定データ + 今つくっている記録） ----
   const RECORDS = [
-    { date: "8月9日(日)", body: "お友だちとよく走り回っていました。", video: true, newest: true, photos: 3, dur: "0:12" },
-    { date: "8月8日(土)", body: "おうちでお昼寝。よく寝ていました。", video: false, photos: 1 },
-    { date: "8月7日(金)", body: "はじめてのシャンプー。がんばりました。", video: true, photos: 2, dur: "0:25" },
-    { date: "8月6日(木)", body: "ごはん完食。", video: false, photos: 0 },
+    { date: "8月8日(土)", body: "おうちでお昼寝。よく寝ていました。", photos: 1, videos: 0 },
+    { date: "8月7日(金)", body: "はじめてのシャンプー。がんばりました。", photos: 2, videos: 1, dur: "0:25" },
+    { date: "8月6日(木)", body: "ごはん完食。", photos: 0, videos: 0 },
   ];
-  $("[data-list]").innerHTML = RECORDS.map((r) => `
-    <article class="flex gap-3 rounded-xl border border-border bg-surface p-3">
-      <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted"${r.newest ? ' data-list-thumb="new"' : ""}>
-        ${r.video ? `<span${r.newest ? " data-new-badge hidden" : ""} class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ ${r.dur}</span>` : ""}
-      </div>
-      <div class="min-w-0">
-        <p class="text-xs text-muted-foreground">${r.date}</p>
-        <p class="truncate text-sm text-foreground">${r.body}</p>
-        <p class="mt-1 text-xs text-muted-foreground"${r.newest ? " data-new-meta" : ""}>
-          ${r.photos > 0 ? `写真${r.photos}枚` : "写真なし"}${r.video && !r.newest ? " ・ 動画1本" : ""}
-        </p>
-      </div>
-    </article>`).join("");
 
-  $("[data-grid]").innerHTML = Array.from({ length: 9 }, (_, i) => {
-    const isVideo = i === 0 || i === 4;
-    const isNew = i === 0; // 今つけた1本だけサムネを差し替える
-    return `<div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted"${isNew ? ' data-list-thumb="new"' : ""}>
-      ${isVideo ? `<span${isNew ? " data-new-badge hidden" : ""} class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶</span>` : ""}
-    </div>`;
-  }).join("");
+  function renderList(ready) {
+    const draft = {
+      date: "8月9日(日)",
+      body: "お友だちとよく走り回っていました。",
+      photos: ready.filter((i) => i.kind === "photo").length,
+      videos: ready.filter((i) => i.kind === "video").length,
+      thumb: ready[0]?.thumb ?? null,
+      dur: ready.find((i) => i.kind === "video")?.duration ?? null,
+    };
+    const rows = [draft, ...RECORDS];
+    $("[data-list]").innerHTML = rows
+      .map((r) => {
+        const meta = [
+          r.photos > 0 ? `写真${r.photos}枚` : null,
+          r.videos > 0 ? `動画${r.videos}本` : null,
+        ].filter(Boolean).join(" ・ ") || "写真・動画なし";
+        const dur = typeof r.dur === "number" ? fmtDur(r.dur) : r.dur;
+        return `
+      <article class="flex gap-3 rounded-xl border border-border bg-surface p-3">
+        <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted"
+          style="${r.thumb ? `background-image:url(${r.thumb});background-size:cover;background-position:center` : ""}">
+          ${r.videos > 0 ? `<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ ${dur ?? ""}</span>` : ""}
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs text-muted-foreground">${r.date}</p>
+          <p class="truncate text-sm text-foreground">${r.body}</p>
+          <p class="mt-1 text-xs text-muted-foreground">${meta}</p>
+        </div>
+      </article>`;
+      })
+      .join("");
+
+    // ギャラリー: 今つくっている記録のぶんを先頭に、残りはダミー
+    const cells = ready
+      .map(
+        (i) => `<div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted"
+          style="${i.thumb ? `background-image:url(${i.thumb});background-size:cover;background-position:center` : ""}">
+          ${i.kind === "video" ? '<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶</span>' : ""}
+        </div>`,
+      )
+      .concat(
+        Array.from({ length: Math.max(0, 9 - ready.length) }, (_, i) =>
+          `<div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted">
+            ${i === 1 ? '<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶</span>' : ""}
+          </div>`,
+        ),
+      );
+    $("[data-grid]").innerHTML = cells.join("");
+  }
 
   setTab("form");
   renderSettings();
-  showV("empty");
+  renderAll();
 })();
 </script>
