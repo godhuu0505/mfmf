@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { refreshPostLoginNext } from "@/app/auth/actions";
 import { sanitizeNextPath } from "@/lib/nextPath";
+import { keepPostLoginNext } from "@/lib/keepPostLoginNext";
 
 const inputClass =
   "w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground";
@@ -23,6 +23,8 @@ function signupErrorMessage(message: string): string {
 // UC-O02（D3）: email/password でのセルフ登録。メール確認を伴う。
 // UC-O06: 利用規約・プライバシーへの同意を必須にし、同意時刻を user_metadata に残す
 //（正式な文書・同意台帳は #50 法務で整備。それまで本画面は flag で閉塞 UC-O08）。
+
+
 export default function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -56,7 +58,7 @@ export default function SignupForm() {
     const next = sanitizeNextPath(
       new URLSearchParams(window.location.search).get("next"),
     );
-    await refreshPostLoginNext(next);
+    await keepPostLoginNext(next);
 
     const supabase = createClient();
     const { data, error } = await supabase.auth.signUp({
