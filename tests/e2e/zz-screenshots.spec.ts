@@ -62,6 +62,24 @@ test("スクリーンショット一式（ライト）", async ({ page }) => {
   await page.locator('main a[href^="/records/"]').first().click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/);
   await shot(page, "record-detail");
+
+  // 招待リンクの受諾画面（宛先違い）。owner には他人宛ての招待も見えるため、
+  // 招待した本人がリンクを確認したときにここへ来る。
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: new URL(page.url()).origin,
+  });
+  await page.goto("/settings");
+  await page.locator("#invite_email").fill("invitee-shot@example.com");
+  await page.getByRole("button", { name: "招待を発行" }).click();
+  const inviteItem = page
+    .locator("li", { hasText: "invitee-shot@example.com" })
+    .first();
+  await inviteItem.getByRole("button", { name: "リンクをコピー" }).click();
+  await page.goto(await page.evaluate(() => navigator.clipboard.readText()));
+  await shot(page, "invite-mismatch");
+
+  await page.goto("/invite/this-token-does-not-exist");
+  await shot(page, "invite-not-found");
 });
 
 test.describe("ダーク", () => {

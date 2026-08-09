@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { saveGoogleRefreshToken } from "@/lib/google/token";
+import { POST_LOGIN_NEXT_COOKIE, sanitizeNextPath } from "@/lib/nextPath";
 
 // Google OAuth のコールバック。認可コードをセッションへ交換し、
 // 初回同意で得られる refresh token を暗号化保存する。
@@ -8,11 +9,12 @@ import { saveGoogleRefreshToken } from "@/lib/google/token";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  // オープンリダイレクト防止: next はサイト内パスのみ許可する
-  //（"//evil.example" のようなプロトコル相対 URL を弾く）。
-  const rawNext = searchParams.get("next") ?? "/";
-  const next =
-    rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  // 戻り先は ?next=（パスワード再設定リンク等）を優先し、無ければ middleware が
+  // 置いた Cookie を使う（Google OAuth は redirectTo が完全一致の許可リストのため
+  // クエリを足せない / src/lib/nextPath.ts）。どちらもサイト内パスのみ許可する。
+  const next = sanitizeNextPath(
+    searchParams.get("next") ?? request.cookies.get(POST_LOGIN_NEXT_COOKIE)?.value,
+  );
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=oauth`);
@@ -37,5 +39,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  const response = NextResponse.redirect(`${origin}${next}`);
+  response.cookies.delete(POST_LOGIN_NEXT_COOKIE);
+  return response;
 }

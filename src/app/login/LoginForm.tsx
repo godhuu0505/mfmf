@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sanitizeNextPath } from "@/lib/nextPath";
 
 // Drive 連携のため drive.file スコープを要求する。
 // drive.file は「アプリが作成・選択したファイルのみ」アクセスでき、
@@ -87,7 +88,10 @@ export default function LoginForm({ signupEnabled }: Props) {
       return;
     }
     // middleware にセッションを認識させるためフルナビゲーションで遷移する。
-    window.location.assign("/");
+    // 招待リンク等から飛ばされてきた場合は元の行き先へ戻す（?next=）。
+    window.location.assign(
+      sanitizeNextPath(new URLSearchParams(window.location.search).get("next")),
+    );
   }
 
   return (
