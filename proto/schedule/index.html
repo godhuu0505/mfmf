@@ -1822,6 +1822,17 @@ function ruleFor(d) {
   }
   return best && best.type ? best : null;
 }
+// ルール表の編集は「今日から」の版に対して行う。直近の版が今日より前から
+// 効いている場合は、その複製を今日の版として積んでから編集する
+// （直接いじると 8/4 のような過去の日まで書き換わる）
+function editableRule(w) {
+  const lv = latestVersion(w);
+  if (!lv || !lv.type) return null;
+  if ((lv.since || "") >= TODAY) return lv;
+  const copy = { ...lv, who: { ...(lv.who || {}) }, since: TODAY };
+  putRuleVersion(w, copy);
+  return copy;
+}
 function putRuleVersion(w, r) {
   const list = RULES[w] || (RULES[w] = []);
   const i = list.findIndex((x) => (x.since || "") === (r.since || ""));
@@ -1837,7 +1848,7 @@ function itemsOn(d) {
   const overridden = CANCELLED.has(d) || saved.some((x) => x.overridesRule);
   const r = overridden ? null : ruleFor(d);
   const list = r
-    ? [...saved, { id: "rule:" + d, date: d, type: r.type, start: r.start, end: r.end, who: { ...r.who }, note: "", status: "planned", body: "", photos: 0, fromRule: true }]
+    ? [...saved, { id: "rule:" + d, date: d, type: r.type, start: r.start, end: r.end, who: { ...r.who }, note: "", status: "planned", body: "", photos: 0, fromRule: true, timeDirty: !!r.timeDirty }]
     : [...saved];
   return list.sort((a, b) => (a.start || "").localeCompare(b.start || ""));
 }
@@ -1861,6 +1872,12 @@ function avatar(id, size) {
 function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+// 開いているシートが 1 つでもあれば背面を固定する
+function syncScrollLock() {
+  const open = ["sheet", "doneSheet", "qrSheet", "invSheet"]
+    .some((id) => !$(id).classList.contains("invisible"));
+  document.body.style.overflow = open ? "hidden" : "";
 }
 function toast(msg) {
   const t = $("toast");
@@ -2149,9 +2166,10 @@ function assignSave() {
 }
 
 // ───────── 予定シート ─────────
-function openDay(d) {
+function openDay(d, id) {
   openDate = d;
-  const cur = planOn(d);
+  // id を渡されたらその行を開く（さいきんの記録から、予定ではなく記録を開くため）
+  const cur = (id && itemsOn(d).find((x) => x.id === id)) || planOn(d);
   DRAFT = cur ? JSON.parse(JSON.stringify(cur)) : null;
   if (DRAFT) DRAFT.repeat = false;
   DRAFT_BASE = cur ? { fromRule: !!cur.fromRule, sig: sig(cur) } : null;
@@ -2160,12 +2178,12 @@ function openDay(d) {
   $("sheet").scrollTop = 0; // 前に開いた日の位置が残らないように
   $("sheet").classList.remove("invisible", "translate-y-full");
   $("backdrop").classList.remove("pointer-events-none", "opacity-0");
-  document.body.style.overflow = "hidden";
+  syncScrollLock();
 }
 function closeSheet() {
   $("sheet").classList.add("invisible", "translate-y-full");
   $("backdrop").classList.add("pointer-events-none", "opacity-0");
-  document.body.style.overflow = "";
+  syncScrollLock();
   openDate = null;
   DRAFT = null;
   DRAFT_BASE = null;
@@ -2436,10 +2454,12 @@ function openDone() {
   $("doneSheet").scrollTop = 0; // 前に開いた分の位置が残らないように
   $("doneSheet").classList.remove("invisible", "translate-y-full");
   $("doneBackdrop").classList.remove("pointer-events-none", "opacity-0");
+  syncScrollLock();
 }
 function closeDone() {
   $("doneSheet").classList.add("invisible", "translate-y-full");
   $("doneBackdrop").classList.add("pointer-events-none", "opacity-0");
+  syncScrollLock();
   DONE_DRAFT = null;
 }
 function renderDone() {
@@ -2536,7 +2556,7 @@ function renderHome() {
   $("recentList").innerHTML = recent.length
     ? recent.map((y) => {
         const t = type(y.type);
-        return `<li><button type="button" onclick="go('calendar'); openDay('${y.date}')" class="flex w-full items-center gap-2 rounded-xl bg-surface px-3 py-2.5 text-left text-sm shadow-sm ring-1 ring-border transition hover:bg-surface-muted">
+        return `<li><button type="button" onclick="go('calendar'); openDay('${y.date}','${y.id}')" class="flex w-full items-center gap-2 rounded-xl bg-surface px-3 py-2.5 text-left text-sm shadow-sm ring-1 ring-border transition hover:bg-surface-muted">
           <span class="w-14 shrink-0 text-xs text-muted-foreground">${fmt(y.date).replace("2026年", "")}</span>
           <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${C[t.color].soft}">${t.emoji}${t.label}</span>
           <span class="min-w-0 flex-1 truncate">${esc(y.body) || "（本文なし）"}</span>
@@ -2617,19 +2637,18 @@ function cycleRule(w) {
   for (const [k] of t.roles) if (lv?.who?.[k]) keep[k] = lv.who[k];
   // 時刻は「触ったかどうか」を旗で持つ。既定値との一致で推測すると、
   // たまたま別の種類の既定と同じ時刻にしたときに勝手に上書きされる
-  const r = {
+  // 既存の版を書き換えず、今日から効く版として積む（過去は前の版のまま）
+  putRuleVersion(w, {
     type: next, who: keep,
     start: lv && lv.timeDirty ? lv.start : t.start,
     end: lv && lv.timeDirty ? lv.end : t.end,
-    // 新規作成の版は今日から。undefined のままだと全期間に効いて過去に遡る
-    since: lv ? lv.since : TODAY,
+    since: lv ? [TODAY, lv.since || ""].sort().pop() : TODAY,
     timeDirty: !!(lv && lv.timeDirty),
-  };
-  if (lv) RULES[w][RULES[w].length - 1] = r; else putRuleVersion(w, r);
+  });
   render();
 }
 function cycleWho(w, key) {
-  const r = latestRule(w);
+  const r = editableRule(w);
   if (!r) return;
   const ids = [...MEMBERS.map((m) => m.id), null];
   r.who = r.who || {};
@@ -2706,10 +2725,12 @@ function openQuick() {
     : "";
   $("qrSheet").classList.remove("invisible", "translate-y-full");
   $("qrBackdrop").classList.remove("pointer-events-none", "opacity-0");
+  syncScrollLock();
 }
 function closeQuick() {
   $("qrSheet").classList.add("invisible", "translate-y-full");
   $("qrBackdrop").classList.add("pointer-events-none", "opacity-0");
+  syncScrollLock();
 }
 // 今日がもう記録ずみ／見送りなら、その日の編集ではなく次に予定を入れられる日を開く
 function nextOpenDay() {
@@ -2736,10 +2757,12 @@ function openInvite(memberId) {
     : "このリンクを送ると、Google アカウントでログインして世帯に加われます。";
   $("invSheet").classList.remove("invisible", "translate-y-full");
   $("invBackdrop").classList.remove("pointer-events-none", "opacity-0");
+  syncScrollLock();
 }
 function closeInvite() {
   $("invSheet").classList.add("invisible", "translate-y-full");
   $("invBackdrop").classList.add("pointer-events-none", "opacity-0");
+  syncScrollLock();
 }
 
 function render() {
