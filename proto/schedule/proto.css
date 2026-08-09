@@ -1106,6 +1106,10 @@
     --tw-duration: 300ms;
     transition-duration: 300ms;
   }
+  .outline-none {
+    --tw-outline-style: none;
+    outline-style: none;
+  }
   .select-all {
     -webkit-user-select: all;
     user-select: all;
