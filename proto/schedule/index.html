@@ -1246,7 +1246,7 @@ input[type="date"] {
       </div>
       <p id="weekReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、担当は変更できません。</p>
       <div id="weekBoard" class="space-y-2"></div>
-      <button id="weekSave" type="button" onclick="toast('今週の担当を保存しました')" class="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">保存する</button>
+      <button id="weekSave" type="button" onclick="weekSave()" class="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">保存する</button>
     </section>
 
   </main>
@@ -1377,6 +1377,11 @@ let openDate = null;
 // シートの編集は下書きに対して行い、「保存する」で確定する。
 // ✕ / 背景タップは破棄（種類・担当・メモで挙動が変わらないように）
 let DRAFT = null;
+// 開いた時点の中身。曜日ルール由来のまま変えていない日を、
+// 手入力の予定として実体化させないために使う
+let DRAFT_BASE = null;
+// 「今週の担当」ボードも下書きに貯めて、「保存する」で確定する
+let WEEK_DRAFT = null;
 
 // ───────── ヘルパ ─────────
 const $ = (id) => document.getElementById(id);
@@ -1421,6 +1426,7 @@ function toast(msg) {
 
 // ───────── 画面切替 ─────────
 function go(s) {
+  if (screen === "week" && s !== "week") WEEK_DRAFT = null; // 保存していない一括編集は捨てる
   screen = s;
   ["home", "calendar", "week", "rules"].forEach((k) => {
     $("screen-" + k).classList.toggle("hidden", k !== s);
@@ -1477,7 +1483,8 @@ function renderGrid() {
 function openDay(d) {
   openDate = d;
   const cur = planFor(d);
-  DRAFT = cur ? { type: cur.type, who: { ...(cur.who || {}) }, note: cur.note || "" } : null;
+  DRAFT = cur ? { type: cur.type, who: { ...(cur.who || {}) }, note: cur.note || "", repeat: false } : null;
+  DRAFT_BASE = cur ? { from: cur.from, sig: sig(cur) } : null;
   $("sheetTitle").textContent = fmt(d) + " の予定";
   renderSheet();
   $("sheet").classList.remove("invisible", "translate-y-full");
@@ -1490,6 +1497,7 @@ function closeSheet() {
   document.body.style.overflow = "";
   openDate = null;
   DRAFT = null; // 保存していない編集は捨てる
+  DRAFT_BASE = null;
 }
 function renderSheet() {
   const d = openDate;
@@ -1572,7 +1580,8 @@ function renderSheet() {
     if (!ro) {
       const wd = ["日", "月", "火", "水", "木", "金", "土"][dow(d)];
       h += `<label class="flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
-        <input type="checkbox" id="rep" class="mt-0.5" />
+        <input type="checkbox" id="rep" class="mt-0.5" ${p.repeat ? "checked" : ""}
+          onchange="if (DRAFT) DRAFT.repeat = this.checked" />
         <span>これから毎週${wd}曜も同じにする<span class="mt-0.5 block text-xs text-muted-foreground">曜日ルールに保存され、以降の${wd}曜に薄く自動で入ります</span></span>
       </label>`;
     }
@@ -1601,10 +1610,26 @@ function renderSheet() {
   $("sheetBody").innerHTML = h;
 }
 function draft() {
-  if (!DRAFT) DRAFT = { type: "daycare", who: {}, note: "" };
+  if (!DRAFT) DRAFT = { type: "daycare", who: {}, note: "", repeat: false };
+  if (!DRAFT.who) DRAFT.who = {};
   return DRAFT;
 }
-function setType(id) { draft().type = id; renderSheet(); }
+// 予定の中身を比べるための署名。種類が持つ担当だけを見る
+function sig(p) {
+  if (!p) return "none";
+  const keys = type(p.type).roles.map(([k]) => k);
+  return JSON.stringify([p.type, keys.map((k) => (p.who || {})[k] || null), p.note || ""]);
+}
+// 種類を変えたら、その種類に無い担当は捨てる（保育園→おうちで送り迎えが
+// 見えないまま残り、カレンダーのドットに出てしまう）
+function setType(id) {
+  const p = draft();
+  p.type = id;
+  const keep = {};
+  for (const [k] of type(id).roles) if (p.who[k]) keep[k] = p.who[k];
+  p.who = keep;
+  renderSheet();
+}
 function setWho(key, mid) {
   const p = draft();
   p.who = p.who || {};
@@ -1634,10 +1659,20 @@ function restoreRule() {
 function savePlan() {
   const d = openDate;
   if (!DRAFT) { clearPlan(); return; }
+  const repeat = !!DRAFT.repeat;
+
+  // 曜日ルール由来のまま何も変えずに保存したら、その日は例外にしない
+  // （実体化させると、以降ルールを変えてもこの日だけ追従しなくなる）
+  if (!repeat && DRAFT_BASE && DRAFT_BASE.from === "rule" && sig(DRAFT) === DRAFT_BASE.sig) {
+    closeSheet();
+    render();
+    toast("変更なし（曜日ルールのままです）");
+    return;
+  }
+
   PLANS[d] = { type: DRAFT.type, who: { ...DRAFT.who }, note: DRAFT.note || "" };
   CANCELLED.delete(d);
-  const rep = $("rep");
-  if (rep && rep.checked) {
+  if (repeat) {
     RULES[dow(d)] = { type: PLANS[d].type, who: { ...PLANS[d].who } };
     toast("予定と曜日ルールを保存しました");
   } else {
@@ -1684,7 +1719,8 @@ function renderHome() {
       </div>`;
 
   const up = [];
-  for (let d = 10; d <= 24 && up.length < 4; d++) {
+  // 表示中の月の末日まで見る（途中で打ち切ると、月末に入れた予定が出ない）
+  for (let d = 10; d <= 31 && up.length < 4; d++) {
     const ds = `2026-08-${String(d).padStart(2, "0")}`;
     const q = planFor(ds);
     if (q) up.push([ds, q]);
@@ -1750,12 +1786,19 @@ function renderWeek() {
   const days = ["2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14"];
   const ro = isViewer();
   $("weekReadonly").classList.toggle("hidden", !ro);
-  $("weekSave").classList.toggle("hidden", ro);
 
   // このボードは「担当がある予定の日」だけを扱う。予定のない日を勝手に保育園として
   // 見せると、入れていない日の担当を決めてしまえる
+  const dirty = WEEK_DRAFT && Object.keys(WEEK_DRAFT).length > 0;
+  $("weekSave").textContent = dirty ? "保存する（未保存の変更あり）" : "保存する";
+  $("weekSave").disabled = !dirty;
+  $("weekSave").className =
+    "w-full rounded-xl py-3 text-sm font-bold transition " +
+    (dirty ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "bg-surface-muted text-muted-foreground");
+  $("weekSave").classList.toggle("hidden", ro);
+
   const rows = days.map((ds) => {
-    const p = planFor(ds);
+    const p = (WEEK_DRAFT && WEEK_DRAFT[ds]) || planFor(ds);
     const t = p ? type(p.type) : null;
     const label = fmt(ds).replace("2026年", "");
     if (!p) {
@@ -1783,16 +1826,26 @@ function renderWeek() {
   });
   $("weekBoard").innerHTML = rows.join("");
 }
-// 既にある予定の担当だけを書き換える（新しい予定はここでは作らない）
+// 既にある予定の担当だけを、下書きの上で書き換える
+// （新しい予定はここでは作らない。確定は「保存する」）
 function weekSet(ds, k, mid) {
-  const cur = planFor(ds);
+  if (isViewer()) return;
+  const cur = (WEEK_DRAFT && WEEK_DRAFT[ds]) || planFor(ds);
   if (!cur) return;
-  const p = PLANS[ds] || (PLANS[ds] = { type: cur.type, who: { ...(cur.who || {}) }, note: cur.note || "" });
-  p.who = p.who || {};
+  if (!WEEK_DRAFT) WEEK_DRAFT = {};
+  const p = WEEK_DRAFT[ds] || (WEEK_DRAFT[ds] = { type: cur.type, who: { ...(cur.who || {}) }, note: cur.note || "" });
   p.who[k] = p.who[k] === mid ? null : mid;
-  renderWeek();
-  renderGrid();
-  renderHome();
+  renderWeek(); // カレンダー / ホームには保存するまで出さない
+}
+function weekSave() {
+  if (!WEEK_DRAFT) return;
+  for (const [ds, p] of Object.entries(WEEK_DRAFT)) {
+    PLANS[ds] = { type: p.type, who: { ...p.who }, note: p.note || "" };
+    CANCELLED.delete(ds);
+  }
+  WEEK_DRAFT = null;
+  render();
+  toast("今週の担当を保存しました");
 }
 
 function render() {
