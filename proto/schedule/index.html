@@ -2202,9 +2202,17 @@ function denseItems() {
   out.forEach((x, i) => { x.created = i; });
   return out;
 }
+// 差し替えたデータに合わせて採番を進める。戻し忘れると、この後のクイック記録が
+// 「いちばん古い」扱いになって「さいきんの記録」に出てこない
+function resyncCreated() {
+  // 元データの分は、いま外していても採番済みとして扱う（0 件の状態で作った記録が
+  // 戻したときの予定と同じ番号になり、並びが入れ替わるのを防ぐ）
+  seqCreated = ITEMS.reduce((m, x) => Math.max(m, (x.created || 0) + 1), FIXTURE_ITEMS.length);
+}
 function toggleDense() {
   if (isDense()) { $("cfgEmpty").checked = false; ITEMS = denseItems(); RULES = JSON.parse(JSON.stringify(FIXTURE_RULES)); }
   else { ITEMS = JSON.parse(JSON.stringify(FIXTURE_ITEMS)); RULES = JSON.parse(JSON.stringify(FIXTURE_RULES)); }
+  resyncCreated();
   CANCELLED = new Set();
   ASSIGN_DRAFT = null;
   render();
@@ -2221,6 +2229,7 @@ function toggleEmpty() {
     ITEMS = JSON.parse(JSON.stringify(FIXTURE_ITEMS));
     RULES = JSON.parse(JSON.stringify(FIXTURE_RULES));
   }
+  resyncCreated();
   CANCELLED = new Set();
   ASSIGN_DRAFT = null;
   render();
