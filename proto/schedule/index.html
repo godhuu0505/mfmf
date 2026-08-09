@@ -1761,7 +1761,9 @@ let ITEMS = [
   { id: "i4", date: "2026-08-07", type: "home",    start: "09:00", end: "18:00", who: { care: "m1" }, note: "", status: "done", body: "ごきげん", photos: 1 },
   { id: "i5", date: "2026-08-08", type: "outing",  start: "10:00", end: "16:00", who: {}, note: "", status: "skipped", body: "", photos: 0 },
   { id: "i6", date: "2026-08-11", type: "clinic",  start: "09:30", end: "11:00", who: { care: "m1" }, note: "ワクチン2回目", status: "planned", body: "", photos: 0 },
-  { id: "i7", date: "2026-08-14", type: "outing",  start: "08:00", end: "17:00", who: {}, note: "海！", status: "planned", body: "", photos: 0 },
+  // 既定（10:00〜16:00）から手で変えた想定なので timeDirty を立てる。
+  // 立てないと、種類を変えたときに「触っていない」と見なされて上書きされる
+  { id: "i7", date: "2026-08-14", type: "outing",  start: "08:00", end: "17:00", who: {}, note: "海！", status: "planned", body: "", photos: 0, timeDirty: true },
   { id: "i8", date: "2026-08-20", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m1", pick: "m3" }, note: "パパ出張のため、迎えはばあば", status: "planned", body: "", photos: 0 },
 ];
 // 曜日ルールは「版」の配列で持つ（since の昇順）。
@@ -2110,6 +2112,11 @@ function assignSet(ds, k, mid) {
   const x = ASSIGN_DRAFT[ds] || (ASSIGN_DRAFT[ds] = JSON.parse(JSON.stringify(cur)));
   x.who = x.who || {};
   x.who[k] = x.who[k] === mid ? null : mid;
+  // 元の値に戻したら下書きから外す。残したままだと、見た目が変わっていないのに
+  // 保存でき、その日がルール由来から手入力の例外に化けてしまう
+  const base = itemsOn(ds)[0];
+  if (base && sig(x) === sig(base)) delete ASSIGN_DRAFT[ds];
+  if (ASSIGN_DRAFT && Object.keys(ASSIGN_DRAFT).length === 0) ASSIGN_DRAFT = null;
   renderAssignBoard();
 }
 function assignSave() {
@@ -2360,6 +2367,8 @@ function savePlan() {
 }
 function skipPlan() {
   const p = draft();
+  const bad = timeProblem(p);
+  if (bad) { toast(bad); return; }
   p.status = "skipped";
   commit(p);
   closeSheet();
@@ -2408,6 +2417,7 @@ function openDone() {
   const t = type(p.type);
   $("doneSummary").textContent = `${fmt(p.date)}・${t.emoji} ${t.label}・${p.start}〜${p.end}`;
   renderDone();
+  $("doneSheet").scrollTop = 0; // 前に開いた分の位置が残らないように
   $("doneSheet").classList.remove("invisible", "translate-y-full");
   $("doneBackdrop").classList.remove("pointer-events-none", "opacity-0");
 }

@@ -12,7 +12,12 @@ const marker = /<!-- proto\.css:start -->[\s\S]*?<!-- proto\.css:end -->/;
 if (!marker.test(html)) {
   throw new Error(`${htmlPath} にマーカー <!-- proto.css:start --> … <!-- proto.css:end --> がありません`);
 }
-const out = html.replace(marker, `<!-- proto.css:start -->\n<style>\n${css}</style>\n<!-- proto.css:end -->`);
+// 置換文字列ではなくコールバックで差し込む。文字列だと CSS 中の `$&` や `$1`
+// （content や url() に入りうる）が置換パターンとして解釈され、HTML が壊れる。
+const out = html.replace(
+  marker,
+  () => `<!-- proto.css:start -->\n<style>\n${css}</style>\n<!-- proto.css:end -->`,
+);
 if (out === html) {
   console.log(`proto/${slug}/index.html は最新です（CSS ${css.length} bytes、変更なし）`);
 } else {
