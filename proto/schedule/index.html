@@ -1776,6 +1776,8 @@ const PRESETS = [
 ];
 const CHIPS = ["ごはん完食", "おやつ", "さんぽ", "トイレOK", "ねんね", "ごきげん"];
 
+let seqCreated = 0;
+ITEMS.forEach((x) => { x.created = seqCreated++; }); // 一覧の並び替え用の作成順
 const FIXTURE_ITEMS = JSON.parse(JSON.stringify(ITEMS));
 const FIXTURE_RULES = JSON.parse(JSON.stringify(RULES));
 let CANCELLED = new Set();
@@ -1849,9 +1851,12 @@ function itemsOn(d) {
     : [...saved];
   return list.sort((a, b) => (a.start || "").localeCompare(b.start || ""));
 }
-// その日の「予定」。編集シートや担当ボードが扱う 1 件
+// その日の「予定」。編集シートや担当ボードが扱う 1 件。
+// 予定を経ない記録（overridesRule === false）はここに出さない。
+// 出すと、日曜に記録を 1 件足しただけで「その日は予定ずみ」扱いになり、
+// 新しい予定を入れられなくなる
 function planOn(d) {
-  const list = itemsOn(d);
+  const list = itemsOn(d).filter((x) => x.overridesRule !== false);
   return list.find((x) => x.status === "planned") || list[0] || null;
 }
 function fmt(d) {
@@ -2059,7 +2064,7 @@ function renderWeek() {
     days.map((ds) => {
       const sk = itemsOn(ds).filter((x) => x.status === "skipped");
       return `<div class="min-h-6 border-l border-border p-0.5">
-        ${sk.map((x) => `<button type="button" onclick="openDay('${ds}')" class="block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] text-muted-foreground line-through">${type(x.type).label}</button>`).join("")}
+        ${sk.map((x) => `<button type="button" onclick="openDay('${ds}','${x.id}')" class="block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] text-muted-foreground line-through">${type(x.type).label}</button>`).join("")}
       </div>`;
     }).join("");
 
@@ -2225,7 +2230,8 @@ function renderSheet() {
 
   if (ro) h += `<p class="rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、変更できません。</p>`;
 
-  if (!ro && CANCELLED.has(d) && ruleFor(d) && !ITEMS.some((x) => x.date === d)) {
+  // 判定は「その日の予定として保存された行があるか」。無関係な記録の有無で隠さない
+  if (!ro && CANCELLED.has(d) && ruleFor(d) && !ITEMS.some((x) => x.date === d && x.overridesRule !== false)) {
     h += `<div class="flex items-center gap-2 rounded-xl border border-dashed border-border p-3 text-sm">
       <span class="min-w-0 flex-1 text-muted-foreground">毎週のルール（${type(ruleFor(d).type).label}）を打ち消しています。</span>
       <button type="button" onclick="restoreRule()" class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">戻す</button>
@@ -2354,7 +2360,7 @@ function renderSheet() {
 function draft() {
   if (!DRAFT) {
     const t = TYPES[0];
-    DRAFT = { id: "n" + seq++, date: openDate, type: t.id, start: t.start, end: t.end, who: {}, note: "", status: "planned", body: "", photos: 0, repeat: false };
+    DRAFT = { id: "n" + seq++, date: openDate, type: t.id, start: t.start, end: t.end, who: {}, note: "", status: "planned", body: "", photos: 0, created: seqCreated++, repeat: false };
   }
   if (!DRAFT.who) DRAFT.who = {};
   return DRAFT;
@@ -2483,11 +2489,14 @@ function openDone() {
   // 保存と同じ検証を通す（ここを素通りすると不正な時刻のまま記録になる）
   const bad = timeProblem(p);
   if (bad) { toast(bad); return; }
-  DONE_DRAFT = { chips: p.body ? p.body.split("、").filter((s) => CHIPS.includes(s)) : [], note: "", photos: p.photos || 0 };
-  if (p.body) {
-    const extra = p.body.split("、").filter((s) => !CHIPS.includes(s)).join("、");
-    DONE_DRAFT.note = extra;
-  }
+  // 本文を「、」で割って復元すると、ひとことが並べ替わる（「あとで、おやつ」→
+  // チップ「おやつ」＋ひとこと「あとで」→ 保存すると「おやつ、あとで」）。
+  // チップとひとことは構造のまま持っておく
+  DONE_DRAFT = {
+    chips: p.chips ? [...p.chips] : [],
+    note: p.freeNote !== undefined ? p.freeNote : (p.body || ""),
+    photos: p.photos || 0,
+  };
   const t = type(p.type);
   $("doneSummary").textContent = `${fmt(p.date)}・${t.emoji} ${t.label}・${p.start}〜${p.end}`;
   renderDone();
@@ -2547,6 +2556,8 @@ function confirmDone() {
   const p = draft();
   const bad = timeProblem(p);
   if (bad) { toast(bad); return; }
+  p.chips = [...dd.chips];
+  p.freeNote = dd.note.trim();
   p.body = [...dd.chips, dd.note.trim()].filter(Boolean).join("、");
   p.photos = dd.photos;
   p.status = "done";
@@ -2594,7 +2605,10 @@ function renderHome() {
     </div>`;
   }
 
-  const recent = ITEMS.filter((y) => y.status === "done").sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 4);
+  // 日付の新しい順。同じ日なら後から作ったものを先に（4 件で切っても新しいものが残る）
+  const recent = ITEMS.filter((y) => y.status === "done")
+    .sort((a, b) => (a.date === b.date ? (b.created || 0) - (a.created || 0) : a.date < b.date ? 1 : -1))
+    .slice(0, 4);
   $("recentList").innerHTML = recent.length
     ? recent.map((y) => {
         const t = type(y.type);
@@ -2722,7 +2736,7 @@ function renderFamily() {
 }
 
 // ───────── シート開閉 ─────────
-let QR = { chips: [], source: "home" };
+let QR = { chips: [], source: "home", note: "", noteOpen: false };
 function renderQuick() {
   $("qrBody").innerHTML = `
     <div class="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1 text-sm">
@@ -2736,7 +2750,24 @@ function renderQuick() {
         return `<button type="button" onclick="qrChip('${c}')" aria-pressed="${on}"
           class="rounded-full border px-3 py-1.5 text-sm transition ${on ? "border-primary bg-primary/10 font-bold text-primary" : "border-border hover:bg-surface-muted"}">${c}</button>`;
       }).join("")}
-    </div>`;
+    </div>
+    ${QR.noteOpen
+      ? `<input id="qrNote" value="${esc(QR.note)}" oninput="QR.note = this.value; qrPreview()" placeholder="ひとこと（任意）"
+          class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-base" />`
+      : `<button type="button" onclick="QR.noteOpen = true; renderQuick(); document.getElementById('qrNote')?.focus()"
+          class="w-full rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground transition hover:bg-surface-muted">＋ ひとことを足す</button>`}
+    <p id="qrPreview" class="rounded-xl bg-surface-muted px-3 py-2.5 text-sm"></p>`;
+  qrPreview();
+}
+function qrBody() {
+  return [...QR.chips, QR.note.trim()].filter(Boolean).join("、");
+}
+function qrPreview() {
+  const body = qrBody();
+  const el = $("qrPreview");
+  if (!el) return;
+  el.textContent = body || "チップを選ぶか、ひとことを書いてください";
+  el.className = "rounded-xl bg-surface-muted px-3 py-2.5 text-sm " + (body ? "" : "text-muted-foreground");
 }
 function qrChip(c) {
   QR.chips = QR.chips.includes(c) ? QR.chips.filter((x) => x !== c) : [...QR.chips, c];
@@ -2744,13 +2775,15 @@ function qrChip(c) {
 }
 // 予定を経ない記録。曜日ルールの予定を置き換えない（overridesRule を付けない）
 function quickSave() {
-  if (!QR.chips.length) { toast("あったことを選んでください"); return; }
+  const body = qrBody();
+  if (!body) { toast("チップを選ぶか、ひとことを書いてください"); return; }
   ITEMS.push({
     id: "q" + seq++, date: TODAY, type: QR.source, start: "12:00", end: "13:00",
-    who: {}, note: "", status: "done", body: QR.chips.join("、"), photos: 0,
+    who: {}, note: "", status: "done", body, chips: [...QR.chips], freeNote: QR.note.trim(),
+    photos: 0, created: seqCreated++,
     overridesRule: false, // 予定を経ない記録。曜日ルールの予定は残す
   });
-  QR = { chips: [], source: "home" };
+  QR = { chips: [], source: "home", note: "", noteOpen: false };
   closeQuick();
   render();
   toast("記録しました");
