@@ -1147,16 +1147,31 @@
     }
   }
   @media (prefers-color-scheme: dark) {
-    .dark\:border-emerald-400 {
+    .dark\:border-emerald-400:where(:not([data-theme="light"] *)) {
       border-color: var(--color-emerald-400);
     }
-    .dark\:text-emerald-300 {
+  }
+  .dark\:border-emerald-400:where([data-theme="dark"] *) {
+    border-color: var(--color-emerald-400);
+  }
+  @media (prefers-color-scheme: dark) {
+    .dark\:text-emerald-300:where(:not([data-theme="light"] *)) {
       color: var(--color-emerald-300);
     }
+  }
+  .dark\:text-emerald-300:where([data-theme="dark"] *) {
+    color: var(--color-emerald-300);
+  }
+  @media (prefers-color-scheme: dark) {
     @media (hover: hover) {
-      .dark\:hover\:bg-emerald-950:hover {
+      .dark\:hover\:bg-emerald-950:where(:not([data-theme="light"] *)):hover {
         background-color: var(--color-emerald-950);
       }
+    }
+  }
+  @media (hover: hover) {
+    .dark\:hover\:bg-emerald-950:where([data-theme="dark"] *):hover {
+      background-color: var(--color-emerald-950);
     }
   }
 }

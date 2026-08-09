@@ -65,6 +65,13 @@ Tailwind CLI に `@source` でその HTML を渡すと、**使っているクラ
 cat > .proto-tmp.css <<EOF
 @import "tailwindcss" source(none);
 @source "$(pwd)/proto/<slug>/index.html";
+/* Artifact のテーマ切替は :root[data-theme] で来る。素の dark: は
+   prefers-color-scheme だけを見るので、端末が light のまま dark に切り替えると
+   dark:* が効かず配色が混ざる。両方に効く変種にしておく */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) { &:where(:not([data-theme="light"] *)) { @slot; } }
+  &:where([data-theme="dark"] *) { @slot; }
+}
 EOF
 # globals.css の @source not 行より後ろ（トークン・ダークモード・セーフエリア等）を全部取り込む。
 # 行番号指定（sed -n '3,50p'）は globals.css が伸びると黙って途中で切れるので使わない（一度踏んだ）。

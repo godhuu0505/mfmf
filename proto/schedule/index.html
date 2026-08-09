@@ -1152,16 +1152,31 @@
     }
   }
   @media (prefers-color-scheme: dark) {
-    .dark\:border-emerald-400 {
+    .dark\:border-emerald-400:where(:not([data-theme="light"] *)) {
       border-color: var(--color-emerald-400);
     }
-    .dark\:text-emerald-300 {
+  }
+  .dark\:border-emerald-400:where([data-theme="dark"] *) {
+    border-color: var(--color-emerald-400);
+  }
+  @media (prefers-color-scheme: dark) {
+    .dark\:text-emerald-300:where(:not([data-theme="light"] *)) {
       color: var(--color-emerald-300);
     }
+  }
+  .dark\:text-emerald-300:where([data-theme="dark"] *) {
+    color: var(--color-emerald-300);
+  }
+  @media (prefers-color-scheme: dark) {
     @media (hover: hover) {
-      .dark\:hover\:bg-emerald-950:hover {
+      .dark\:hover\:bg-emerald-950:where(:not([data-theme="light"] *)):hover {
         background-color: var(--color-emerald-950);
       }
+    }
+  }
+  @media (hover: hover) {
+    .dark\:hover\:bg-emerald-950:where([data-theme="dark"] *):hover {
+      background-color: var(--color-emerald-950);
     }
   }
 }
@@ -2541,7 +2556,7 @@ function renderSheet() {
       <p class="mb-2 text-xs font-bold text-muted-foreground">いつものパターン</p>
       <div class="flex flex-wrap gap-2">
         ${PRESETS.map((ps, i) => `
-          <button type="button" onclick="applyPreset(${i})"
+          <button type="button" data-preset="${i}" onclick="applyPreset(${i})"
             class="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm transition hover:bg-surface-muted">
             <span>${type(ps.type).emoji}</span><span class="font-medium">${ps.label}</span>
             <span class="flex -space-x-1">${Object.values(ps.who).map((id) => avatar(id, "sm")).join("")}</span>
@@ -2577,7 +2592,7 @@ function renderSheet() {
         <input type="time" id="end" ${ro ? "disabled" : ""} value="${p.end}" onchange="setTime('end', this.value)"
           aria-label="終了時刻" class="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm tabular-nums" />
       </div>
-      <p id="timeError" class="mt-1 hidden text-xs text-rose-600">終了は開始より後にしてください。</p>
+      <p id="timeError" class="mt-1 text-xs text-rose-600 ${timeProblem(p) ? "" : "hidden"}">${esc(timeProblem(p) || "終了は開始より後にしてください")}</p>
     </div>`;
   }
 
@@ -2701,11 +2716,15 @@ function setTime(which, v) {
   const p = draft();
   p[which] = v;
   p.timeDirty = true;
-  // 片方だけ消すと min("") が 0 になり、不正な予定が通ってしまう
-  const blank = !p.start || !p.end;
-  const bad = blank || min(p.end) <= min(p.start);
+  // 保存・完了と同じ判定を使う（別々に書くと文言や条件がずれる）
+  showTimeProblem(p);
+}
+// 時刻の不備をその場に出す。renderSheet() でも同じ形を組み立てるので、
+// 担当や種類を触って描き直しても、直っていないエラーは出たままになる
+function showTimeProblem(p) {
+  const bad = timeProblem(p);
   const el = $("timeError");
-  el.textContent = blank ? "開始と終了の時刻を入れてください。" : "終了は開始より後にしてください。";
+  if (bad) el.textContent = bad;
   el.classList.toggle("hidden", !bad);
 }
 function setWho(key, mid) {
@@ -2723,6 +2742,8 @@ function applyPreset(i) {
   // パターンの時刻が「手で触った時刻」として居座る
   p.timeDirty = false;
   renderSheet();
+  // 描き直すとフォーカスが外れる。押したパターンのまま保存へ進めるように戻す
+  document.querySelector(`[data-preset="${i}"]`)?.focus({ preventScroll: true });
   toast(`「${ps.label}」を入れました`);
 }
 function commit(x) {
