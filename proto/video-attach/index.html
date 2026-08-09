@@ -1192,6 +1192,7 @@ input[type="date"] {
     $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== tab));
     // hidden にしても <video> は鳴り続けるので、詳細から離れたら止める。
     if (tab !== "detail") $("[data-detail-video]").pause();
+    if (tab !== "form") $("[data-preview]").pause();
     window.scrollTo({ top: 0 });
   }
   $$("[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
@@ -1416,6 +1417,9 @@ input[type="date"] {
       // 表示を落としておかないと、「見る」に revoke 済みの前の動画が残る。
       stopConversion();
       clearAttachmentViews();
+      // await 中に上限/画質を切り替えると evaluate(state.picked) が走る。
+      // 古い選択を残したままだと、revoke 済みの前の動画で変換が始まってしまう。
+      state.picked = null;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       const { url, duration } = await readMeta(file);
       objectUrl = url;
