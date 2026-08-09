@@ -492,9 +492,6 @@
   .p-3 {
     padding: calc(var(--spacing) * 3);
   }
-  .p-4 {
-    padding: calc(var(--spacing) * 4);
-  }
   .px-1 {
     padding-inline: var(--spacing);
   }
@@ -515,6 +512,9 @@
   }
   .py-2\.5 {
     padding-block: calc(var(--spacing) * 2.5);
+  }
+  .py-4 {
+    padding-block: calc(var(--spacing) * 4);
   }
   .py-6 {
     padding-block: calc(var(--spacing) * 6);
@@ -1011,7 +1011,7 @@ input[type="date"] {
   <!-- 設定シート -->
   <div data-settings hidden class="fixed inset-0 z-30">
     <div class="absolute inset-0 bg-black/40" data-close-settings></div>
-    <div class="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div class="safe-px absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-border bg-surface py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <p class="text-sm font-semibold text-foreground">上限を試す</p>
       <p class="mt-0.5 text-xs text-muted-foreground">実機で「足りるか」「入れすぎないか」を確かめてください。</p>
@@ -1177,8 +1177,9 @@ input[type="date"] {
         forget(it);
         return false;
       }
-      // 画質を変えたら見積もりサイズを取り直す
-      it.after = Math.min(it.size, estVideoBytes(it.duration));
+      // 画質を変えたら見積もりサイズを取り直す。必ず H.264 へ再エンコードするので
+      // 出力は元サイズではなくビットレートで決まる（min を取ると 720p/1080p の比較が崩れる）
+      it.after = estVideoBytes(it.duration);
       return true;
     });
     if (dropped.length) addErrors(dropped);
@@ -1228,9 +1229,16 @@ input[type="date"] {
     return null;
   }
 
-  async function handleFiles(fileList) {
+  // 取り込みは直列にする。readVideoMeta を待っている間に別の選択が走ると、
+  // 同じ「残り枠」を二重に数えて上限を超えられる。
+  let ingestChain = Promise.resolve();
+  function handleFiles(fileList) {
     const files = Array.from(fileList);
     if (files.length === 0) return;
+    ingestChain = ingestChain.then(() => ingest(files)).catch(() => {});
+  }
+
+  async function ingest(files) {
     const errors = [];
     const queue = [];
 
@@ -1247,6 +1255,11 @@ input[type="date"] {
       }
       if (state.items.length + queue.length >= MAX_ITEMS) {
         errors.push({ msg: `${file.name} — 合計${MAX_ITEMS}件までです` });
+        continue;
+      }
+      // 本番の handleSubmit も size===0 は送らない。中身が無いので添付として成立しない
+      if (file.size === 0) {
+        errors.push({ msg: `${file.name} — 中身が空のようです` });
         continue;
       }
       if (file.size > MAX_OBJECT_BYTES) {
@@ -1298,12 +1311,40 @@ input[type="date"] {
       queue.push(item);
     }
 
-    state.items.push(...queue);
+    // 2. 確定の直前にもう一度上限で照らす。readVideoMeta を待っている間に
+    //    設定シートで上限を下げられている可能性がある。
+    const accepted = [];
+    for (const item of queue) {
+      if (state.items.length + accepted.length >= MAX_ITEMS) {
+        release(item);
+        errors.push({ msg: `${item.name} — 合計${MAX_ITEMS}件までです` });
+        continue;
+      }
+      if (item.kind === "video") {
+        if (item.duration > state.cap + 0.5) {
+          release(item);
+          errors.push({
+            msg: `${item.name} — ${fmtDurJa(item.duration)}。${state.cap}秒までにしてください`,
+            duration: true,
+          });
+          continue;
+        }
+        const queued = accepted.filter((a) => a.kind === "video").length;
+        if (videos().length + queued >= state.maxVideos) {
+          release(item);
+          errors.push({ msg: `${item.name} — 動画は${state.maxVideos}本までです` });
+          continue;
+        }
+      }
+      accepted.push(item);
+    }
+
+    state.items.push(...accepted);
     renderAll();
     if (errors.length) addErrors(errors.splice(0));
 
-    // 2. 受け付けたぶんを順に処理する（端末の再エンコードは並列にしても速くならない）
-    for (const item of queue) {
+    // 3. 受け付けたぶんを順に処理する（端末の再エンコードは並列にしても速くならない）
+    for (const item of accepted) {
       if (!alive(item)) continue; // 待っている間に削除されたもの
       const n = errors.length;
       await processItem(item, errors);
@@ -1391,7 +1432,10 @@ input[type="date"] {
       const c = document.createElement("canvas");
       c.width = Math.max(1, Math.round(bmp.width * scale));
       c.height = Math.max(1, Math.round(bmp.height * scale));
-      c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+      const ctx = c.getContext("2d");
+      // メモリ逼迫でコンテキストが取れないことがある。本番と同じく元ファイルへ倒す
+      if (!ctx) return { size: file.size, url: URL.createObjectURL(file) };
+      ctx.drawImage(bmp, 0, 0, c.width, c.height);
       const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.8));
       if (!blob) return { size: file.size, url: URL.createObjectURL(file) };
       // 本番の resizeImage() と同じ判断: 縮小していないのに圧縮後が大きいなら元を使う
