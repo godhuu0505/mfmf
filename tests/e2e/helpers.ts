@@ -89,3 +89,35 @@ export async function savePhotoRecord(page: Page): Promise<void> {
   await confirm.getByRole("button", { name: "保存する" }).click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/, { timeout: 30_000 });
 }
+
+// owner として /settings で内部招待を 1 件発行し、招待リンクの絶対 URL を返す。
+// リンクの取り出しは本番と同じコピーボタン経由。
+// 注意点が 2 つあり、どちらも実際に CI を落とした:
+//   - 「招待を発行」は exact 指定が要る（ペットが居るとゲスト招待フォームの
+//     「ゲスト招待を発行」に部分一致して strict mode で落ちる）
+//   - 発行後の反映が稀に固まる（#137。招待自体は作成済み）ためリロードで吸収する
+export async function issueInviteLink(
+  page: Page,
+  email: string,
+): Promise<string> {
+  await page.goto("/settings");
+  await page.locator("#invite_email").fill(email);
+  await page.getByRole("button", { name: "招待を発行", exact: true }).click();
+  try {
+    await expect(page.getByText(email, { exact: false })).toBeVisible({
+      timeout: 15_000,
+    });
+  } catch {
+    await page.reload();
+    await expect(page.getByText(email, { exact: false })).toBeVisible();
+  }
+
+  await page
+    .locator("li", { hasText: email })
+    .first()
+    .getByRole("button", { name: "リンクをコピー" })
+    .click();
+  // writeText の完了を待つ（成功表示が出てからでないと空を読み得る）
+  await expect(page.getByText("コピーしました")).toBeVisible();
+  return page.evaluate(() => navigator.clipboard.readText());
+}

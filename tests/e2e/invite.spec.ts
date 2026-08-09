@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { login } from "./helpers";
+import { expect, test } from "@playwright/test";
+import { issueInviteLink, login } from "./helpers";
 
 // 招待リンク（/invite/{token}）の受入条件（UC-O09〜O10 / D12・D13）。
 //
@@ -8,53 +8,44 @@ import { login } from "./helpers";
 // 受諾ボタンが出て、押すと accept_household_invite が弾いて例外 →
 // 画面全体が Next の「Application error」に置き換わっていた。
 
-const INVITEE = "invitee-e2e@example.com";
-
-// owner として招待を 1 件発行し、その招待リンクの絶対 URL を返す。
-// リンクはコピーボタン経由で取り出す（本番と同じ導線）。
-async function issueInviteLink(page: Page): Promise<string> {
-  await page
-    .context()
-    .grantPermissions(["clipboard-read", "clipboard-write"], {
-      origin: new URL(page.url()).origin,
-    });
-
-  await page.goto("/settings");
-  // ゲスト招待にも同名ラベルの入力があるので id で取る
-  await page.locator("#invite_email").fill(INVITEE);
-  await page.getByRole("button", { name: "招待を発行" }).click();
-
-  const item = page.locator("li", { hasText: INVITEE }).first();
-  await expect(item).toBeVisible();
-  await item.getByRole("button", { name: "リンクをコピー" }).click();
-  return page.evaluate(() => navigator.clipboard.readText());
-}
-
 test("未ログインで招待リンクを開くと、ログイン後に招待へ戻れる（?next=）", async ({
   page,
 }) => {
   await page.goto("/invite/dummy-token-for-redirect");
-  await expect(page).toHaveURL(/\/login\?next=%2Finvite%2Fdummy-token-for-redirect/);
+  await expect(page).toHaveURL(
+    /\/login\?next=%2Finvite%2Fdummy-token-for-redirect/,
+  );
 });
 
-test("宛先と違うアカウントで開くと、受諾ボタンではなく理由が出る", async ({
-  page,
-}) => {
-  await login(page);
-  const link = await issueInviteLink(page);
+test.describe("宛先違いの受諾", () => {
+  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
-  await page.goto(link);
-  await expect(
-    page.getByText("宛てですが、いまログインしているのは"),
-  ).toBeVisible();
-  await expect(page.getByText(INVITEE)).toBeVisible();
-  // 押せば必ず失敗するボタンは出さない（これがエラー画面の原因だった）
-  await expect(
-    page.getByRole("button", { name: "この世帯に参加する" }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "別のアカウントでログインし直す" }),
-  ).toBeVisible();
+  test("受諾ボタンではなく理由とログインし直す導線が出る", async ({ page }) => {
+    const email = `e2e-invitee-${Date.now()}@example.com`;
+    await login(page);
+    const link = await issueInviteLink(page, email);
+
+    await page.goto(link);
+    await expect(
+      page.getByText("宛てですが、いまログインしているのは"),
+    ).toBeVisible();
+    await expect(page.getByText(email, { exact: false })).toBeVisible();
+    // 押せば必ず失敗するボタンは出さない（これがエラー画面の原因だった）
+    await expect(
+      page.getByRole("button", { name: "この世帯に参加する" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "別のアカウントでログインし直す" }),
+    ).toBeVisible();
+
+    // 後片付け: 招待を取り消す
+    await page.goto("/settings");
+    await page
+      .locator("li", { hasText: email })
+      .first()
+      .getByRole("button", { name: "取り消す" })
+      .click();
+  });
 });
 
 test("開けない token は理由とログインし直す導線を出す（例外にしない）", async ({

@@ -1,5 +1,5 @@
 import { test, type Page } from "@playwright/test";
-import { login } from "./helpers";
+import { issueInviteLink, login } from "./helpers";
 
 // UI 変更 PR 用のスクリーンショット生成（CLAUDE.md「Git / PR」参照）。
 // アサーションは持たない。他 spec の後（zz- 接頭辞で最後）に走らせ、
@@ -68,15 +68,17 @@ test("スクリーンショット一式（ライト）", async ({ page }) => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"], {
     origin: new URL(page.url()).origin,
   });
-  await page.goto("/settings");
-  await page.locator("#invite_email").fill("invitee-shot@example.com");
-  await page.getByRole("button", { name: "招待を発行" }).click();
-  const inviteItem = page
-    .locator("li", { hasText: "invitee-shot@example.com" })
-    .first();
-  await inviteItem.getByRole("button", { name: "リンクをコピー" }).click();
-  await page.goto(await page.evaluate(() => navigator.clipboard.readText()));
+  const inviteEmail = `invitee-shot-${Date.now()}@example.com`;
+  await page.goto(await issueInviteLink(page, inviteEmail));
   await shot(page, "invite-mismatch");
+
+  // 後片付け（招待一覧を溜めない）
+  await page.goto("/settings");
+  await page
+    .locator("li", { hasText: inviteEmail })
+    .first()
+    .getByRole("button", { name: "取り消す" })
+    .click();
 
   await page.goto("/invite/this-token-does-not-exist");
   await shot(page, "invite-not-found");
