@@ -23,10 +23,12 @@
     --color-sky-400: oklch(74.6% 0.16 232.661);
     --color-sky-500: oklch(68.5% 0.169 237.323);
     --color-sky-900: oklch(39.1% 0.09 240.876);
+    --color-violet-500: oklch(60.6% 0.25 292.717);
     --color-rose-100: oklch(94.1% 0.03 12.58);
     --color-rose-400: oklch(71.2% 0.194 13.428);
     --color-rose-500: oklch(64.5% 0.246 16.439);
     --color-rose-900: oklch(41% 0.159 10.272);
+    --color-slate-400: oklch(70.4% 0.04 256.788);
     --color-black: #000;
     --spacing: 0.25rem;
     --container-2xl: 42rem;
@@ -40,10 +42,9 @@
     --text-lg--line-height: calc(1.75 / 1.125);
     --text-xl: 1.25rem;
     --text-xl--line-height: calc(1.75 / 1.25);
-    --text-2xl: 1.5rem;
-    --text-2xl--line-height: calc(2 / 1.5);
     --text-3xl: 1.875rem;
     --text-3xl--line-height: calc(2.25 / 1.875);
+    --font-weight-normal: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
     --font-weight-bold: 700;
@@ -211,8 +212,14 @@
   .invisible {
     visibility: hidden;
   }
+  .absolute {
+    position: absolute;
+  }
   .fixed {
     position: fixed;
+  }
+  .relative {
+    position: relative;
   }
   .sticky {
     position: sticky;
@@ -271,9 +278,6 @@
   .mt-3 {
     margin-top: calc(var(--spacing) * 3);
   }
-  .mt-4 {
-    margin-top: calc(var(--spacing) * 4);
-  }
   .mb-1 {
     margin-bottom: var(--spacing);
   }
@@ -283,8 +287,8 @@
   .mb-3 {
     margin-bottom: calc(var(--spacing) * 3);
   }
-  .mb-4 {
-    margin-bottom: calc(var(--spacing) * 4);
+  .-ml-1 {
+    margin-left: calc(var(--spacing) * -1);
   }
   .ml-auto {
     margin-left: auto;
@@ -304,11 +308,23 @@
   .inline-flex {
     display: inline-flex;
   }
+  .aspect-square {
+    aspect-ratio: 1 / 1;
+  }
+  .h-0\.5 {
+    height: calc(var(--spacing) * 0.5);
+  }
   .h-1 {
     height: var(--spacing);
   }
   .h-1\.5 {
     height: calc(var(--spacing) * 1.5);
+  }
+  .h-2 {
+    height: calc(var(--spacing) * 2);
+  }
+  .h-3\.5 {
+    height: calc(var(--spacing) * 3.5);
   }
   .h-4 {
     height: calc(var(--spacing) * 4);
@@ -316,17 +332,29 @@
   .h-5 {
     height: calc(var(--spacing) * 5);
   }
+  .h-6 {
+    height: calc(var(--spacing) * 6);
+  }
+  .h-7 {
+    height: calc(var(--spacing) * 7);
+  }
+  .h-8 {
+    height: calc(var(--spacing) * 8);
+  }
   .h-9 {
     height: calc(var(--spacing) * 9);
   }
   .h-10 {
     height: calc(var(--spacing) * 10);
   }
+  .h-12 {
+    height: calc(var(--spacing) * 12);
+  }
   .h-14 {
     height: calc(var(--spacing) * 14);
   }
-  .h-16 {
-    height: calc(var(--spacing) * 16);
+  .h-24 {
+    height: calc(var(--spacing) * 24);
   }
   .max-h-\[85dvh\] {
     max-height: 85dvh;
@@ -337,14 +365,35 @@
   .w-1\.5 {
     width: calc(var(--spacing) * 1.5);
   }
+  .w-2 {
+    width: calc(var(--spacing) * 2);
+  }
+  .w-3\.5 {
+    width: calc(var(--spacing) * 3.5);
+  }
+  .w-4 {
+    width: calc(var(--spacing) * 4);
+  }
   .w-5 {
     width: calc(var(--spacing) * 5);
+  }
+  .w-6 {
+    width: calc(var(--spacing) * 6);
+  }
+  .w-7 {
+    width: calc(var(--spacing) * 7);
+  }
+  .w-8 {
+    width: calc(var(--spacing) * 8);
   }
   .w-9 {
     width: calc(var(--spacing) * 9);
   }
   .w-10 {
     width: calc(var(--spacing) * 10);
+  }
+  .w-12 {
+    width: calc(var(--spacing) * 12);
   }
   .w-14 {
     width: calc(var(--spacing) * 14);
@@ -393,6 +442,9 @@
   .grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
   .grid-cols-5 {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
@@ -407,9 +459,6 @@
   }
   .items-center {
     align-items: center;
-  }
-  .items-end {
-    align-items: flex-end;
   }
   .items-start {
     align-items: flex-start;
@@ -474,6 +523,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .overflow-hidden {
+    overflow: hidden;
+  }
   .overflow-x-auto {
     overflow-x: auto;
   }
@@ -500,6 +552,10 @@
     border-style: var(--tw-border-style);
     border-width: 1px;
   }
+  .border-\[1\.5px\] {
+    border-style: var(--tw-border-style);
+    border-width: 1.5px;
+  }
   .border-t {
     border-top-style: var(--tw-border-style);
     border-top-width: 1px;
@@ -512,11 +568,35 @@
     --tw-border-style: dashed;
     border-style: dashed;
   }
+  .border-amber-500 {
+    border-color: var(--color-amber-500);
+  }
   .border-border {
     border-color: var(--border-color);
   }
+  .border-emerald-500 {
+    border-color: var(--color-emerald-500);
+  }
+  .border-muted-foreground {
+    border-color: var(--muted-foreground);
+  }
+  .border-muted-foreground\/50 {
+    border-color: var(--muted-foreground);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
+    }
+  }
   .border-primary {
     border-color: var(--primary);
+  }
+  .border-sky-500 {
+    border-color: var(--color-sky-500);
+  }
+  .border-slate-400 {
+    border-color: var(--color-slate-400);
+  }
+  .border-violet-500 {
+    border-color: var(--color-violet-500);
   }
   .bg-amber-100 {
     background-color: var(--color-amber-100);
@@ -545,6 +625,9 @@
   .bg-muted {
     background-color: var(--muted);
   }
+  .bg-muted-foreground {
+    background-color: var(--muted-foreground);
+  }
   .bg-primary {
     background-color: var(--primary);
   }
@@ -566,6 +649,9 @@
   .bg-sky-500 {
     background-color: var(--color-sky-500);
   }
+  .bg-slate-400 {
+    background-color: var(--color-slate-400);
+  }
   .bg-surface {
     background-color: var(--surface);
   }
@@ -578,11 +664,8 @@
       background-color: color-mix(in oklab, var(--surface) 90%, transparent);
     }
   }
-  .bg-surface\/95 {
-    background-color: var(--surface);
-    @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in oklab, var(--surface) 95%, transparent);
-    }
+  .bg-violet-500 {
+    background-color: var(--color-violet-500);
   }
   .p-1 {
     padding: var(--spacing);
@@ -598,6 +681,9 @@
   }
   .px-2 {
     padding-inline: calc(var(--spacing) * 2);
+  }
+  .px-2\.5 {
+    padding-inline: calc(var(--spacing) * 2.5);
   }
   .px-3 {
     padding-inline: calc(var(--spacing) * 3);
@@ -623,11 +709,11 @@
   .py-3 {
     padding-block: calc(var(--spacing) * 3);
   }
-  .py-5 {
-    padding-block: calc(var(--spacing) * 5);
+  .py-3\.5 {
+    padding-block: calc(var(--spacing) * 3.5);
   }
-  .pt-1 {
-    padding-top: var(--spacing);
+  .pt-2 {
+    padding-top: calc(var(--spacing) * 2);
   }
   .pt-3 {
     padding-top: calc(var(--spacing) * 3);
@@ -635,20 +721,29 @@
   .pt-4 {
     padding-top: calc(var(--spacing) * 4);
   }
+  .pt-9 {
+    padding-top: calc(var(--spacing) * 9);
+  }
   .pr-3 {
     padding-right: calc(var(--spacing) * 3);
   }
-  .pb-32 {
-    padding-bottom: calc(var(--spacing) * 32);
+  .pr-\[env\(safe-area-inset-right\)\] {
+    padding-right: env(safe-area-inset-right);
   }
-  .pb-\[calc\(0\.25rem\+env\(safe-area-inset-bottom\)\)\] {
-    padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
+  .pb-1\.5 {
+    padding-bottom: calc(var(--spacing) * 1.5);
   }
   .pb-\[calc\(1\.5rem\+env\(safe-area-inset-bottom\)\)\] {
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
   }
+  .pb-\[env\(safe-area-inset-bottom\)\] {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
   .pl-1 {
     padding-left: var(--spacing);
+  }
+  .pl-\[env\(safe-area-inset-left\)\] {
+    padding-left: env(safe-area-inset-left);
   }
   .text-center {
     text-align: center;
@@ -656,9 +751,8 @@
   .text-left {
     text-align: left;
   }
-  .text-2xl {
-    font-size: var(--text-2xl);
-    line-height: var(--tw-leading, var(--text-2xl--line-height));
+  .font-mono {
+    font-family: var(--font-mono);
   }
   .text-3xl {
     font-size: var(--text-3xl);
@@ -702,12 +796,13 @@
     --tw-font-weight: var(--font-weight-medium);
     font-weight: var(--font-weight-medium);
   }
+  .font-normal {
+    --tw-font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-normal);
+  }
   .font-semibold {
     --tw-font-weight: var(--font-weight-semibold);
     font-weight: var(--font-weight-semibold);
-  }
-  .whitespace-nowrap {
-    white-space: nowrap;
   }
   .text-amber-900 {
     color: var(--color-amber-900);
@@ -723,6 +818,12 @@
   }
   .text-muted-foreground {
     color: var(--muted-foreground);
+  }
+  .text-muted-foreground\/40 {
+    color: var(--muted-foreground);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--muted-foreground) 40%, transparent);
+    }
   }
   .text-primary {
     color: var(--primary);
@@ -777,6 +878,9 @@
   .ring-emerald-400 {
     --tw-ring-color: var(--color-emerald-400);
   }
+  .ring-muted {
+    --tw-ring-color: var(--muted);
+  }
   .ring-primary {
     --tw-ring-color: var(--primary);
   }
@@ -826,6 +930,9 @@
     }
     .hover\:bg-surface-muted:hover {
       background-color: var(--surface-muted);
+    }
+    .hover\:text-foreground:hover {
+      color: var(--foreground);
     }
   }
 }
@@ -1145,23 +1252,19 @@ input[type="date"] {
 </style>
 
 <div class="min-h-dvh bg-background text-foreground">
-  <!-- ヘッダー -->
+  <!-- ヘッダー（AppHeader 相当） -->
   <header class="sticky top-0 z-30 safe-pt border-b border-border bg-surface/90 backdrop-blur">
     <div class="safe-px mx-auto flex h-14 max-w-2xl items-center justify-between">
       <span class="text-lg font-bold text-primary">mfmf</span>
-      <span id="screenTitle" class="text-sm font-medium text-muted-foreground">カレンダー</span>
+      <span class="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">マ</span>
     </div>
   </header>
 
-  <main class="safe-px mx-auto max-w-2xl pt-4 pb-32">
+  <main class="safe-px mx-auto max-w-2xl pt-4">
 
     <!-- ═══════════ ホーム ═══════════ -->
     <section id="screen-home" class="hidden space-y-4">
       <div id="todayPlanCard"></div>
-      <div>
-        <h2 class="mb-2 text-sm font-bold text-muted-foreground">これからの予定</h2>
-        <ul id="upcomingList" class="space-y-2"></ul>
-      </div>
       <div>
         <h2 class="mb-2 text-sm font-bold text-muted-foreground">さいきんの記録</h2>
         <ul class="space-y-2">
@@ -1180,128 +1283,191 @@ input[type="date"] {
     <!-- ═══════════ カレンダー ═══════════ -->
     <section id="screen-calendar" class="hidden">
       <div class="mb-3 flex items-center justify-between">
-        <button type="button" class="rounded-lg px-2 py-1 text-sm text-muted-foreground transition hover:bg-surface-muted">‹ 7月</button>
+        <!-- プロトは 2026 年 8 月だけのモック。押せるように見せない -->
+        <span class="px-2 py-1 text-sm text-muted-foreground/40" aria-hidden="true">‹ 7月</span>
         <h1 class="text-base font-bold">2026年8月</h1>
-        <button type="button" class="rounded-lg px-2 py-1 text-sm text-muted-foreground transition hover:bg-surface-muted">9月 ›</button>
+        <span class="px-2 py-1 text-sm text-muted-foreground/40" aria-hidden="true">9月 ›</span>
       </div>
 
-      <div id="grid" class="grid grid-cols-7 gap-1 text-center"></div>
+      <!-- 月 / 週 の切替。週は「送り・お迎えを一気に埋める」ビューを兼ねる -->
+      <div class="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1 text-sm">
+        <button type="button" id="tabMonth" onclick="setCalView('month')" class="rounded-lg py-1.5 font-medium transition">月</button>
+        <button type="button" id="tabWeek" onclick="setCalView('week')" class="rounded-lg py-1.5 font-medium transition">週（担当）</button>
+      </div>
 
-      <p class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <span class="flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>保育園の記録</span>
-        <span class="flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>おうちの記録</span>
-        <span class="flex items-center gap-1"><span class="opacity-50">薄い絵文字</span>= 曜日ルール</span>
-        <span class="ml-auto">日付をタップで予定を編集</span>
-      </p>
+      <div id="calMonth">
+        <div id="grid" class="grid grid-cols-7 gap-1 text-center"></div>
+        <p id="legend" class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"></p>
+      </div>
 
-      <div class="mt-4 rounded-xl bg-surface p-3 shadow-sm ring-1 ring-border">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium">毎週の曜日ルール</p>
-            <p id="ruleSummary" class="mt-0.5 text-xs text-muted-foreground"></p>
-          </div>
-          <button type="button" onclick="go('rules')" class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-surface-muted">編集</button>
-        </div>
+      <div id="calWeek" class="hidden space-y-2">
+        <p class="text-xs text-muted-foreground">担当のある予定の日だけ、顔をタップして埋めます。予定のない日はここでは決められません。</p>
+        <p id="weekReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、担当は変更できません。</p>
+        <div id="weekBoard" class="space-y-2"></div>
+        <button id="weekSave" type="button" onclick="weekSave()" class="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">保存する</button>
       </div>
     </section>
 
-    <!-- ═══════════ 曜日ルール（案3） ═══════════ -->
-    <section id="screen-rules" class="hidden space-y-4">
-      <div>
-        <h1 class="text-base font-bold">毎週の曜日ルール</h1>
-        <p class="mt-1 text-sm text-muted-foreground">
-          いつもの週をここで一度だけ決めます。カレンダーには薄く自動で入り、<b class="font-semibold text-foreground">違う日だけ上書き</b>すれば大丈夫です。
-        </p>
+    <!-- ═══════════ アルバム（既存タブ。プロトではスタブ） ═══════════ -->
+    <section id="screen-gallery" class="hidden">
+      <div class="grid grid-cols-3 gap-1">
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+      </div>
+      <p class="mt-3 text-center text-xs text-muted-foreground">（既存のアルバム。今回は変更なし）</p>
+    </section>
+
+    <!-- ═══════════ メニュー ═══════════ -->
+    <section id="screen-menu" class="hidden space-y-4">
+      <div class="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+        <span class="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">マ</span>
+        <span class="min-w-0 flex-1">
+          <span class="block truncate font-semibold">ママ</span>
+          <span class="block truncate text-xs text-muted-foreground">わが家（オーナー）</span>
+        </span>
+        <span class="ml-auto text-muted-foreground" id="mchev"></span>
       </div>
 
-      <p id="ruleReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、曜日ルールは変更できません。</p>
+      <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+        <div class="flex w-full items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted-foreground">ペット<span class="ml-auto" data-lucide="chevron-right"></span></div>
+        <div class="border-t border-border"></div>
+        <div class="flex w-full items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted-foreground">体重の推移<span class="ml-auto" data-lucide="chevron-right"></span></div>
+      </div>
 
-      <div class="overflow-x-auto rounded-xl bg-surface shadow-sm ring-1 ring-border">
+      <!-- 追加するのはこの 1 行だけ。曜日ルールは毎日触るものではない -->
+      <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+        <button type="button" onclick="go('rules')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium transition hover:bg-surface-muted">
+          <span class="text-muted-foreground" data-lucide="repeat"></span>
+          <span class="min-w-0 flex-1">毎週の予定ルール
+            <span id="ruleSummary" class="block truncate text-xs font-normal text-muted-foreground"></span>
+          </span>
+          <span class="text-muted-foreground" data-lucide="chevron-right"></span>
+        </button>
+        <div class="border-t border-border"></div>
+        <button type="button" onclick="go('family')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium transition hover:bg-surface-muted">
+          <span class="text-muted-foreground" data-lucide="users"></span>
+          <span class="min-w-0 flex-1">世帯の設定
+            <span id="familySummary" class="block truncate text-xs font-normal text-muted-foreground"></span>
+          </span>
+          <span class="text-muted-foreground" data-lucide="chevron-right"></span>
+        </button>
+      </div>
+
+      <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+        <div class="flex w-full items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted-foreground">ガイド<span class="ml-auto" data-lucide="chevron-right"></span></div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 毎週の予定ルール（メニュー配下） ═══════════ -->
+    <section id="screen-rules" class="hidden space-y-4">
+      <button type="button" onclick="go('menu')" class="-ml-1 flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground">‹ メニュー</button>
+      <div>
+        <h1 class="text-base font-bold">毎週の予定ルール</h1>
+        <p class="mt-1 text-sm text-muted-foreground">
+          いつもの週をここで一度だけ決めます。カレンダーには<b class="font-semibold text-foreground">薄く</b>自動で入り、違う日だけ上書きすれば大丈夫です。
+        </p>
+      </div>
+      <p id="ruleReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、ルールは変更できません。</p>
+      <div class="overflow-x-auto rounded-2xl bg-surface shadow-sm ring-1 ring-border">
         <table class="w-full min-w-[22rem] text-center text-sm">
           <thead>
             <tr class="border-b border-border">
-              <th class="w-14 py-2 text-xs font-medium text-muted-foreground"></th>
+              <th class="w-14 py-2"></th>
               <th class="py-2 text-xs font-medium text-rose-500">日</th>
-              <th class="py-2 text-xs font-medium">月</th>
-              <th class="py-2 text-xs font-medium">火</th>
-              <th class="py-2 text-xs font-medium">水</th>
-              <th class="py-2 text-xs font-medium">木</th>
-              <th class="py-2 text-xs font-medium">金</th>
+              <th class="py-2 text-xs font-medium text-muted-foreground">月</th>
+              <th class="py-2 text-xs font-medium text-muted-foreground">火</th>
+              <th class="py-2 text-xs font-medium text-muted-foreground">水</th>
+              <th class="py-2 text-xs font-medium text-muted-foreground">木</th>
+              <th class="py-2 text-xs font-medium text-muted-foreground">金</th>
               <th class="py-2 text-xs font-medium text-sky-500">土</th>
             </tr>
           </thead>
           <tbody id="ruleTable"></tbody>
         </table>
       </div>
-      <p class="text-xs text-muted-foreground">
-        予定の行はタップで <span class="whitespace-nowrap">🏫 → 🏡 → 👵 → なし</span> と切り替わります。担当の行はタップでメンバーが順に入れ替わります。
-      </p>
+      <p class="text-xs text-muted-foreground">予定の行はタップで 保育園 → おうち → 家族が来る → なし と切り替わります。担当の行はタップでメンバーが順に入れ替わります。</p>
     </section>
 
-    <!-- ═══════════ 週まとめ（案2b: 担当だけ一気に） ═══════════ -->
-    <section id="screen-week" class="hidden space-y-4">
+    <!-- ═══════════ 世帯の設定 / 担当できる人（アカウント連携） ═══════════ -->
+    <section id="screen-family" class="hidden space-y-4">
+      <button type="button" onclick="go('menu')" class="-ml-1 flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground">‹ メニュー</button>
       <div>
-        <h1 class="text-base font-bold">今週の担当</h1>
-        <p class="mt-1 text-sm text-muted-foreground">担当のある予定の日だけ、顔をタップして埋めます。予定のない日はここでは決められません。</p>
+        <h1 class="text-base font-bold">世帯の設定</h1>
+        <p class="mt-1 text-sm text-muted-foreground">
+          担当に選べるのはこの一覧の人です。<b class="font-semibold text-foreground">アカウントを連携すると</b>、その人のスマホにも予定が出ます。
+        </p>
       </div>
-      <p id="weekReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、担当は変更できません。</p>
-      <div id="weekBoard" class="space-y-2"></div>
-      <button id="weekSave" type="button" onclick="weekSave()" class="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">保存する</button>
+      <ul id="familyList" class="space-y-2"></ul>
+      <button type="button" onclick="openInvite()" class="flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-medium transition hover:bg-surface-muted">
+        <span data-lucide="user-plus"></span>家族を招待する
+      </button>
     </section>
 
   </main>
 
-  <!-- ═══════════ ボトムタブバー ═══════════ -->
-  <nav data-app-tabbar class="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 backdrop-blur">
-    <div class="mx-auto grid max-w-2xl grid-cols-5 items-end px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]">
-      <button type="button" onclick="go('home')" data-tab="home" class="tab flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-[10px]">
-        <span class="text-lg leading-none">🏠</span>ホーム
-      </button>
-      <button type="button" onclick="go('calendar')" data-tab="calendar" class="tab flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-[10px]">
-        <span class="text-lg leading-none">📅</span>カレンダー
-      </button>
-      <div class="flex justify-center">
-        <button type="button" onclick="openCreate()" aria-label="記録・予定を追加" class="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-2xl text-primary-foreground shadow-lg transition hover:bg-primary-hover">＋</button>
-      </div>
-      <button type="button" onclick="go('week')" data-tab="week" class="tab flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-[10px]">
-        <span class="text-lg leading-none">🧑‍🤝‍🧑</span>担当
-      </button>
-      <button type="button" onclick="go('rules')" data-tab="rules" class="tab flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-[10px]">
-        <span class="text-lg leading-none">🔁</span>ルール
-      </button>
-    </div>
+  <div class="h-24"></div>
+
+  <!-- ═══════════ ボトムタブバー（AppTabBar と同じ 5 スロット） ═══════════ -->
+  <nav aria-label="メインナビゲーション" data-app-tabbar
+    class="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur">
+    <div id="tabRow" class="mx-auto grid max-w-2xl grid-cols-5"></div>
   </nav>
 
-  <!-- ═══════════ 日別シート（予定エディタ） ═══════════ -->
+  <!-- ═══════════ 日別シート（予定 + 記録） ═══════════ -->
   <div id="backdrop" onclick="closeSheet()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
   <div id="sheet" role="dialog" aria-modal="true" class="invisible fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
     <div class="mx-auto max-w-2xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <div class="mb-3 flex items-center justify-between">
         <h2 id="sheetTitle" class="text-base font-bold"></h2>
-        <button type="button" onclick="closeSheet()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted">✕</button>
+        <button type="button" onclick="closeSheet()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
       </div>
       <div id="sheetBody" class="space-y-4"></div>
     </div>
   </div>
 
-  <!-- ═══════════ ＋シート（記録 / 予定） ═══════════ -->
-  <div id="createBackdrop" onclick="closeCreate()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
-  <div id="createSheet" role="dialog" aria-modal="true" class="invisible fixed inset-x-0 bottom-0 z-50 translate-y-full rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+  <!-- ═══════════ クイック記録シート（既存。下部に予定への導線を足した） ═══════════ -->
+  <div id="qrBackdrop" onclick="closeQuick()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
+  <div id="qrSheet" role="dialog" aria-modal="true" class="invisible fixed inset-x-0 bottom-0 z-50 translate-y-full rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
     <div class="mx-auto max-w-2xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-      <div class="mx-auto mb-4 h-1 w-10 rounded-full bg-muted"></div>
-      <div class="grid grid-cols-2 gap-3">
-        <button type="button" onclick="closeCreate();toast('（プロトでは記録フォームは省略）')" class="flex flex-col items-center gap-1 rounded-2xl bg-surface-muted py-5 transition hover:bg-muted">
-          <span class="text-3xl">📝</span>
-          <span class="text-sm font-bold">記録する</span>
-          <span class="text-xs text-muted-foreground">あったことを残す</span>
-        </button>
-        <button type="button" onclick="closeCreate();openDay(TODAY)" class="flex flex-col items-center gap-1 rounded-2xl bg-surface-muted py-5 transition hover:bg-muted">
-          <span class="text-3xl">🗓️</span>
-          <span class="text-sm font-bold">予定を入れる</span>
-          <span class="text-xs text-muted-foreground">これからの予定と担当</span>
-        </button>
+      <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-base font-bold">クイック記録</h2>
+        <button type="button" onclick="closeQuick()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
       </div>
+      <p class="mb-2 text-xs text-muted-foreground">2026年8月9日(日)</p>
+      <div class="flex flex-wrap gap-2">
+        <span class="rounded-full border border-border px-3 py-1.5 text-sm">ごはん完食</span>
+        <span class="rounded-full border border-border px-3 py-1.5 text-sm">おやつ</span>
+        <span class="rounded-full border border-border px-3 py-1.5 text-sm">さんぽ</span>
+        <span class="rounded-full border border-border px-3 py-1.5 text-sm">ねんね</span>
+        <span class="rounded-full border border-border px-3 py-1.5 text-sm">ごきげん</span>
+      </div>
+      <button type="button" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">保存する</button>
+      <!-- 記録のつもりで開いたが予定だった、の受け皿。既存の 2 タップは増やさない -->
+      <button type="button" onclick="closeQuick(); go('calendar'); openDay(TODAY)"
+        class="mt-2 w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
+        これからの予定を入れる →
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════ 招待シート ═══════════ -->
+  <div id="invBackdrop" onclick="closeInvite()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
+  <div id="invSheet" role="dialog" aria-modal="true" class="invisible fixed inset-x-0 bottom-0 z-50 translate-y-full rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+    <div class="mx-auto max-w-2xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+      <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+      <h2 id="invTitle" class="mb-1 text-base font-bold">家族を招待する</h2>
+      <p id="invBody" class="mb-3 text-sm text-muted-foreground"></p>
+      <div class="flex items-center gap-2 rounded-xl bg-surface-muted px-3 py-2.5 text-xs">
+        <span class="min-w-0 flex-1 truncate font-mono">mfmf.app/invite/8f3a…c1</span>
+        <button type="button" onclick="toast('招待リンクをコピーしました')" class="shrink-0 rounded-lg bg-surface px-3 py-1.5 font-medium ring-1 ring-border">コピー</button>
+      </div>
+      <button type="button" onclick="closeInvite()" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">閉じる</button>
     </div>
   </div>
 
@@ -1309,14 +1475,21 @@ input[type="date"] {
   <button type="button" onclick="document.getElementById('cfg').classList.toggle('hidden')" class="fixed bottom-24 left-3 z-30 rounded-full bg-surface px-3 py-1.5 text-xs shadow-lg ring-1 ring-border">⚙︎ プロト設定</button>
   <div id="cfg" class="hidden fixed bottom-36 left-3 z-30 w-64 space-y-3 rounded-xl bg-surface p-3 text-xs shadow-lg ring-1 ring-border">
     <div>
-      <p class="mb-1 font-bold">担当の入れかた</p>
+      <p class="mb-1 font-bold">カレンダーの予定の見せ方</p>
       <div class="space-y-1">
-        <label class="flex items-center gap-2"><input type="radio" name="mode" value="avatar" checked onchange="setMode(this.value)">案1: 顔をタップ</label>
-        <label class="flex items-center gap-2"><input type="radio" name="mode" value="preset" onchange="setMode(this.value)">案2: いつものパターン</label>
-        <label class="flex items-center gap-2"><input type="radio" name="mode" value="rule" onchange="setMode(this.value)">案3: 曜日ルールにおまかせ</label>
+        <label class="flex items-center gap-2"><input type="radio" name="mark" value="ring" checked onchange="setMark(this.value)">中抜きの点（記録は塗り）</label>
+        <label class="flex items-center gap-2"><input type="radio" name="mark" value="bar" onchange="setMark(this.value)">日付の下のライン</label>
+        <label class="flex items-center gap-2"><input type="radio" name="mark" value="emoji" onchange="setMark(this.value)">絵文字</label>
       </div>
     </div>
-    <label class="flex items-center gap-2"><input type="checkbox" id="cfgCell" checked onchange="render()">セルに担当を出す</label>
+    <div>
+      <p class="mb-1 font-bold">担当の入れかた</p>
+      <div class="space-y-1">
+        <label class="flex items-center gap-2"><input type="radio" name="mode" value="avatar" checked onchange="setMode(this.value)">顔をタップ</label>
+        <label class="flex items-center gap-2"><input type="radio" name="mode" value="preset" onchange="setMode(this.value)">いつものパターン</label>
+      </div>
+      <p class="mt-1 text-[10px] text-muted-foreground">毎週のルールは下地として常に効いています（メニュー › 毎週の予定ルール）。</p>
+    </div>
     <label class="flex items-center gap-2"><input type="checkbox" id="cfgEmpty" onchange="toggleEmpty()">予定が 0 件の状態</label>
     <label class="flex items-center gap-2"><input type="checkbox" id="cfgViewer" onchange="render()">viewer（編集不可）</label>
   </div>
@@ -1325,27 +1498,52 @@ input[type="date"] {
 </div>
 
 <script>
+// ───────── lucide のアイコン（本番と同じ形。実装時は lucide-react に戻す） ─────────
+const ICONS = {
+  "house": `<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>`,
+  "calendar-days": `<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>`,
+  "images": `<path d="m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"/><path d="M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"/><circle cx="13" cy="7" r="1" fill="currentColor"/><rect x="8" y="2" width="14" height="14" rx="2"/>`,
+  "menu": `<path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/>`,
+  "plus": `<path d="M5 12h14"/><path d="M12 5v14"/>`,
+  "repeat": `<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>`,
+  "users": `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/>`,
+  "chevron-right": `<path d="m9 18 6-6-6-6"/>`,
+  "camera": `<path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/>`,
+  "x": `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`,
+  "user-plus": `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>`,
+};
+function svg(name, cls) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${cls || "h-5 w-5"}" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+}
+
 // ───────── モックデータ（API は呼ばない） ─────────
 const TODAY = "2026-08-09";
+// link: "linked"（アカウント連携済み）/ "invited"（招待中）/ "none"（未連携）
 const MEMBERS = [
-  { id: "m1", name: "ママ",   initial: "マ", ring: "ring-rose-400",    bg: "bg-rose-100 text-rose-900",       solid: "bg-rose-500" },
-  { id: "m2", name: "パパ",   initial: "パ", ring: "ring-sky-400",     bg: "bg-sky-100 text-sky-900",         solid: "bg-sky-500" },
-  { id: "m3", name: "ばあば", initial: "バ", ring: "ring-emerald-400", bg: "bg-emerald-100 text-emerald-900", solid: "bg-emerald-500" },
+  { id: "m1", name: "ママ",   initial: "マ", link: "linked",  bg: "bg-rose-100 text-rose-900",       solid: "bg-rose-500",    ring: "ring-rose-400" },
+  { id: "m2", name: "パパ",   initial: "パ", link: "linked",  bg: "bg-sky-100 text-sky-900",         solid: "bg-sky-500",     ring: "ring-sky-400" },
+  { id: "m3", name: "ばあば", initial: "バ", link: "none",    bg: "bg-surface-muted text-muted-foreground", solid: "bg-muted", ring: "ring-muted" },
+  { id: "m4", name: "じいじ", initial: "ジ", link: "invited", bg: "bg-emerald-100 text-emerald-900", solid: "bg-emerald-500", ring: "ring-emerald-400" },
 ];
+const LINK_LABEL = { linked: "連携済み", invited: "招待中", none: "未連携" };
 const TYPES = [
-  { id: "daycare", emoji: "🏫", label: "保育園",     roles: [["drop", "送り"], ["pick", "お迎え"]] },
-  { id: "home",    emoji: "🏡", label: "おうち",     roles: [["care", "みる人"]] },
-  { id: "family",  emoji: "👵", label: "家族が来る", roles: [["care", "みる人"]] },
-  { id: "clinic",  emoji: "🏥", label: "通院",       roles: [["care", "連れて行く"]] },
-  { id: "outing",  emoji: "✈️", label: "おでかけ",   roles: [] },
-  { id: "other",   emoji: "📌", label: "その他",     roles: [] },
+  { id: "daycare", emoji: "🏫", label: "保育園",     dot: "sky",   roles: [["drop", "送り"], ["pick", "お迎え"]] },
+  { id: "home",    emoji: "🏡", label: "おうち",     dot: "amber", roles: [["care", "みる人"]] },
+  { id: "family",  emoji: "👵", label: "家族が来る", dot: "emerald", roles: [["care", "みる人"]] },
+  { id: "clinic",  emoji: "🏥", label: "通院",       dot: "violet", roles: [["care", "連れて行く"]] },
+  { id: "outing",  emoji: "✈️", label: "おでかけ",   dot: "slate", roles: [] },
+  { id: "other",   emoji: "📌", label: "その他",     dot: "slate", roles: [] },
 ];
+// 予定の点（中抜き）と記録の点（塗り）。色は種類ごと
+const RING = { sky: "border-sky-500", amber: "border-amber-500", emerald: "border-emerald-500", violet: "border-violet-500", slate: "border-slate-400" };
+const BAR = { sky: "bg-sky-500", amber: "bg-amber-500", emerald: "bg-emerald-500", violet: "bg-violet-500", slate: "bg-slate-400" };
+
 const PRESETS = [
   { label: "いつもの保育園", type: "daycare", who: { drop: "m2", pick: "m1" } },
   { label: "ママ在宅の日",   type: "home",    who: { care: "m1" } },
   { label: "ばあばが来る日", type: "family",  who: { care: "m3" } },
 ];
-// 曜日ルール（0=日）。案3 の「登録しない登録」
 let RULES = {
   1: { type: "daycare", who: { drop: "m2", pick: "m1" } },
   2: { type: "daycare", who: { drop: "m2", pick: "m1" } },
@@ -1353,34 +1551,29 @@ let RULES = {
   4: { type: "daycare", who: { drop: "m1", pick: "m2" } },
   5: { type: "daycare", who: { drop: "m2", pick: "m1" } },
 };
-// 個別の予定（ルールを上書きする）
 let PLANS = {
   "2026-08-05": { type: "family", who: { care: "m3" }, note: "ばあばが泊まりに来る" },
   "2026-08-11": { type: "clinic", who: { care: "m1" }, note: "9:30 ワクチン2回目" },
   "2026-08-14": { type: "outing", who: {}, note: "海！" },
   "2026-08-20": { type: "daycare", who: { drop: "m1", pick: "m3" }, note: "パパ出張のため、迎えはばあば" },
 };
-// 記録（既存機能）
 const RECORDS = {
   "2026-08-03": ["daycare"], "2026-08-04": ["daycare", "home"],
   "2026-08-05": ["home"], "2026-08-06": ["daycare"], "2026-08-07": ["daycare", "home"],
+  "2026-08-08": ["home"],
 };
 
-// 初期フィクスチャ。「予定 0 件」の切替で PLANS を空にする / 戻すのに使う
-const FIXTURES = JSON.parse(JSON.stringify(PLANS));
-// 曜日ルール由来の予定を「この日はなし」にした墓標（案3 の例外を試せるように）
+const FIXTURE_PLANS = JSON.parse(JSON.stringify(PLANS));
+const FIXTURE_RULES = JSON.parse(JSON.stringify(RULES));
 let CANCELLED = new Set();
-
+// 担当の「入れかた」だけの切替。毎週のルールは常に効いている（下地）
 let MODE = "avatar";
+let MARK = "ring";
 let screen = "calendar";
+let calView = "month";
 let openDate = null;
-// シートの編集は下書きに対して行い、「保存する」で確定する。
-// ✕ / 背景タップは破棄（種類・担当・メモで挙動が変わらないように）
 let DRAFT = null;
-// 開いた時点の中身。曜日ルール由来のまま変えていない日を、
-// 手入力の予定として実体化させないために使う
 let DRAFT_BASE = null;
-// 「今週の担当」ボードも下書きに貯めて、「保存する」で確定する
 let WEEK_DRAFT = null;
 
 // ───────── ヘルパ ─────────
@@ -1391,18 +1584,26 @@ const dow = (d) => new Date(d + "T00:00:00").getDay();
 const isEmpty = () => $("cfgEmpty").checked;
 const isViewer = () => $("cfgViewer").checked;
 
-// その日の予定。個別 > 墓標 > 曜日ルール（案3 のときだけルールを効かせる）。
-// 「予定 0 件」は PLANS を空にして表現するので、ここで一律に null を返さない
-// （返すと、その状態から新しく入れた予定まで見えなくなる）。
+// その日に効く曜日ルール。since（作った日）より前の日には遡らせない
+function ruleFor(d) {
+  const r = RULES[dow(d)];
+  if (!r) return null;
+  if (r.since && d < r.since) return null;
+  return r;
+}
+// 個別の予定 > 打ち消し > 曜日ルール。ルールは担当の入れかたに関係なく常に効く
 function planFor(d) {
   if (PLANS[d]) return { ...PLANS[d], from: "plan" };
   if (CANCELLED.has(d)) return null;
-  if (MODE === "rule" && !isEmpty() && RULES[dow(d)]) return { ...RULES[dow(d)], from: "rule" };
-  return null;
+  const r = ruleFor(d);
+  return r ? { ...r, from: "rule" } : null;
 }
-// 「予定 0 件の状態」トグル。フィクスチャを空にする / 戻す
 function toggleEmpty() {
-  PLANS = isEmpty() ? {} : JSON.parse(JSON.stringify(FIXTURES));
+  if (isEmpty()) { PLANS = {}; RULES = {}; }
+  else {
+    PLANS = JSON.parse(JSON.stringify(FIXTURE_PLANS));
+    RULES = JSON.parse(JSON.stringify(FIXTURE_RULES));
+  }
   CANCELLED = new Set();
   render();
 }
@@ -1413,8 +1614,9 @@ function fmt(d) {
 function avatar(id, size) {
   const m = member(id);
   const s = size === "sm" ? "h-5 w-5 text-[9px]" : "h-9 w-9 text-xs";
-  if (!m) return `<span class="inline-flex ${s} items-center justify-center rounded-full bg-surface-muted text-muted-foreground">?</span>`;
-  return `<span class="inline-flex ${s} items-center justify-center rounded-full ${m.bg} font-bold">${m.initial}</span>`;
+  if (!m) return `<span class="inline-flex ${s} items-center justify-center rounded-full border border-dashed border-border text-muted-foreground">?</span>`;
+  const unlinked = m.link !== "linked";
+  return `<span class="inline-flex ${s} items-center justify-center rounded-full ${m.bg} font-bold ${unlinked ? "border border-dashed border-muted-foreground/50" : ""}">${m.initial}</span>`;
 }
 function toast(msg) {
   const t = $("toast");
@@ -1423,60 +1625,123 @@ function toast(msg) {
   clearTimeout(t._t);
   t._t = setTimeout(() => t.classList.add("opacity-0"), 1800);
 }
+function sig(p) {
+  if (!p) return "none";
+  const keys = type(p.type).roles.map(([k]) => k);
+  return JSON.stringify([p.type, keys.map((k) => (p.who || {})[k] || null), p.note || ""]);
+}
+
+// ───────── タブバー ─────────
+const TABS = [
+  { key: "home", label: "ホーム", icon: "house" },
+  { key: "calendar", label: "カレンダー", icon: "calendar-days" },
+  { key: "__plus", label: "記録", icon: "plus" },
+  { key: "gallery", label: "アルバム", icon: "images" },
+  { key: "menu", label: "メニュー", icon: "menu" },
+];
+// メニュータブ配下（本番の MENU_PATHS 相当）
+const MENU_SCREENS = ["menu", "rules", "family"];
+function renderTabs() {
+  const ro = isViewer();
+  const row = $("tabRow");
+  row.className = "mx-auto grid max-w-2xl " + (ro ? "grid-cols-4" : "grid-cols-5");
+  row.innerHTML = TABS.filter((t) => !(ro && t.key === "__plus")).map((t) => {
+    if (t.key === "__plus") {
+      return `<button type="button" onclick="openQuick()" aria-label="クイック記録" aria-haspopup="dialog" class="relative">
+        <span class="absolute left-1/2 top-0 -mt-5 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:bg-primary-hover">${svg("plus", "h-7 w-7")}</span>
+        <span class="block pb-1.5 pt-9 text-center text-[10px] font-medium text-muted-foreground">記録</span></button>`;
+    }
+    const active = t.key === screen || (t.key === "menu" && MENU_SCREENS.includes(screen));
+    return `<button type="button" onclick="go('${t.key}')" ${active ? 'aria-current="page"' : ""}
+      class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium transition ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}">
+      ${svg(t.icon, "h-6 w-6")}${t.label}</button>`;
+  }).join("");
+}
 
 // ───────── 画面切替 ─────────
 function go(s) {
-  if (screen === "week" && s !== "week") WEEK_DRAFT = null; // 保存していない一括編集は捨てる
+  if (screen === "calendar" && s !== "calendar") WEEK_DRAFT = null;
   screen = s;
-  ["home", "calendar", "week", "rules"].forEach((k) => {
+  ["home", "calendar", "gallery", "menu", "rules", "family"].forEach((k) => {
     $("screen-" + k).classList.toggle("hidden", k !== s);
-  });
-  $("screenTitle").textContent =
-    { home: "ホーム", calendar: "カレンダー", week: "今週の担当", rules: "曜日ルール" }[s];
-  document.querySelectorAll(".tab").forEach((b) => {
-    const on = b.dataset.tab === s;
-    b.className = "tab flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-[10px] " +
-      (on ? "font-bold text-primary" : "text-muted-foreground");
   });
   window.scrollTo(0, 0);
   render();
 }
 function setMode(m) { MODE = m; render(); }
+function setMark(m) { MARK = m; render(); }
+function setCalView(v) {
+  if (v !== "week") WEEK_DRAFT = null;
+  calView = v;
+  render();
+}
 
-// ───────── カレンダー ─────────
+// ───────── カレンダー（既存 CalendarMonth の見た目に合わせる） ─────────
 function renderGrid() {
+  $("tabMonth").className = "rounded-lg py-1.5 font-medium transition " + (calView === "month" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground");
+  $("tabWeek").className = "rounded-lg py-1.5 font-medium transition " + (calView === "week" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground");
+  $("calMonth").classList.toggle("hidden", calView !== "month");
+  $("calWeek").classList.toggle("hidden", calView !== "week");
+
   const g = $("grid");
   const WD = ["日", "月", "火", "水", "木", "金", "土"];
   let h = WD.map((w, i) =>
     `<div class="py-1 text-xs font-medium ${i === 0 ? "text-rose-500" : i === 6 ? "text-sky-500" : "text-muted-foreground"}">${w}</div>`
   ).join("");
-  // 2026-08-01 は土曜
-  for (let i = 0; i < 6; i++) h += "<div></div>";
+  for (let i = 0; i < 6; i++) h += `<div></div>`; // 2026-08-01 は土曜
   for (let d = 1; d <= 31; d++) {
     const ds = `2026-08-${String(d).padStart(2, "0")}`;
     const p = planFor(ds);
     const t = p ? type(p.type) : null;
     const recs = RECORDS[ds] || [];
     const isToday = ds === TODAY;
-    const showWho = $("cfgCell").checked && p;
-    const who = showWho ? Object.values(p.who || {}).filter(Boolean) : [];
-    h += `<button type="button" onclick="openDay('${ds}')" aria-label="${8}月${d}日${t ? " " + t.label : ""}"
-      class="flex h-16 flex-col items-center justify-start gap-0.5 rounded-lg p-1 text-sm transition hover:bg-surface-muted
-      ${p ? "bg-surface shadow-sm ring-1 ring-border" : "text-muted-foreground"} ${isToday ? "ring-2 ring-primary" : ""}">
-      <span class="${p ? "font-semibold text-foreground" : ""}">${d}</span>
-      ${t ? `<span class="text-base leading-none ${p.from === "rule" ? "opacity-40" : ""}">${t.emoji}</span>` : `<span class="h-4"></span>`}
-      <span class="flex items-center gap-0.5">
-        ${who.map((id) => `<span class="h-1.5 w-1.5 rounded-full ${member(id).solid}"></span>`).join("")}
-        ${recs.includes("daycare") ? '<span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>' : ""}
-        ${recs.includes("home") ? '<span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>' : ""}
-      </span>
+    const faint = p && p.from === "rule";
+
+    // 予定のしるし。記録（塗りの点）と見分けがつく形にする
+    let planMark = "";
+    if (t) {
+      if (MARK === "emoji") planMark = `<span class="text-sm leading-none ${faint ? "opacity-40" : ""}">${t.emoji}</span>`;
+      else if (MARK === "bar") planMark = `<span class="mt-0.5 block h-0.5 w-5 rounded-full ${BAR[t.dot]} ${faint ? "opacity-40" : ""}"></span>`;
+      else planMark = `<span class="h-2 w-2 rounded-full border-[1.5px] ${RING[t.dot]} ${faint ? "opacity-40" : ""}"></span>`;
+    }
+    const recMark = recs.length
+      ? `<span class="flex items-center gap-0.5">
+          ${recs.includes("daycare") ? '<span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>' : ""}
+          ${recs.includes("home") ? '<span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>' : ""}
+        </span>` : "";
+
+    const label = `${8}月${d}日` +
+      (t ? ` 予定 ${t.label}${faint ? "（曜日ルール）" : ""}` : " 予定なし") +
+      (recs.length ? ` 記録${recs.length}件` : "");
+
+    h += `<button type="button" onclick="openDay('${ds}')" aria-haspopup="dialog" aria-label="${label}"
+      class="flex h-14 flex-col items-center justify-start rounded-lg p-1 text-sm transition hover:bg-surface-muted
+      ${p || recs.length ? "bg-surface shadow-sm ring-1 ring-border" : "text-muted-foreground"}${isToday ? " ring-2 ring-primary" : ""}">
+      <span class="${p || recs.length ? "font-semibold text-foreground" : ""}">${d}</span>
+      <span class="mt-0.5 flex flex-col items-center gap-0.5">${planMark}${recMark}</span>
     </button>`;
   }
   g.innerHTML = h;
 
+  // 凡例。「予定」と「記録」の違いをここで言い切る
+  const planLegend = MARK === "emoji"
+    ? `<span class="flex items-center gap-1"><span class="text-sm leading-none">🏫</span>予定</span>`
+    : MARK === "bar"
+      ? `<span class="flex items-center gap-1"><span class="h-0.5 w-5 rounded-full bg-sky-500"></span>予定</span>`
+      : `<span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full border-[1.5px] border-sky-500"></span>予定</span>`;
+  $("legend").innerHTML =
+    planLegend +
+    `<span class="flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>記録（保育園）</span>` +
+    `<span class="flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>記録（おうち）</span>` +
+    `<span class="flex items-center gap-1"><span class="opacity-40">薄い</span>= 毎週のルール</span>` +
+    `<span class="ml-auto">日付をタップ</span>`;
+
   const days = ["日", "月", "火", "水", "木", "金", "土"];
-  const sum = Object.entries(RULES).map(([k, v]) => `${days[k]}${type(v.type).emoji}`).join(" ");
-  $("ruleSummary").textContent = MODE === "rule" ? sum : "（案3 を選ぶと有効になります）";
+  $("ruleSummary").textContent = Object.keys(RULES).length
+    ? Object.entries(RULES).map(([k, v]) => `${days[k]}=${type(v.type).label}`).join(" / ")
+    : "まだ設定していません";
+  $("familySummary").textContent =
+    `${MEMBERS.filter((m) => m.link === "linked").length} 人が連携済み・${MEMBERS.filter((m) => m.link !== "linked").length} 人が未連携`;
 }
 
 // ───────── 日別シート ─────────
@@ -1485,7 +1750,7 @@ function openDay(d) {
   const cur = planFor(d);
   DRAFT = cur ? { type: cur.type, who: { ...(cur.who || {}) }, note: cur.note || "", repeat: false } : null;
   DRAFT_BASE = cur ? { from: cur.from, sig: sig(cur) } : null;
-  $("sheetTitle").textContent = fmt(d) + " の予定";
+  $("sheetTitle").textContent = fmt(d);
   renderSheet();
   $("sheet").classList.remove("invisible", "translate-y-full");
   $("backdrop").classList.remove("pointer-events-none", "opacity-0");
@@ -1496,7 +1761,7 @@ function closeSheet() {
   $("backdrop").classList.add("pointer-events-none", "opacity-0");
   document.body.style.overflow = "";
   openDate = null;
-  DRAFT = null; // 保存していない編集は捨てる
+  DRAFT = null;
   DRAFT_BASE = null;
 }
 function renderSheet() {
@@ -1507,72 +1772,75 @@ function renderSheet() {
   const ro = isViewer();
   let h = "";
 
-  if (ro) {
-    h += `<p class="rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、予定は変更できません。</p>`;
-  }
+  if (ro) h += `<p class="rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、予定は変更できません。</p>`;
 
-  // 曜日ルールを打ち消している日は、戻せることを見せる
-  if (!ro && CANCELLED.has(d) && MODE === "rule" && RULES[dow(d)]) {
+  if (!ro && CANCELLED.has(d) && ruleFor(d)) {
     h += `<div class="flex items-center gap-2 rounded-xl border border-dashed border-border p-3 text-sm">
-      <span class="min-w-0 flex-1 text-muted-foreground">この日は曜日ルール（${type(RULES[dow(d)].type).emoji} ${type(RULES[dow(d)].type).label}）を打ち消しています。</span>
+      <span class="min-w-0 flex-1 text-muted-foreground">毎週のルール（${type(ruleFor(d).type).label}）を打ち消しています。</span>
       <button type="button" onclick="restoreRule()" class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">戻す</button>
     </div>`;
   }
 
-  // 案2: いつものパターン（先頭に置く。1タップで全部埋まる）
+  // ── 予定 ──
+  h += `<section class="space-y-3">
+    <h3 class="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+      <span class="h-2 w-2 rounded-full border-[1.5px] border-muted-foreground"></span>予定
+    </h3>`;
+
   if (MODE === "preset" && !ro) {
-    h += `<div>
-      <p class="mb-2 text-xs font-bold text-muted-foreground">いつものパターン</p>
-      <div class="flex flex-wrap gap-2">
-        ${PRESETS.map((ps, i) => `
-          <button type="button" onclick="applyPreset(${i})"
-            class="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm transition hover:bg-surface-muted">
-            <span>${type(ps.type).emoji}</span><span class="font-medium">${ps.label}</span>
-            <span class="flex -space-x-1">${Object.values(ps.who).map((id) => avatar(id, "sm")).join("")}</span>
-          </button>`).join("")}
-      </div>
+    h += `<div class="flex flex-wrap gap-2">
+      ${PRESETS.map((ps, i) => `
+        <button type="button" onclick="applyPreset(${i})"
+          class="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm transition hover:bg-surface-muted">
+          <span>${type(ps.type).emoji}</span><span class="font-medium">${ps.label}</span>
+          <span class="flex -space-x-1">${Object.values(ps.who).map((id) => avatar(id, "sm")).join("")}</span>
+        </button>`).join("")}
     </div>`;
   }
 
-  // 予定の種類
-  h += `<div>
-    <p class="mb-2 text-xs font-bold text-muted-foreground">この日はどう過ごす？</p>
-    <div class="grid grid-cols-3 gap-2">
-      ${TYPES.map((x) => `
-        <button type="button" ${ro ? "disabled" : ""} onclick="setType('${x.id}')"
-          class="flex flex-col items-center gap-1 rounded-xl border py-2.5 text-xs transition
-          ${p && p.type === x.id ? "border-primary bg-primary/10 font-bold text-primary" : "border-border bg-surface hover:bg-surface-muted"}
-          ${ro ? "opacity-50" : ""}">
-          <span class="text-xl leading-none">${x.emoji}</span>${x.label}
-        </button>`).join("")}
-    </div>
+  h += `<div class="grid grid-cols-3 gap-2">
+    ${TYPES.map((x) => `
+      <button type="button" ${ro ? "disabled" : ""} onclick="setType('${x.id}')"
+        class="flex flex-col items-center gap-1 rounded-xl border py-2.5 text-xs transition
+        ${p && p.type === x.id ? "border-primary bg-primary/10 font-bold text-primary" : "border-border bg-surface hover:bg-surface-muted"}
+        ${ro ? "opacity-50" : ""}">
+        <span class="text-xl leading-none">${x.emoji}</span>${x.label}
+      </button>`).join("")}
   </div>`;
 
-  // 担当（種類に応じて出る＝独立した「項目」を作らない）
+  // 担当（種類に応じて出る＝独立した項目を作らない）
   if (t && t.roles.length) {
     h += `<div class="space-y-3 rounded-xl bg-surface-muted p-3">`;
     for (const [key, label] of t.roles) {
-      h += `<div class="flex items-center gap-3">
+      h += `<div class="flex flex-wrap items-center gap-2">
         <span class="w-16 shrink-0 text-sm font-medium">${label}</span>
-        <div class="flex flex-wrap gap-2">
-          ${MEMBERS.map((m) => {
-            const on = (p.who || {})[key] === m.id;
-            return `<button type="button" ${ro ? "disabled" : ""} onclick="setWho('${key}','${m.id}')"
-              aria-pressed="${on}" aria-label="${label}は${m.name}"
-              class="flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs transition
-              ${on ? `bg-surface font-bold shadow-sm ring-2 ${m.ring}` : "text-muted-foreground hover:bg-surface"} ${ro ? "opacity-50" : ""}">
-              ${avatar(m.id, "sm")}${m.name}</button>`;
-          }).join("")}
-        </div>
+        ${MEMBERS.map((m) => {
+          const on = (p.who || {})[key] === m.id;
+          return `<button type="button" ${ro ? "disabled" : ""} onclick="setWho('${key}','${m.id}')"
+            aria-pressed="${on}" aria-label="${label}は${m.name}"
+            class="flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs transition
+            ${on ? `bg-surface font-bold shadow-sm ring-2 ${m.ring}` : "text-muted-foreground hover:bg-surface"} ${ro ? "opacity-50" : ""}">
+            ${avatar(m.id, "sm")}${m.name}</button>`;
+        }).join("")}
+      </div>`;
+    }
+    // アカウント未連携の担当がいたら、そこで連携に誘う
+    const unlinked = t.roles.map(([k]) => (p.who || {})[k]).filter(Boolean).map(member).filter((m) => m && m.link !== "linked");
+    if (unlinked.length && !ro) {
+      const u = unlinked[0];
+      h += `<div class="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-xs ring-1 ring-border">
+        <span class="min-w-0 flex-1 text-muted-foreground">
+          <b class="font-semibold text-foreground">${u.name}</b> は${u.link === "invited" ? "招待に応じていません" : "アカウント未連携です"}。連携すると本人のスマホにも予定が出ます。
+        </span>
+        <button type="button" onclick="openInvite('${u.id}')" class="shrink-0 rounded-lg border border-border px-2.5 py-1.5 font-medium transition hover:bg-surface-muted">招待</button>
       </div>`;
     }
     h += `</div>`;
   }
 
-  // メモ + 繰り返し
   if (p) {
     h += `<div>
-      <label class="mb-1 block text-xs font-bold text-muted-foreground" for="note">ひとことメモ（任意）</label>
+      <label class="mb-1 block text-xs font-medium text-muted-foreground" for="note">ひとことメモ（任意）</label>
       <input id="note" ${ro ? "disabled" : ""} value="${(p.note || "").replace(/"/g, "&quot;")}"
         oninput="if (DRAFT) DRAFT.note = this.value" placeholder="例: パパ出張のため、迎えはばあば"
         class="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm" />
@@ -1580,33 +1848,38 @@ function renderSheet() {
     if (!ro) {
       const wd = ["日", "月", "火", "水", "木", "金", "土"][dow(d)];
       h += `<label class="flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
-        <input type="checkbox" id="rep" class="mt-0.5" ${p.repeat ? "checked" : ""}
-          onchange="if (DRAFT) DRAFT.repeat = this.checked" />
-        <span>これから毎週${wd}曜も同じにする<span class="mt-0.5 block text-xs text-muted-foreground">曜日ルールに保存され、以降の${wd}曜に薄く自動で入ります</span></span>
+        <input type="checkbox" id="rep" class="mt-0.5" ${p.repeat ? "checked" : ""} onchange="if (DRAFT) DRAFT.repeat = this.checked" />
+        <span>これから毎週${wd}曜も同じにする<span class="mt-0.5 block text-xs text-muted-foreground">毎週の予定ルールに保存され、以降の${wd}曜に薄く自動で入ります</span></span>
       </label>`;
     }
   }
 
-  // 記録との接続
-  const recs = RECORDS[d] || [];
-  h += `<div class="border-t border-border pt-3">
-    <p class="mb-2 text-xs font-bold text-muted-foreground">この日の記録</p>
-    ${recs.length === 0
-      ? `<p class="rounded-xl bg-surface-muted px-3 py-2.5 text-sm text-muted-foreground">まだありません。</p>`
-      : recs.map((r) => `<div class="mb-2 flex items-center gap-2 rounded-xl bg-surface-muted px-3 py-2.5 text-sm">
-          <span class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${r === "home" ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-900"}">${r === "home" ? "おうち" : "保育園"}</span>
-          <span class="min-w-0 flex-1 truncate">きょうもげんき</span></div>`).join("")}
-    ${!ro ? `<button type="button" onclick="toast('${t ? t.label + "の記録として" : ""}記録フォームを開きます')"
-      class="mt-1 w-full rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">
-      ＋ この日の記録を追加${t ? `（${t.label} で下書き）` : ""}</button>` : ""}
-  </div>`;
-
   if (!ro) {
-    h += `<div class="flex gap-2 pt-1">
+    h += `<div class="flex gap-2">
       ${p ? `<button type="button" onclick="clearPlan()" class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">予定を消す</button>` : ""}
-      <button type="button" onclick="savePlan()" class="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">保存する</button>
+      <button type="button" onclick="savePlan()" class="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">予定を保存する</button>
     </div>`;
   }
+  h += `</section>`;
+
+  // ── 記録 ──
+  const recs = RECORDS[d] || [];
+  h += `<section class="space-y-2 border-t border-border pt-4">
+    <h3 class="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+      <span class="h-1.5 w-1.5 rounded-full bg-muted-foreground"></span>記録
+    </h3>
+    ${recs.length === 0
+      ? `<p class="rounded-xl bg-surface-muted px-3 py-2.5 text-sm text-muted-foreground">この日の記録はありません。</p>`
+      : recs.map((r) => `<div class="flex items-center gap-2 rounded-xl bg-surface-muted px-3 py-2.5 text-sm">
+          <span class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${r === "home" ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-900"}">${r === "home" ? "おうち" : "保育園"}</span>
+          <span class="min-w-0 flex-1 truncate">きょうもげんき</span>
+          <span class="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">${svg("camera", "h-3.5 w-3.5")}2</span>
+        </div>`).join("")}
+    ${!ro ? `<button type="button" onclick="toast('${t ? t.label + " の記録として" : ""}記録フォームを開きます')"
+      class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">
+      ${svg("plus", "h-4 w-4")}この日の記録を追加${t ? `（${t.label}）` : ""}</button>` : ""}
+  </section>`;
+
   $("sheetBody").innerHTML = h;
 }
 function draft() {
@@ -1614,14 +1887,6 @@ function draft() {
   if (!DRAFT.who) DRAFT.who = {};
   return DRAFT;
 }
-// 予定の中身を比べるための署名。種類が持つ担当だけを見る
-function sig(p) {
-  if (!p) return "none";
-  const keys = type(p.type).roles.map(([k]) => k);
-  return JSON.stringify([p.type, keys.map((k) => (p.who || {})[k] || null), p.note || ""]);
-}
-// 種類を変えたら、その種類に無い担当は捨てる（保育園→おうちで送り迎えが
-// 見えないまま残り、カレンダーのドットに出てしまう）
 function setType(id) {
   const p = draft();
   p.type = id;
@@ -1632,49 +1897,40 @@ function setType(id) {
 }
 function setWho(key, mid) {
   const p = draft();
-  p.who = p.who || {};
-  p.who[key] = p.who[key] === mid ? null : mid; // 二度押しで解除
+  p.who[key] = p.who[key] === mid ? null : mid;
   renderSheet();
 }
 function applyPreset(i) {
   const ps = PRESETS[i];
-  DRAFT = { type: ps.type, who: { ...ps.who }, note: DRAFT?.note || "" };
+  DRAFT = { type: ps.type, who: { ...ps.who }, note: DRAFT?.note || "", repeat: DRAFT?.repeat || false };
   renderSheet();
   toast(`「${ps.label}」を入れました`);
 }
-// 曜日ルール由来の日も「この日はなし」にできるようにする（案3 の例外）
 function clearPlan() {
   const d = openDate;
   delete PLANS[d];
-  if (MODE === "rule" && !isEmpty() && RULES[dow(d)]) CANCELLED.add(d);
+  if (ruleFor(d)) CANCELLED.add(d);
   closeSheet();
   render();
   toast("この日の予定をなしにしました");
 }
 function restoreRule() {
   CANCELLED.delete(openDate);
-  openDay(openDate); // 下書きをルールから作り直す
+  openDay(openDate);
   toast("曜日ルールに戻しました");
 }
 function savePlan() {
   const d = openDate;
   if (!DRAFT) { clearPlan(); return; }
   const repeat = !!DRAFT.repeat;
-
-  // 曜日ルール由来のまま何も変えずに保存したら、その日は例外にしない
-  // （実体化させると、以降ルールを変えてもこの日だけ追従しなくなる）
   if (!repeat && DRAFT_BASE && DRAFT_BASE.from === "rule" && sig(DRAFT) === DRAFT_BASE.sig) {
-    closeSheet();
-    render();
-    toast("変更なし（曜日ルールのままです）");
-    return;
+    closeSheet(); render(); toast("変更なし（曜日ルールのままです）"); return;
   }
-
   PLANS[d] = { type: DRAFT.type, who: { ...DRAFT.who }, note: DRAFT.note || "" };
   CANCELLED.delete(d);
   if (repeat) {
-    RULES[dow(d)] = { type: PLANS[d].type, who: { ...PLANS[d].who } };
-    toast("予定と曜日ルールを保存しました");
+    RULES[dow(d)] = { type: PLANS[d].type, who: { ...PLANS[d].who }, since: d };
+    toast("予定と毎週のルールを保存しました");
   } else {
     toast("予定を保存しました");
   }
@@ -1682,14 +1938,27 @@ function savePlan() {
   render();
 }
 
-// ───────── ＋シート ─────────
-function openCreate() {
-  $("createSheet").classList.remove("invisible", "translate-y-full");
-  $("createBackdrop").classList.remove("pointer-events-none", "opacity-0");
+// ───────── クイック記録 / 招待シート ─────────
+function openQuick() {
+  $("qrSheet").classList.remove("invisible", "translate-y-full");
+  $("qrBackdrop").classList.remove("pointer-events-none", "opacity-0");
 }
-function closeCreate() {
-  $("createSheet").classList.add("invisible", "translate-y-full");
-  $("createBackdrop").classList.add("pointer-events-none", "opacity-0");
+function closeQuick() {
+  $("qrSheet").classList.add("invisible", "translate-y-full");
+  $("qrBackdrop").classList.add("pointer-events-none", "opacity-0");
+}
+function openInvite(memberId) {
+  const m = memberId ? member(memberId) : null;
+  $("invTitle").textContent = m ? `${m.name} を招待する` : "家族を招待する";
+  $("invBody").textContent = m
+    ? `このリンクを ${m.name} に送ると、Google アカウントでログインして世帯に加われます。連携後は担当になった日が ${m.name} のカレンダーにも出ます。`
+    : "このリンクを送ると、Google アカウントでログインして世帯に加われます。";
+  $("invSheet").classList.remove("invisible", "translate-y-full");
+  $("invBackdrop").classList.remove("pointer-events-none", "opacity-0");
+}
+function closeInvite() {
+  $("invSheet").classList.add("invisible", "translate-y-full");
+  $("invBackdrop").classList.add("pointer-events-none", "opacity-0");
 }
 
 // ───────── ホーム ─────────
@@ -1711,35 +1980,15 @@ function renderHome() {
             ${avatar((p.who || {})[k], "sm")}<span class="text-muted-foreground">${l}</span>
             <span class="font-bold">${member((p.who || {})[k])?.name || "未定"}</span></span>`).join("")}
         </div>` : ""}
-        <button type="button" onclick="openDay('${TODAY}')" class="mt-3 w-full rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">予定を見る・変える</button>
+        <button type="button" onclick="go('calendar'); openDay('${TODAY}')" class="mt-3 w-full rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">予定を見る・変える</button>
       </div>`
     : `<div class="rounded-2xl border border-dashed border-border p-4 text-center">
         <p class="text-sm text-muted-foreground">きょうの予定はまだありません。</p>
-        <button type="button" onclick="openDay('${TODAY}')" class="mt-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">予定を入れる</button>
+        <button type="button" onclick="go('calendar'); openDay('${TODAY}')" class="mt-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">予定を入れる</button>
       </div>`;
-
-  const up = [];
-  // 表示中の月の末日まで見る（途中で打ち切ると、月末に入れた予定が出ない）
-  for (let d = 10; d <= 31 && up.length < 4; d++) {
-    const ds = `2026-08-${String(d).padStart(2, "0")}`;
-    const q = planFor(ds);
-    if (q) up.push([ds, q]);
-  }
-  $("upcomingList").innerHTML = up.length
-    ? up.map(([ds, q]) => {
-        const ty = type(q.type);
-        const who = ty.roles.map(([k]) => (q.who || {})[k]).filter(Boolean);
-        return `<li><button type="button" onclick="openDay('${ds}')" class="flex w-full items-center gap-3 rounded-xl bg-surface px-3 py-2.5 text-left text-sm shadow-sm ring-1 ring-border transition hover:bg-surface-muted">
-          <span class="w-14 shrink-0 text-xs text-muted-foreground">${fmt(ds).replace("2026年", "")}</span>
-          <span class="text-lg">${ty.emoji}</span>
-          <span class="min-w-0 flex-1 truncate">${q.note || ty.label}</span>
-          <span class="flex shrink-0 -space-x-1">${who.map((id) => avatar(id, "sm")).join("")}</span>
-        </button></li>`;
-      }).join("")
-    : `<li class="rounded-xl bg-surface-muted px-3 py-2.5 text-sm text-muted-foreground">これからの予定はありません。</li>`;
 }
 
-// ───────── 曜日ルール表 ─────────
+// ───────── 毎週の予定ルール ─────────
 function renderRules() {
   const order = [0, 1, 2, 3, 4, 5, 6];
   const ro = isViewer();
@@ -1747,18 +1996,18 @@ function renderRules() {
   let h = `<tr class="border-b border-border"><td class="py-2 text-xs font-medium text-muted-foreground">予定</td>`;
   h += order.map((w) => {
     const r = RULES[w];
-    return `<td class="py-1"><button type="button" ${ro ? "disabled" : ""} onclick="cycleRule(${w})" class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg text-xl transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"} ${r ? "bg-surface-muted" : "text-muted-foreground"}">${r ? type(r.type).emoji : "－"}</button></td>`;
+    return `<td class="py-1"><button type="button" ${ro ? "disabled" : ""} onclick="cycleRule(${w})"
+      class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg text-xl transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"} ${r ? "bg-surface-muted" : "text-muted-foreground"}">${r ? type(r.type).emoji : "－"}</button></td>`;
   }).join("") + `</tr>`;
   for (const [key, label] of [["drop", "送り"], ["pick", "お迎え"], ["care", "みる人"]]) {
-    const any = order.some((w) => RULES[w] && type(RULES[w].type).roles.some(([k]) => k === key));
-    if (!any) continue;
+    if (!order.some((w) => RULES[w] && type(RULES[w].type).roles.some(([k]) => k === key))) continue;
     h += `<tr class="border-b border-border last:border-0"><td class="py-2 text-xs font-medium text-muted-foreground">${label}</td>`;
     h += order.map((w) => {
       const r = RULES[w];
-      const ok = r && type(r.type).roles.some(([k]) => k === key);
-      if (!ok) return `<td class="py-1 text-xs text-muted-foreground">·</td>`;
-      const id = (r.who || {})[key];
-      return `<td class="py-1"><button type="button" ${ro ? "disabled" : ""} onclick="cycleWho(${w},'${key}')" class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"}">${avatar(id)}</button></td>`;
+      const okRole = r && type(r.type).roles.some(([k]) => k === key);
+      if (!okRole) return `<td class="py-1 text-xs text-muted-foreground">·</td>`;
+      return `<td class="py-1"><button type="button" ${ro ? "disabled" : ""} onclick="cycleWho(${w},'${key}')"
+        class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"}">${avatar((r.who || {})[key])}</button></td>`;
     }).join("") + `</tr>`;
   }
   $("ruleTable").innerHTML = h;
@@ -1768,7 +2017,11 @@ function cycleRule(w) {
   const cur = RULES[w] ? RULES[w].type : null;
   const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
   if (next === null) delete RULES[w];
-  else RULES[w] = { type: next, who: RULES[w]?.who || {} };
+  else {
+    const keep = {};
+    for (const [k] of type(next).roles) if (RULES[w]?.who?.[k]) keep[k] = RULES[w].who[k];
+    RULES[w] = { type: next, who: keep };
+  }
   renderRules();
   renderGrid();
 }
@@ -1781,32 +2034,43 @@ function cycleWho(w, key) {
   renderGrid();
 }
 
-// ───────── 今週の担当ボード ─────────
+// ───────── 世帯の設定（アカウント連携） ─────────
+function renderFamily() {
+  $("familyList").innerHTML = MEMBERS.map((m) => {
+    const linked = m.link === "linked";
+    return `<li class="flex items-center gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border">
+      ${avatar(m.id)}
+      <span class="min-w-0 flex-1">
+        <span class="block truncate font-medium">${m.name}</span>
+        <span class="block truncate text-xs ${linked ? "text-muted-foreground" : "text-primary"}">${LINK_LABEL[m.link]}${linked ? "・編集者" : ""}</span>
+      </span>
+      ${linked ? "" : `<button type="button" onclick="openInvite('${m.id}')" class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">${m.link === "invited" ? "再送" : "招待"}</button>`}
+    </li>`;
+  }).join("");
+}
+
+// ───────── 週（担当）ビュー ─────────
 function renderWeek() {
   const days = ["2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14"];
   const ro = isViewer();
   $("weekReadonly").classList.toggle("hidden", !ro);
-
-  // このボードは「担当がある予定の日」だけを扱う。予定のない日を勝手に保育園として
-  // 見せると、入れていない日の担当を決めてしまえる
   const dirty = WEEK_DRAFT && Object.keys(WEEK_DRAFT).length > 0;
   $("weekSave").textContent = dirty ? "保存する（未保存の変更あり）" : "保存する";
   $("weekSave").disabled = !dirty;
-  $("weekSave").className =
-    "w-full rounded-xl py-3 text-sm font-bold transition " +
+  $("weekSave").className = "w-full rounded-xl py-3 text-sm font-bold transition " +
     (dirty ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "bg-surface-muted text-muted-foreground");
   $("weekSave").classList.toggle("hidden", ro);
 
-  const rows = days.map((ds) => {
+  $("weekBoard").innerHTML = days.map((ds) => {
     const p = (WEEK_DRAFT && WEEK_DRAFT[ds]) || planFor(ds);
-    const t = p ? type(p.type) : null;
-    const label = fmt(ds).replace("2026年", "");
+    const label = fmt(ds);
     if (!p) {
       return `<button type="button" onclick="openDay('${ds}')" class="flex w-full items-center gap-3 rounded-xl border border-dashed border-border px-3 py-3 text-left text-sm transition hover:bg-surface-muted">
         <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
         <span class="min-w-0 flex-1 text-muted-foreground">予定なし</span>
         <span class="shrink-0 text-xs text-primary">予定を入れる</span></button>`;
     }
+    const t = type(p.type);
     if (!t.roles.length) {
       return `<div class="flex items-center gap-3 rounded-xl bg-surface-muted px-3 py-3 text-sm">
         <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
@@ -1823,11 +2087,8 @@ function renderWeek() {
             <span class="text-xs font-bold">${m.initial}</span></button>`;
         }).join("")}</div></div>`).join("")}
     </div>`;
-  });
-  $("weekBoard").innerHTML = rows.join("");
+  }).join("");
 }
-// 既にある予定の担当だけを、下書きの上で書き換える
-// （新しい予定はここでは作らない。確定は「保存する」）
 function weekSet(ds, k, mid) {
   if (isViewer()) return;
   const cur = (WEEK_DRAFT && WEEK_DRAFT[ds]) || planFor(ds);
@@ -1835,7 +2096,7 @@ function weekSet(ds, k, mid) {
   if (!WEEK_DRAFT) WEEK_DRAFT = {};
   const p = WEEK_DRAFT[ds] || (WEEK_DRAFT[ds] = { type: cur.type, who: { ...(cur.who || {}) }, note: cur.note || "" });
   p.who[k] = p.who[k] === mid ? null : mid;
-  renderWeek(); // カレンダー / ホームには保存するまで出さない
+  renderWeek();
 }
 function weekSave() {
   if (!WEEK_DRAFT) return;
@@ -1849,11 +2110,19 @@ function weekSave() {
 }
 
 function render() {
+  renderTabs();
   renderGrid();
   renderHome();
   renderRules();
+  renderFamily();
   renderWeek();
   if (openDate) renderSheet();
+  // data-lucide のプレースホルダをアイコンに差し替える
+  document.querySelectorAll("[data-lucide]").forEach((el) => {
+    if (el.dataset.done) return;
+    el.innerHTML = svg(el.dataset.lucide, "h-5 w-5");
+    el.dataset.done = "1";
+  });
 }
 go("calendar");
 </script>
