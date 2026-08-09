@@ -314,6 +314,9 @@
   .max-h-72 {
     max-height: calc(var(--spacing) * 72);
   }
+  .max-h-\[85vh\] {
+    max-height: 85vh;
+  }
   .min-h-screen {
     min-height: 100vh;
   }
@@ -393,6 +396,9 @@
   }
   .overflow-hidden {
     overflow: hidden;
+  }
+  .overflow-y-auto {
+    overflow-y: auto;
   }
   .rounded {
     border-radius: 0.25rem;
@@ -1116,7 +1122,7 @@ input[type="date"] {
   <!-- 設定シート -->
   <div data-settings hidden class="fixed inset-0 z-30">
     <div class="absolute inset-0 bg-black/40" data-close-settings></div>
-    <div class="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-border bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div class="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <p class="text-sm font-semibold text-foreground">上限を試す</p>
       <p class="mt-0.5 text-xs text-muted-foreground">この設定はプロト用です。実機で「何秒あれば足りるか」を確かめてください。</p>
@@ -1236,10 +1242,12 @@ input[type="date"] {
 
   let objectUrl = null;
   let timer = null;
+  let thumbJob = 0; // サムネ生成の世代番号（grabThumb / clearAttachmentViews）
 
   // 「見る」「一覧」に出ている添付の見た目を、添付ゼロの状態へ戻す。
   // 中途半端に消すと、消したはずの動画が残って見えて空の状態を確かめられない。
   function clearAttachmentViews() {
+    thumbJob++; // 進行中のサムネ生成を無効化する（後から書き戻させない）
     const dv = $("[data-detail-video]");
     dv.pause();
     dv.removeAttribute("src");
@@ -1360,14 +1368,18 @@ input[type="date"] {
     grabThumb(url);
   }
 
-  // 1フレーム目をサムネにする（実装でも poster として別途保存する想定）
+  // 1フレーム目をサムネにする（実装でも poster として別途保存する想定）。
+  // デコードは非同期なので、遅れて返ってきたコールバックが「もう消した動画」や
+  // 「差し替え前の動画」のコマを書き戻さないよう、世代番号（thumbJob）で無効化する。
   function grabThumb(url) {
+    const job = ++thumbJob;
     const v = document.createElement("video");
     v.preload = "metadata";
     v.muted = true;
     v.playsInline = true;
     v.src = url;
     v.onloadeddata = () => {
+      if (job !== thumbJob) return; // 世代が進んでいる = このコマはもう要らない
       try {
         // 4K の動画をそのままキャンバスに載せると 30MB 超のピクセルバッファを確保して
         // メインスレッドで data URL に焼くことになる。表示は数百 px なので長辺 640 に縮める。
