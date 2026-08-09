@@ -1,0 +1,1386 @@
+<title>mfmf 動画の保存 プロト</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%A5%3C/text%3E%3C/svg%3E" />
+<style id="proto-css">
+/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */
+@layer properties;
+@layer theme, base, components, utilities;
+@layer theme {
+  :root, :host {
+    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    --color-red-600: oklch(57.7% 0.245 27.325);
+    --color-black: #000;
+    --color-white: #fff;
+    --spacing: 0.25rem;
+    --container-md: 28rem;
+    --text-xs: 0.75rem;
+    --text-xs--line-height: calc(1 / 0.75);
+    --text-sm: 0.875rem;
+    --text-sm--line-height: calc(1.25 / 0.875);
+    --text-lg: 1.125rem;
+    --text-lg--line-height: calc(1.75 / 1.125);
+    --text-2xl: 1.5rem;
+    --text-2xl--line-height: calc(2 / 1.5);
+    --text-3xl: 1.875rem;
+    --text-3xl--line-height: calc(2.25 / 1.875);
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --leading-relaxed: 1.625;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --aspect-video: 16 / 9;
+    --default-transition-duration: 150ms;
+    --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    --default-font-family: var(--font-sans);
+    --default-mono-font-family: var(--font-mono);
+  }
+}
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  html, :host {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    font-family: var(--default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
+    -webkit-tap-highlight-color: transparent;
+  }
+  hr {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+  abbr:where([title]) {
+    -webkit-text-decoration: underline dotted;
+    text-decoration: underline dotted;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  a {
+    color: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit;
+  }
+  b, strong {
+    font-weight: bolder;
+  }
+  code, kbd, samp, pre {
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-feature-settings: var(--default-mono-font-feature-settings, normal);
+    font-variation-settings: var(--default-mono-font-variation-settings, normal);
+    font-size: 1em;
+  }
+  small {
+    font-size: 80%;
+  }
+  sub, sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+  sub {
+    bottom: -0.25em;
+  }
+  sup {
+    top: -0.5em;
+  }
+  table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+  :-moz-focusring {
+    outline: auto;
+  }
+  progress {
+    vertical-align: baseline;
+  }
+  summary {
+    display: list-item;
+  }
+  ol, ul, menu {
+    list-style: none;
+  }
+  img, svg, video, canvas, audio, iframe, embed, object {
+    display: block;
+    vertical-align: middle;
+  }
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+  button, input, select, optgroup, textarea, ::file-selector-button {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  :where(select:is([multiple], [size])) optgroup {
+    font-weight: bolder;
+  }
+  :where(select:is([multiple], [size])) optgroup option {
+    padding-inline-start: 20px;
+  }
+  ::file-selector-button {
+    margin-inline-end: 4px;
+  }
+  ::placeholder {
+    opacity: 1;
+  }
+  @supports (not (-webkit-appearance: -apple-pay-button))  or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: currentcolor;
+      @supports (color: color-mix(in lab, red, red)) {
+        color: color-mix(in oklab, currentcolor 50%, transparent);
+      }
+    }
+  }
+  textarea {
+    resize: vertical;
+  }
+  ::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+  ::-webkit-date-and-time-value {
+    min-height: 1lh;
+    text-align: inherit;
+  }
+  ::-webkit-datetime-edit {
+    display: inline-flex;
+  }
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  ::-webkit-datetime-edit, ::-webkit-datetime-edit-year-field, ::-webkit-datetime-edit-month-field, ::-webkit-datetime-edit-day-field, ::-webkit-datetime-edit-hour-field, ::-webkit-datetime-edit-minute-field, ::-webkit-datetime-edit-second-field, ::-webkit-datetime-edit-millisecond-field, ::-webkit-datetime-edit-meridiem-field {
+    padding-block: 0;
+  }
+  ::-webkit-calendar-picker-indicator {
+    line-height: 1;
+  }
+  :-moz-ui-invalid {
+    box-shadow: none;
+  }
+  button, input:where([type="button"], [type="reset"], [type="submit"]), ::file-selector-button {
+    appearance: button;
+  }
+  ::-webkit-inner-spin-button, ::-webkit-outer-spin-button {
+    height: auto;
+  }
+  [hidden]:where(:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
+@layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+  .absolute {
+    position: absolute;
+  }
+  .fixed {
+    position: fixed;
+  }
+  .relative {
+    position: relative;
+  }
+  .sticky {
+    position: sticky;
+  }
+  .inset-0 {
+    inset: 0px;
+  }
+  .inset-x-0 {
+    inset-inline: 0px;
+  }
+  .top-0 {
+    top: 0px;
+  }
+  .right-1 {
+    right: var(--spacing);
+  }
+  .right-2 {
+    right: calc(var(--spacing) * 2);
+  }
+  .bottom-0 {
+    bottom: 0px;
+  }
+  .bottom-1 {
+    bottom: var(--spacing);
+  }
+  .bottom-2 {
+    bottom: calc(var(--spacing) * 2);
+  }
+  .z-10 {
+    z-index: 10;
+  }
+  .z-20 {
+    z-index: 20;
+  }
+  .z-30 {
+    z-index: 30;
+  }
+  .mx-auto {
+    margin-inline: auto;
+  }
+  .mt-0\.5 {
+    margin-top: calc(var(--spacing) * 0.5);
+  }
+  .mt-1 {
+    margin-top: var(--spacing);
+  }
+  .mt-1\.5 {
+    margin-top: calc(var(--spacing) * 1.5);
+  }
+  .mt-2 {
+    margin-top: calc(var(--spacing) * 2);
+  }
+  .mt-3 {
+    margin-top: calc(var(--spacing) * 3);
+  }
+  .mt-4 {
+    margin-top: calc(var(--spacing) * 4);
+  }
+  .mb-1 {
+    margin-bottom: var(--spacing);
+  }
+  .mb-1\.5 {
+    margin-bottom: calc(var(--spacing) * 1.5);
+  }
+  .mb-3 {
+    margin-bottom: calc(var(--spacing) * 3);
+  }
+  .block {
+    display: block;
+  }
+  .flex {
+    display: flex;
+  }
+  .grid {
+    display: grid;
+  }
+  .hidden {
+    display: none;
+  }
+  .inline-block {
+    display: inline-block;
+  }
+  .inline-flex {
+    display: inline-flex;
+  }
+  .aspect-square {
+    aspect-ratio: 1 / 1;
+  }
+  .aspect-video {
+    aspect-ratio: var(--aspect-video);
+  }
+  .h-1 {
+    height: var(--spacing);
+  }
+  .h-2 {
+    height: calc(var(--spacing) * 2);
+  }
+  .h-16 {
+    height: calc(var(--spacing) * 16);
+  }
+  .h-full {
+    height: 100%;
+  }
+  .max-h-72 {
+    max-height: calc(var(--spacing) * 72);
+  }
+  .min-h-screen {
+    min-height: 100vh;
+  }
+  .w-0 {
+    width: 0px;
+  }
+  .w-10 {
+    width: calc(var(--spacing) * 10);
+  }
+  .w-16 {
+    width: calc(var(--spacing) * 16);
+  }
+  .w-40 {
+    width: calc(var(--spacing) * 40);
+  }
+  .w-full {
+    width: 100%;
+  }
+  .max-w-md {
+    max-width: var(--container-md);
+  }
+  .min-w-0 {
+    min-width: 0px;
+  }
+  .flex-1 {
+    flex: 1;
+  }
+  .shrink-0 {
+    flex-shrink: 0;
+  }
+  .cursor-pointer {
+    cursor: pointer;
+  }
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .flex-wrap {
+    flex-wrap: wrap;
+  }
+  .items-baseline {
+    align-items: baseline;
+  }
+  .items-center {
+    align-items: center;
+  }
+  .justify-between {
+    justify-content: space-between;
+  }
+  .justify-center {
+    justify-content: center;
+  }
+  .gap-2 {
+    gap: calc(var(--spacing) * 2);
+  }
+  .gap-3 {
+    gap: calc(var(--spacing) * 3);
+  }
+  :where(.space-y-3 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 3) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 3) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-4 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 4) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 4) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-5 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 5) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 5) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .overflow-hidden {
+    overflow: hidden;
+  }
+  .rounded {
+    border-radius: 0.25rem;
+  }
+  .rounded-full {
+    border-radius: calc(infinity * 1px);
+  }
+  .rounded-lg {
+    border-radius: var(--radius-lg);
+  }
+  .rounded-md {
+    border-radius: var(--radius-md);
+  }
+  .rounded-xl {
+    border-radius: var(--radius-xl);
+  }
+  .rounded-t-2xl {
+    border-top-left-radius: var(--radius-2xl);
+    border-top-right-radius: var(--radius-2xl);
+  }
+  .border {
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+  }
+  .border-t {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 1px;
+  }
+  .border-b {
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 1px;
+  }
+  .border-dashed {
+    --tw-border-style: dashed;
+    border-style: dashed;
+  }
+  .border-border {
+    border-color: var(--border-color);
+  }
+  .border-red-600\/40 {
+    border-color: color-mix(in srgb, oklch(57.7% 0.245 27.325) 40%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-red-600) 40%, transparent);
+    }
+  }
+  .bg-background\/90 {
+    background-color: var(--background);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--background) 90%, transparent);
+    }
+  }
+  .bg-black {
+    background-color: var(--color-black);
+  }
+  .bg-black\/40 {
+    background-color: color-mix(in srgb, #000 40%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 40%, transparent);
+    }
+  }
+  .bg-black\/60 {
+    background-color: color-mix(in srgb, #000 60%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 60%, transparent);
+    }
+  }
+  .bg-black\/70 {
+    background-color: color-mix(in srgb, #000 70%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 70%, transparent);
+    }
+  }
+  .bg-muted {
+    background-color: var(--muted);
+  }
+  .bg-primary {
+    background-color: var(--primary);
+  }
+  .bg-surface {
+    background-color: var(--surface);
+  }
+  .bg-surface-muted {
+    background-color: var(--surface-muted);
+  }
+  .object-cover {
+    object-fit: cover;
+  }
+  .p-0\.5 {
+    padding: calc(var(--spacing) * 0.5);
+  }
+  .p-3 {
+    padding: calc(var(--spacing) * 3);
+  }
+  .p-4 {
+    padding: calc(var(--spacing) * 4);
+  }
+  .px-1 {
+    padding-inline: var(--spacing);
+  }
+  .px-1\.5 {
+    padding-inline: calc(var(--spacing) * 1.5);
+  }
+  .px-3 {
+    padding-inline: calc(var(--spacing) * 3);
+  }
+  .px-4 {
+    padding-inline: calc(var(--spacing) * 4);
+  }
+  .px-5 {
+    padding-inline: calc(var(--spacing) * 5);
+  }
+  .py-0\.5 {
+    padding-block: calc(var(--spacing) * 0.5);
+  }
+  .py-1\.5 {
+    padding-block: calc(var(--spacing) * 1.5);
+  }
+  .py-2 {
+    padding-block: calc(var(--spacing) * 2);
+  }
+  .py-2\.5 {
+    padding-block: calc(var(--spacing) * 2.5);
+  }
+  .py-3 {
+    padding-block: calc(var(--spacing) * 3);
+  }
+  .py-4 {
+    padding-block: calc(var(--spacing) * 4);
+  }
+  .py-6 {
+    padding-block: calc(var(--spacing) * 6);
+  }
+  .pt-2 {
+    padding-top: calc(var(--spacing) * 2);
+  }
+  .pt-4 {
+    padding-top: calc(var(--spacing) * 4);
+  }
+  .pb-2 {
+    padding-bottom: calc(var(--spacing) * 2);
+  }
+  .pb-24 {
+    padding-bottom: calc(var(--spacing) * 24);
+  }
+  .text-center {
+    text-align: center;
+  }
+  .text-2xl {
+    font-size: var(--text-2xl);
+    line-height: var(--tw-leading, var(--text-2xl--line-height));
+  }
+  .text-3xl {
+    font-size: var(--text-3xl);
+    line-height: var(--tw-leading, var(--text-3xl--line-height));
+  }
+  .text-lg {
+    font-size: var(--text-lg);
+    line-height: var(--tw-leading, var(--text-lg--line-height));
+  }
+  .text-sm {
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+  }
+  .text-xs {
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+  }
+  .text-\[10px\] {
+    font-size: 10px;
+  }
+  .leading-relaxed {
+    --tw-leading: var(--leading-relaxed);
+    line-height: var(--leading-relaxed);
+  }
+  .font-medium {
+    --tw-font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-medium);
+  }
+  .font-semibold {
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+  }
+  .text-foreground {
+    color: var(--foreground);
+  }
+  .text-muted-foreground {
+    color: var(--muted-foreground);
+  }
+  .text-primary-foreground {
+    color: var(--primary-foreground);
+  }
+  .text-red-600 {
+    color: var(--color-red-600);
+  }
+  .text-white {
+    color: var(--color-white);
+  }
+  .backdrop-blur {
+    --tw-backdrop-blur: blur(8px);
+    -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+    backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+  }
+  .transition {
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .transition-all {
+    transition-property: all;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .duration-200 {
+    --tw-duration: 200ms;
+    transition-duration: 200ms;
+  }
+  .outline-none {
+    --tw-outline-style: none;
+    outline-style: none;
+  }
+  @media (hover: hover) {
+    .hover\:bg-black\/75:hover {
+      background-color: color-mix(in srgb, #000 75%, transparent);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-black\/75:hover {
+        background-color: color-mix(in oklab, var(--color-black) 75%, transparent);
+      }
+    }
+    .hover\:bg-primary-hover:hover {
+      background-color: var(--primary-hover);
+    }
+    .hover\:bg-surface-muted:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+  .focus\:border-muted-foreground:focus {
+    border-color: var(--muted-foreground);
+  }
+  .focus\:ring-1:focus {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .focus\:ring-muted-foreground:focus {
+    --tw-ring-color: var(--muted-foreground);
+  }
+}
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1220;
+    --foreground: #e2e8f0;
+    --surface: #111827;
+    --surface-muted: #1f2937;
+    --border-color: #334155;
+    --muted: #475569;
+    --muted-foreground: #94a3b8;
+    --primary: #fb923c;
+    --primary-hover: #fdba74;
+    --primary-foreground: #431407;
+    --skeleton-base: #1f2937;
+    --skeleton-shine: rgba(71, 85, 105, 0.6);
+    --focus-ring: #fb923c;
+  }
+}
+html {
+  color-scheme: light dark;
+}
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+body:has([data-app-tabbar]) main {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+.safe-px {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+.safe-pt {
+  padding-top: env(safe-area-inset-top);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 60;
+}
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.18);
+}
+.skeleton {
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient( 90deg, var(--skeleton-base) 0%, var(--skeleton-shine) 50%, var(--skeleton-base) 100% );
+  @supports (color: color-mix(in lab, red, red)) {
+    background-image: linear-gradient( 90deg, color-mix(in srgb, var(--skeleton-base) 100%, transparent) 0%, var(--skeleton-shine) 50%, color-mix(in srgb, var(--skeleton-base) 100%, transparent) 100% );
+  }
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@property --tw-space-y-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-border-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
+@property --tw-leading {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-font-weight {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-blur {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-brightness {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-contrast {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-grayscale {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-hue-rotate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-invert {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-opacity {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-saturate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-sepia {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-duration {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-inset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-ring-inset {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-offset-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --tw-ring-offset-color {
+  syntax: "*";
+  inherits: false;
+  initial-value: #fff;
+}
+@property --tw-ring-offset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@layer properties {
+  @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
+    *, ::before, ::after, ::backdrop {
+      --tw-space-y-reverse: 0;
+      --tw-border-style: solid;
+      --tw-leading: initial;
+      --tw-font-weight: initial;
+      --tw-backdrop-blur: initial;
+      --tw-backdrop-brightness: initial;
+      --tw-backdrop-contrast: initial;
+      --tw-backdrop-grayscale: initial;
+      --tw-backdrop-hue-rotate: initial;
+      --tw-backdrop-invert: initial;
+      --tw-backdrop-opacity: initial;
+      --tw-backdrop-saturate: initial;
+      --tw-backdrop-sepia: initial;
+      --tw-duration: initial;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-color: initial;
+      --tw-shadow-alpha: 100%;
+      --tw-inset-shadow: 0 0 #0000;
+      --tw-inset-shadow-color: initial;
+      --tw-inset-shadow-alpha: 100%;
+      --tw-ring-color: initial;
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-inset-ring-color: initial;
+      --tw-inset-ring-shadow: 0 0 #0000;
+      --tw-ring-inset: initial;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-offset-shadow: 0 0 #0000;
+    }
+  }
+}
+
+</style>
+
+<div class="mx-auto min-h-screen max-w-md">
+  <!-- ヘッダー -->
+  <header class="safe-pt sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
+    <div class="safe-px flex items-center justify-between gap-3 py-2.5">
+      <div>
+        <p class="text-sm font-semibold text-foreground">動画の保存</p>
+        <p class="text-xs text-muted-foreground">プロトタイプ / 保存はされません</p>
+      </div>
+      <button type="button" data-open-settings
+        class="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-surface-muted">
+        上限 <span data-cap-label>30秒</span>
+      </button>
+    </div>
+    <div class="safe-px pb-2">
+      <div class="inline-flex w-full rounded-lg border border-border p-0.5">
+        <button type="button" data-tab="form" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">記録する</button>
+        <button type="button" data-tab="detail" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">見る</button>
+        <button type="button" data-tab="list" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">一覧</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="safe-px pb-24 pt-4">
+
+    <!-- ============ タブ1: 記録フォーム ============ -->
+    <section data-panel="form" class="space-y-5">
+      <div class="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
+        <span class="text-sm text-muted-foreground">キャンセル</span>
+        <span class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground">保存</span>
+      </div>
+
+      <div>
+        <span class="mb-1 block text-sm font-medium text-foreground">記録の日付</span>
+        <input type="date" value="2026-08-09"
+          class="rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground" />
+      </div>
+
+      <div>
+        <span class="mb-1 block text-sm font-medium text-foreground">写真を追加（複数選択可）</span>
+        <div class="flex items-center gap-3 rounded-lg border border-dashed border-border px-3 py-3">
+          <span class="rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-foreground">ファイルを選択</span>
+          <span class="text-sm text-muted-foreground">既存のまま（変更なし）</span>
+        </div>
+        <p class="mt-1.5 text-xs text-muted-foreground">アップロード時に自動で縮小・圧縮します（長辺 1600px）。</p>
+      </div>
+
+      <!-- ▼ 新規: 動画 -->
+      <div>
+        <div class="mb-1 flex items-baseline justify-between gap-2">
+          <span class="text-sm font-medium text-foreground">動画を追加</span>
+          <span class="text-xs text-muted-foreground">1記録に1本まで</span>
+        </div>
+
+        <!-- 空 -->
+        <div data-vstate="empty" class="rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-center">
+          <p class="text-3xl" aria-hidden="true">🎥</p>
+          <p class="mt-2 text-sm text-muted-foreground">
+            <span data-cap-label>30秒</span>までの短い動画を1本つけられます
+          </p>
+          <label class="mt-3 inline-block cursor-pointer rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover">
+            動画を選ぶ
+            <input type="file" accept="video/*" data-video-input class="sr-only" />
+          </label>
+          <p class="mt-2 text-xs text-muted-foreground">iPhone / Android どちらの形式でも大丈夫です</p>
+        </div>
+
+        <!-- 確認中 -->
+        <div data-vstate="checking" hidden class="rounded-lg border border-border bg-surface px-4 py-6 text-center">
+          <div class="skeleton mx-auto h-2 w-40 rounded-full"></div>
+          <p class="mt-3 text-sm text-muted-foreground">動画を確認しています…</p>
+        </div>
+
+        <!-- 長すぎ -->
+        <div data-vstate="toolong" hidden class="rounded-lg border border-red-600/40 bg-surface px-4 py-4">
+          <p class="text-sm font-medium text-red-600">動画が長すぎます</p>
+          <p class="mt-1 text-sm text-foreground">
+            選んだ動画は <b data-actual-dur>1分12秒</b> です。<span data-cap-label>30秒</span>までにしてください。
+          </p>
+          <p class="mt-2 text-xs text-muted-foreground">
+            写真アプリで前後を切ってから選び直せます（iPhone: 編集 → 黄色い枠をドラッグ / Android: フォト → 編集 → トリミング）。
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <label class="cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+              別の動画を選ぶ
+              <input type="file" accept="video/*" data-video-input class="sr-only" />
+            </label>
+            <button type="button" data-video-reset
+              class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">やめる</button>
+          </div>
+        </div>
+
+        <!-- 対応外 -->
+        <div data-vstate="unsupported" hidden class="rounded-lg border border-red-600/40 bg-surface px-4 py-4">
+          <p class="text-sm font-medium text-red-600">この動画は読み込めませんでした</p>
+          <p class="mt-1 text-sm text-foreground">形式が対応していない可能性があります。別の動画を選んでください。</p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <label class="cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+              別の動画を選ぶ
+              <input type="file" accept="video/*" data-video-input class="sr-only" />
+            </label>
+            <button type="button" data-video-reset
+              class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">やめる</button>
+          </div>
+        </div>
+
+        <!-- 変換中 -->
+        <div data-vstate="converting" hidden class="rounded-lg border border-border bg-surface px-4 py-4">
+          <p class="text-sm font-medium text-foreground">動画を準備しています…</p>
+          <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-surface-muted">
+            <div data-progress class="h-full w-0 rounded-full bg-primary transition-all duration-200"></div>
+          </div>
+          <p class="mt-2 text-xs text-muted-foreground" aria-live="polite">
+            <span data-progress-label>0%</span> ・ この端末の中で処理しています（まだ送信していません）
+          </p>
+          <button type="button" data-video-reset
+            class="mt-3 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">やめる</button>
+        </div>
+
+        <!-- 完了 -->
+        <div data-vstate="ready" hidden class="overflow-hidden rounded-lg border border-border bg-surface">
+          <video data-preview controls playsinline preload="metadata" class="block max-h-72 w-full bg-black"></video>
+          <div class="px-4 py-3">
+            <p class="text-sm font-medium text-foreground" data-ready-name>IMG_0421.MOV</p>
+            <p class="mt-0.5 text-xs text-muted-foreground" data-ready-meta>0:12 ・ 24.3 MB → 3.1 MB</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <label class="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">
+                差し替える
+                <input type="file" accept="video/*" data-video-input class="sr-only" />
+              </label>
+              <button type="button" data-video-reset
+                class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-surface-muted">削除する</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <span class="mb-1 block text-sm font-medium text-foreground">保育園からの記録</span>
+        <textarea rows="5" placeholder="今日の様子などを記録します"
+          class="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"></textarea>
+      </div>
+    </section>
+
+    <!-- ============ タブ2: 記録詳細 ============ -->
+    <section data-panel="detail" hidden class="space-y-4">
+      <div>
+        <p class="text-xs text-muted-foreground">2026年8月9日（日）</p>
+        <h1 class="text-lg font-semibold text-foreground">保育園からの記録</h1>
+      </div>
+
+      <!-- 動画カード: タップするまで読み込まない（通信量対策） -->
+      <div class="overflow-hidden rounded-xl border border-border bg-surface">
+        <div data-detail-poster class="relative flex aspect-video w-full items-center justify-center bg-surface-muted">
+          <img data-detail-thumb alt="" hidden class="absolute inset-0 h-full w-full object-cover" />
+          <button type="button" data-detail-play
+            class="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-black/60 text-2xl text-white backdrop-blur transition hover:bg-black/75">▶</button>
+          <span data-detail-dur class="absolute bottom-2 right-2 z-10 rounded bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">0:12</span>
+        </div>
+        <video data-detail-video hidden controls playsinline preload="none" class="block aspect-video w-full bg-black"></video>
+        <p class="px-4 py-2 text-xs text-muted-foreground" data-detail-note>
+          タップすると再生します（開くまで通信しません）
+        </p>
+      </div>
+
+      <div>
+        <p class="mb-1.5 text-sm font-medium text-foreground">写真</p>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="aspect-square rounded-lg bg-surface-muted"></div>
+          <div class="aspect-square rounded-lg bg-surface-muted"></div>
+          <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        </div>
+      </div>
+
+      <p class="text-sm leading-relaxed text-foreground">
+        今日はお友だちとよく走り回っていました。おやつも完食です。動画はボール遊びの様子です。
+      </p>
+    </section>
+
+    <!-- ============ タブ3: 一覧 ============ -->
+    <section data-panel="list" hidden class="space-y-4">
+      <p class="text-xs text-muted-foreground">動画がある記録には ▶ が付きます。</p>
+      <div data-list class="space-y-3"></div>
+
+      <div class="pt-2">
+        <p class="mb-1.5 text-sm font-medium text-foreground">ギャラリー</p>
+        <div data-grid class="grid grid-cols-3 gap-2"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 設定シート -->
+  <div data-settings hidden class="fixed inset-0 z-30">
+    <div class="absolute inset-0 bg-black/40" data-close-settings></div>
+    <div class="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-border bg-surface p-4"
+      style="padding-bottom: calc(1rem + env(safe-area-inset-bottom))">
+      <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+      <p class="text-sm font-semibold text-foreground">上限を試す</p>
+      <p class="mt-0.5 text-xs text-muted-foreground">この設定はプロト用です。実機で「何秒あれば足りるか」を確かめてください。</p>
+
+      <div class="mt-4">
+        <span class="mb-1.5 block text-sm font-medium text-foreground">動画の最長</span>
+        <div class="inline-flex w-full rounded-lg border border-border p-0.5">
+          <button type="button" data-cap="15" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">15秒</button>
+          <button type="button" data-cap="30" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">30秒</button>
+          <button type="button" data-cap="60" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">60秒</button>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <span class="mb-1.5 block text-sm font-medium text-foreground">保存する画質</span>
+        <div class="inline-flex w-full rounded-lg border border-border p-0.5">
+          <button type="button" data-quality="720" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">720p</button>
+          <button type="button" data-quality="1080" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">1080p</button>
+        </div>
+      </div>
+
+      <div class="mt-4 rounded-lg bg-surface-muted p-3">
+        <p class="text-sm text-foreground" data-budget></p>
+        <p class="mt-1 text-xs text-muted-foreground">
+          無料枠 1GB のうち動画に 500MB を充てた場合の概算です。写真・DB で残りを使います。
+        </p>
+      </div>
+
+      <button type="button" data-close-settings
+        class="mt-4 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---- 状態（プロト用。実データは無い） ----
+  const state = { cap: 30, quality: 720, tab: "form", picked: null };
+  // 保存時のビットレート想定（映像+音声, Mbps）
+  const BITRATE = { 720: 2.0, 1080: 4.5 };
+  const BUDGET_BYTES = 500 * 1024 * 1024;
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+  const fmtBytes = (b) =>
+    b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`;
+  const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const fmtDurJa = (s) =>
+    s >= 60 ? `${Math.floor(s / 60)}分${Math.round(s % 60)}秒` : `${Math.round(s)}秒`;
+  const estBytes = (sec) => (sec * BITRATE[state.quality] * 1e6) / 8;
+
+  // ---- タブ ----
+  function setTab(tab) {
+    state.tab = tab;
+    $$("[data-tab]").forEach((b) => {
+      const on = b.dataset.tab === tab;
+      b.className =
+        "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition " +
+        (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface-muted");
+      b.setAttribute("aria-pressed", String(on));
+    });
+    $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== tab));
+    window.scrollTo({ top: 0 });
+  }
+  $$("[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+
+  // ---- 設定シート ----
+  function segment(attr, value) {
+    $$(`[${attr}]`).forEach((b) => {
+      const on = b.getAttribute(attr) === String(value);
+      b.className =
+        "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition " +
+        (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface-muted");
+      b.setAttribute("aria-pressed", String(on));
+    });
+  }
+  function renderSettings() {
+    segment("data-cap", state.cap);
+    segment("data-quality", state.quality);
+    $$("[data-cap-label]").forEach((el) => (el.textContent = `${state.cap}秒`));
+    const per = estBytes(state.cap);
+    const count = Math.floor(BUDGET_BYTES / per);
+    const weeks = (count / 52).toFixed(1);
+    $("[data-budget]").textContent =
+      `${state.cap}秒 / ${state.quality}p ≒ ${fmtBytes(per)}。500MB で約 ${count} 本（週1本なら約 ${weeks} 年）。`;
+  }
+  $$("[data-cap]").forEach((b) =>
+    b.addEventListener("click", () => {
+      state.cap = Number(b.dataset.cap);
+      renderSettings();
+      if (state.picked) evaluate(state.picked);
+    }),
+  );
+  $$("[data-quality]").forEach((b) =>
+    b.addEventListener("click", () => {
+      state.quality = Number(b.dataset.quality);
+      renderSettings();
+      if (state.picked) evaluate(state.picked);
+    }),
+  );
+  $("[data-open-settings]").addEventListener("click", () => ($("[data-settings]").hidden = false));
+  $$("[data-close-settings]").forEach((b) =>
+    b.addEventListener("click", () => ($("[data-settings]").hidden = true)),
+  );
+
+  // ---- 動画欄 ----
+  function showV(name) {
+    $$("[data-vstate]").forEach((el) => (el.hidden = el.dataset.vstate !== name));
+  }
+
+  let objectUrl = null;
+  let timer = null;
+
+  function reset() {
+    if (timer) { clearInterval(timer); timer = null; }
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    state.picked = null;
+    $("[data-preview]").removeAttribute("src");
+    $("[data-detail-video]").removeAttribute("src");
+    $("[data-detail-video]").hidden = true;
+    $("[data-detail-poster]").hidden = false;
+    $("[data-detail-thumb]").hidden = true;
+    $("[data-detail-dur]").textContent = "0:12";
+    $("[data-detail-note]").textContent = "タップすると再生します（開くまで通信しません）";
+    $$("[data-video-input]").forEach((i) => (i.value = ""));
+    showV("empty");
+  }
+  $$("[data-video-reset]").forEach((b) => b.addEventListener("click", reset));
+
+  // メタデータ（長さ）を読む。プロトなので実際の変換はせず進捗だけ再現する。
+  function readMeta(file) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.muted = true;
+      const done = (dur) => { resolve({ url, duration: dur }); };
+      v.onloadedmetadata = () => done(isFinite(v.duration) ? v.duration : null);
+      v.onerror = () => done(null);
+      setTimeout(() => done(isFinite(v.duration) && v.duration > 0 ? v.duration : null), 4000);
+      v.src = url;
+    });
+  }
+
+  function evaluate(picked) {
+    const { file, url, duration } = picked;
+    if (duration == null) { showV("unsupported"); return; }
+    if (duration > state.cap + 0.5) {
+      $("[data-actual-dur]").textContent = fmtDurJa(duration);
+      showV("toolong");
+      return;
+    }
+    convert(picked);
+  }
+
+  function convert(picked) {
+    const { file, url, duration } = picked;
+    showV("converting");
+    let p = 0;
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+      p = Math.min(100, p + 7 + Math.random() * 9);
+      $("[data-progress]").style.width = `${p}%`;
+      $("[data-progress-label]").textContent = `${Math.round(p)}%`;
+      if (p >= 100) {
+        clearInterval(timer);
+        timer = null;
+        finish(picked);
+      }
+    }, 160);
+  }
+
+  function finish({ file, url, duration }) {
+    const after = Math.min(file.size, estBytes(duration));
+    $("[data-preview]").src = url;
+    $("[data-ready-name]").textContent = file.name || "動画";
+    $("[data-ready-meta]").textContent =
+      `${fmtDur(duration)} ・ ${fmtBytes(file.size)} → ${fmtBytes(after)}`;
+    showV("ready");
+
+    // 「見る」タブ・一覧にも同じ動画を反映して、再生の見え方を確かめられるようにする
+    $("[data-detail-video]").src = url;
+    $("[data-detail-dur]").textContent = fmtDur(duration);
+    $("[data-detail-note]").textContent =
+      `タップすると再生します（${fmtBytes(after)} / 開くまで通信しません）`;
+    grabThumb(url);
+  }
+
+  // 1フレーム目をサムネにする（実装でも poster として別途保存する想定）
+  function grabThumb(url) {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.muted = true;
+    v.playsInline = true;
+    v.src = url;
+    v.onloadeddata = () => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = v.videoWidth || 640;
+        c.height = v.videoHeight || 360;
+        c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+        const data = c.toDataURL("image/jpeg", 0.7);
+        const thumb = $("[data-detail-thumb]");
+        thumb.src = data;
+        thumb.hidden = false;
+        $$("[data-list-thumb]").forEach((el) => {
+          el.style.backgroundImage = `url(${data})`;
+          el.style.backgroundSize = "cover";
+          el.style.backgroundPosition = "center";
+        });
+      } catch (_) { /* プロトなので失敗は無視 */ }
+    };
+    v.currentTime = 0.1;
+  }
+
+  $$("[data-video-input]").forEach((input) =>
+    input.addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      showV("checking");
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      const { url, duration } = await readMeta(file);
+      objectUrl = url;
+      state.picked = { file, url, duration };
+      evaluate(state.picked);
+    }),
+  );
+
+  // ---- 詳細: タップして初めて再生 ----
+  $("[data-detail-play]").addEventListener("click", () => {
+    const v = $("[data-detail-video]");
+    if (!v.getAttribute("src")) {
+      $("[data-detail-note]").textContent =
+        "「記録する」タブで動画を選ぶと、ここで再生できます。";
+      return;
+    }
+    $("[data-detail-poster]").hidden = true;
+    v.hidden = false;
+    v.play().catch(() => {});
+  });
+
+  // ---- 一覧（固定データ） ----
+  const RECORDS = [
+    { date: "8月9日(日)", body: "お友だちとよく走り回っていました。", video: true, photos: 3 },
+    { date: "8月8日(土)", body: "おうちでお昼寝。よく寝ていました。", video: false, photos: 1 },
+    { date: "8月7日(金)", body: "はじめてのシャンプー。がんばりました。", video: true, photos: 2 },
+    { date: "8月6日(木)", body: "ごはん完食。", video: false, photos: 0 },
+  ];
+  $("[data-list]").innerHTML = RECORDS.map((r) => `
+    <article class="flex gap-3 rounded-xl border border-border bg-surface p-3">
+      <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted"${r.video ? ' data-list-thumb' : ""}>
+        ${r.video ? '<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ 0:12</span>' : ""}
+      </div>
+      <div class="min-w-0">
+        <p class="text-xs text-muted-foreground">${r.date}</p>
+        <p class="truncate text-sm text-foreground">${r.body}</p>
+        <p class="mt-1 text-xs text-muted-foreground">
+          ${r.photos > 0 ? `写真${r.photos}枚` : "写真なし"}${r.video ? " ・ 動画1本" : ""}
+        </p>
+      </div>
+    </article>`).join("");
+
+  $("[data-grid]").innerHTML = Array.from({ length: 9 }, (_, i) => {
+    const isVideo = i === 0 || i === 4;
+    return `<div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted"${isVideo ? " data-list-thumb" : ""}>
+      ${isVideo ? '<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶</span>' : ""}
+    </div>`;
+  }).join("");
+
+  setTab("form");
+  renderSettings();
+  showV("empty");
+})();
+</script>
