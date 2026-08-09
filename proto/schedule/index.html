@@ -18,11 +18,14 @@
     --color-amber-900: oklch(41.4% 0.112 45.904);
     --color-emerald-50: oklch(97.9% 0.021 166.113);
     --color-emerald-100: oklch(95% 0.052 163.051);
+    --color-emerald-300: oklch(84.5% 0.143 164.978);
     --color-emerald-400: oklch(76.5% 0.177 163.223);
     --color-emerald-500: oklch(69.6% 0.17 162.48);
     --color-emerald-600: oklch(59.6% 0.145 163.225);
     --color-emerald-700: oklch(50.8% 0.118 165.612);
+    --color-emerald-800: oklch(43.2% 0.095 166.913);
     --color-emerald-900: oklch(37.8% 0.077 168.94);
+    --color-emerald-950: oklch(26.2% 0.051 172.552);
     --color-sky-50: oklch(97.7% 0.013 236.62);
     --color-sky-100: oklch(95.1% 0.026 236.824);
     --color-sky-400: oklch(74.6% 0.16 232.661);
@@ -661,6 +664,9 @@
   .border-emerald-500 {
     border-color: var(--color-emerald-500);
   }
+  .border-emerald-600 {
+    border-color: var(--color-emerald-600);
+  }
   .border-muted-foreground\/50 {
     border-color: var(--muted-foreground);
     @supports (color: color-mix(in lab, red, red)) {
@@ -967,8 +973,8 @@
   .text-background {
     color: var(--background);
   }
-  .text-emerald-700 {
-    color: var(--color-emerald-700);
+  .text-emerald-800 {
+    color: var(--color-emerald-800);
   }
   .text-emerald-900 {
     color: var(--color-emerald-900);
@@ -1132,6 +1138,19 @@
   @media (width >= 40rem) {
     .sm\:inline {
       display: inline;
+    }
+  }
+  @media (prefers-color-scheme: dark) {
+    .dark\:border-emerald-400 {
+      border-color: var(--color-emerald-400);
+    }
+    .dark\:text-emerald-300 {
+      color: var(--color-emerald-300);
+    }
+    @media (hover: hover) {
+      .dark\:hover\:bg-emerald-950:hover {
+        background-color: var(--color-emerald-950);
+      }
     }
   }
 }
@@ -1646,14 +1665,14 @@ input[type="date"] {
   </nav>
 
   <!-- ═══════════ 予定シート ═══════════ -->
-  <div id="backdrop" onclick="closeSheet()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
+  <div id="backdrop" onclick="requestCloseSheet()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
   <div id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
     <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <div class="mb-3 flex items-center justify-between gap-2">
         <h2 id="sheetTitle" class="min-w-0 flex-1 truncate text-base font-bold"></h2>
         <span id="sheetStatus"></span>
-        <button type="button" onclick="closeSheet()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
+        <button type="button" onclick="requestCloseSheet()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
       </div>
       <div id="sheetBody" class="space-y-4"></div>
     </div>
@@ -1707,7 +1726,7 @@ input[type="date"] {
       <p id="invBody" class="mb-3 text-sm text-muted-foreground"></p>
       <div class="flex items-center gap-2 rounded-xl bg-surface-muted px-3 py-2.5 text-xs">
         <span class="min-w-0 flex-1 truncate font-mono">mfmf.app/invite/8f3a…c1</span>
-        <button type="button" onclick="toast('招待リンクをコピーしました')" class="shrink-0 rounded-lg bg-surface px-3 py-1.5 font-medium ring-1 ring-border">コピー</button>
+        <button type="button" onclick="copyInvite()" class="shrink-0 rounded-lg bg-surface px-3 py-1.5 font-medium ring-1 ring-border">コピー</button>
       </div>
       <button type="button" onclick="closeInvite()" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">閉じる</button>
     </div>
@@ -1827,6 +1846,8 @@ let DRAFT = null;
 let DRAFT_BASE = null;
 let DONE_DRAFT = null;
 let CONFIRM_DELETE = false; // 記録削除の確認state
+let CONFIRM_CLOSE = false;  // 編集を捨てるときの確認state
+let OPEN_SIG = null;        // 開いた時点の内容（変更の有無を見る）
 let ASSIGN_DRAFT = null;
 let assignOpen = false;
 let seq = 100;
@@ -1866,7 +1887,9 @@ function ruleFor(d) {
 function editableRule(w) {
   const lv = latestVersion(w);
   if (!lv || !lv.type) return null;
-  if ((lv.since || "") >= TODAY) return lv;
+  if ((lv.since || "") === TODAY) return lv;
+  // 未来から始まる版は畳んでから、今日の版として編集する
+  RULES[w] = versionsOf(w).filter((r) => !r.since || r.since <= TODAY);
   const copy = { ...lv, who: { ...(lv.who || {}) }, since: TODAY };
   putRuleVersion(w, copy);
   return copy;
@@ -1933,7 +1956,7 @@ document.addEventListener("keydown", (e) => {
   if (open("invSheet")) return closeInvite();
   if (open("doneSheet")) return closeDone();
   if (open("qrSheet")) return closeQuick();
-  if (open("sheet")) return closeSheet();
+  if (open("sheet")) return requestCloseSheet();
 });
 const SHEET_IDS = ["sheet", "doneSheet", "qrSheet", "invSheet"];
 // 上に開いているシートの順（z-index の高い順）
@@ -2041,7 +2064,12 @@ function assignDiscard() {
   toast("未保存の変更を捨てました");
 }
 function toggleEmpty() {
-  if (isEmpty()) { ITEMS = []; RULES = {}; }
+  // 「予定が 0 件」＝これからの予定が無い状態。すでにある記録は残す
+  // （消すと新規アカウントの状態になってしまい、確かめたい状態と違う）
+  if (isEmpty()) {
+    ITEMS = JSON.parse(JSON.stringify(FIXTURE_ITEMS)).filter((x) => x.status === "done");
+    RULES = {};
+  }
   else {
     ITEMS = JSON.parse(JSON.stringify(FIXTURE_ITEMS));
     RULES = JSON.parse(JSON.stringify(FIXTURE_RULES));
@@ -2258,7 +2286,7 @@ function renderAssignBoard() {
         <span class="w-16 shrink-0 text-xs text-muted-foreground">${l}</span>
         <div class="flex gap-1.5">${MEMBERS.map((m) => {
           const on = (x.who || {})[k] === m.id;
-          return `<button type="button" ${ro ? "disabled" : ""} onclick="assignSet('${ds}','${k}','${m.id}')" aria-label="${label} ${l} ${m.name}" aria-pressed="${on}"
+          return `<button type="button" data-assign="${ds}|${k}|${m.id}" ${ro ? "disabled" : ""} onclick="assignSet('${ds}','${k}','${m.id}')" aria-label="${label} ${l} ${m.name}" aria-pressed="${on}"
             class="flex h-9 w-9 items-center justify-center rounded-full transition ${on ? `ring-2 ${m.ring} ` + m.bg : "bg-surface-muted text-muted-foreground"} ${ro ? "opacity-50" : on ? "" : "hover:bg-muted"}">
             <span class="text-xs font-bold">${m.initial}</span></button>`;
         }).join("")}</div></div>`).join("")}
@@ -2301,7 +2329,10 @@ function assignSet(ds, k, mid) {
   else delta[k] = next;
   if (Object.keys(delta).length === 0) delete ASSIGN_DRAFT[ds];
   if (ASSIGN_DRAFT && Object.keys(ASSIGN_DRAFT).length === 0) ASSIGN_DRAFT = null;
+  // 週ぶんの担当を続けて選ぶので、押したボタンへフォーカスを戻す
+  const key = document.activeElement?.dataset?.assign || null;
   renderAssignBoard();
+  if (key) document.querySelector(`[data-assign="${key}"]`)?.focus({ preventScroll: true });
 }
 function assignSave() {
   if (!ASSIGN_DRAFT) return;
@@ -2337,6 +2368,8 @@ function openDay(d, id) {
   DRAFT = cur ? JSON.parse(JSON.stringify(cur)) : null;
   if (DRAFT) DRAFT.repeat = false;
   DRAFT_BASE = cur ? { fromRule: !!cur.fromRule, sig: sig(cur) } : null;
+  OPEN_SIG = cur ? sig(cur) : "none";
+  CONFIRM_CLOSE = false;
   $("sheetTitle").textContent = fmt(d);
   renderSheet();
   rememberTrigger("sheet");
@@ -2345,6 +2378,26 @@ function openDay(d, id) {
   $("backdrop").classList.remove("pointer-events-none", "opacity-0");
   syncScrollLock();
   focusSheet("sheet");
+}
+// 編集が入っているか（本番の記録フォームと同じく、捨てる前に確認する）
+function sheetDirty() {
+  if (isViewer()) return false;
+  if (!DRAFT) return OPEN_SIG !== "none";
+  return sig(DRAFT) !== OPEN_SIG || !!DRAFT.repeat;
+}
+// ✕ / 背景 / Esc から呼ぶ。変更があれば確認をはさむ
+function requestCloseSheet() {
+  if (sheetDirty()) {
+    CONFIRM_CLOSE = true;
+    renderSheet();
+    $("sheet").scrollTop = 0;
+    return;
+  }
+  closeSheet();
+}
+function discardSheet() {
+  CONFIRM_CLOSE = false;
+  closeSheet();
 }
 function closeSheet() {
   $("sheet").classList.add("invisible", "translate-y-full");
@@ -2364,6 +2417,16 @@ function renderSheet() {
   $("sheetStatus").innerHTML = p ? statusBadge(p.status) : "";
   let h = "";
 
+  if (CONFIRM_CLOSE) {
+    h += `<div class="space-y-2 rounded-xl border border-border bg-surface-muted p-3">
+      <p class="text-sm font-medium">編集をやめますか？</p>
+      <p class="text-xs text-muted-foreground">保存していない変更は失われます。</p>
+      <div class="flex gap-2">
+        <button type="button" onclick="CONFIRM_CLOSE = false; renderSheet()" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">編集に戻る</button>
+        <button type="button" onclick="discardSheet()" class="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background">やめる</button>
+      </div>
+    </div>`;
+  }
   if (ro) h += `<p class="rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、変更できません。</p>`;
 
   // 判定は「その日の予定として保存された行があるか」。無関係な記録の有無で隠さない
@@ -2474,7 +2537,7 @@ function renderSheet() {
         ${p ? (p.status === "done" ? "変更を保存する" : "予定を保存する") : "どう過ごすか選んでください"}</button>`;
     if (p && p.status === "planned") {
       h += `<div class="flex gap-2">
-        <button type="button" onclick="openDone()" class="flex-1 rounded-xl border-2 border-emerald-500 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50">
+        <button type="button" onclick="openDone()" class="flex-1 rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950">
           ${svg("check", "mr-1 inline h-4 w-4")}完了して記録にする</button>
         <button type="button" onclick="skipPlan()" class="rounded-xl border border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">見送り</button>
       </div>`;
@@ -2782,7 +2845,7 @@ function renderHome() {
       </div>` : ""}
       ${x.status === "done" ? `<p class="mt-3 rounded-xl bg-surface-muted px-3 py-2 text-sm">${esc(x.body) || "（本文なし）"}</p>` : ""}
       <div class="mt-3 flex gap-2">
-        ${!ro && x.status === "planned" ? `<button type="button" onclick="openDay('${TODAY}'); openDone()" class="flex-1 rounded-xl border-2 border-emerald-500 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50">${svg("check", "mr-1 inline h-4 w-4")}完了して記録にする</button>` : ""}
+        ${!ro && x.status === "planned" ? `<button type="button" onclick="openDay('${TODAY}'); openDone()" class="flex-1 rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950">${svg("check", "mr-1 inline h-4 w-4")}完了して記録にする</button>` : ""}
         <button type="button" onclick="go('calendar'); openDay('${TODAY}')" class="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">${x.status === "planned" ? "予定を見る・変える" : "詳しく見る"}</button>
       </div>
     </div>`;
@@ -2879,12 +2942,14 @@ function cycleRule(w) {
   for (const [k] of t.roles) if (lv?.who?.[k]) keep[k] = lv.who[k];
   // 時刻は「触ったかどうか」を旗で持つ。既定値との一致で推測すると、
   // たまたま別の種類の既定と同じ時刻にしたときに勝手に上書きされる
-  // 既存の版を書き換えず、今日から効く版として積む（過去は前の版のまま）
+  // 今日から効く版として積む。画面に日付の指定が無い以上、編集は「今日から」で
+  // なければ表示と食い違う。今日より後から始まる版は畳む（「なし」と同じ扱い）
+  RULES[w] = versionsOf(w).filter((r) => !r.since || r.since <= TODAY);
   putRuleVersion(w, {
     type: next, who: keep,
     start: lv && lv.timeDirty ? lv.start : t.start,
     end: lv && lv.timeDirty ? lv.end : t.end,
-    since: lv ? [TODAY, lv.since || ""].sort().pop() : TODAY,
+    since: TODAY,
     timeDirty: !!(lv && lv.timeDirty),
   });
   render();
@@ -2990,7 +3055,7 @@ function openQuick() {
   const x = planOn(TODAY);
   $("qrTodayPlan").innerHTML = x && x.status === "planned"
     ? `<button type="button" onclick="closeQuick(); go('calendar'); openDay('${TODAY}'); openDone()"
-        class="flex w-full items-center gap-2 rounded-xl border-2 border-emerald-500 px-3 py-2.5 text-left text-sm transition hover:bg-emerald-50">
+        class="flex w-full items-center gap-2 rounded-xl border-2 border-emerald-600 px-3 py-2.5 text-left text-sm transition hover:bg-emerald-50 dark:border-emerald-400 dark:hover:bg-emerald-950">
         <span class="text-lg">${type(x.type).emoji}</span>
         <span class="min-w-0 flex-1"><b class="font-bold">きょうの予定「${type(x.type).label}」を完了にする</b>
         <span class="block text-xs text-muted-foreground">担当や時間を引き継いで記録にします</span></span>
@@ -3036,6 +3101,16 @@ function openInvite(memberId) {
   $("invBackdrop").classList.remove("pointer-events-none", "opacity-0");
   syncScrollLock();
   focusSheet("invSheet");
+}
+const INVITE_URL = "https://mfmf.app/invite/8f3a1d2e4b6c9a70c1";
+async function copyInvite() {
+  try {
+    await navigator.clipboard.writeText(INVITE_URL);
+    toast("招待リンクをコピーしました");
+  } catch {
+    // iframe や権限で弾かれることがある。成功したふりをしない
+    toast("コピーできませんでした。リンクを長押しして選んでください");
+  }
 }
 function closeInvite() {
   $("invSheet").classList.add("invisible", "translate-y-full");
