@@ -384,6 +384,9 @@
     --tw-translate-y: 100%;
     translate: var(--tw-translate-x) var(--tw-translate-y);
   }
+  .cursor-default {
+    cursor: default;
+  }
   .grid-cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1211,6 +1214,8 @@ input[type="date"] {
         </p>
       </div>
 
+      <p id="ruleReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、曜日ルールは変更できません。</p>
+
       <div class="overflow-x-auto rounded-xl bg-surface shadow-sm ring-1 ring-border">
         <table class="w-full min-w-[22rem] text-center text-sm">
           <thead>
@@ -1237,10 +1242,11 @@ input[type="date"] {
     <section id="screen-week" class="hidden space-y-4">
       <div>
         <h1 class="text-base font-bold">今週の担当</h1>
-        <p class="mt-1 text-sm text-muted-foreground">保育園の日だけ、送りとお迎えの顔をタップして埋めます。</p>
+        <p class="mt-1 text-sm text-muted-foreground">担当のある予定の日だけ、顔をタップして埋めます。予定のない日はここでは決められません。</p>
       </div>
+      <p id="weekReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、担当は変更できません。</p>
       <div id="weekBoard" class="space-y-2"></div>
-      <button type="button" onclick="toast('今週の担当を保存しました')" class="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">保存する</button>
+      <button id="weekSave" type="button" onclick="toast('今週の担当を保存しました')" class="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">保存する</button>
     </section>
 
   </main>
@@ -1311,7 +1317,7 @@ input[type="date"] {
       </div>
     </div>
     <label class="flex items-center gap-2"><input type="checkbox" id="cfgCell" checked onchange="render()">セルに担当を出す</label>
-    <label class="flex items-center gap-2"><input type="checkbox" id="cfgEmpty" onchange="render()">予定が 0 件の状態</label>
+    <label class="flex items-center gap-2"><input type="checkbox" id="cfgEmpty" onchange="toggleEmpty()">予定が 0 件の状態</label>
     <label class="flex items-center gap-2"><input type="checkbox" id="cfgViewer" onchange="render()">viewer（編集不可）</label>
   </div>
 
@@ -1360,9 +1366,17 @@ const RECORDS = {
   "2026-08-05": ["home"], "2026-08-06": ["daycare"], "2026-08-07": ["daycare", "home"],
 };
 
+// 初期フィクスチャ。「予定 0 件」の切替で PLANS を空にする / 戻すのに使う
+const FIXTURES = JSON.parse(JSON.stringify(PLANS));
+// 曜日ルール由来の予定を「この日はなし」にした墓標（案3 の例外を試せるように）
+let CANCELLED = new Set();
+
 let MODE = "avatar";
 let screen = "calendar";
 let openDate = null;
+// シートの編集は下書きに対して行い、「保存する」で確定する。
+// ✕ / 背景タップは破棄（種類・担当・メモで挙動が変わらないように）
+let DRAFT = null;
 
 // ───────── ヘルパ ─────────
 const $ = (id) => document.getElementById(id);
@@ -1372,12 +1386,20 @@ const dow = (d) => new Date(d + "T00:00:00").getDay();
 const isEmpty = () => $("cfgEmpty").checked;
 const isViewer = () => $("cfgViewer").checked;
 
-// その日の予定。個別 > 曜日ルール（案3 のときだけルールを効かせる）
+// その日の予定。個別 > 墓標 > 曜日ルール（案3 のときだけルールを効かせる）。
+// 「予定 0 件」は PLANS を空にして表現するので、ここで一律に null を返さない
+// （返すと、その状態から新しく入れた予定まで見えなくなる）。
 function planFor(d) {
-  if (isEmpty()) return null;
   if (PLANS[d]) return { ...PLANS[d], from: "plan" };
-  if (MODE === "rule" && RULES[dow(d)]) return { ...RULES[dow(d)], from: "rule" };
+  if (CANCELLED.has(d)) return null;
+  if (MODE === "rule" && !isEmpty() && RULES[dow(d)]) return { ...RULES[dow(d)], from: "rule" };
   return null;
+}
+// 「予定 0 件の状態」トグル。フィクスチャを空にする / 戻す
+function toggleEmpty() {
+  PLANS = isEmpty() ? {} : JSON.parse(JSON.stringify(FIXTURES));
+  CANCELLED = new Set();
+  render();
 }
 function fmt(d) {
   return new Intl.DateTimeFormat("ja-JP", { month: "long", day: "numeric", weekday: "short" })
@@ -1454,6 +1476,8 @@ function renderGrid() {
 // ───────── 日別シート ─────────
 function openDay(d) {
   openDate = d;
+  const cur = planFor(d);
+  DRAFT = cur ? { type: cur.type, who: { ...(cur.who || {}) }, note: cur.note || "" } : null;
   $("sheetTitle").textContent = fmt(d) + " の予定";
   renderSheet();
   $("sheet").classList.remove("invisible", "translate-y-full");
@@ -1465,17 +1489,26 @@ function closeSheet() {
   $("backdrop").classList.add("pointer-events-none", "opacity-0");
   document.body.style.overflow = "";
   openDate = null;
+  DRAFT = null; // 保存していない編集は捨てる
 }
 function renderSheet() {
   const d = openDate;
   if (!d) return;
-  const p = planFor(d);
+  const p = DRAFT;
   const t = p ? type(p.type) : null;
   const ro = isViewer();
   let h = "";
 
   if (ro) {
     h += `<p class="rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、予定は変更できません。</p>`;
+  }
+
+  // 曜日ルールを打ち消している日は、戻せることを見せる
+  if (!ro && CANCELLED.has(d) && MODE === "rule" && RULES[dow(d)]) {
+    h += `<div class="flex items-center gap-2 rounded-xl border border-dashed border-border p-3 text-sm">
+      <span class="min-w-0 flex-1 text-muted-foreground">この日は曜日ルール（${type(RULES[dow(d)].type).emoji} ${type(RULES[dow(d)].type).label}）を打ち消しています。</span>
+      <button type="button" onclick="restoreRule()" class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">戻す</button>
+    </div>`;
   }
 
   // 案2: いつものパターン（先頭に置く。1タップで全部埋まる）
@@ -1532,7 +1565,8 @@ function renderSheet() {
   if (p) {
     h += `<div>
       <label class="mb-1 block text-xs font-bold text-muted-foreground" for="note">ひとことメモ（任意）</label>
-      <input id="note" ${ro ? "disabled" : ""} value="${(p.note || "").replace(/"/g, "&quot;")}" placeholder="例: パパ出張のため、迎えはばあば"
+      <input id="note" ${ro ? "disabled" : ""} value="${(p.note || "").replace(/"/g, "&quot;")}"
+        oninput="if (DRAFT) DRAFT.note = this.value" placeholder="例: パパ出張のため、迎えはばあば"
         class="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm" />
     </div>`;
     if (!ro) {
@@ -1566,33 +1600,45 @@ function renderSheet() {
   }
   $("sheetBody").innerHTML = h;
 }
-function ensure(d) {
-  if (!PLANS[d]) {
-    const r = MODE === "rule" && RULES[dow(d)];
-    PLANS[d] = r ? { type: r.type, who: { ...r.who }, note: "" } : { type: "daycare", who: {}, note: "" };
-  }
-  return PLANS[d];
+function draft() {
+  if (!DRAFT) DRAFT = { type: "daycare", who: {}, note: "" };
+  return DRAFT;
 }
-function setType(id) { const p = ensure(openDate); p.type = id; renderSheet(); }
+function setType(id) { draft().type = id; renderSheet(); }
 function setWho(key, mid) {
-  const p = ensure(openDate);
+  const p = draft();
   p.who = p.who || {};
   p.who[key] = p.who[key] === mid ? null : mid; // 二度押しで解除
   renderSheet();
 }
 function applyPreset(i) {
   const ps = PRESETS[i];
-  PLANS[openDate] = { type: ps.type, who: { ...ps.who }, note: PLANS[openDate]?.note || "" };
+  DRAFT = { type: ps.type, who: { ...ps.who }, note: DRAFT?.note || "" };
   renderSheet();
   toast(`「${ps.label}」を入れました`);
 }
-function clearPlan() { delete PLANS[openDate]; renderSheet(); render(); toast("予定を消しました"); }
+// 曜日ルール由来の日も「この日はなし」にできるようにする（案3 の例外）
+function clearPlan() {
+  const d = openDate;
+  delete PLANS[d];
+  if (MODE === "rule" && !isEmpty() && RULES[dow(d)]) CANCELLED.add(d);
+  closeSheet();
+  render();
+  toast("この日の予定をなしにしました");
+}
+function restoreRule() {
+  CANCELLED.delete(openDate);
+  openDay(openDate); // 下書きをルールから作り直す
+  toast("曜日ルールに戻しました");
+}
 function savePlan() {
-  const n = $("note");
-  if (n && PLANS[openDate]) PLANS[openDate].note = n.value;
+  const d = openDate;
+  if (!DRAFT) { clearPlan(); return; }
+  PLANS[d] = { type: DRAFT.type, who: { ...DRAFT.who }, note: DRAFT.note || "" };
+  CANCELLED.delete(d);
   const rep = $("rep");
-  if (rep && rep.checked && PLANS[openDate]) {
-    RULES[dow(openDate)] = { type: PLANS[openDate].type, who: { ...PLANS[openDate].who } };
+  if (rep && rep.checked) {
+    RULES[dow(d)] = { type: PLANS[d].type, who: { ...PLANS[d].who } };
     toast("予定と曜日ルールを保存しました");
   } else {
     toast("予定を保存しました");
@@ -1660,11 +1706,12 @@ function renderHome() {
 // ───────── 曜日ルール表 ─────────
 function renderRules() {
   const order = [0, 1, 2, 3, 4, 5, 6];
-  const cycle = ["daycare", "home", "family", null];
+  const ro = isViewer();
+  $("ruleReadonly").classList.toggle("hidden", !ro);
   let h = `<tr class="border-b border-border"><td class="py-2 text-xs font-medium text-muted-foreground">予定</td>`;
   h += order.map((w) => {
     const r = RULES[w];
-    return `<td class="py-1"><button type="button" onclick="cycleRule(${w})" class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg text-xl transition hover:bg-surface-muted ${r ? "bg-surface-muted" : "text-muted-foreground"}">${r ? type(r.type).emoji : "－"}</button></td>`;
+    return `<td class="py-1"><button type="button" ${ro ? "disabled" : ""} onclick="cycleRule(${w})" class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg text-xl transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"} ${r ? "bg-surface-muted" : "text-muted-foreground"}">${r ? type(r.type).emoji : "－"}</button></td>`;
   }).join("") + `</tr>`;
   for (const [key, label] of [["drop", "送り"], ["pick", "お迎え"], ["care", "みる人"]]) {
     const any = order.some((w) => RULES[w] && type(RULES[w].type).roles.some(([k]) => k === key));
@@ -1675,7 +1722,7 @@ function renderRules() {
       const ok = r && type(r.type).roles.some(([k]) => k === key);
       if (!ok) return `<td class="py-1 text-xs text-muted-foreground">·</td>`;
       const id = (r.who || {})[key];
-      return `<td class="py-1"><button type="button" onclick="cycleWho(${w},'${key}')" class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg transition hover:bg-surface-muted">${avatar(id)}</button></td>`;
+      return `<td class="py-1"><button type="button" ${ro ? "disabled" : ""} onclick="cycleWho(${w},'${key}')" class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"}">${avatar(id)}</button></td>`;
     }).join("") + `</tr>`;
   }
   $("ruleTable").innerHTML = h;
@@ -1701,10 +1748,22 @@ function cycleWho(w, key) {
 // ───────── 今週の担当ボード ─────────
 function renderWeek() {
   const days = ["2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14"];
-  $("weekBoard").innerHTML = days.map((ds) => {
-    const p = planFor(ds) || { type: "daycare", who: {} };
-    const t = type(p.type);
+  const ro = isViewer();
+  $("weekReadonly").classList.toggle("hidden", !ro);
+  $("weekSave").classList.toggle("hidden", ro);
+
+  // このボードは「担当がある予定の日」だけを扱う。予定のない日を勝手に保育園として
+  // 見せると、入れていない日の担当を決めてしまえる
+  const rows = days.map((ds) => {
+    const p = planFor(ds);
+    const t = p ? type(p.type) : null;
     const label = fmt(ds).replace("2026年", "");
+    if (!p) {
+      return `<button type="button" onclick="openDay('${ds}')" class="flex w-full items-center gap-3 rounded-xl border border-dashed border-border px-3 py-3 text-left text-sm transition hover:bg-surface-muted">
+        <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
+        <span class="min-w-0 flex-1 text-muted-foreground">予定なし</span>
+        <span class="shrink-0 text-xs text-primary">予定を入れる</span></button>`;
+    }
     if (!t.roles.length) {
       return `<div class="flex items-center gap-3 rounded-xl bg-surface-muted px-3 py-3 text-sm">
         <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
@@ -1716,26 +1775,24 @@ function renderWeek() {
         <span class="w-16 shrink-0 text-xs text-muted-foreground">${l}</span>
         <div class="flex gap-1.5">${MEMBERS.map((m) => {
           const on = (p.who || {})[k] === m.id;
-          return `<button type="button" onclick="weekSet('${ds}','${k}','${m.id}')" aria-label="${label} ${l} ${m.name}"
-            class="flex h-9 w-9 items-center justify-center rounded-full transition ${on ? `ring-2 ${m.ring} ` + m.bg : "bg-surface-muted text-muted-foreground hover:bg-muted"}">
+          return `<button type="button" ${ro ? "disabled" : ""} onclick="weekSet('${ds}','${k}','${m.id}')" aria-label="${label} ${l} ${m.name}" aria-pressed="${on}"
+            class="flex h-9 w-9 items-center justify-center rounded-full transition ${on ? `ring-2 ${m.ring} ` + m.bg : "bg-surface-muted text-muted-foreground"} ${ro ? "opacity-50" : on ? "" : "hover:bg-muted"}">
             <span class="text-xs font-bold">${m.initial}</span></button>`;
         }).join("")}</div></div>`).join("")}
     </div>`;
-  }).join("");
+  });
+  $("weekBoard").innerHTML = rows.join("");
 }
+// 既にある予定の担当だけを書き換える（新しい予定はここでは作らない）
 function weekSet(ds, k, mid) {
-  const p = ensureFor(ds);
+  const cur = planFor(ds);
+  if (!cur) return;
+  const p = PLANS[ds] || (PLANS[ds] = { type: cur.type, who: { ...(cur.who || {}) }, note: cur.note || "" });
   p.who = p.who || {};
   p.who[k] = p.who[k] === mid ? null : mid;
   renderWeek();
   renderGrid();
-}
-function ensureFor(ds) {
-  if (!PLANS[ds]) {
-    const r = MODE === "rule" && RULES[dow(ds)];
-    PLANS[ds] = r ? { type: r.type, who: { ...r.who }, note: "" } : { type: "daycare", who: {}, note: "" };
-  }
-  return PLANS[ds];
+  renderHome();
 }
 
 function render() {

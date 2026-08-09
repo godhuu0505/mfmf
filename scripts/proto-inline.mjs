@@ -3,12 +3,19 @@
 import { readFileSync, writeFileSync } from "node:fs";
 const slug = process.argv[2];
 if (!slug) throw new Error("usage: node scripts/proto-inline.mjs <slug>");
-const html = readFileSync(`proto/${slug}/index.html`, "utf8");
+const htmlPath = `proto/${slug}/index.html`;
+const html = readFileSync(htmlPath, "utf8");
 const css = readFileSync(`proto/${slug}/proto.css`, "utf8");
-const out = html.replace(
-  /<!-- proto\.css:start -->[\s\S]*?<!-- proto\.css:end -->/,
-  `<!-- proto.css:start -->\n<style>\n${css}</style>\n<!-- proto.css:end -->`,
-);
-if (out === html) throw new Error("マーカー <!-- proto.css:start/end --> が見つかりません");
-writeFileSync(`proto/${slug}/index.html`, out);
-console.log(`inlined ${css.length} bytes of CSS into proto/${slug}/index.html`);
+const marker = /<!-- proto\.css:start -->[\s\S]*?<!-- proto\.css:end -->/;
+// 差し替え結果が入力と同じでも「マーカーが無い」とは限らない（CSS が前回と同一なら
+// 一致する）ので、マーカーの有無は置換結果ではなく正規表現で直接確かめる。
+if (!marker.test(html)) {
+  throw new Error(`${htmlPath} にマーカー <!-- proto.css:start --> … <!-- proto.css:end --> がありません`);
+}
+const out = html.replace(marker, `<!-- proto.css:start -->\n<style>\n${css}</style>\n<!-- proto.css:end -->`);
+if (out === html) {
+  console.log(`proto/${slug}/index.html は最新です（CSS ${css.length} bytes、変更なし）`);
+} else {
+  writeFileSync(htmlPath, out);
+  console.log(`inlined ${css.length} bytes of CSS into ${htmlPath}`);
+}
