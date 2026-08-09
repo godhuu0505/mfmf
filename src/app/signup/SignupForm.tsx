@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { refreshPostLoginNext } from "@/app/auth/actions";
+import { sanitizeNextPath } from "@/lib/nextPath";
 
 const inputClass =
   "w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground";
@@ -48,6 +50,14 @@ export default function SignupForm() {
     }
 
     setLoading(true);
+
+    // 招待リンクから来た場合の戻り先を貼り直す（確認メールの往復に耐えるように。
+    // 寿命の起点を「登録した時刻」にして確認リンクの有効期限と揃える）。
+    const next = sanitizeNextPath(
+      new URLSearchParams(window.location.search).get("next"),
+    );
+    await refreshPostLoginNext(next);
+
     const supabase = createClient();
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -67,7 +77,7 @@ export default function SignupForm() {
 
     // メール確認が無効な環境（ローカル既定）では即セッションが返る。
     if (data.session) {
-      window.location.assign("/");
+      window.location.assign(next);
       return;
     }
 

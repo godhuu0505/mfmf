@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { refreshPostLoginNext } from "@/app/forgot-password/actions";
+import { refreshPostLoginNext } from "@/app/auth/actions";
 
 const inputClass =
   "w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground";

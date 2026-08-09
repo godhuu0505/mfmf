@@ -41,7 +41,7 @@ export default function LoginForm({ signupEnabled }: Props) {
   const [password, setPassword] = useState("");
 
   // 招待リンク等からの戻り先。パスワード再設定へ回る場合も落とさないよう、
-  // /forgot-password のリンクにも引き継ぐ（SSR では window を読めないので effect で）。
+  // /forgot-password・/signup のリンクにも引き継ぐ（SSR では window を読めないので effect で）。
   const [next, setNext] = useState("/");
 
   // マウント時に URL から戻り先と、コールバックからの ?error=... を読む。
@@ -184,7 +184,9 @@ export default function LoginForm({ signupEnabled }: Props) {
           <p className="text-muted-foreground">
             アカウントをお持ちでない方は{" "}
             <Link
-              href="/signup"
+              href={
+                next === "/" ? "/signup" : `/signup?next=${encodeURIComponent(next)}`
+              }
               className="font-medium text-foreground underline-offset-2 hover:underline"
             >
               新規登録
