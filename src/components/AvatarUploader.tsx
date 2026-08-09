@@ -14,6 +14,11 @@ type Props = {
   /** 現在のアバターの署名付き URL（未設定は null）。 */
   currentUrl: string | null;
   /**
+   * currentUrl が無いときにプレビューへ出す画像（例: Google アカウントの画像）。
+   * 「まだ何も設定していないが表示上はこれが使われる」ことを示すためだけの表示用。
+   */
+  fallbackUrl?: string | null;
+  /**
    * 保存用 Server Action（bind 済み）。FormData の `avatar_path` に
    * アップロード済みパス（削除時は空文字）を入れて呼ぶ。
    */
@@ -34,6 +39,7 @@ type Props = {
 export default function AvatarUploader({
   scopeId,
   currentUrl,
+  fallbackUrl = null,
   action,
   alt,
   label = "アバター画像",
@@ -46,6 +52,8 @@ export default function AvatarUploader({
   const [isPending, startTransition] = useTransition();
 
   const working = busy || isPending;
+  // 未設定なら fallback（Google アカウントの画像など）を出す。実アプリの表示と揃える。
+  const previewUrl = currentUrl ?? fallbackUrl;
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.currentTarget.files?.[0];
@@ -100,9 +108,9 @@ export default function AvatarUploader({
           className="relative shrink-0 overflow-hidden rounded-full bg-surface-muted ring-1 ring-border"
           style={{ width: size, height: size }}
         >
-          {currentUrl ? (
+          {previewUrl ? (
             <Image
-              src={currentUrl}
+              src={previewUrl}
               alt={alt}
               fill
               sizes={`${size}px`}
@@ -146,7 +154,9 @@ export default function AvatarUploader({
               </button>
             )}
             <p className="text-xs text-muted-foreground">
-              長辺 512px に縮小して保存します。
+              {!currentUrl && fallbackUrl
+                ? "未設定のため Google アカウントの画像を表示しています。長辺 512px に縮小して保存します。"
+                : "長辺 512px に縮小して保存します。"}
             </p>
           </div>
         )}
