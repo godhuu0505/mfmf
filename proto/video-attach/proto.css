@@ -500,6 +500,9 @@
   .px-5 {
     padding-inline: calc(var(--spacing) * 5);
   }
+  .px-6 {
+    padding-inline: calc(var(--spacing) * 6);
+  }
   .py-0\.5 {
     padding-block: calc(var(--spacing) * 0.5);
   }
@@ -532,6 +535,9 @@
   }
   .pb-24 {
     padding-bottom: calc(var(--spacing) * 24);
+  }
+  .pb-\[calc\(1rem\+env\(safe-area-inset-bottom\)\)\] {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   }
   .text-center {
     text-align: center;

@@ -504,6 +504,9 @@
   .px-5 {
     padding-inline: calc(var(--spacing) * 5);
   }
+  .px-6 {
+    padding-inline: calc(var(--spacing) * 6);
+  }
   .py-0\.5 {
     padding-block: calc(var(--spacing) * 0.5);
   }
@@ -536,6 +539,9 @@
   }
   .pb-24 {
     padding-bottom: calc(var(--spacing) * 24);
+  }
+  .pb-\[calc\(1rem\+env\(safe-area-inset-bottom\)\)\] {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   }
   .text-center {
     text-align: center;
@@ -1068,13 +1074,16 @@ input[type="date"] {
       <div class="overflow-hidden rounded-xl border border-border bg-surface">
         <div data-detail-poster class="relative flex aspect-video w-full items-center justify-center bg-surface-muted">
           <img data-detail-thumb alt="" hidden class="absolute inset-0 h-full w-full object-cover" />
-          <button type="button" data-detail-play
+          <button type="button" data-detail-play hidden
             class="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-black/60 text-2xl text-white backdrop-blur transition hover:bg-black/75">▶</button>
-          <span data-detail-dur class="absolute bottom-2 right-2 z-10 rounded bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">0:12</span>
+          <p data-detail-empty class="relative z-10 px-6 text-center text-sm text-muted-foreground">
+            この記録に動画はありません
+          </p>
+          <span data-detail-dur hidden class="absolute bottom-2 right-2 z-10 rounded bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">0:12</span>
         </div>
         <video data-detail-video hidden controls playsinline preload="none" class="block aspect-video w-full bg-black"></video>
         <p class="px-4 py-2 text-xs text-muted-foreground" data-detail-note>
-          タップすると再生します（開くまで通信しません）
+          「記録する」タブで動画を選ぶと、ここに出ます。
         </p>
       </div>
 
@@ -1107,8 +1116,7 @@ input[type="date"] {
   <!-- 設定シート -->
   <div data-settings hidden class="fixed inset-0 z-30">
     <div class="absolute inset-0 bg-black/40" data-close-settings></div>
-    <div class="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-border bg-surface p-4"
-      style="padding-bottom: calc(1rem + env(safe-area-inset-bottom))">
+    <div class="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-border bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <p class="text-sm font-semibold text-foreground">上限を試す</p>
       <p class="mt-0.5 text-xs text-muted-foreground">この設定はプロト用です。実機で「何秒あれば足りるか」を確かめてください。</p>
@@ -1176,6 +1184,8 @@ input[type="date"] {
       b.setAttribute("aria-pressed", String(on));
     });
     $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== tab));
+    // hidden にしても <video> は鳴り続けるので、詳細から離れたら止める。
+    if (tab !== "detail") $("[data-detail-video]").pause();
     window.scrollTo({ top: 0 });
   }
   $$("[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
@@ -1227,24 +1237,37 @@ input[type="date"] {
   let objectUrl = null;
   let timer = null;
 
-  function reset() {
-    if (timer) { clearInterval(timer); timer = null; }
-    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-    state.picked = null;
-    $("[data-preview]").removeAttribute("src");
-    $("[data-detail-video]").removeAttribute("src");
-    $("[data-detail-video]").hidden = true;
+  // 「見る」「一覧」に出ている添付の見た目を、添付ゼロの状態へ戻す。
+  // 中途半端に消すと、消したはずの動画が残って見えて空の状態を確かめられない。
+  function clearAttachmentViews() {
+    const dv = $("[data-detail-video]");
+    dv.pause();
+    dv.removeAttribute("src");
+    dv.hidden = true;
     $("[data-detail-poster]").hidden = false;
     $("[data-detail-thumb]").hidden = true;
-    $("[data-detail-dur]").textContent = "0:12";
-    $("[data-detail-note]").textContent = "タップすると再生します（開くまで通信しません）";
+    $("[data-detail-thumb]").removeAttribute("src");
+    $("[data-detail-play]").hidden = true;
+    $("[data-detail-empty]").hidden = false;
+    $("[data-detail-dur]").hidden = true;
+    $("[data-detail-note]").textContent = "「記録する」タブで動画を選ぶと、ここに出ます。";
+    $$("[data-list-thumb='new']").forEach((el) => (el.style.backgroundImage = ""));
+    $$("[data-new-badge]").forEach((el) => (el.hidden = true));
+    $("[data-new-meta]").textContent = "写真3枚";
+  }
+
+  function stopConversion() {
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  function reset() {
+    stopConversion();
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    state.picked = null;
+    $("[data-preview]").pause();
+    $("[data-preview]").removeAttribute("src");
     $$("[data-video-input]").forEach((i) => (i.value = ""));
-    // grabThumb が書いたサムネを消す。消し忘れると削除後の「一覧」に
-    // 消したはずの動画のコマが残り、空の状態を確かめられない。
-    $$("[data-list-thumb='new']").forEach((el) => {
-      el.style.backgroundImage = "";
-    });
-    $$("[data-new-badge]").forEach((el) => (el.textContent = el.dataset.newBadge));
+    clearAttachmentViews();
     showV("empty");
   }
   $$("[data-video-reset]").forEach((b) => b.addEventListener("click", reset));
@@ -1268,34 +1291,47 @@ input[type="date"] {
   }
 
   function evaluate(picked) {
-    const { file, url, duration } = picked;
-    if (duration == null) { showV("unsupported"); return; }
+    const { duration } = picked;
+    // 変換中に上限を下げたときも通る。走っている変換を止めないと、
+    // 上限超えの動画がそのまま finish() で「保存できます」になってしまう。
+    stopConversion();
+    if (duration == null) { clearAttachmentViews(); showV("unsupported"); return; }
     if (duration > state.cap + 0.5) {
       $("[data-actual-dur]").textContent = fmtDurJa(duration);
+      clearAttachmentViews();
       showV("toolong");
       return;
     }
     convert(picked);
   }
 
+  // 実装では端末側の再エンコードに実時間がかかる（720p でおおむね再生時間の半分程度）。
+  // ここが一瞬で終わると「待てるかどうか」を確かめられないので、長さに比例させる。
+  const CONVERT_SPEED = 0.5; // 実時間 ≒ 動画の長さ × これ
+  const MIN_CONVERT_MS = 3000;
+
   function convert(picked) {
-    const { file, url, duration } = picked;
+    const { duration } = picked;
     showV("converting");
-    let p = 0;
+    const totalMs = Math.max(MIN_CONVERT_MS, duration * CONVERT_SPEED * 1000);
+    const tick = 100;
+    let elapsed = 0;
     // 前回の 100% が残っていると、再変換の頭で 100% → 数% へ巻き戻って見える。
-    if (timer) clearInterval(timer);
+    stopConversion();
     $("[data-progress]").style.width = "0%";
     $("[data-progress-label]").textContent = "0%";
     timer = setInterval(() => {
-      p = Math.min(100, p + 7 + Math.random() * 9);
+      elapsed += tick;
+      const p = Math.min(100, (elapsed / totalMs) * 100);
+      const left = Math.ceil((totalMs - elapsed) / 1000);
       $("[data-progress]").style.width = `${p}%`;
-      $("[data-progress-label]").textContent = `${Math.round(p)}%`;
+      $("[data-progress-label]").textContent =
+        p >= 100 ? "100%" : `${Math.round(p)}% ・ 残り約${left}秒`;
       if (p >= 100) {
-        clearInterval(timer);
-        timer = null;
+        stopConversion();
         finish(picked);
       }
-    }, 160);
+    }, tick);
   }
 
   function finish({ file, url, duration }) {
@@ -1308,14 +1344,19 @@ input[type="date"] {
 
     // 「見る」タブ・一覧にも同じ動画を反映して、再生の見え方を確かめられるようにする
     $("[data-detail-video]").src = url;
+    $("[data-detail-play]").hidden = false;
+    $("[data-detail-empty]").hidden = true;
+    $("[data-detail-dur]").hidden = false;
     $("[data-detail-dur]").textContent = fmtDur(duration);
     $("[data-detail-note]").textContent =
       `タップすると再生します（${fmtBytes(after)} / 開くまで通信しません）`;
     // 一覧のバッジも実際の長さに合わせる（サムネだけ変わって 0:12 のままだと
     // ▶ バッジの見え方を確かめる材料にならない）。
     $$("[data-new-badge]").forEach((el) => {
-      el.textContent = el.dataset.newBadge.replace("0:12", fmtDur(duration));
+      el.hidden = false;
+      if (el.textContent.includes(":")) el.textContent = `▶ ${fmtDur(duration)}`;
     });
+    $("[data-new-meta]").textContent = "写真3枚 ・ 動画1本";
     grabThumb(url);
   }
 
@@ -1328,9 +1369,15 @@ input[type="date"] {
     v.src = url;
     v.onloadeddata = () => {
       try {
+        // 4K の動画をそのままキャンバスに載せると 30MB 超のピクセルバッファを確保して
+        // メインスレッドで data URL に焼くことになる。表示は数百 px なので長辺 640 に縮める。
+        const MAX = 640;
+        const vw = v.videoWidth || 640;
+        const vh = v.videoHeight || 360;
+        const scale = Math.min(1, MAX / Math.max(vw, vh));
         const c = document.createElement("canvas");
-        c.width = v.videoWidth || 640;
-        c.height = v.videoHeight || 360;
+        c.width = Math.max(1, Math.round(vw * scale));
+        c.height = Math.max(1, Math.round(vh * scale));
         c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
         const data = c.toDataURL("image/jpeg", 0.7);
         const thumb = $("[data-detail-thumb]");
@@ -1353,6 +1400,10 @@ input[type="date"] {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
       showV("checking");
+      // 差し替えの場合、新しい動画が通るとは限らない。古い URL を revoke する前に
+      // 表示を落としておかないと、「見る」に revoke 済みの前の動画が残る。
+      stopConversion();
+      clearAttachmentViews();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       const { url, duration } = await readMeta(file);
       objectUrl = url;
@@ -1364,11 +1415,7 @@ input[type="date"] {
   // ---- 詳細: タップして初めて再生 ----
   $("[data-detail-play]").addEventListener("click", () => {
     const v = $("[data-detail-video]");
-    if (!v.getAttribute("src")) {
-      $("[data-detail-note]").textContent =
-        "「記録する」タブで動画を選ぶと、ここで再生できます。";
-      return;
-    }
+    if (!v.getAttribute("src")) return; // 添付が無いときは再生ボタン自体を出していない
     $("[data-detail-poster]").hidden = true;
     v.hidden = false;
     v.play().catch(() => {});
@@ -1386,13 +1433,13 @@ input[type="date"] {
   $("[data-list]").innerHTML = RECORDS.map((r) => `
     <article class="flex gap-3 rounded-xl border border-border bg-surface p-3">
       <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted"${r.newest ? ' data-list-thumb="new"' : ""}>
-        ${r.video ? `<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white"${r.newest ? ' data-new-badge="▶ 0:12"' : ""}>▶ ${r.dur}</span>` : ""}
+        ${r.video ? `<span${r.newest ? " data-new-badge hidden" : ""} class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ ${r.dur}</span>` : ""}
       </div>
       <div class="min-w-0">
         <p class="text-xs text-muted-foreground">${r.date}</p>
         <p class="truncate text-sm text-foreground">${r.body}</p>
-        <p class="mt-1 text-xs text-muted-foreground">
-          ${r.photos > 0 ? `写真${r.photos}枚` : "写真なし"}${r.video ? " ・ 動画1本" : ""}
+        <p class="mt-1 text-xs text-muted-foreground"${r.newest ? " data-new-meta" : ""}>
+          ${r.photos > 0 ? `写真${r.photos}枚` : "写真なし"}${r.video && !r.newest ? " ・ 動画1本" : ""}
         </p>
       </div>
     </article>`).join("");
@@ -1401,7 +1448,7 @@ input[type="date"] {
     const isVideo = i === 0 || i === 4;
     const isNew = i === 0; // 今つけた1本だけサムネを差し替える
     return `<div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted"${isNew ? ' data-list-thumb="new"' : ""}>
-      ${isVideo ? '<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶</span>' : ""}
+      ${isVideo ? `<span${isNew ? " data-new-badge hidden" : ""} class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶</span>` : ""}
     </div>`;
   }).join("");
 
