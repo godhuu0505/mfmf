@@ -1111,6 +1111,10 @@
     --tw-duration: 300ms;
     transition-duration: 300ms;
   }
+  .outline-none {
+    --tw-outline-style: none;
+    outline-style: none;
+  }
   .select-all {
     -webkit-user-select: all;
     user-select: all;
@@ -1512,7 +1516,7 @@ input[type="date"] {
   <main data-proto-bg class="mx-auto max-w-3xl pt-4">
 
     <!-- ═══════════ ホーム ═══════════ -->
-    <section id="screen-home" class="hidden safe-px space-y-4">
+    <section id="screen-home" tabindex="-1" class="hidden outline-none safe-px space-y-4">
       <div id="todayCard"></div>
       <div>
         <h2 class="mb-2 text-sm font-bold text-muted-foreground">さいきんの記録</h2>
@@ -1521,7 +1525,7 @@ input[type="date"] {
     </section>
 
     <!-- ═══════════ カレンダー ═══════════ -->
-    <section id="screen-calendar" class="hidden">
+    <section id="screen-calendar" tabindex="-1" class="hidden outline-none">
       <div class="safe-px">
         <div class="mb-3 flex items-center justify-between">
           <span class="px-2 py-1 text-sm text-muted-foreground/40" aria-hidden="true">‹ 7月</span>
@@ -1563,7 +1567,7 @@ input[type="date"] {
     </section>
 
     <!-- ═══════════ アルバム（既存タブ。スタブ） ═══════════ -->
-    <section id="screen-gallery" class="hidden safe-px">
+    <section id="screen-gallery" tabindex="-1" class="hidden outline-none safe-px">
       <div class="grid grid-cols-3 gap-1">
         <div class="aspect-square rounded-lg bg-surface-muted"></div>
         <div class="aspect-square rounded-lg bg-surface-muted"></div>
@@ -1576,7 +1580,7 @@ input[type="date"] {
     </section>
 
     <!-- ═══════════ メニュー ═══════════ -->
-    <section id="screen-menu" class="hidden safe-px space-y-4">
+    <section id="screen-menu" tabindex="-1" class="hidden outline-none safe-px space-y-4">
       <div class="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
         <span class="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">マ</span>
         <span class="min-w-0 flex-1">
@@ -1612,7 +1616,7 @@ input[type="date"] {
     </section>
 
     <!-- ═══════════ 毎週の予定ルール ═══════════ -->
-    <section id="screen-rules" class="hidden safe-px space-y-4">
+    <section id="screen-rules" tabindex="-1" class="hidden outline-none safe-px space-y-4">
       <button type="button" onclick="go('menu')" class="-ml-1 flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground">‹ メニュー</button>
       <div>
         <h1 class="text-base font-bold">毎週の予定ルール</h1>
@@ -1646,7 +1650,7 @@ input[type="date"] {
     </section>
 
     <!-- ═══════════ 世帯の設定 ═══════════ -->
-    <section id="screen-family" class="hidden safe-px space-y-4">
+    <section id="screen-family" tabindex="-1" class="hidden outline-none safe-px space-y-4">
       <button type="button" onclick="go('menu')" class="-ml-1 flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground">‹ メニュー</button>
       <div>
         <h1 class="text-base font-bold">世帯の設定</h1>
@@ -1952,13 +1956,41 @@ function esc(v) {
 // 開いているシートが 1 つでもあれば背面を固定する
 // シートを開いた要素を覚えておき、閉じたらそこへフォーカスを戻す（UC-Q05）
 const TRIGGERS = {};
+const TRIGGER_SEL = {}; // 描き直しでノードが差し替わるので、選び直すための目印
 function rememberTrigger(id) {
-  TRIGGERS[id] = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const el = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  setTrigger(id, el, el && openSelectors(el));
+}
+// 覚えた要素を選び直すための候補（前から順に試す）。
+// 予定を保存すると id が変わることがある（ルール由来 → 実体）ので、
+// 「その行」で見つからなければ「その日」まで緩める
+function openSelectors(el) {
+  const key = el.dataset.open;
+  if (!key) return el.dataset.tab ? [`[data-tab="${el.dataset.tab}"]`] : [];
+  const day = key.split("|")[0];
+  return [`[data-open="${key}"]`, `[data-open^="${day}|"]`, `[data-open="${day}"]`];
+}
+function setTrigger(id, el, sel) {
+  TRIGGERS[id] = el || null;
+  TRIGGER_SEL[id] = sel && sel.length ? sel : null;
 }
 function restoreTrigger(id) {
   const el = TRIGGERS[id];
+  const sel = TRIGGER_SEL[id];
   TRIGGERS[id] = null;
-  if (el && document.contains(el)) requestAnimationFrame(() => el.focus({ preventScroll: true }));
+  TRIGGER_SEL[id] = null;
+  if (!el && !sel) return;
+  requestAnimationFrame(() => {
+    // 保存すると render() でカレンダーが作り直され、覚えていたノードは外れている。
+    // 同じ意味の要素を選び直してからフォーカスする（見えているものだけ）
+    let fresh = null;
+    for (const q of sel || []) {
+      fresh = [...document.querySelectorAll(q)].find((x) => x.offsetParent);
+      if (fresh) break;
+    }
+    const back = el && document.contains(el) && el.offsetParent ? el : null;
+    (fresh || back)?.focus({ preventScroll: true });
+  });
 }
 // Esc は一番上に開いているシートを閉じる
 document.addEventListener("keydown", (e) => {
@@ -2066,6 +2098,9 @@ function go(s) {
   render();
   // タブバーは innerHTML を作り直すので、押したタブへフォーカスを戻す
   if (wasTab) document.querySelector(`[data-tab="${s}"], [data-tab="${wasTab}"]`)?.focus({ preventScroll: true });
+  // 画面内のリンク（メニュー › 毎週の予定ルール、‹ メニュー など）から移ったときは
+  // 押した要素が hidden の中に取り残される。移った先の画面へフォーカスを送る
+  else $("screen-" + s).focus({ preventScroll: true });
 }
 function setMode(m) { MODE = m; render(); }
 function setCalView(v) {
@@ -2108,7 +2143,7 @@ function renderMonth() {
     const isToday = ds === TODAY;
     const shown = list.slice(0, 2);
     const rest = list.length - shown.length;
-    h += `<button type="button" data-day="${ds}" onclick="openDay('${ds}')" aria-haspopup="dialog"
+    h += `<button type="button" data-open="${ds}" onclick="openDay('${ds}')" aria-haspopup="dialog"
       aria-label="${8}月${d}日 ${list.length ? list.map((x) => type(x.type).label + (x.status === "done" ? " 記録ずみ" : x.status === "skipped" ? " 見送り" : " 予定")).join("、") : "予定なし"}"
       class="flex min-h-24 flex-col items-stretch gap-0.5 border-b border-r border-border p-1 text-left transition hover:bg-surface-muted">
       <span class="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-full text-xs ${isToday ? "bg-primary font-bold text-primary-foreground" : "text-muted-foreground"}">${d}</span>
@@ -2221,7 +2256,7 @@ function renderWeek() {
       // 時刻を持たないもの（見送り・クイック記録）は上のバンドに出す
       const sk = itemsOn(ds).filter((x) => x.status === "skipped" || x.untimed);
       return `<div class="min-h-6 border-l border-border p-0.5">
-        ${sk.map((x) => `<button type="button" onclick="openDay('${ds}','${x.id}')"
+        ${sk.map((x) => `<button type="button" data-open="${ds}|${x.id}" onclick="openDay('${ds}','${x.id}')"
           aria-label="${fmt(ds)} ${x.status === "skipped" ? "見送り" : "時刻なしの記録"} ${esc(x.body) || type(x.type).label}"
           class="block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] ${x.status === "skipped" ? "text-muted-foreground line-through" : "text-foreground"}">${type(x.type).emoji}${esc(x.body) || type(x.type).label}</button>`).join("")}
       </div>`;
@@ -2247,7 +2282,7 @@ function renderWeek() {
       const { top, hgt: hgt2 } = g; // 枠内に収めた位置。列の割り当てもこの位置で決めている
       const done = x.status === "done";
       const who = t.roles.map(([k]) => (x.who || {})[k]).filter(Boolean);
-      return `<button type="button" onclick="openDay('${ds}','${x.id}')"
+      return `<button type="button" data-open="${ds}|${x.id}" onclick="openDay('${ds}','${x.id}')"
         aria-label="${fmt(ds)} ${x.start}から${x.end} ${t.label}${done ? " 記録ずみ" : ""}"
         class="absolute flex flex-col items-stretch justify-start overflow-hidden rounded border-l-4 px-1 py-0.5 text-left text-[10px] leading-tight ${done ? c.solid + " border-l-black/20" : c.soft} ${x.fromRule ? "opacity-60" : ""}"
         style="top:${top}px;height:${hgt2}px;left:calc(${(col / total) * 100}% + 2px);width:calc(${100 / total}% - 4px)">
@@ -2282,7 +2317,7 @@ function renderAssignBoard() {
     const label = fmt(ds);
     if (!x) {
       if (ro) return `<div class="flex items-center gap-3 rounded-xl border border-dashed border-border px-3 py-2.5 text-sm"><span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span><span class="text-muted-foreground">予定なし</span></div>`;
-      return `<button type="button" onclick="openDay('${ds}')" class="flex w-full items-center gap-3 rounded-xl border border-dashed border-border px-3 py-2.5 text-left text-sm transition hover:bg-surface-muted">
+      return `<button type="button" data-open="${ds}|assign" onclick="openDay('${ds}')" class="flex w-full items-center gap-3 rounded-xl border border-dashed border-border px-3 py-2.5 text-left text-sm transition hover:bg-surface-muted">
         <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
         <span class="min-w-0 flex-1 text-muted-foreground">予定なし</span>
         <span class="shrink-0 text-xs text-primary">予定を入れる</span></button>`;
@@ -2388,9 +2423,9 @@ function goOpenDay(d, id) {
   openDay(d, id);
   // 月表示の日セルへ。週表示のときはセルが隠れていて focus() が効かないので、
   // カレンダータブへ落とす
-  const cell = document.querySelector(`[data-day="${d}"]`);
-  TRIGGERS.sheet = (cell && cell.offsetParent ? cell : document.querySelector('[data-tab="calendar"]'))
-    || TRIGGERS.sheet;
+  const cell = document.querySelector(`[data-open="${d}"]`);
+  const sel = cell && cell.offsetParent ? `[data-open="${d}"]` : '[data-tab="calendar"]';
+  setTrigger("sheet", document.querySelector(sel), [sel]);
 }
 function openDay(d, id) {
   openDate = d;
