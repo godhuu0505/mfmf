@@ -1311,6 +1311,7 @@ input[type="date"] {
   --skeleton-base: #e2e8f0;
   --skeleton-shine: rgba(248, 250, 252, 0.9);
   --focus-ring: #c2410c;
+  color-scheme: light;
 }
 :root[data-theme="dark"] {
   --background: #0b1220;
@@ -1326,6 +1327,7 @@ input[type="date"] {
   --skeleton-base: #1f2937;
   --skeleton-shine: rgba(71, 85, 105, 0.6);
   --focus-ring: #fb923c;
+  color-scheme: dark;
 }
 @property --tw-translate-x {
   syntax: "*";
@@ -2176,10 +2178,10 @@ function assignDiscard() {
   toast("未保存の変更を捨てました");
 }
 function toggleEmpty() {
-  // 「予定が 0 件」＝これからの予定が無い状態。すでにある記録は残す
-  // （消すと新規アカウントの状態になってしまい、確かめたい状態と違う）
+  // 「予定が 0 件」＝これからの予定が無い状態。すでにある履歴（記録ずみ・見送り）は
+  // 残す（消すと新規アカウントの状態になってしまい、確かめたい状態と違う）
   if (isEmpty()) {
-    ITEMS = JSON.parse(JSON.stringify(FIXTURE_ITEMS)).filter((x) => x.status === "done");
+    ITEMS = JSON.parse(JSON.stringify(FIXTURE_ITEMS)).filter((x) => x.status !== "planned");
     RULES = {};
   }
   else {
@@ -2228,14 +2230,16 @@ function renderMonth() {
 function monthChip(x) {
   const t = type(x.type);
   const c = C[t.color];
+  // 薄くするのは「しるし」だけ。文字ごと薄くすると 10px の見出しが
+  // 3.4:1（開始時刻は 2.3:1）まで落ちて、カレンダーの大半が読みにくくなる
   const faint = x.fromRule ? "opacity-50" : "";
   if (x.status === "skipped") {
     return `<span class="flex items-center gap-1 rounded px-0.5 text-[10px] text-muted-foreground line-through"><span class="h-2 w-2 shrink-0 rounded-full bg-muted"></span><span class="truncate">${t.label}</span></span>`;
   }
   const dot = x.status === "done"
-    ? `<span class="h-2 w-2 shrink-0 rounded-full ${c.dot}"></span>`
-    : `<span class="h-2 w-2 shrink-0 rounded-full border-[1.5px] ${c.ring}"></span>`;
-  return `<span class="flex items-center gap-1 rounded px-0.5 text-[10px] ${faint}">
+    ? `<span class="h-2 w-2 shrink-0 rounded-full ${c.dot} ${faint}"></span>`
+    : `<span class="h-2 w-2 shrink-0 rounded-full border-[1.5px] ${c.ring} ${faint}"></span>`;
+  return `<span class="flex items-center gap-1 rounded px-0.5 text-[10px]">
     ${dot}${x.untimed ? "" : `<span class="hidden shrink-0 tabular-nums text-muted-foreground sm:inline">${x.start}</span>`}<span class="truncate">${t.label}</span>
     ${x.photos ? `<span class="shrink-0 text-muted-foreground">${svg("camera", "inline h-2.5 w-2.5")}</span>` : ""}
   </span>`;

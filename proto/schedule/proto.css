@@ -1306,6 +1306,7 @@ input[type="date"] {
   --skeleton-base: #e2e8f0;
   --skeleton-shine: rgba(248, 250, 252, 0.9);
   --focus-ring: #c2410c;
+  color-scheme: light;
 }
 :root[data-theme="dark"] {
   --background: #0b1220;
@@ -1321,6 +1322,7 @@ input[type="date"] {
   --skeleton-base: #1f2937;
   --skeleton-shine: rgba(71, 85, 105, 0.6);
   --focus-ring: #fb923c;
+  color-scheme: dark;
 }
 @property --tw-translate-x {
   syntax: "*";
