@@ -1989,6 +1989,16 @@ function setTrigger(id, el, sel) {
   TRIGGERS[id] = el || null;
   TRIGGER_SEL[id] = sel && sel.length ? sel : null;
 }
+// 確認を出したら、そこへフォーカスを移す。描き直しで押したボタンが消えるので、
+// そのままだとフォーカスが body に落ちて「確認が出たこと」に気づけない
+function focusConfirm(id) {
+  requestAnimationFrame(() => $(id)?.focus({ preventScroll: true }));
+}
+function askDelete() {
+  CONFIRM_DELETE = true;
+  renderSheet();
+  focusConfirm("confirmDelete");
+}
 function restoreTrigger(id) {
   const el = TRIGGERS[id];
   const sel = TRIGGER_SEL[id];
@@ -2482,6 +2492,7 @@ function requestSwitchItem(d, id) {
     CONFIRM_CLOSE = true;
     renderSheet();
     $("sheet").scrollTop = 0;
+    focusConfirm("confirmClose");
     return;
   }
   openDay(d, id);
@@ -2492,6 +2503,7 @@ function requestCloseSheet() {
     CONFIRM_CLOSE = true;
     renderSheet();
     $("sheet").scrollTop = 0;
+    focusConfirm("confirmClose");
     return;
   }
   closeSheet();
@@ -2522,7 +2534,7 @@ function renderSheet() {
   let h = "";
 
   if (CONFIRM_CLOSE) {
-    h += `<div class="space-y-2 rounded-xl border border-border bg-surface-muted p-3">
+    h += `<div id="confirmClose" role="alert" tabindex="-1" class="space-y-2 rounded-xl border border-border bg-surface-muted p-3 outline-none">
       <p class="text-sm font-medium">${PENDING_SWITCH ? "編集をやめて、そちらを開きますか？" : "編集をやめますか？"}</p>
       <p class="text-xs text-muted-foreground">保存していない変更は失われます。</p>
       <div class="flex gap-2">
@@ -2652,7 +2664,7 @@ function renderSheet() {
     if (p) {
       if (p.status === "done" && CONFIRM_DELETE) {
         // 記録と写真は元に戻せない。本番の RecordActionsSheet と同じく確認をはさむ
-        h += `<div class="space-y-2 rounded-xl border border-rose-300 bg-rose-50 p-3">
+        h += `<div id="confirmDelete" role="alert" tabindex="-1" class="space-y-2 rounded-xl border border-rose-300 bg-rose-50 p-3 outline-none">
           <p class="text-sm font-medium text-rose-900">この記録を削除しますか？</p>
           <p class="text-xs text-rose-800">本文と写真 ${p.photos || 0} 枚も一緒に消えます。元に戻せません。</p>
           <div class="flex gap-2">
@@ -2661,7 +2673,7 @@ function renderSheet() {
           </div>
         </div>`;
       } else {
-        h += `<button type="button" onclick="${p.status === "done" ? "CONFIRM_DELETE = true; renderSheet()" : "clearPlan()"}"
+        h += `<button type="button" onclick="${p.status === "done" ? "askDelete()" : "clearPlan()"}"
           class="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
           ${p.status === "done" ? "この記録を削除する（写真ごと）" : "この日の予定を消す"}</button>`;
       }
@@ -2883,6 +2895,7 @@ function requestCloseDone() {
     CONFIRM_CLOSE_DONE = true;
     renderDone();
     $("doneSheet").scrollTop = 0;
+    focusConfirm("confirmDone");
     return;
   }
   closeDone();
@@ -2903,7 +2916,7 @@ function renderDone() {
   if (!dd) return;
   const body = [...dd.chips, dd.note.trim()].filter(Boolean).join("、");
   $("doneBody").innerHTML = `
-    ${CONFIRM_CLOSE_DONE ? `<div class="space-y-2 rounded-xl border border-border bg-surface-muted p-3">
+    ${CONFIRM_CLOSE_DONE ? `<div id="confirmDone" role="alert" tabindex="-1" class="space-y-2 rounded-xl border border-border bg-surface-muted p-3 outline-none">
       <p class="text-sm font-medium">入力をやめますか？</p>
       <p class="text-xs text-muted-foreground">選んだ内容と写真は保存されません。</p>
       <div class="flex gap-2">
@@ -3153,7 +3166,7 @@ function renderQuick() {
   $("qrBody").innerHTML = `
     <div role="radiogroup" aria-label="記録元" class="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1 text-sm">
       ${[["home", "おうち"], ["daycare", "保育園"]].map(([id, label]) =>
-        `<button type="button" role="radio" aria-checked="${QR.source === id}" onclick="QR.source='${id}'; renderQuick()"
+        `<button type="button" role="radio" data-qr-source="${id}" aria-checked="${QR.source === id}" onclick="setQuickSource('${id}')"
           class="rounded-lg py-1.5 font-medium transition ${QR.source === id ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground"}">${label}</button>`).join("")}
     </div>
     <div class="flex flex-wrap gap-2">
@@ -3185,6 +3198,12 @@ function qrPreview() {
   save.disabled = !body;
   save.className = "mt-3 w-full rounded-xl py-3 text-sm font-bold transition " +
     (body ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "bg-surface-muted text-muted-foreground");
+}
+function setQuickSource(id) {
+  QR.source = id;
+  renderQuick();
+  // 描き直すとフォーカスが外れる。チップへ進む前に先頭へ戻されないように
+  document.querySelector(`[data-qr-source="${id}"]`)?.focus({ preventScroll: true });
 }
 function qrChip(c) {
   QR.chips = QR.chips.includes(c) ? QR.chips.filter((x) => x !== c) : [...QR.chips, c];
