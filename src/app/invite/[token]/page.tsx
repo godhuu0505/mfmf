@@ -53,6 +53,9 @@ export default async function InvitePage({
   const userEmail = (user.email ?? "").trim().toLowerCase();
   const status = (() => {
     if (error) return "load_failed" as const;
+    // 既に世帯メンバーがゲスト招待を開いた場合（P0001）は、DB 側の状態が変わらない
+    // ＝何度押しても必ず失敗するので、受諾フォームを出さない終端状態として扱う。
+    if (errorReason === "already_member") return "already_member" as const;
     if (!invite) return "not_found" as const;
     if (invite.revoked_at !== null) return "revoked" as const;
     if (invite.accepted_at !== null) {
@@ -128,7 +131,10 @@ export default async function InvitePage({
               inviteEmail={invite?.email ?? null}
               userEmail={user.email ?? null}
             />
-            {status === "mismatch" && (
+            {/* not_found も出す: 招待先と違う Google アカウントでログインしていると
+                RLS（invites_select_invitee）が行ごと隠すため、いちばん多い
+                「アカウント違い」が mismatch ではなく not_found として届く。 */}
+            {(status === "mismatch" || status === "not_found") && (
               <form method="post" action="/auth/signout">
                 <input type="hidden" name="next" value={`/invite/${token}`} />
                 <button
@@ -164,6 +170,7 @@ function InviteProblem({
     | "revoked"
     | "used"
     | "already_accepted"
+    | "already_member"
     | "expired"
     | "mismatch"
     | "ok";
@@ -188,12 +195,14 @@ function InviteProblem({
       return (
         <>
           <p className="text-sm text-foreground">
-            この招待は見つかりませんでした。リンクが途中で切れていないか確認して
-            ください。
+            この招待は、いまログインしている{" "}
+            <span className="font-medium">{userEmail ?? "不明"}</span>{" "}
+            では開けません。宛先が別のアカウントか、リンクが途中で切れている
+            可能性があります。
           </p>
           <p className="text-sm text-muted-foreground">
-            心当たりがない場合は、招待した方に再送を依頼してください
-            （ログイン中: {userEmail ?? "不明"}）。
+            招待に使われたメールアドレスのアカウントでログインし直すか、
+            招待した方に再送を依頼してください。
           </p>
         </>
       );
@@ -231,13 +240,29 @@ function InviteProblem({
         </>
       );
     case "already_accepted":
+      // accepted_by が自分でも「いま参加している」ことの証明にはならない
+      // （その後に退出した / ゲスト付与が期限切れ・取消になった場合がある）。
+      // 招待の履歴として言い切る範囲に留める。
       return (
         <>
           <p className="text-sm text-foreground">
-            この招待は受諾済みです。すでに世帯に参加しています。
+            この招待はこのアカウントで受諾済みです。
           </p>
           <p className="text-sm text-muted-foreground">
-            ホームから記録を確認できます。
+            いま参加している世帯はホームから確認できます（その後に退出した場合や、
+            ゲストの期間が終わっている場合は、招待した方に再発行を依頼して
+            ください）。
+          </p>
+        </>
+      );
+    case "already_member":
+      return (
+        <>
+          <p className="text-sm text-foreground">
+            既にこの世帯のメンバーのため、ゲストとして参加する必要はありません。
+          </p>
+          <p className="text-sm text-muted-foreground">
+            メンバーはゲストより広い権限を持っています。そのままご利用ください。
           </p>
         </>
       );

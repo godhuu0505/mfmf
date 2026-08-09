@@ -57,11 +57,15 @@ test("宛先と違うアカウントで開くと、受諾ボタンではなく�
   ).toBeVisible();
 });
 
-test("存在しない token は「見つかりません」を出す（例外にしない）", async ({
+test("開けない token は理由とログインし直す導線を出す（例外にしない）", async ({
   page,
 }) => {
   await login(page);
   await page.goto("/invite/this-token-does-not-exist");
-  await expect(page.getByText("この招待は見つかりませんでした")).toBeVisible();
+  // 宛先と違うアカウントの場合、RLS が行ごと隠すのでここに来る（いちばん多い経路）
+  await expect(page.getByText("では開けません")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "別のアカウントでログインし直す" }),
+  ).toBeVisible();
   await expect(page.getByText("Application error")).toHaveCount(0);
 });

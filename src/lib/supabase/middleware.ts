@@ -86,5 +86,18 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(new URL(next, request.url));
   }
 
+  // ログイン済みのユーザーに戻り先 Cookie が残っていたら、ここで使い切る。
+  // メール/パスワードログインは ?next= だけを見てクライアントで遷移するため、
+  // 消さないと Cookie が最大 10 分残り、その間に別アカウントで Google OAuth を
+  // 始めると /auth/callback が古い行き先（前の招待）へ飛ばしてしまう。
+  // /auth/* は callback 自身が Cookie を読むので触らない。
+  if (
+    user &&
+    !pathname.startsWith("/auth") &&
+    request.cookies.has(POST_LOGIN_NEXT_COOKIE)
+  ) {
+    supabaseResponse.cookies.delete(POST_LOGIN_NEXT_COOKIE);
+  }
+
   return supabaseResponse;
 }
