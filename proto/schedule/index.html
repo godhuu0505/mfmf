@@ -1304,6 +1304,7 @@ input[type="date"] {
         <p class="text-xs text-muted-foreground">担当のある予定の日だけ、顔をタップして埋めます。予定のない日はここでは決められません。</p>
         <p id="weekReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、担当は変更できません。</p>
         <div id="weekBoard" class="space-y-2"></div>
+        <div id="weekUnlinked" class="hidden flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs ring-1 ring-border"></div>
         <button id="weekSave" type="button" onclick="weekSave()" class="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">保存する</button>
       </div>
     </section>
@@ -1401,8 +1402,9 @@ input[type="date"] {
           担当に選べるのはこの一覧の人です。<b class="font-semibold text-foreground">アカウントを連携すると</b>、その人のスマホにも予定が出ます。
         </p>
       </div>
+      <p id="familyReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">招待できるのはオーナーだけです。</p>
       <ul id="familyList" class="space-y-2"></ul>
-      <button type="button" onclick="openInvite()" class="flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-medium transition hover:bg-surface-muted">
+      <button id="familyInvite" type="button" onclick="openInvite()" class="flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-medium transition hover:bg-surface-muted">
         <span data-lucide="user-plus"></span>家族を招待する
       </button>
     </section>
@@ -1948,6 +1950,7 @@ function closeQuick() {
   $("qrBackdrop").classList.add("pointer-events-none", "opacity-0");
 }
 function openInvite(memberId) {
+  if (isViewer()) return;
   const m = memberId ? member(memberId) : null;
   $("invTitle").textContent = m ? `${m.name} を招待する` : "家族を招待する";
   $("invBody").textContent = m
@@ -2020,7 +2023,8 @@ function cycleRule(w) {
   else {
     const keep = {};
     for (const [k] of type(next).roles) if (RULES[w]?.who?.[k]) keep[k] = RULES[w].who[k];
-    RULES[w] = { type: next, who: keep };
+    // since（いつから効くか）は種類を変えても引き継ぐ。捨てると過去に遡ってしまう
+    RULES[w] = { type: next, who: keep, since: RULES[w]?.since };
   }
   renderRules();
   renderGrid();
@@ -2036,6 +2040,9 @@ function cycleWho(w, key) {
 
 // ───────── 世帯の設定（アカウント連携） ─────────
 function renderFamily() {
+  const ro = isViewer();
+  $("familyInvite").classList.toggle("hidden", ro);
+  $("familyReadonly").classList.toggle("hidden", !ro);
   $("familyList").innerHTML = MEMBERS.map((m) => {
     const linked = m.link === "linked";
     return `<li class="flex items-center gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border">
@@ -2044,7 +2051,7 @@ function renderFamily() {
         <span class="block truncate font-medium">${m.name}</span>
         <span class="block truncate text-xs ${linked ? "text-muted-foreground" : "text-primary"}">${LINK_LABEL[m.link]}${linked ? "・編集者" : ""}</span>
       </span>
-      ${linked ? "" : `<button type="button" onclick="openInvite('${m.id}')" class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">${m.link === "invited" ? "再送" : "招待"}</button>`}
+      ${linked || ro ? "" : `<button type="button" onclick="openInvite('${m.id}')" class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">${m.link === "invited" ? "再送" : "招待"}</button>`}
     </li>`;
   }).join("");
 }
@@ -2060,6 +2067,24 @@ function renderWeek() {
   $("weekSave").className = "w-full rounded-xl py-3 text-sm font-bold transition " +
     (dirty ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "bg-surface-muted text-muted-foreground");
   $("weekSave").classList.toggle("hidden", ro);
+
+  // 週ボードで未連携の人を担当にしたときも、日別シートと同じように連携に誘う
+  const assigned = new Set();
+  for (const ds of days) {
+    const q = (WEEK_DRAFT && WEEK_DRAFT[ds]) || planFor(ds);
+    if (!q) continue;
+    for (const [k] of type(q.type).roles) if ((q.who || {})[k]) assigned.add(q.who[k]);
+  }
+  const unlinked = [...assigned].map(member).filter((m) => m && m.link !== "linked");
+  $("weekUnlinked").classList.toggle("hidden", ro || unlinked.length === 0);
+  if (unlinked.length && !ro) {
+    $("weekUnlinked").innerHTML =
+      `<span class="min-w-0 flex-1 text-muted-foreground">
+        <b class="font-semibold text-foreground">${unlinked.map((m) => m.name).join("・")}</b>
+        ${unlinked.length > 1 ? "はまだ" : "は"}アカウント未連携です。連携すると本人のスマホにも予定が出ます。
+      </span>
+      <button type="button" onclick="openInvite('${unlinked[0].id}')" class="shrink-0 rounded-lg border border-border px-2.5 py-1.5 font-medium transition hover:bg-surface-muted">招待</button>`;
+  }
 
   $("weekBoard").innerHTML = days.map((ds) => {
     const p = (WEEK_DRAFT && WEEK_DRAFT[ds]) || planFor(ds);
