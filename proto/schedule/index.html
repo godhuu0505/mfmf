@@ -898,6 +898,9 @@
   .pl-1 {
     padding-left: var(--spacing);
   }
+  .pl-20 {
+    padding-left: calc(var(--spacing) * 20);
+  }
   .pl-\[env\(safe-area-inset-left\)\] {
     padding-left: env(safe-area-inset-left);
   }
@@ -1711,7 +1714,7 @@ input[type="date"] {
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <div class="mb-1 flex items-center justify-between">
         <h2 id="doneTitle" class="text-base font-bold">記録にする</h2>
-        <button type="button" onclick="requestCloseDone()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
+        <button id="doneClose" type="button" onclick="requestCloseDone()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
       </div>
       <p id="doneSummary" class="mb-3 text-xs text-muted-foreground"></p>
       <div id="doneBody" class="space-y-4"></div>
@@ -1978,12 +1981,19 @@ function rememberTrigger(id) {
 }
 // 覚えた要素を選び直すための候補（前から順に試す）。
 // 予定を保存すると id が変わることがある（ルール由来 → 実体）ので、
-// 「その行」で見つからなければ「その日」まで緩める
+// data-open は「その行」で見つからなければ「その日」まで緩める
 function openSelectors(el) {
+  if (el.id) return [`#${CSS.escape(el.id)}`];
   const key = el.dataset.open;
-  if (!key) return el.dataset.tab ? [`[data-tab="${el.dataset.tab}"]`] : [];
-  const day = key.split("|")[0];
-  return [`[data-open="${key}"]`, `[data-open^="${day}|"]`, `[data-open="${day}"]`];
+  if (key) {
+    const day = key.split("|")[0];
+    return [`[data-open="${key}"]`, `[data-open^="${day}|"]`, `[data-open="${day}"]`];
+  }
+  for (const attr of ["data-tab", "data-who", "data-type", "data-preset", "data-qr-source", "data-assign", "data-chip", "data-done-photo", "data-done-open"]) {
+    const v = el.getAttribute(attr);
+    if (v != null) return [`[${attr}="${v}"]`];
+  }
+  return [];
 }
 function setTrigger(id, el, sel) {
   TRIGGERS[id] = el || null;
@@ -1991,10 +2001,22 @@ function setTrigger(id, el, sel) {
 }
 // 確認を出したら、そこへフォーカスを移す。描き直しで押したボタンが消えるので、
 // そのままだとフォーカスが body に落ちて「確認が出たこと」に気づけない
+// 「編集に戻る」で帰ってくる先。描き直すと押していた要素は消えるので、
+// 確認を出す前（renderSheet の前）に呼ぶこと
+function rememberConfirmReturn(back) {
+  const el = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  setTrigger("confirm", el, [...(el ? openSelectors(el) : []), back].filter(Boolean));
+}
 function focusConfirm(id) {
   requestAnimationFrame(() => $(id)?.focus({ preventScroll: true }));
 }
+// 確認から戻る。描き直しで確認の枠ごと消えるので、元いた場所へフォーカスを返す
+function backFromConfirm(render0) {
+  render0();
+  restoreTrigger("confirm");
+}
 function askDelete() {
+  rememberConfirmReturn("#sheetClose");
   CONFIRM_DELETE = true;
   renderSheet();
   focusConfirm("confirmDelete");
@@ -2363,6 +2385,18 @@ function renderAssignBoard() {
         <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
         <span>${t.emoji}</span><span class="text-muted-foreground">${t.label}（担当なし）</span></div>`;
     }
+    // 記録ずみは「これからの担当を決める」道具の対象外。ここで押せると、
+    // 済んだ日の送り迎えを黙って書き換えてしまう（見送りと同じく読むだけにする）
+    if (x.status === "done") {
+      return `<div class="rounded-xl bg-surface-muted p-3 text-sm">
+        <div class="mb-1 flex items-center gap-2"><span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
+          <span class="opacity-70">${t.emoji}</span><span class="text-muted-foreground">${t.label}</span>
+          <span class="ml-auto shrink-0">${statusBadge("done")}</span></div>
+        <p class="pl-20 text-xs text-muted-foreground">
+          ${t.roles.map(([k, l]) => `${l}: ${member((x.who || {})[k])?.name || "未定"}`).join(" / ")}
+          <span class="block">記録ずみのため変えられません。変えるにはその日をタップ。</span>
+        </p></div>`;
+    }
     return `<div class="rounded-xl bg-surface p-3 shadow-sm ring-1 ring-border">
       <div class="mb-2 flex items-center gap-2 text-sm"><span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span><span>${t.emoji}</span><span class="font-medium">${t.label}</span>${x.status === "done" ? statusBadge("done") : ""}</div>
       ${t.roles.map(([k, l]) => `<div class="mt-1 flex items-center gap-2">
@@ -2381,7 +2415,7 @@ function renderAssignBoard() {
   // 保育園の送り迎えしか見ないため care の未連携を取りこぼす
   const unlinked = [...new Set(days.flatMap((ds) => {
     const base = planOn(ds);
-    if (!base || base.status === "skipped") return [];
+    if (!base || base.status !== "planned") return [];
     const who = { ...(base.who || {}), ...((ASSIGN_DRAFT || {})[ds] || {}) };
     return type(base.type).roles.map(([k]) => who[k]).filter(Boolean);
   }))].map(member).filter((m) => m && m.link !== "linked");
@@ -2402,7 +2436,8 @@ function renderAssignBoard() {
 function assignSet(ds, k, mid) {
   if (isViewer()) return;
   const base = planOn(ds);
-  if (!base || base.status === "skipped") return;
+  // 見送り・記録ずみは対象外（記録ずみを通すと済んだ日の担当が書き換わる）
+  if (!base || base.status !== "planned") return;
   if (!ASSIGN_DRAFT) ASSIGN_DRAFT = {};
   const delta = ASSIGN_DRAFT[ds] || (ASSIGN_DRAFT[ds] = {});
   const current = k in delta ? delta[k] : (base.who || {})[k] || null;
@@ -2422,7 +2457,8 @@ function assignSave() {
   let saved = 0;
   for (const [ds, who] of Object.entries(ASSIGN_DRAFT)) {
     const base = planOn(ds); // 保存の瞬間の予定に、触った担当だけを載せる
-    if (!base || base.status === "skipped") continue;
+    // 開いている間に完了した日は、下書きが残っていても書き戻さない
+    if (!base || base.status !== "planned") continue;
     const merged = { ...(base.who || {}), ...who };
     const next = {};
     for (const [k] of type(base.type).roles) if (merged[k]) next[k] = merged[k];
@@ -2488,6 +2524,7 @@ function sheetDirty() {
 // 同じ日のほかの行へ切り替える。未保存の編集があれば確認をはさむ
 function requestSwitchItem(d, id) {
   if (sheetDirty()) {
+    rememberConfirmReturn("#sheetClose");
     PENDING_SWITCH = { d, id };
     CONFIRM_CLOSE = true;
     renderSheet();
@@ -2500,6 +2537,7 @@ function requestSwitchItem(d, id) {
 function requestCloseSheet() {
   PENDING_SWITCH = null;
   if (sheetDirty()) {
+    rememberConfirmReturn("#sheetClose");
     CONFIRM_CLOSE = true;
     renderSheet();
     $("sheet").scrollTop = 0;
@@ -2538,7 +2576,7 @@ function renderSheet() {
       <p class="text-sm font-medium">${PENDING_SWITCH ? "編集をやめて、そちらを開きますか？" : "編集をやめますか？"}</p>
       <p class="text-xs text-muted-foreground">保存していない変更は失われます。</p>
       <div class="flex gap-2">
-        <button type="button" onclick="CONFIRM_CLOSE = false; PENDING_SWITCH = null; renderSheet()" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">編集に戻る</button>
+        <button type="button" onclick="CONFIRM_CLOSE = false; PENDING_SWITCH = null; backFromConfirm(renderSheet)" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">編集に戻る</button>
         <button type="button" onclick="discardSheet()" class="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background">${PENDING_SWITCH ? "開く" : "やめる"}</button>
       </div>
     </div>`;
@@ -2668,12 +2706,12 @@ function renderSheet() {
           <p class="text-sm font-medium text-rose-900">この記録を削除しますか？</p>
           <p class="text-xs text-rose-800">本文と写真 ${p.photos || 0} 枚も一緒に消えます。元に戻せません。</p>
           <div class="flex gap-2">
-            <button type="button" onclick="CONFIRM_DELETE = false; renderSheet()" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">やめる</button>
+            <button type="button" onclick="CONFIRM_DELETE = false; backFromConfirm(renderSheet)" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">やめる</button>
             <button type="button" onclick="clearPlan()" class="flex-1 rounded-lg bg-rose-600 py-2.5 text-sm font-bold text-white">削除する</button>
           </div>
         </div>`;
       } else {
-        h += `<button type="button" onclick="${p.status === "done" ? "askDelete()" : "clearPlan()"}"
+        h += `<button id="planDelete" type="button" onclick="${p.status === "done" ? "askDelete()" : "clearPlan()"}"
           class="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
           ${p.status === "done" ? "この記録を削除する（写真ごと）" : "この日の予定を消す"}</button>`;
       }
@@ -2892,6 +2930,7 @@ function doneDirty() {
 // ✕ / 背景 / Esc から呼ぶ。入力があれば確認をはさむ
 function requestCloseDone() {
   if (doneDirty()) {
+    rememberConfirmReturn("#doneClose");
     CONFIRM_CLOSE_DONE = true;
     renderDone();
     $("doneSheet").scrollTop = 0;
@@ -2920,7 +2959,7 @@ function renderDone() {
       <p class="text-sm font-medium">入力をやめますか？</p>
       <p class="text-xs text-muted-foreground">選んだ内容と写真は保存されません。</p>
       <div class="flex gap-2">
-        <button type="button" onclick="CONFIRM_CLOSE_DONE = false; renderDone()" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">入力に戻る</button>
+        <button type="button" onclick="CONFIRM_CLOSE_DONE = false; backFromConfirm(renderDone)" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">入力に戻る</button>
         <button type="button" onclick="discardDone()" class="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background">やめる</button>
       </div>
     </div>` : ""}
