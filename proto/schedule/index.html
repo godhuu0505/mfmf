@@ -1657,14 +1657,8 @@ input[type="date"] {
       </div>
       <div id="qrTodayPlan" class="mb-3"></div>
       <p class="mb-2 text-xs text-muted-foreground">2026年8月9日(日)</p>
-      <div class="flex flex-wrap gap-2">
-        <span class="rounded-full border border-border px-3 py-1.5 text-sm">ごはん完食</span>
-        <span class="rounded-full border border-border px-3 py-1.5 text-sm">おやつ</span>
-        <span class="rounded-full border border-border px-3 py-1.5 text-sm">さんぽ</span>
-        <span class="rounded-full border border-border px-3 py-1.5 text-sm">ねんね</span>
-        <span class="rounded-full border border-border px-3 py-1.5 text-sm">ごきげん</span>
-      </div>
-      <button type="button" onclick="closeQuick(); toast('（プロトでは記録フォームは省略）')" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">保存する</button>
+      <div id="qrBody" class="space-y-3"></div>
+      <button type="button" onclick="quickSave()" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">保存する</button>
       <button type="button" onclick="closeQuick(); openNextFreeDay()"
         class="mt-2 w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
         これからの予定を入れる →
@@ -1758,16 +1752,16 @@ const C = {
 // 出来事は 1 本の配列。status で「予定」「記録（完了）」「見送り」を表す。
 // 予定として作られ、完了すると記録になる。予定を経ずに記録だけ作ることもできる。
 let ITEMS = [
-  { id: "i1", date: "2026-08-03", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" }, note: "", status: "done", body: "おやつをぜんぶ食べました", photos: 2 },
-  { id: "i2", date: "2026-08-05", type: "family",  start: "10:00", end: "17:00", who: { care: "m3" }, note: "ばあばが泊まりに来る", status: "done", body: "ばあばと公園へ", photos: 3 },
-  { id: "i3", date: "2026-08-06", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" }, note: "", status: "done", body: "お昼寝が長かった", photos: 0 },
-  { id: "i4", date: "2026-08-07", type: "home",    start: "09:00", end: "18:00", who: { care: "m1" }, note: "", status: "done", body: "ごきげん", photos: 1 },
-  { id: "i5", date: "2026-08-08", type: "outing",  start: "10:00", end: "16:00", who: {}, note: "", status: "skipped", body: "", photos: 0 },
-  { id: "i6", date: "2026-08-11", type: "clinic",  start: "09:30", end: "11:00", who: { care: "m1" }, note: "ワクチン2回目", status: "planned", body: "", photos: 0 },
+  { id: "i1", date: "2026-08-03", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" }, note: "", status: "done", body: "おやつをぜんぶ食べました", photos: 2, overridesRule: true },
+  { id: "i2", date: "2026-08-05", type: "family",  start: "10:00", end: "17:00", who: { care: "m3" }, note: "ばあばが泊まりに来る", status: "done", body: "ばあばと公園へ", photos: 3, overridesRule: true },
+  { id: "i3", date: "2026-08-06", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" }, note: "", status: "done", body: "お昼寝が長かった", photos: 0, overridesRule: true },
+  { id: "i4", date: "2026-08-07", type: "home",    start: "09:00", end: "18:00", who: { care: "m1" }, note: "", status: "done", body: "ごきげん", photos: 1, overridesRule: true },
+  { id: "i5", date: "2026-08-08", type: "outing",  start: "10:00", end: "16:00", who: {}, note: "", status: "skipped", body: "", photos: 0, overridesRule: true },
+  { id: "i6", date: "2026-08-11", type: "clinic",  start: "09:30", end: "11:00", who: { care: "m1" }, note: "ワクチン2回目", status: "planned", body: "", photos: 0, overridesRule: true },
   // 既定（10:00〜16:00）から手で変えた想定なので timeDirty を立てる。
   // 立てないと、種類を変えたときに「触っていない」と見なされて上書きされる
-  { id: "i7", date: "2026-08-14", type: "outing",  start: "08:00", end: "17:00", who: {}, note: "海！", status: "planned", body: "", photos: 0, timeDirty: true },
-  { id: "i8", date: "2026-08-20", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m1", pick: "m3" }, note: "パパ出張のため、迎えはばあば", status: "planned", body: "", photos: 0 },
+  { id: "i7", date: "2026-08-14", type: "outing",  start: "08:00", end: "17:00", who: {}, note: "海！", status: "planned", body: "", photos: 0, timeDirty: true, overridesRule: true },
+  { id: "i8", date: "2026-08-20", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m1", pick: "m3" }, note: "パパ出張のため、迎えはばあば", status: "planned", body: "", photos: 0, overridesRule: true },
 ];
 // 曜日ルールは「版」の配列で持つ（since の昇順）。
 // ひとつの枠を上書きすると、since より前の日まで巻き添えで消えてしまうため。
@@ -1834,15 +1828,23 @@ function putRuleVersion(w, r) {
   if (i >= 0) list[i] = r; else list.push(r);
   list.sort((a, b) => (a.since || "").localeCompare(b.since || ""));
 }
-// その日の出来事。保存済みが 1 件でもあればそれを使い、
-// 無ければ曜日ルールから「まだ保存していない予定」を作って見せる
+// その日の出来事。保存済みの行に、曜日ルール由来の予定を足して返す。
+// ルールを隠すのは「その日の予定として保存し直した（overridesRule）」ときだけ。
+// 保存済みが 1 件でもあれば隠す作りだと、無関係なクイック記録を 1 件足しただけで
+// その日の保育園の予定と担当が消えてしまう。
 function itemsOn(d) {
   const saved = ITEMS.filter((x) => x.date === d);
-  if (saved.length) return saved;
-  if (CANCELLED.has(d)) return [];
-  const r = ruleFor(d);
-  if (!r) return [];
-  return [{ id: "rule:" + d, date: d, type: r.type, start: r.start, end: r.end, who: { ...r.who }, note: "", status: "planned", body: "", photos: 0, fromRule: true }];
+  const overridden = CANCELLED.has(d) || saved.some((x) => x.overridesRule);
+  const r = overridden ? null : ruleFor(d);
+  const list = r
+    ? [...saved, { id: "rule:" + d, date: d, type: r.type, start: r.start, end: r.end, who: { ...r.who }, note: "", status: "planned", body: "", photos: 0, fromRule: true }]
+    : [...saved];
+  return list.sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+}
+// その日の「予定」。編集シートや担当ボードが扱う 1 件
+function planOn(d) {
+  const list = itemsOn(d);
+  return list.find((x) => x.status === "planned") || list[0] || null;
 }
 function fmt(d) {
   return new Intl.DateTimeFormat("ja-JP", { month: "long", day: "numeric", weekday: "short" }).format(new Date(d + "T00:00:00"));
@@ -1853,6 +1855,12 @@ function avatar(id, size) {
   if (!m) return `<span class="inline-flex ${s} items-center justify-center rounded-full border border-dashed border-border text-muted-foreground">?</span>`;
   const unlinked = m.link !== "linked";
   return `<span class="inline-flex ${s} items-center justify-center rounded-full ${m.bg} font-bold ${unlinked ? "border border-dashed border-muted-foreground/50" : ""}">${m.initial}</span>`;
+}
+// 自由入力（メモ・記録本文）は innerHTML のテンプレートに入るのでエスケープする。
+// 素で入れると <img onerror> が publish 済みの Artifact 上で実行できてしまう
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 function toast(msg) {
   const t = $("toast");
@@ -2061,7 +2069,7 @@ function renderAssignBoard() {
   const days = weekDays();
   const dirty = ASSIGN_DRAFT && Object.keys(ASSIGN_DRAFT).length > 0;
   const rows = days.map((ds) => {
-    const base = itemsOn(ds)[0];
+    const base = planOn(ds);
     const x = (ASSIGN_DRAFT && ASSIGN_DRAFT[ds]) || base;
     const label = fmt(ds);
     if (!x) {
@@ -2098,7 +2106,7 @@ function renderAssignBoard() {
   }).join("");
 
   const unlinked = [...new Set(days.flatMap((ds) => {
-    const x = (ASSIGN_DRAFT && ASSIGN_DRAFT[ds]) || itemsOn(ds)[0];
+    const x = (ASSIGN_DRAFT && ASSIGN_DRAFT[ds]) || planOn(ds);
     if (!x || x.status === "skipped") return [];
     return type(x.type).roles.map(([k]) => (x.who || {})[k]).filter(Boolean);
   }))].map(member).filter((m) => m && m.link !== "linked");
@@ -2114,7 +2122,7 @@ function renderAssignBoard() {
 }
 function assignSet(ds, k, mid) {
   if (isViewer()) return;
-  const cur = (ASSIGN_DRAFT && ASSIGN_DRAFT[ds]) || itemsOn(ds)[0];
+  const cur = (ASSIGN_DRAFT && ASSIGN_DRAFT[ds]) || planOn(ds);
   if (!cur || cur.status === "skipped") return;
   if (!ASSIGN_DRAFT) ASSIGN_DRAFT = {};
   const x = ASSIGN_DRAFT[ds] || (ASSIGN_DRAFT[ds] = JSON.parse(JSON.stringify(cur)));
@@ -2122,7 +2130,7 @@ function assignSet(ds, k, mid) {
   x.who[k] = x.who[k] === mid ? null : mid;
   // 元の値に戻したら下書きから外す。残したままだと、見た目が変わっていないのに
   // 保存でき、その日がルール由来から手入力の例外に化けてしまう
-  const base = itemsOn(ds)[0];
+  const base = planOn(ds);
   if (base && sig(x) === sig(base)) delete ASSIGN_DRAFT[ds];
   if (ASSIGN_DRAFT && Object.keys(ASSIGN_DRAFT).length === 0) ASSIGN_DRAFT = null;
   renderAssignBoard();
@@ -2130,9 +2138,9 @@ function assignSet(ds, k, mid) {
 function assignSave() {
   if (!ASSIGN_DRAFT) return;
   for (const [ds, x] of Object.entries(ASSIGN_DRAFT)) {
-    const existing = ITEMS.find((y) => y.date === ds);
+    const existing = ITEMS.find((y) => y.id === x.id);
     if (existing) existing.who = { ...x.who };
-    else ITEMS.push({ ...x, id: "n" + seq++, fromRule: undefined });
+    else ITEMS.push({ ...x, id: "n" + seq++, fromRule: undefined, overridesRule: true });
     CANCELLED.delete(ds);
   }
   ASSIGN_DRAFT = null;
@@ -2143,7 +2151,7 @@ function assignSave() {
 // ───────── 予定シート ─────────
 function openDay(d) {
   openDate = d;
-  const cur = itemsOn(d)[0] || null;
+  const cur = planOn(d);
   DRAFT = cur ? JSON.parse(JSON.stringify(cur)) : null;
   if (DRAFT) DRAFT.repeat = false;
   DRAFT_BASE = cur ? { fromRule: !!cur.fromRule, sig: sig(cur) } : null;
@@ -2184,7 +2192,7 @@ function renderSheet() {
   if (p && p.status === "done") {
     h += `<div class="rounded-xl bg-surface-muted p-3">
       <p class="mb-1 text-xs font-bold text-muted-foreground">記録</p>
-      <p class="text-sm">${p.body || "（本文なし）"}</p>
+      <p class="text-sm">${esc(p.body) || "（本文なし）"}</p>
       ${p.photos ? `<p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">${svg("camera", "h-3.5 w-3.5")}写真 ${p.photos} 枚</p>` : ""}
       ${!ro ? `<button type="button" onclick="openDone()" class="mt-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">記録を編集</button>` : ""}
     </div>`;
@@ -2262,7 +2270,7 @@ function renderSheet() {
   if (p) {
     h += `<div>
       <label class="mb-1 block text-xs font-medium text-muted-foreground" for="note">ひとことメモ（任意）</label>
-      <input id="note" ${ro ? "disabled" : ""} value="${(p.note || "").replace(/"/g, "&quot;")}"
+      <input id="note" ${ro ? "disabled" : ""} value="${esc(p.note)}"
         oninput="if (DRAFT) DRAFT.note = this.value" placeholder="例: パパ出張のため、迎えはばあば"
         class="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm" />
     </div>`;
@@ -2343,10 +2351,10 @@ function applyPreset(i) {
   toast(`「${ps.label}」を入れました`);
 }
 function commit(x) {
-  const i = ITEMS.findIndex((y) => y.date === x.date);
-  const row = { ...x };
+  const row = { ...x, overridesRule: true }; // 日の編集からの保存はその日のルールを置き換える
   delete row.repeat;
   delete row.fromRule;
+  const i = ITEMS.findIndex((y) => y.id === row.id);
   if (i >= 0) ITEMS[i] = row; else ITEMS.push(row);
   CANCELLED.delete(x.date);
 }
@@ -2394,7 +2402,7 @@ function unskip() {
 function clearPlan() {
   const d = openDate;
   const wasDone = DRAFT && DRAFT.status === "done";
-  ITEMS = ITEMS.filter((x) => x.date !== d);
+  if (DRAFT) ITEMS = ITEMS.filter((x) => x.id !== DRAFT.id);
   if (ruleFor(d)) CANCELLED.add(d);
   closeSheet();
   render();
@@ -2451,12 +2459,12 @@ function renderDone() {
     </div>
     <div>
       <label class="mb-1 block text-xs font-medium text-muted-foreground" for="doneNote">ひとこと（任意）</label>
-      <input id="doneNote" value="${dd.note.replace(/"/g, "&quot;")}" oninput="DONE_DRAFT.note = this.value; renderDonePreview()"
+      <input id="doneNote" value="${esc(dd.note)}" oninput="DONE_DRAFT.note = this.value; renderDonePreview()"
         placeholder="例: おやつをぜんぶ食べました" class="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm" />
     </div>
     <button type="button" onclick="donePhoto()" class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">
       ${svg("camera", "h-4 w-4")}写真を追加${dd.photos ? `（${dd.photos} 枚）` : ""}</button>
-    <p id="donePreview" class="rounded-xl bg-surface-muted px-3 py-2.5 text-sm ${body ? "" : "text-muted-foreground"}">${body || "まだ何も選んでいません"}</p>
+    <p id="donePreview" class="rounded-xl bg-surface-muted px-3 py-2.5 text-sm ${body ? "" : "text-muted-foreground"}">${esc(body) || "まだ何も選んでいません"}</p>
     <button type="button" onclick="confirmDone()" class="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700">
       ${svg("check", "mr-1 inline h-4 w-4")}記録として保存する</button>
     <p class="text-center text-xs text-muted-foreground">保存すると、この予定は<b class="font-semibold text-foreground">記録ずみ</b>になります。</p>`;
@@ -2491,8 +2499,7 @@ function confirmDone() {
 
 // ───────── ホーム ─────────
 function renderHome() {
-  const list = itemsOn(TODAY);
-  const x = list[0];
+  const x = planOn(TODAY);
   const ro = isViewer();
   if (!x) {
     $("todayCard").innerHTML = `<div class="rounded-2xl border border-dashed border-border p-4 text-center">
@@ -2509,7 +2516,7 @@ function renderHome() {
         <span class="text-3xl">${t.emoji}</span>
         <div class="min-w-0 flex-1">
           <p class="font-bold">${t.label}</p>
-          <p class="text-xs tabular-nums text-muted-foreground">${x.start}〜${x.end}${x.note ? "・" + x.note : ""}</p>
+          <p class="text-xs tabular-nums text-muted-foreground">${x.start}〜${x.end}${x.note ? "・" + esc(x.note) : ""}</p>
         </div>
       </div>
       ${t.roles.length ? `<div class="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
@@ -2517,7 +2524,7 @@ function renderHome() {
           ${avatar((x.who || {})[k], "sm")}<span class="text-muted-foreground">${l}</span>
           <span class="font-bold">${member((x.who || {})[k])?.name || "未定"}</span></span>`).join("")}
       </div>` : ""}
-      ${x.status === "done" ? `<p class="mt-3 rounded-xl bg-surface-muted px-3 py-2 text-sm">${x.body || "（本文なし）"}</p>` : ""}
+      ${x.status === "done" ? `<p class="mt-3 rounded-xl bg-surface-muted px-3 py-2 text-sm">${esc(x.body) || "（本文なし）"}</p>` : ""}
       <div class="mt-3 flex gap-2">
         ${!ro && x.status === "planned" ? `<button type="button" onclick="openDay('${TODAY}'); openDone()" class="flex-1 rounded-xl border-2 border-emerald-500 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50">${svg("check", "mr-1 inline h-4 w-4")}完了して記録にする</button>` : ""}
         <button type="button" onclick="go('calendar'); openDay('${TODAY}')" class="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">${x.status === "planned" ? "予定を見る・変える" : "詳しく見る"}</button>
@@ -2532,7 +2539,7 @@ function renderHome() {
         return `<li><button type="button" onclick="go('calendar'); openDay('${y.date}')" class="flex w-full items-center gap-2 rounded-xl bg-surface px-3 py-2.5 text-left text-sm shadow-sm ring-1 ring-border transition hover:bg-surface-muted">
           <span class="w-14 shrink-0 text-xs text-muted-foreground">${fmt(y.date).replace("2026年", "")}</span>
           <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${C[t.color].soft}">${t.emoji}${t.label}</span>
-          <span class="min-w-0 flex-1 truncate">${y.body || "（本文なし）"}</span>
+          <span class="min-w-0 flex-1 truncate">${esc(y.body) || "（本文なし）"}</span>
           ${y.photos ? `<span class="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground">${svg("camera", "h-3.5 w-3.5")}${y.photos}</span>` : ""}
         </button></li>`;
       }).join("")
@@ -2614,7 +2621,8 @@ function cycleRule(w) {
     type: next, who: keep,
     start: lv && lv.timeDirty ? lv.start : t.start,
     end: lv && lv.timeDirty ? lv.end : t.end,
-    since: lv?.since,
+    // 新規作成の版は今日から。undefined のままだと全期間に効いて過去に遡る
+    since: lv ? lv.since : TODAY,
     timeDirty: !!(lv && lv.timeDirty),
   };
   if (lv) RULES[w][RULES[w].length - 1] = r; else putRuleVersion(w, r);
@@ -2653,8 +2661,41 @@ function renderFamily() {
 }
 
 // ───────── シート開閉 ─────────
+let QR = { chips: [], source: "home" };
+function renderQuick() {
+  $("qrBody").innerHTML = `
+    <div class="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1 text-sm">
+      ${[["home", "おうち"], ["daycare", "保育園"]].map(([id, label]) =>
+        `<button type="button" onclick="QR.source='${id}'; renderQuick()"
+          class="rounded-lg py-1.5 font-medium transition ${QR.source === id ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground"}">${label}</button>`).join("")}
+    </div>
+    <div class="flex flex-wrap gap-2">
+      ${CHIPS.map((c) => {
+        const on = QR.chips.includes(c);
+        return `<button type="button" onclick="qrChip('${c}')" aria-pressed="${on}"
+          class="rounded-full border px-3 py-1.5 text-sm transition ${on ? "border-primary bg-primary/10 font-bold text-primary" : "border-border hover:bg-surface-muted"}">${c}</button>`;
+      }).join("")}
+    </div>`;
+}
+function qrChip(c) {
+  QR.chips = QR.chips.includes(c) ? QR.chips.filter((x) => x !== c) : [...QR.chips, c];
+  renderQuick();
+}
+// 予定を経ない記録。曜日ルールの予定を置き換えない（overridesRule を付けない）
+function quickSave() {
+  if (!QR.chips.length) { toast("あったことを選んでください"); return; }
+  ITEMS.push({
+    id: "q" + seq++, date: TODAY, type: QR.source, start: "12:00", end: "13:00",
+    who: {}, note: "", status: "done", body: QR.chips.join("、"), photos: 0,
+  });
+  QR = { chips: [], source: "home" };
+  closeQuick();
+  render();
+  toast("記録しました");
+}
 function openQuick() {
-  const x = itemsOn(TODAY)[0];
+  renderQuick();
+  const x = planOn(TODAY);
   $("qrTodayPlan").innerHTML = x && x.status === "planned"
     ? `<button type="button" onclick="closeQuick(); go('calendar'); openDay('${TODAY}'); openDone()"
         class="flex w-full items-center gap-2 rounded-xl border-2 border-emerald-500 px-3 py-2.5 text-left text-sm transition hover:bg-emerald-50">
@@ -2674,8 +2715,8 @@ function closeQuick() {
 function nextOpenDay() {
   for (let d = dayNum(TODAY); d <= 31; d++) {
     const ds = `2026-08-${String(d).padStart(2, "0")}`;
-    const list = itemsOn(ds);
-    if (!list.length || list[0].status === "planned") return ds;
+    const p2 = planOn(ds);
+    if (!p2 || p2.status === "planned") return ds;
   }
   return null;
 }
