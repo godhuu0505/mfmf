@@ -962,6 +962,9 @@
     --tw-font-weight: var(--font-weight-semibold);
     font-weight: var(--font-weight-semibold);
   }
+  .break-all {
+    word-break: break-all;
+  }
   .text-amber-900 {
     color: var(--color-amber-900);
   }
@@ -1102,6 +1105,10 @@
   .duration-300 {
     --tw-duration: 300ms;
     transition-duration: 300ms;
+  }
+  .select-all {
+    -webkit-user-select: all;
+    user-select: all;
   }
   .last\:border-0:last-child {
     border-style: var(--tw-border-style);

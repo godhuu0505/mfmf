@@ -967,6 +967,9 @@
     --tw-font-weight: var(--font-weight-semibold);
     font-weight: var(--font-weight-semibold);
   }
+  .break-all {
+    word-break: break-all;
+  }
   .text-amber-900 {
     color: var(--color-amber-900);
   }
@@ -1107,6 +1110,10 @@
   .duration-300 {
     --tw-duration: 300ms;
     transition-duration: 300ms;
+  }
+  .select-all {
+    -webkit-user-select: all;
+    user-select: all;
   }
   .last\:border-0:last-child {
     border-style: var(--tw-border-style);
@@ -1679,13 +1686,13 @@ input[type="date"] {
   </div>
 
   <!-- ═══════════ 完了（記録にする）シート ═══════════ -->
-  <div id="doneBackdrop" onclick="closeDone()" class="pointer-events-none fixed inset-0 z-[60] bg-black/40 opacity-0 transition-opacity duration-300"></div>
+  <div id="doneBackdrop" onclick="requestCloseDone()" class="pointer-events-none fixed inset-0 z-[60] bg-black/40 opacity-0 transition-opacity duration-300"></div>
   <div id="doneSheet" role="dialog" aria-modal="true" aria-labelledby="doneTitle" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-[70] max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
     <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <div class="mb-1 flex items-center justify-between">
         <h2 id="doneTitle" class="text-base font-bold">記録にする</h2>
-        <button type="button" onclick="closeDone()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
+        <button type="button" onclick="requestCloseDone()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
       </div>
       <p id="doneSummary" class="mb-3 text-xs text-muted-foreground"></p>
       <div id="doneBody" class="space-y-4"></div>
@@ -1724,8 +1731,9 @@ input[type="date"] {
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <h2 id="invTitle" class="mb-1 text-base font-bold">家族を招待する</h2>
       <p id="invBody" class="mb-3 text-sm text-muted-foreground"></p>
-      <div class="flex items-center gap-2 rounded-xl bg-surface-muted px-3 py-2.5 text-xs">
-        <span class="min-w-0 flex-1 truncate font-mono">mfmf.app/invite/8f3a…c1</span>
+      <div class="flex items-start gap-2 rounded-xl bg-surface-muted px-3 py-2.5 text-xs">
+        <!-- コピーが弾かれても手で選べるよう、URL は省略せず全部出す -->
+        <span id="inviteUrl" class="min-w-0 flex-1 select-all break-all font-mono"></span>
         <button type="button" onclick="copyInvite()" class="shrink-0 rounded-lg bg-surface px-3 py-1.5 font-medium ring-1 ring-border">コピー</button>
       </div>
       <button type="button" onclick="closeInvite()" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">閉じる</button>
@@ -1848,6 +1856,8 @@ let DONE_DRAFT = null;
 let CONFIRM_DELETE = false; // 記録削除の確認state
 let CONFIRM_CLOSE = false;  // 編集を捨てるときの確認state
 let OPEN_SIG = null;        // 開いた時点の内容（変更の有無を見る）
+let CONFIRM_CLOSE_DONE = false;
+let DONE_OPEN_SIG = null;
 let ASSIGN_DRAFT = null;
 let assignOpen = false;
 let seq = 100;
@@ -1954,7 +1964,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   const open = (id) => !$(id).classList.contains("invisible");
   if (open("invSheet")) return closeInvite();
-  if (open("doneSheet")) return closeDone();
+  if (open("doneSheet")) return requestCloseDone();
   if (open("qrSheet")) return closeQuick();
   if (open("sheet")) return requestCloseSheet();
 });
@@ -2037,7 +2047,7 @@ function renderTabs() {
         <span class="block pb-1.5 pt-9 text-center text-[10px] font-medium text-muted-foreground">記録</span></button>`;
     }
     const active = t.key === screen || (t.key === "menu" && MENU_SCREENS.includes(screen));
-    return `<button type="button" onclick="go('${t.key}')" ${active ? 'aria-current="page"' : ""}
+    return `<button type="button" data-tab="${t.key}" onclick="go('${t.key}')" ${active ? 'aria-current="page"' : ""}
       class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium transition ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}">
       ${svg(t.icon, "h-6 w-6")}${t.label}</button>`;
   }).join("");
@@ -2051,7 +2061,10 @@ function go(s) {
     $("screen-" + k).classList.toggle("hidden", k !== s);
   });
   window.scrollTo(0, 0);
+  const wasTab = document.activeElement?.dataset?.tab || null;
   render();
+  // タブバーは innerHTML を作り直すので、押したタブへフォーカスを戻す
+  if (wasTab) document.querySelector(`[data-tab="${s}"], [data-tab="${wasTab}"]`)?.focus({ preventScroll: true });
 }
 function setMode(m) { MODE = m; render(); }
 function setCalView(v) {
@@ -2736,6 +2749,8 @@ function openDone() {
     photos: p.photos || 0,
   };
   const t = type(p.type);
+  DONE_OPEN_SIG = JSON.stringify([DONE_DRAFT.chips, DONE_DRAFT.note, DONE_DRAFT.photos]);
+  CONFIRM_CLOSE_DONE = false;
   $("doneSummary").textContent = `${fmt(p.date)}・${t.emoji} ${t.label}` + (p.untimed ? "" : `・${p.start}〜${p.end}`);
   renderDone();
   rememberTrigger("doneSheet");
@@ -2744,6 +2759,24 @@ function openDone() {
   $("doneBackdrop").classList.remove("pointer-events-none", "opacity-0");
   syncScrollLock();
   focusSheet("doneSheet");
+}
+function doneDirty() {
+  if (!DONE_DRAFT) return false;
+  return JSON.stringify([DONE_DRAFT.chips, DONE_DRAFT.note, DONE_DRAFT.photos]) !== DONE_OPEN_SIG;
+}
+// ✕ / 背景 / Esc から呼ぶ。入力があれば確認をはさむ
+function requestCloseDone() {
+  if (doneDirty()) {
+    CONFIRM_CLOSE_DONE = true;
+    renderDone();
+    $("doneSheet").scrollTop = 0;
+    return;
+  }
+  closeDone();
+}
+function discardDone() {
+  CONFIRM_CLOSE_DONE = false;
+  closeDone();
 }
 function closeDone() {
   $("doneSheet").classList.add("invisible", "translate-y-full");
@@ -2757,6 +2790,14 @@ function renderDone() {
   if (!dd) return;
   const body = [...dd.chips, dd.note.trim()].filter(Boolean).join("、");
   $("doneBody").innerHTML = `
+    ${CONFIRM_CLOSE_DONE ? `<div class="space-y-2 rounded-xl border border-border bg-surface-muted p-3">
+      <p class="text-sm font-medium">入力をやめますか？</p>
+      <p class="text-xs text-muted-foreground">選んだ内容と写真は保存されません。</p>
+      <div class="flex gap-2">
+        <button type="button" onclick="CONFIRM_CLOSE_DONE = false; renderDone()" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">入力に戻る</button>
+        <button type="button" onclick="discardDone()" class="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background">やめる</button>
+      </div>
+    </div>` : ""}
     <div>
       <p class="mb-2 text-xs font-bold text-muted-foreground">あったこと（タップで選ぶ）</p>
       <div class="flex flex-wrap gap-2">
@@ -3097,6 +3138,7 @@ function openInvite(memberId) {
   $("invBody").textContent = m
     ? `このリンクを ${m.name} に送ると、Google アカウントでログインして世帯に加われます。連携後は担当になった日が ${m.name} のカレンダーにも出ます。`
     : "このリンクを送ると、Google アカウントでログインして世帯に加われます。";
+  $("inviteUrl").textContent = INVITE_URL;
   $("invSheet").classList.remove("invisible", "translate-y-full");
   $("invBackdrop").classList.remove("pointer-events-none", "opacity-0");
   syncScrollLock();
@@ -3109,7 +3151,7 @@ async function copyInvite() {
     toast("招待リンクをコピーしました");
   } catch {
     // iframe や権限で弾かれることがある。成功したふりをしない
-    toast("コピーできませんでした。リンクを長押しして選んでください");
+    toast("コピーできませんでした。下のリンクを長押しして選んでください");
   }
 }
 function closeInvite() {
