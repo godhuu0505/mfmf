@@ -238,9 +238,6 @@
   .inset-x-0 {
     inset-inline: 0px;
   }
-  .inset-x-0\.5 {
-    inset-inline: calc(var(--spacing) * 0.5);
-  }
   .top-0 {
     top: 0px;
   }

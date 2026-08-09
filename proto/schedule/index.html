@@ -243,9 +243,6 @@
   .inset-x-0 {
     inset-inline: 0px;
   }
-  .inset-x-0\.5 {
-    inset-inline: calc(var(--spacing) * 0.5);
-  }
   .top-0 {
     top: 0px;
   }
@@ -2017,6 +2014,35 @@ function weekBounds() {
 function weekDays() {
   return ["2026-08-09", "2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14", "2026-08-15"];
 }
+// 時間が重なるブロックを横に並べる。同じ列に全幅で重ねると、
+// 後から描いたものが前のものを完全に隠してしまう
+function layoutDay(list) {
+  const sorted = list.slice().sort((a, b) => min(a.start) - min(b.start) || min(a.end) - min(b.end));
+  const out = [];
+  let cluster = [];
+  let clusterEnd = -1;
+  const flush = () => {
+    if (!cluster.length) return;
+    const colEnds = [];
+    const placed = [];
+    for (const x of cluster) {
+      let c = colEnds.findIndex((end) => min(x.start) >= end);
+      if (c === -1) { c = colEnds.length; colEnds.push(0); }
+      colEnds[c] = min(x.end);
+      placed.push({ x, col: c });
+    }
+    for (const q of placed) out.push({ ...q, total: colEnds.length });
+    cluster = [];
+    clusterEnd = -1;
+  };
+  for (const x of sorted) {
+    if (cluster.length && min(x.start) >= clusterEnd) flush();
+    cluster.push(x);
+    clusterEnd = Math.max(clusterEnd, min(x.end));
+  }
+  flush();
+  return out;
+}
 function renderWeek() {
   const days = weekDays();
   const WD = ["日", "月", "火", "水", "木", "金", "土"];
@@ -2051,7 +2077,7 @@ function renderWeek() {
     for (let hgt = H_START; hgt < H_END; hgt++) {
       lines += `<div class="absolute inset-x-0 border-t border-border" style="top:${(hgt - H_START) * ROW}px"></div>`;
     }
-    const blocks = list.map((x) => {
+    const blocks = layoutDay(list).map(({ x, col, total }) => {
       const t = type(x.type);
       const c = C[t.color];
       // レンジ外にはみ出さないよう、両端を切り詰めてから高さを出す
@@ -2061,10 +2087,10 @@ function renderWeek() {
       const hgt2 = Math.max(22, (e0 - s0) / 60 * ROW);
       const done = x.status === "done";
       const who = t.roles.map(([k]) => (x.who || {})[k]).filter(Boolean);
-      return `<button type="button" onclick="openDay('${ds}')"
+      return `<button type="button" onclick="openDay('${ds}','${x.id}')"
         aria-label="${fmt(ds)} ${x.start}から${x.end} ${t.label}${done ? " 記録ずみ" : ""}"
-        class="absolute inset-x-0.5 flex flex-col items-stretch justify-start overflow-hidden rounded border-l-4 px-1 py-0.5 text-left text-[10px] leading-tight ${done ? c.solid + " border-l-black/20" : c.soft} ${x.fromRule ? "opacity-60" : ""}"
-        style="top:${top}px;height:${hgt2}px">
+        class="absolute flex flex-col items-stretch justify-start overflow-hidden rounded border-l-4 px-1 py-0.5 text-left text-[10px] leading-tight ${done ? c.solid + " border-l-black/20" : c.soft} ${x.fromRule ? "opacity-60" : ""}"
+        style="top:${top}px;height:${hgt2}px;left:calc(${(col / total) * 100}% + 2px);width:calc(${100 / total}% - 4px)">
         <span class="block truncate font-medium">${t.emoji} ${t.label}</span>
         <span class="block truncate tabular-nums ${done ? "opacity-90" : "opacity-70"}">${x.start}〜${x.end}</span>
         ${who.length ? `<span class="mt-0.5 flex gap-0.5">${who.map((id) => avatar(id, "sm")).join("")}</span>` : ""}
@@ -2369,7 +2395,9 @@ function applyPreset(i) {
   toast(`「${ps.label}」を入れました`);
 }
 function commit(x) {
-  const row = { ...x, overridesRule: true }; // 日の編集からの保存はその日のルールを置き換える
+  // 素性は作ったときに決まる。保存のたびに立て直すと、クイック記録を編集した
+  // だけでその日の曜日ルールの予定が消える
+  const row = { ...x, overridesRule: x.overridesRule === undefined ? true : x.overridesRule };
   delete row.repeat;
   delete row.fromRule;
   const i = ITEMS.findIndex((y) => y.id === row.id);
@@ -2411,6 +2439,8 @@ function skipPlan() {
 }
 function unskip() {
   const p = draft();
+  const bad = timeProblem(p);
+  if (bad) { toast(bad); return; }
   p.status = "planned";
   commit(p);
   renderSheet();
@@ -2420,8 +2450,11 @@ function unskip() {
 function clearPlan() {
   const d = openDate;
   const wasDone = DRAFT && DRAFT.status === "done";
+  const wasPlan = !DRAFT || DRAFT.overridesRule !== false;
   if (DRAFT) ITEMS = ITEMS.filter((x) => x.id !== DRAFT.id);
-  if (ruleFor(d)) CANCELLED.add(d);
+  // その日の「予定」を消したときだけルールを打ち消す。
+  // 併存しているだけの記録を消してもルールは残す
+  if (wasPlan && ruleFor(d)) CANCELLED.add(d);
   closeSheet();
   render();
   toast(wasDone ? "記録を削除しました" : "この日の予定を消しました");
@@ -2510,11 +2543,18 @@ function confirmDone() {
   p.body = [...dd.chips, dd.note.trim()].filter(Boolean).join("、");
   p.photos = dd.photos;
   p.status = "done";
+  const repeat = !!p.repeat; // 完了の経路でもチェックを尊重する
   commit(p);
+  if (repeat) {
+    putRuleVersion(dow(p.date), {
+      type: p.type, start: p.start, end: p.end, who: { ...p.who },
+      since: p.date, timeDirty: !!p.timeDirty,
+    });
+  }
   closeDone();
   closeSheet();
   render();
-  toast("記録にしました");
+  toast(repeat ? "記録にして、毎週のルールも保存しました" : "記録にしました");
 }
 
 // ───────── ホーム ─────────
@@ -2706,6 +2746,7 @@ function quickSave() {
   ITEMS.push({
     id: "q" + seq++, date: TODAY, type: QR.source, start: "12:00", end: "13:00",
     who: {}, note: "", status: "done", body: QR.chips.join("、"), photos: 0,
+    overridesRule: false, // 予定を経ない記録。曜日ルールの予定は残す
   });
   QR = { chips: [], source: "home" };
   closeQuick();
