@@ -1046,14 +1046,8 @@
   .opacity-50 {
     opacity: 50%;
   }
-  .opacity-60 {
-    opacity: 60%;
-  }
   .opacity-70 {
     opacity: 70%;
-  }
-  .opacity-90 {
-    opacity: 90%;
   }
   .shadow-lg {
     --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 4px 6px -4px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
@@ -2184,10 +2178,12 @@ function assignDiscard() {
 function denseItems() {
   const out = JSON.parse(JSON.stringify(FIXTURE_ITEMS));
   const kinds = ["daycare", "home", "family", "clinic", "outing", "other"];
+  const last = Number(TODAY.slice(-2)); // 記録は起きたこと。今日より後には作らない
+  const perDay = Math.ceil(200 / last);
   let n = 0;
-  for (let d = 1; d <= 31 && n < 200; d++) {
+  for (let d = 1; d <= last && n < 200; d++) {
     const date = `2026-08-${String(d).padStart(2, "0")}`;
-    for (let i = 0; i < 7 && n < 200; i++) {
+    for (let i = 0; i < perDay && n < 200; i++) {
       const t = type(kinds[(d + i) % kinds.length]);
       const h = 7 + i * 2;
       out.push({
@@ -2388,10 +2384,10 @@ function renderWeek() {
       const who = t.roles.map(([k]) => (x.who || {})[k]).filter(Boolean);
       return `<button type="button" data-open="${ds}|${x.id}" onclick="openDay('${ds}','${x.id}')"
         aria-label="${fmt(ds)} ${x.start}から${x.end} ${t.label}${done ? " 記録ずみ" : ""}"
-        class="absolute flex flex-col items-stretch justify-start overflow-hidden rounded border-l-4 px-1 py-0.5 text-left text-[10px] leading-tight ${done ? c.solid + " border-l-black/20" : c.soft} ${x.fromRule ? "opacity-60" : ""}"
+        class="absolute flex flex-col items-stretch justify-start overflow-hidden rounded border-l-4 px-1 py-0.5 text-left text-[10px] leading-tight ${done ? c.solid + " border-l-black/20" : c.soft} ${x.fromRule ? "border-dashed" : ""}"
         style="top:${top}px;height:${hgt2}px;left:calc(${(col / total) * 100}% + 2px);width:calc(${100 / total}% - 4px)">
         <span class="block truncate font-medium">${t.emoji} ${t.label}</span>
-        <span class="block truncate tabular-nums ${done ? "opacity-90" : "opacity-70"}">${x.start}〜${x.end}</span>
+        <span class="block truncate tabular-nums">${x.start}〜${x.end}</span>
         ${who.length ? `<span class="mt-0.5 flex gap-0.5">${who.map((id) => avatar(id, "sm")).join("")}</span>` : ""}
       </button>`;
     }).join("");
