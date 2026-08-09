@@ -2108,7 +2108,7 @@ function renderMonth() {
     const isToday = ds === TODAY;
     const shown = list.slice(0, 2);
     const rest = list.length - shown.length;
-    h += `<button type="button" onclick="openDay('${ds}')" aria-haspopup="dialog"
+    h += `<button type="button" data-day="${ds}" onclick="openDay('${ds}')" aria-haspopup="dialog"
       aria-label="${8}月${d}日 ${list.length ? list.map((x) => type(x.type).label + (x.status === "done" ? " 記録ずみ" : x.status === "skipped" ? " 見送り" : " 予定")).join("、") : "予定なし"}"
       class="flex min-h-24 flex-col items-stretch gap-0.5 border-b border-r border-border p-1 text-left transition hover:bg-surface-muted">
       <span class="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-full text-xs ${isToday ? "bg-primary font-bold text-primary-foreground" : "text-muted-foreground"}">${d}</span>
@@ -2380,6 +2380,18 @@ function assignSave() {
 }
 
 // ───────── 予定シート ─────────
+// ホームなど別の画面からカレンダーへ移ってその日を開く。go() が画面を描き直すので、
+// 押したボタンはこの時点で消えている。閉じたときの戻り先はカレンダーのその日にする
+// （そのままだと rememberTrigger が body を覚えてフォーカスが迷子になる）
+function goOpenDay(d, id) {
+  go("calendar");
+  openDay(d, id);
+  // 月表示の日セルへ。週表示のときはセルが隠れていて focus() が効かないので、
+  // カレンダータブへ落とす
+  const cell = document.querySelector(`[data-day="${d}"]`);
+  TRIGGERS.sheet = (cell && cell.offsetParent ? cell : document.querySelector('[data-tab="calendar"]'))
+    || TRIGGERS.sheet;
+}
 function openDay(d, id) {
   openDate = d;
   CONFIRM_DELETE = false;
@@ -2877,8 +2889,8 @@ function confirmDone() {
   if (bad) { toast(bad); return; }
   p.chips = [...dd.chips];
   p.freeNote = dd.note.trim();
-  // 記録になった時点を並び順に反映する（予定として作った古い順のままだと、
-  // 完了した直後の記録が「さいきんの記録」の 4 件から漏れる）
+  // 記録になった時点を並び順に反映する。予定として作った古い順のままだと、
+  // きょう完了した記録が、きょうのクイック記録より下に沈む
   if (p.status !== "done") p.created = seqCreated++;
   p.body = [...dd.chips, dd.note.trim()].filter(Boolean).join("、");
   p.photos = dd.photos;
@@ -2899,7 +2911,7 @@ function renderHome() {
   if (!x) {
     $("todayCard").innerHTML = `<div class="rounded-2xl border border-dashed border-border p-4 text-center">
       <p class="text-sm text-muted-foreground">きょうの予定はまだありません。</p>
-      ${ro ? "" : `<button type="button" onclick="go('calendar'); openDay('${TODAY}')" class="mt-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">予定を入れる</button>`}
+      ${ro ? "" : `<button type="button" onclick="goOpenDay('${TODAY}')" class="mt-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">予定を入れる</button>`}
     </div>`;
   } else {
     const t = type(x.type);
@@ -2922,19 +2934,20 @@ function renderHome() {
       ${x.status === "done" ? `<p class="mt-3 rounded-xl bg-surface-muted px-3 py-2 text-sm">${esc(x.body) || "（本文なし）"}</p>` : ""}
       <div class="mt-3 flex gap-2">
         ${!ro && x.status === "planned" ? `<button type="button" onclick="openDay('${TODAY}'); openDone()" class="flex-1 rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950">${svg("check", "mr-1 inline h-4 w-4")}完了して記録にする</button>` : ""}
-        <button type="button" onclick="go('calendar'); openDay('${TODAY}')" class="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">${x.status === "planned" ? "予定を見る・変える" : "詳しく見る"}</button>
+        <button type="button" onclick="goOpenDay('${TODAY}')" class="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">${x.status === "planned" ? "予定を見る・変える" : "詳しく見る"}</button>
       </div>
     </div>`;
   }
 
-  // 日付の新しい順。同じ日なら後から作ったものを先に（4 件で切っても新しいものが残る）
+  // 本番の一覧に合わせて record_date → created_at の降順（src/app/(app)/page.tsx）。
+  // 同じ日なら後から作った・後から完了したものが先に来る
   const recent = ITEMS.filter((y) => y.status === "done")
     .sort((a, b) => (a.date === b.date ? (b.created || 0) - (a.created || 0) : a.date < b.date ? 1 : -1))
     .slice(0, 4);
   $("recentList").innerHTML = recent.length
     ? recent.map((y) => {
         const t = type(y.type);
-        return `<li><button type="button" onclick="go('calendar'); openDay('${y.date}','${y.id}')" class="flex w-full items-center gap-2 rounded-xl bg-surface px-3 py-2.5 text-left text-sm shadow-sm ring-1 ring-border transition hover:bg-surface-muted">
+        return `<li><button type="button" onclick="goOpenDay('${y.date}','${y.id}')" class="flex w-full items-center gap-2 rounded-xl bg-surface px-3 py-2.5 text-left text-sm shadow-sm ring-1 ring-border transition hover:bg-surface-muted">
           <span class="w-14 shrink-0 text-xs text-muted-foreground">${fmt(y.date).replace("2026年", "")}</span>
           <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${C[t.color].soft}">${t.emoji}${t.label}</span>
           <span class="min-w-0 flex-1 truncate">${esc(y.body) || "（本文なし）"}</span>
@@ -3130,7 +3143,7 @@ function openQuick() {
   renderQuick();
   const x = planOn(TODAY);
   $("qrTodayPlan").innerHTML = x && x.status === "planned"
-    ? `<button type="button" onclick="closeQuick(); go('calendar'); openDay('${TODAY}'); openDone()"
+    ? `<button type="button" onclick="closeQuick(); goOpenDay('${TODAY}'); openDone()"
         class="flex w-full items-center gap-2 rounded-xl border-2 border-emerald-600 px-3 py-2.5 text-left text-sm transition hover:bg-emerald-50 dark:border-emerald-400 dark:hover:bg-emerald-950">
         <span class="text-lg">${type(x.type).emoji}</span>
         <span class="min-w-0 flex-1"><b class="font-bold">きょうの予定「${type(x.type).label}」を完了にする</b>
