@@ -2169,7 +2169,9 @@ function renderWeek() {
       // 時刻を持たないもの（見送り・クイック記録）は上のバンドに出す
       const sk = itemsOn(ds).filter((x) => x.status === "skipped" || x.untimed);
       return `<div class="min-h-6 border-l border-border p-0.5">
-        ${sk.map((x) => `<button type="button" onclick="openDay('${ds}','${x.id}')" class="block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] ${x.status === "skipped" ? "text-muted-foreground line-through" : "text-foreground"}">${type(x.type).emoji}${esc(x.body) || type(x.type).label}</button>`).join("")}
+        ${sk.map((x) => `<button type="button" onclick="openDay('${ds}','${x.id}')"
+          aria-label="${fmt(ds)} ${x.status === "skipped" ? "見送り" : "時刻なしの記録"} ${esc(x.body) || type(x.type).label}"
+          class="block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] ${x.status === "skipped" ? "text-muted-foreground line-through" : "text-foreground"}">${type(x.type).emoji}${esc(x.body) || type(x.type).label}</button>`).join("")}
       </div>`;
     }).join("");
 
@@ -2864,10 +2866,10 @@ function cycleRule(w) {
   const next = cycle[(cycle.indexOf(lv ? lv.type : null) + 1) % cycle.length];
   if (next === null) {
     if (!lv) return;
-    // 版ごと消すと since より前の日のルールまで巻き添えになるので、
-    // 「ここから先はなし」を日付つきの墓標として積む
-    const since = [TODAY, lv.since || ""].sort().pop();
-    putRuleVersion(w, { type: null, since });
+    // 「今日以降なし」と伝える以上、墓標は今日から効かせる。
+    // 今日より後から始まる版が残っていると、墓標のあとで復活してしまうので畳む
+    RULES[w] = versionsOf(w).filter((r) => !r.since || r.since <= TODAY);
+    putRuleVersion(w, { type: null, since: TODAY });
     render();
     toast("今日以降、この曜日のルールを外しました");
     return;
@@ -2931,7 +2933,7 @@ function renderQuick() {
     <div class="flex flex-wrap gap-2">
       ${CHIPS.map((c) => {
         const on = QR.chips.includes(c);
-        return `<button type="button" onclick="qrChip('${c}')" aria-pressed="${on}"
+        return `<button type="button" data-qrchip="${c}" onclick="qrChip('${c}')" aria-pressed="${on}"
           class="rounded-full border px-3 py-1.5 text-sm transition ${on ? "border-primary bg-primary/10 font-bold text-primary" : "border-border hover:bg-surface-muted"}">${c}</button>`;
       }).join("")}
     </div>
@@ -2961,6 +2963,8 @@ function qrPreview() {
 function qrChip(c) {
   QR.chips = QR.chips.includes(c) ? QR.chips.filter((x) => x !== c) : [...QR.chips, c];
   renderQuick();
+  // 描き直すとフォーカスが外れる（完了シートのチップと同じ）
+  document.querySelector(`[data-qrchip="${c}"]`)?.focus({ preventScroll: true });
 }
 // 予定を経ない記録。曜日ルールの予定を置き換えない（overridesRule を付けない）
 function quickSave() {
@@ -3004,18 +3008,19 @@ function closeQuick() {
   restoreTrigger("qrSheet");
 }
 // 今日がもう記録ずみ／見送りなら、その日の編集ではなく次に予定を入れられる日を開く
+// 「予定を入れる」なので、予定がまだ無い日を返す。
+// すでに予定がある日を返すと、追加のつもりが既存の予定の編集になってしまう
 function nextOpenDay() {
   for (let d = dayNum(TODAY); d <= 31; d++) {
     const ds = `2026-08-${String(d).padStart(2, "0")}`;
-    const p2 = planOn(ds);
-    if (!p2 || p2.status === "planned") return ds;
+    if (!planOn(ds)) return ds;
   }
   return null;
 }
 function openNextFreeDay() {
   go("calendar");
   const ds = nextOpenDay();
-  if (!ds) { toast("この先の日はすべて記録ずみです。日付をタップして編集してください"); return; }
+  if (!ds) { toast("この先の日はすべて予定が入っています。日付をタップして編集してください"); return; }
   openDay(ds);
   if (ds !== TODAY) toast(`${fmt(ds)}を開きました`);
 }
