@@ -1157,8 +1157,12 @@ input[type="date"] {
   const fmtBytes = (b) =>
     b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`;
   const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  const fmtDurJa = (s) =>
-    s >= 60 ? `${Math.floor(s / 60)}分${Math.round(s % 60)}秒` : `${Math.round(s)}秒`;
+  // 先に整数秒へ丸めてから分秒へ分ける（`Math.round(s % 60)` だと 59.6 秒が
+  // 「1分60秒」になる）。エラー文の文言はこのプロトの確認対象なので正しく出す。
+  const fmtDurJa = (s) => {
+    const t = Math.round(s);
+    return t >= 60 ? `${Math.floor(t / 60)}分${t % 60}秒` : `${t}秒`;
+  };
   const estBytes = (sec) => (sec * BITRATE[state.quality] * 1e6) / 8;
 
   // ---- タブ ----
@@ -1235,6 +1239,12 @@ input[type="date"] {
     $("[data-detail-dur]").textContent = "0:12";
     $("[data-detail-note]").textContent = "タップすると再生します（開くまで通信しません）";
     $$("[data-video-input]").forEach((i) => (i.value = ""));
+    // grabThumb が書いたサムネを消す。消し忘れると削除後の「一覧」に
+    // 消したはずの動画のコマが残り、空の状態を確かめられない。
+    $$("[data-list-thumb='new']").forEach((el) => {
+      el.style.backgroundImage = "";
+    });
+    $$("[data-new-badge]").forEach((el) => (el.textContent = el.dataset.newBadge));
     showV("empty");
   }
   $$("[data-video-reset]").forEach((b) => b.addEventListener("click", reset));
@@ -1249,7 +1259,10 @@ input[type="date"] {
       const done = (dur) => { resolve({ url, duration: dur }); };
       v.onloadedmetadata = () => done(isFinite(v.duration) ? v.duration : null);
       v.onerror = () => done(null);
-      setTimeout(() => done(isFinite(v.duration) && v.duration > 0 ? v.duration : null), 4000);
+      // 保険のタイムアウト。短すぎると「大きい動画を選んだだけ」で対応外扱いになり、
+      // このプロトが確かめたい実機の選択フローが壊れる（先に resolve すると
+      // 後から来る loadedmetadata では取り返せない）。余裕をもって 15 秒。
+      setTimeout(() => done(isFinite(v.duration) && v.duration > 0 ? v.duration : null), 15000);
       v.src = url;
     });
   }
@@ -1269,7 +1282,10 @@ input[type="date"] {
     const { file, url, duration } = picked;
     showV("converting");
     let p = 0;
+    // 前回の 100% が残っていると、再変換の頭で 100% → 数% へ巻き戻って見える。
     if (timer) clearInterval(timer);
+    $("[data-progress]").style.width = "0%";
+    $("[data-progress-label]").textContent = "0%";
     timer = setInterval(() => {
       p = Math.min(100, p + 7 + Math.random() * 9);
       $("[data-progress]").style.width = `${p}%`;
@@ -1295,6 +1311,11 @@ input[type="date"] {
     $("[data-detail-dur]").textContent = fmtDur(duration);
     $("[data-detail-note]").textContent =
       `タップすると再生します（${fmtBytes(after)} / 開くまで通信しません）`;
+    // 一覧のバッジも実際の長さに合わせる（サムネだけ変わって 0:12 のままだと
+    // ▶ バッジの見え方を確かめる材料にならない）。
+    $$("[data-new-badge]").forEach((el) => {
+      el.textContent = el.dataset.newBadge.replace("0:12", fmtDur(duration));
+    });
     grabThumb(url);
   }
 
@@ -1315,7 +1336,9 @@ input[type="date"] {
         const thumb = $("[data-detail-thumb]");
         thumb.src = data;
         thumb.hidden = false;
-        $$("[data-list-thumb]").forEach((el) => {
+        // 反映するのは「今つけた1本」の枠だけ。全部に配ると、過去の記録まで
+        // 同じ動画に見えて「写真と別々の動画が混ざった一覧」を確かめられない。
+        $$("[data-list-thumb='new']").forEach((el) => {
           el.style.backgroundImage = `url(${data})`;
           el.style.backgroundSize = "cover";
           el.style.backgroundPosition = "center";
@@ -1352,16 +1375,18 @@ input[type="date"] {
   });
 
   // ---- 一覧（固定データ） ----
+  // `newest` の1件だけが「今つけた動画」。他の動画つき記録は別の動画のつもりで、
+  // サムネも長さも変えない（混ざった見え方を確かめるため）。
   const RECORDS = [
-    { date: "8月9日(日)", body: "お友だちとよく走り回っていました。", video: true, photos: 3 },
+    { date: "8月9日(日)", body: "お友だちとよく走り回っていました。", video: true, newest: true, photos: 3, dur: "0:12" },
     { date: "8月8日(土)", body: "おうちでお昼寝。よく寝ていました。", video: false, photos: 1 },
-    { date: "8月7日(金)", body: "はじめてのシャンプー。がんばりました。", video: true, photos: 2 },
+    { date: "8月7日(金)", body: "はじめてのシャンプー。がんばりました。", video: true, photos: 2, dur: "0:25" },
     { date: "8月6日(木)", body: "ごはん完食。", video: false, photos: 0 },
   ];
   $("[data-list]").innerHTML = RECORDS.map((r) => `
     <article class="flex gap-3 rounded-xl border border-border bg-surface p-3">
-      <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted"${r.video ? ' data-list-thumb' : ""}>
-        ${r.video ? '<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ 0:12</span>' : ""}
+      <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted"${r.newest ? ' data-list-thumb="new"' : ""}>
+        ${r.video ? `<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white"${r.newest ? ' data-new-badge="▶ 0:12"' : ""}>▶ ${r.dur}</span>` : ""}
       </div>
       <div class="min-w-0">
         <p class="text-xs text-muted-foreground">${r.date}</p>
@@ -1374,7 +1399,8 @@ input[type="date"] {
 
   $("[data-grid]").innerHTML = Array.from({ length: 9 }, (_, i) => {
     const isVideo = i === 0 || i === 4;
-    return `<div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted"${isVideo ? " data-list-thumb" : ""}>
+    const isNew = i === 0; // 今つけた1本だけサムネを差し替える
+    return `<div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted"${isNew ? ' data-list-thumb="new"' : ""}>
       ${isVideo ? '<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶</span>' : ""}
     </div>`;
   }).join("");
