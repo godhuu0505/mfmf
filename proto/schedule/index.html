@@ -2561,6 +2561,9 @@ function applyPreset(i) {
   const ps = PRESETS[i];
   const p = draft();
   p.type = ps.type; p.start = ps.start; p.end = ps.end; p.who = { ...ps.who };
+  // パターンは種類も時刻も置き換える。旗を残すと、この後で種類を変えたときに
+  // パターンの時刻が「手で触った時刻」として居座る
+  p.timeDirty = false;
   renderSheet();
   toast(`「${ps.label}」を入れました`);
 }
@@ -2694,7 +2697,7 @@ function renderDone() {
       <div class="flex flex-wrap gap-2">
         ${CHIPS.map((c) => {
           const on = dd.chips.includes(c);
-          return `<button type="button" onclick="doneChip('${c}')" aria-pressed="${on}"
+          return `<button type="button" data-chip="${c}" onclick="doneChip('${c}')" aria-pressed="${on}"
             class="rounded-full border px-3 py-1.5 text-sm transition ${on ? "border-primary bg-primary/10 font-bold text-primary" : "border-border hover:bg-surface-muted"}">${c}</button>`;
         }).join("")}
       </div>
@@ -2722,6 +2725,8 @@ function doneChip(c) {
   const dd = DONE_DRAFT;
   dd.chips = dd.chips.includes(c) ? dd.chips.filter((x) => x !== c) : [...dd.chips, c];
   renderDone();
+  // 描き直すとフォーカスが外れる。複数選ぶたびに先頭から辿り直させない
+  document.querySelector(`[data-chip="${c}"]`)?.focus({ preventScroll: true });
 }
 function donePhoto() { DONE_DRAFT.photos += 1; renderDone(); toast("（プロト）写真を 1 枚追加しました"); }
 function confirmDone() {
@@ -2803,13 +2808,14 @@ function renderRules() {
   const order = [0, 1, 2, 3, 4, 5, 6];
   const ro = isViewer();
   $("ruleReadonly").classList.toggle("hidden", !ro);
-  let h = `<tr class="border-b border-border"><td class="py-2 text-xs font-medium text-muted-foreground">予定</td>`;
+  const WD = ["日", "月", "火", "水", "木", "金", "土"];
+  let h = `<tr class="border-b border-border"><th scope="row" class="py-2 text-xs font-medium text-muted-foreground">予定</th>`;
   h += order.map((w) => {
     const r = latestRule(w);
-    return `<td class="py-1"><button type="button" data-rule="type-${w}" ${ro ? "disabled" : ""} onclick="keepRuleFocus(() => cycleRule(${w}))"
+    return `<td class="py-1"><button type="button" data-rule="type-${w}" aria-label="${WD[w]}曜の予定 ${r ? type(r.type).label : "なし"}" ${ro ? "disabled" : ""} onclick="keepRuleFocus(() => cycleRule(${w}))"
       class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg text-xl transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"} ${r ? "bg-surface-muted" : "text-muted-foreground"}">${r ? type(r.type).emoji : "－"}</button></td>`;
   }).join("") + `</tr>`;
-  h += `<tr class="border-b border-border"><td class="py-2 text-xs font-medium text-muted-foreground">時間</td>` +
+  h += `<tr class="border-b border-border"><th scope="row" class="py-2 text-xs font-medium text-muted-foreground">時間</th>` +
     order.map((w) => {
       const r = latestRule(w);
       return `<td class="py-1 text-[10px] tabular-nums text-muted-foreground">${r ? `${r.start}<br>${r.end}` : "·"}</td>`;
@@ -2818,12 +2824,12 @@ function renderRules() {
   // 曜日をまたぐこの行では総称にする
   for (const [key, label] of [["drop", "送り"], ["pick", "お迎え"], ["care", "担当"]]) {
     if (!order.some((w) => latestRule(w) && type(latestRule(w).type).roles.some(([k]) => k === key))) continue;
-    h += `<tr class="border-b border-border last:border-0"><td class="py-2 text-xs font-medium text-muted-foreground">${label}</td>`;
+    h += `<tr class="border-b border-border last:border-0"><th scope="row" class="py-2 text-xs font-medium text-muted-foreground">${label}</th>`;
     h += order.map((w) => {
       const r = latestRule(w);
       const okRole = r && type(r.type).roles.some(([k]) => k === key);
       if (!okRole) return `<td class="py-1 text-xs text-muted-foreground">·</td>`;
-      return `<td class="py-1"><button type="button" data-rule="who-${w}-${key}" ${ro ? "disabled" : ""} onclick="keepRuleFocus(() => cycleWho(${w},'${key}'))"
+      return `<td class="py-1"><button type="button" data-rule="who-${w}-${key}" aria-label="${WD[w]}曜の${label} ${member((r.who || {})[key])?.name || "未定"}" ${ro ? "disabled" : ""} onclick="keepRuleFocus(() => cycleWho(${w},'${key}'))"
         class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"}">${avatar((r.who || {})[key])}</button></td>`;
     }).join("") + `</tr>`;
   }
@@ -2838,10 +2844,9 @@ function renderRules() {
   $("ruleUnlinked").classList.toggle("hidden", ro || un.length === 0);
   if (un.length && !ro) $("ruleUnlinked").innerHTML = unlinkedNotice(un);
 
-  const days = ["日", "月", "火", "水", "木", "金", "土"];
   const active = Object.keys(RULES).filter((w) => latestRule(w));
   $("ruleSummary").textContent = active.length
-    ? active.map((w) => `${days[w]}=${type(latestRule(w).type).label}`).join(" / ")
+    ? active.map((w) => `${WD[w]}=${type(latestRule(w).type).label}`).join(" / ")
     : "まだ設定していません";
   $("familySummary").textContent =
     `${MEMBERS.filter((m) => m.link === "linked").length} 人が連携済み・${MEMBERS.filter((m) => m.link !== "linked").length} 人が未連携`;

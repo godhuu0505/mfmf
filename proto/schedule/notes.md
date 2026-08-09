@@ -119,3 +119,8 @@ mfmf は今、**起きたこと（記録）**しか持っていない。ここ�
 - 週表示は 8/9（日）〜8/15（土）固定
 - `fetch` なし。データは JS の固定配列（`ITEMS` / `RULES` / `MEMBERS`）
 - アイコンは lucide の同じ形を SVG で直書き（実装時は `lucide-react` に戻す）
+- **このファイルに `<!doctype html>` は書かない。** Artifact が publish 時に
+  `<!doctype html><head>…</head><body>` で包むため、こちら側に書くと重複する
+  （[Artifact の仕様](../../.claude/skills/prototype/SKILL.md)）。
+  ファイルを直接ブラウザで開くと quirks mode になるので、レイアウトを測るときは
+  doctype で包んだコピーを作って確かめる（実測では両者に差は出なかった）
