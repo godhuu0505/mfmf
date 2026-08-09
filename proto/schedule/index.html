@@ -1525,7 +1525,7 @@ input[type="date"] {
         <span class="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">マ</span>
         <span class="min-w-0 flex-1">
           <span class="block truncate font-semibold">ママ</span>
-          <span class="block truncate text-xs text-muted-foreground">わが家（オーナー）</span>
+          <span id="meRole" class="block truncate text-xs text-muted-foreground"></span>
         </span>
       </div>
       <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
@@ -1582,6 +1582,7 @@ input[type="date"] {
           <tbody id="ruleTable"></tbody>
         </table>
       </div>
+      <div id="ruleUnlinked" class="hidden flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs ring-1 ring-border"></div>
       <p class="text-xs text-muted-foreground">
         予定の行はタップで種類が順に切り替わります（最後まで行くと「なし」）。担当の行はタップでメンバーが入れ替わります。
         <b class="font-semibold text-foreground">時間</b>は、日の予定を編集して「これから毎週◯曜も同じにする」で保存すると、その時間がルールに入ります。
@@ -1763,12 +1764,14 @@ let ITEMS = [
   { id: "i7", date: "2026-08-14", type: "outing",  start: "08:00", end: "17:00", who: {}, note: "海！", status: "planned", body: "", photos: 0 },
   { id: "i8", date: "2026-08-20", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m1", pick: "m3" }, note: "パパ出張のため、迎えはばあば", status: "planned", body: "", photos: 0 },
 ];
+// 曜日ルールは「版」の配列で持つ（since の昇順）。
+// ひとつの枠を上書きすると、since より前の日まで巻き添えで消えてしまうため。
 let RULES = {
-  1: { type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } },
-  2: { type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } },
-  3: { type: "home",    start: "09:00", end: "18:00", who: { care: "m1" } },
-  4: { type: "daycare", start: "09:00", end: "18:00", who: { drop: "m1", pick: "m2" } },
-  5: { type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } },
+  1: [{ type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } }],
+  2: [{ type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } }],
+  3: [{ type: "home",    start: "09:00", end: "18:00", who: { care: "m1" } }],
+  4: [{ type: "daycare", start: "09:00", end: "18:00", who: { drop: "m1", pick: "m2" } }],
+  5: [{ type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } }],
 };
 const PRESETS = [
   { label: "いつもの保育園", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } },
@@ -1801,11 +1804,25 @@ const isViewer = () => $("cfgViewer").checked;
 const min = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 const dayNum = (d) => Number(d.slice(8, 10));
 
+function versionsOf(w) { return RULES[w] || []; }
+function latestRule(w) {
+  const v = versionsOf(w);
+  return v.length ? v[v.length - 1] : null;
+}
+// その日に効く版 = since がその日以前で、いちばん新しいもの
 function ruleFor(d) {
-  const r = RULES[dow(d)];
-  if (!r) return null;
-  if (r.since && d < r.since) return null;
-  return r;
+  let best = null;
+  for (const r of versionsOf(dow(d))) {
+    if (r.since && d < r.since) continue;
+    if (!best || (r.since || "") >= (best.since || "")) best = r;
+  }
+  return best;
+}
+function putRuleVersion(w, r) {
+  const list = RULES[w] || (RULES[w] = []);
+  const i = list.findIndex((x) => (x.since || "") === (r.since || ""));
+  if (i >= 0) list[i] = r; else list.push(r);
+  list.sort((a, b) => (a.since || "").localeCompare(b.since || ""));
 }
 // その日の出来事。保存済みが 1 件でもあればそれを使い、
 // 無ければ曜日ルールから「まだ保存していない予定」を作って見せる
@@ -2045,6 +2062,13 @@ function renderAssignBoard() {
         <span class="shrink-0 text-xs text-primary">予定を入れる</span></button>`;
     }
     const t = type(x.type);
+    if (x.status === "skipped") {
+      return `<div class="flex items-center gap-3 rounded-xl bg-surface-muted px-3 py-2.5 text-sm">
+        <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
+        <span class="opacity-50">${t.emoji}</span>
+        <span class="text-muted-foreground line-through">${t.label}</span>
+        <span class="ml-auto shrink-0 text-xs text-muted-foreground">見送り</span></div>`;
+    }
     if (!t.roles.length) {
       return `<div class="flex items-center gap-3 rounded-xl bg-surface-muted px-3 py-2.5 text-sm">
         <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
@@ -2065,7 +2089,7 @@ function renderAssignBoard() {
 
   const unlinked = [...new Set(days.flatMap((ds) => {
     const x = (ASSIGN_DRAFT && ASSIGN_DRAFT[ds]) || itemsOn(ds)[0];
-    if (!x) return [];
+    if (!x || x.status === "skipped") return [];
     return type(x.type).roles.map(([k]) => (x.who || {})[k]).filter(Boolean);
   }))].map(member).filter((m) => m && m.link !== "linked");
 
@@ -2081,7 +2105,7 @@ function renderAssignBoard() {
 function assignSet(ds, k, mid) {
   if (isViewer()) return;
   const cur = (ASSIGN_DRAFT && ASSIGN_DRAFT[ds]) || itemsOn(ds)[0];
-  if (!cur) return;
+  if (!cur || cur.status === "skipped") return;
   if (!ASSIGN_DRAFT) ASSIGN_DRAFT = {};
   const x = ASSIGN_DRAFT[ds] || (ASSIGN_DRAFT[ds] = JSON.parse(JSON.stringify(cur)));
   x.who = x.who || {};
@@ -2270,18 +2294,20 @@ function draft() {
 }
 function setType(id) {
   const p = draft();
-  const wasDefault = p.start === type(p.type).start && p.end === type(p.type).end;
   p.type = id;
   const keep = {};
   for (const [k] of type(id).roles) if (p.who[k]) keep[k] = p.who[k];
   p.who = keep;
-  // 時間を触っていなければ、その種類の既定時間に合わせる
-  if (wasDefault) { p.start = type(id).start; p.end = type(id).end; }
+  // 時間を触っていなければ、その種類の既定時間に合わせる。
+  // 既定値との一致で推測すると、たまたま別の種類の既定と同じ時刻にしたときに
+  // 勝手に上書きされてしまうので、触ったかどうかは旗で持つ
+  if (!p.timeDirty) { p.start = type(id).start; p.end = type(id).end; }
   renderSheet();
 }
 function setTime(which, v) {
   const p = draft();
   p[which] = v;
+  p.timeDirty = true;
   // 片方だけ消すと min("") が 0 になり、不正な予定が通ってしまう
   const blank = !p.start || !p.end;
   const bad = blank || min(p.end) <= min(p.start);
@@ -2312,8 +2338,8 @@ function commit(x) {
 function savePlan() {
   const p = DRAFT;
   if (!p) return;
-  if (!p.start || !p.end) { toast("開始と終了の時刻を入れてください"); return; }
-  if (min(p.end) <= min(p.start)) { toast("終了は開始より後にしてください"); return; }
+  const bad = timeProblem(p);
+  if (bad) { toast(bad); return; }
   const repeat = !!p.repeat;
   // ルール由来のまま何も変えていないなら、例外として実体化させない
   if (!repeat && DRAFT_BASE && DRAFT_BASE.fromRule && sig(p) === DRAFT_BASE.sig) {
@@ -2321,7 +2347,10 @@ function savePlan() {
   }
   commit(p);
   if (repeat) {
-    RULES[dow(p.date)] = { type: p.type, start: p.start, end: p.end, who: { ...p.who }, since: p.date };
+    putRuleVersion(dow(p.date), {
+      type: p.type, start: p.start, end: p.end, who: { ...p.who },
+      since: p.date, timeDirty: !!p.timeDirty,
+    });
     toast("予定と毎週のルールを保存しました");
   } else {
     toast(p.status === "done" ? "記録を保存しました" : "予定を保存しました");
@@ -2361,8 +2390,16 @@ function restoreRule() {
 }
 
 // ───────── 完了 → 記録にする ─────────
+function timeProblem(p) {
+  if (!p.start || !p.end) return "開始と終了の時刻を入れてください";
+  if (min(p.end) <= min(p.start)) return "終了は開始より後にしてください";
+  return null;
+}
 function openDone() {
   const p = draft();
+  // 保存と同じ検証を通す（ここを素通りすると不正な時刻のまま記録になる）
+  const bad = timeProblem(p);
+  if (bad) { toast(bad); return; }
   DONE_DRAFT = { chips: p.body ? p.body.split("、").filter((s) => CHIPS.includes(s)) : [], note: "", photos: p.photos || 0 };
   if (p.body) {
     const extra = p.body.split("、").filter((s) => !CHIPS.includes(s)).join("、");
@@ -2422,6 +2459,8 @@ function donePhoto() { DONE_DRAFT.photos += 1; renderDone(); toast("（プロト
 function confirmDone() {
   const dd = DONE_DRAFT;
   const p = draft();
+  const bad = timeProblem(p);
+  if (bad) { toast(bad); return; }
   p.body = [...dd.chips, dd.note.trim()].filter(Boolean).join("、");
   p.photos = dd.photos;
   p.status = "done";
@@ -2489,22 +2528,22 @@ function renderRules() {
   $("ruleReadonly").classList.toggle("hidden", !ro);
   let h = `<tr class="border-b border-border"><td class="py-2 text-xs font-medium text-muted-foreground">予定</td>`;
   h += order.map((w) => {
-    const r = RULES[w];
+    const r = latestRule(w);
     return `<td class="py-1"><button type="button" ${ro ? "disabled" : ""} onclick="cycleRule(${w})"
       class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg text-xl transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"} ${r ? "bg-surface-muted" : "text-muted-foreground"}">${r ? type(r.type).emoji : "－"}</button></td>`;
   }).join("") + `</tr>`;
   h += `<tr class="border-b border-border"><td class="py-2 text-xs font-medium text-muted-foreground">時間</td>` +
     order.map((w) => {
-      const r = RULES[w];
+      const r = latestRule(w);
       return `<td class="py-1 text-[10px] tabular-nums text-muted-foreground">${r ? `${r.start}<br>${r.end}` : "·"}</td>`;
     }).join("") + `</tr>`;
   // care の呼び名は種類ごとに違う（おうち=みる人 / 通院=連れて行く）ので、
   // 曜日をまたぐこの行では総称にする
   for (const [key, label] of [["drop", "送り"], ["pick", "お迎え"], ["care", "担当"]]) {
-    if (!order.some((w) => RULES[w] && type(RULES[w].type).roles.some(([k]) => k === key))) continue;
+    if (!order.some((w) => latestRule(w) && type(latestRule(w).type).roles.some(([k]) => k === key))) continue;
     h += `<tr class="border-b border-border last:border-0"><td class="py-2 text-xs font-medium text-muted-foreground">${label}</td>`;
     h += order.map((w) => {
-      const r = RULES[w];
+      const r = latestRule(w);
       const okRole = r && type(r.type).roles.some(([k]) => k === key);
       if (!okRole) return `<td class="py-1 text-xs text-muted-foreground">·</td>`;
       return `<td class="py-1"><button type="button" ${ro ? "disabled" : ""} onclick="cycleWho(${w},'${key}')"
@@ -2513,46 +2552,70 @@ function renderRules() {
   }
   $("ruleTable").innerHTML = h;
 
+  // 日の編集・週の一括入力と同じく、未連携の人を担当にしたら連携に誘う
+  const un = [...new Set(order.flatMap((w) => {
+    const r = latestRule(w);
+    if (!r) return [];
+    return type(r.type).roles.map(([k]) => (r.who || {})[k]).filter(Boolean);
+  }))].map(member).filter((m) => m && m.link !== "linked");
+  $("ruleUnlinked").classList.toggle("hidden", ro || un.length === 0);
+  if (un.length && !ro) {
+    $("ruleUnlinked").innerHTML =
+      `<span class="min-w-0 flex-1 text-muted-foreground"><b class="font-semibold text-foreground">${un.map((m) => m.name).join("・")}</b> はアカウント未連携です。連携すると本人のスマホにも予定が出ます。</span>
+       <button type="button" onclick="openInvite('${un[0].id}')" class="shrink-0 rounded-lg border border-border px-2.5 py-1.5 font-medium transition hover:bg-surface-muted">招待</button>`;
+  }
+
   const days = ["日", "月", "火", "水", "木", "金", "土"];
-  $("ruleSummary").textContent = Object.keys(RULES).length
-    ? Object.entries(RULES).map(([k, v]) => `${days[k]}=${type(v.type).label}`).join(" / ")
+  const active = Object.keys(RULES).filter((w) => latestRule(w));
+  $("ruleSummary").textContent = active.length
+    ? active.map((w) => `${days[w]}=${type(latestRule(w).type).label}`).join(" / ")
     : "まだ設定していません";
   $("familySummary").textContent =
     `${MEMBERS.filter((m) => m.link === "linked").length} 人が連携済み・${MEMBERS.filter((m) => m.link !== "linked").length} 人が未連携`;
 }
 function cycleRule(w) {
   const cycle = [...TYPES.map((t) => t.id), null];
-  const cur = RULES[w] ? RULES[w].type : null;
-  const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
-  if (next === null) delete RULES[w];
-  else {
-    const keep = {};
-    for (const [k] of type(next).roles) if (RULES[w]?.who?.[k]) keep[k] = RULES[w].who[k];
-    const t = type(next);
-    const prev = RULES[w];
-    const prevT = prev ? type(prev.type) : null;
-    // 時刻を触っていなければ、新しい種類の既定時刻に合わせる（日の編集と同じ挙動）
-    const untouched = !prev || (prev.start === prevT.start && prev.end === prevT.end);
-    RULES[w] = {
-      type: next, who: keep,
-      start: untouched ? t.start : prev.start,
-      end: untouched ? t.end : prev.end,
-      since: prev?.since,
-    };
+  const cur = latestRule(w);
+  const next = cycle[(cycle.indexOf(cur ? cur.type : null) + 1) % cycle.length];
+  if (next === null) {
+    // 「なし」はこの曜日のルールを全部外す（ユーザーの明示操作なので過去の版も畳む）
+    delete RULES[w];
+    render();
+    toast("この曜日のルールを外しました");
+    return;
   }
+  const t = type(next);
+  const keep = {};
+  for (const [k] of t.roles) if (cur?.who?.[k]) keep[k] = cur.who[k];
+  // 時刻は「触ったかどうか」を旗で持つ。既定値との一致で推測すると、
+  // たまたま別の種類の既定と同じ時刻にしたときに勝手に上書きされる
+  const r = {
+    type: next, who: keep,
+    start: cur && cur.timeDirty ? cur.start : t.start,
+    end: cur && cur.timeDirty ? cur.end : t.end,
+    since: cur?.since,
+    timeDirty: !!(cur && cur.timeDirty),
+  };
+  if (cur) RULES[w][RULES[w].length - 1] = r; else putRuleVersion(w, r);
   render();
 }
 function cycleWho(w, key) {
+  const r = latestRule(w);
+  if (!r) return;
   const ids = [...MEMBERS.map((m) => m.id), null];
-  const cur = (RULES[w].who || {})[key] || null;
-  RULES[w].who = RULES[w].who || {};
-  RULES[w].who[key] = ids[(ids.indexOf(cur) + 1) % ids.length];
+  r.who = r.who || {};
+  const cur = r.who[key] || null;
+  r.who[key] = ids[(ids.indexOf(cur) + 1) % ids.length];
   render();
 }
 
 // ───────── 世帯の設定 ─────────
+// プロトの viewer トグルは「いま自分が viewer である」状態。
+// 一覧やメニューの役割表示もそれに合わせないと、権限の確認にならない
+function myRole() { return isViewer() ? "viewer" : "owner"; }
 function renderFamily() {
   const ro = isViewer();
+  $("meRole").textContent = `わが家（${ROLE_LABEL[myRole()]}）`;
   $("familyInvite").classList.toggle("hidden", ro);
   $("familyReadonly").classList.toggle("hidden", !ro);
   $("familyList").innerHTML = MEMBERS.map((m) => {
@@ -2561,7 +2624,7 @@ function renderFamily() {
       ${avatar(m.id)}
       <span class="min-w-0 flex-1">
         <span class="block truncate font-medium">${m.name}</span>
-        <span class="block truncate text-xs ${linked ? "text-muted-foreground" : "text-primary"}">${LINK_LABEL[m.link]}${linked && m.role ? "・" + ROLE_LABEL[m.role] : ""}</span>
+        <span class="block truncate text-xs ${linked ? "text-muted-foreground" : "text-primary"}">${LINK_LABEL[m.link]}${linked && m.role ? "・" + ROLE_LABEL[m.id === "m1" ? myRole() : m.role] : ""}${m.id === "m1" ? "（自分）" : ""}</span>
       </span>
       ${linked || ro ? "" : `<button type="button" onclick="openInvite('${m.id}')" class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">${m.link === "invited" ? "再送" : "招待"}</button>`}
     </li>`;
