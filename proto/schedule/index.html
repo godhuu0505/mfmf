@@ -1709,7 +1709,7 @@ input[type="date"] {
     <label class="flex items-center gap-2"><input type="checkbox" id="cfgViewer" onchange="render()">viewer（編集不可）</label>
   </div>
 
-  <div id="toast" class="pointer-events-none fixed bottom-28 left-1/2 z-[80] -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background opacity-0 transition-opacity duration-300"></div>
+  <div id="toast" role="status" aria-live="polite" class="pointer-events-none fixed bottom-28 left-1/2 z-[80] -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background opacity-0 transition-opacity duration-300"></div>
 </div>
 
 <script>
@@ -1915,11 +1915,18 @@ document.addEventListener("keydown", (e) => {
   if (open("sheet")) return closeSheet();
 });
 const SHEET_IDS = ["sheet", "doneSheet", "qrSheet", "invSheet"];
+// 上に開いているシートの順（z-index の高い順）
+const SHEET_STACK = ["invSheet", "doneSheet", "qrSheet", "sheet"];
+function topSheet() {
+  return SHEET_STACK.find((id) => !$(id).classList.contains("invisible")) || null;
+}
 function syncScrollLock() {
-  const open = SHEET_IDS.some((id) => !$(id).classList.contains("invisible"));
-  document.body.style.overflow = open ? "hidden" : "";
+  const top = topSheet();
+  document.body.style.overflow = top ? "hidden" : "";
   // 背面を inert にして、Tab が隠れたナビや本文へ抜けないようにする
-  document.querySelectorAll("[data-proto-bg]").forEach((el) => { el.inert = open; });
+  document.querySelectorAll("[data-proto-bg]").forEach((el) => { el.inert = !!top; });
+  // 重ねて開いているときは、下のシートも inert にする（最前面だけが操作対象）
+  SHEET_IDS.forEach((id) => { $(id).inert = !!top && id !== top; });
 }
 // シートを開いたら、その中へフォーカスを移す。
 // visibility はトランジション対象なので、開いた直後はまだ hidden のことがある
@@ -2197,8 +2204,10 @@ function renderAssignBoard() {
   const days = weekDays();
   const dirty = ASSIGN_DRAFT && Object.keys(ASSIGN_DRAFT).length > 0;
   const rows = days.map((ds) => {
+    // 下書きは担当だけを持つ。予定そのもの（種類・時刻）は常に今の値を見るので、
+    // ルールを変えたあとに保存しても古い種類で上書きされない
     const base = planOn(ds);
-    const x = (ASSIGN_DRAFT && ASSIGN_DRAFT[ds]) || base;
+    const x = base ? { ...base, who: { ...(base.who || {}), ...((ASSIGN_DRAFT || {})[ds] || {}) } } : null;
     const label = fmt(ds);
     if (!x) {
       if (ro) return `<div class="flex items-center gap-3 rounded-xl border border-dashed border-border px-3 py-2.5 text-sm"><span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span><span class="text-muted-foreground">予定なし</span></div>`;
@@ -2251,30 +2260,36 @@ function renderAssignBoard() {
 }
 function assignSet(ds, k, mid) {
   if (isViewer()) return;
-  const cur = (ASSIGN_DRAFT && ASSIGN_DRAFT[ds]) || planOn(ds);
-  if (!cur || cur.status === "skipped") return;
-  if (!ASSIGN_DRAFT) ASSIGN_DRAFT = {};
-  const x = ASSIGN_DRAFT[ds] || (ASSIGN_DRAFT[ds] = JSON.parse(JSON.stringify(cur)));
-  x.who = x.who || {};
-  x.who[k] = x.who[k] === mid ? null : mid;
-  // 元の値に戻したら下書きから外す。残したままだと、見た目が変わっていないのに
-  // 保存でき、その日がルール由来から手入力の例外に化けてしまう
   const base = planOn(ds);
-  if (base && sig(x) === sig(base)) delete ASSIGN_DRAFT[ds];
+  if (!base || base.status === "skipped") return;
+  if (!ASSIGN_DRAFT) ASSIGN_DRAFT = {};
+  const who = ASSIGN_DRAFT[ds] || (ASSIGN_DRAFT[ds] = { ...(base.who || {}) });
+  who[k] = who[k] === mid ? null : mid;
+  // 元の値に戻したら下書きから外す（見た目が変わっていないのに保存でき、
+  // その日がルール由来から手入力の例外に化けるのを防ぐ）
+  const keys = type(base.type).roles.map(([r]) => r);
+  const same = keys.every((r) => (who[r] || null) === ((base.who || {})[r] || null));
+  if (same) delete ASSIGN_DRAFT[ds];
   if (ASSIGN_DRAFT && Object.keys(ASSIGN_DRAFT).length === 0) ASSIGN_DRAFT = null;
   renderAssignBoard();
 }
 function assignSave() {
   if (!ASSIGN_DRAFT) return;
-  for (const [ds, x] of Object.entries(ASSIGN_DRAFT)) {
-    const existing = ITEMS.find((y) => y.id === x.id);
-    if (existing) existing.who = { ...x.who };
-    else ITEMS.push({ ...x, id: "n" + seq++, fromRule: undefined, overridesRule: true });
+  let saved = 0;
+  for (const [ds, who] of Object.entries(ASSIGN_DRAFT)) {
+    const base = planOn(ds); // 保存の瞬間の予定に載せる（下書きは担当だけ）
+    if (!base || base.status === "skipped") continue;
+    const next = {};
+    for (const [k] of type(base.type).roles) if (who[k]) next[k] = who[k];
+    const existing = ITEMS.find((y) => y.id === base.id);
+    if (existing) existing.who = next;
+    else ITEMS.push({ ...base, who: next, id: "n" + seq++, fromRule: undefined, overridesRule: true, created: seqCreated++ });
     CANCELLED.delete(ds);
+    saved++;
   }
   ASSIGN_DRAFT = null;
   render();
-  toast("今週の担当を保存しました");
+  toast(saved ? "今週の担当を保存しました" : "保存できる予定がありませんでした");
 }
 
 // ───────── 予定シート ─────────
@@ -2663,6 +2678,9 @@ function confirmDone() {
   if (bad) { toast(bad); return; }
   p.chips = [...dd.chips];
   p.freeNote = dd.note.trim();
+  // 記録になった時点を並び順に反映する（予定として作った古い順のままだと、
+  // 完了した直後の記録が「さいきんの記録」の 4 件から漏れる）
+  if (p.status !== "done") p.created = seqCreated++;
   p.body = [...dd.chips, dd.note.trim()].filter(Boolean).join("、");
   p.photos = dd.photos;
   p.status = "done";
