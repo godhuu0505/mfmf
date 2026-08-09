@@ -1582,7 +1582,7 @@ input[type="date"] {
           <tbody id="ruleTable"></tbody>
         </table>
       </div>
-      <div id="ruleUnlinked" class="hidden flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs ring-1 ring-border"></div>
+      <div id="ruleUnlinked" class="hidden space-y-2"></div>
       <p class="text-xs text-muted-foreground">
         予定の行はタップで種類が順に切り替わります（最後まで行くと「なし」）。担当の行はタップでメンバーが入れ替わります。
         <b class="font-semibold text-foreground">時間</b>は、日の予定を編集して「これから毎週◯曜も同じにする」で保存すると、その時間がルールに入ります。
@@ -1645,7 +1645,7 @@ input[type="date"] {
 
   <!-- ═══════════ クイック記録シート ═══════════ -->
   <div id="qrBackdrop" onclick="closeQuick()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
-  <div id="qrSheet" role="dialog" aria-modal="true" class="invisible fixed inset-x-0 bottom-0 z-50 translate-y-full rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+  <div id="qrSheet" role="dialog" aria-modal="true" class="invisible fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
     <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
       <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
       <div class="mb-3 flex items-center justify-between">
@@ -1656,8 +1656,13 @@ input[type="date"] {
       <p class="mb-2 text-xs text-muted-foreground">2026年8月9日(日)</p>
       <div id="qrBody" class="space-y-3"></div>
       <button type="button" onclick="quickSave()" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">保存する</button>
-      <button type="button" onclick="closeQuick(); openNextFreeDay()"
+      <!-- 本番の導線（写真つき）は残したまま、予定への受け皿を下に足す -->
+      <button type="button" onclick="closeQuick(); toast('（プロトでは記録フォームは省略）')"
         class="mt-2 w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
+        写真つきでくわしく記録する →
+      </button>
+      <button type="button" onclick="closeQuick(); openNextFreeDay()"
+        class="mt-1 w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
         これからの予定を入れる →
       </button>
     </div>
@@ -1774,7 +1779,8 @@ const PRESETS = [
   { label: "ママ在宅の日",   type: "home",    start: "09:00", end: "18:00", who: { care: "m1" } },
   { label: "ばあばが来る日", type: "family",  start: "10:00", end: "17:00", who: { care: "m3" } },
 ];
-const CHIPS = ["ごはん完食", "おやつ", "さんぽ", "トイレOK", "ねんね", "ごきげん"];
+// 本番の QuickRecordSheet.tsx と同じ語彙（D32 で合意した 8 つ）
+const CHIPS = ["ごはん完食", "ごはん少なめ", "おやつ", "さんぽ", "トイレOK", "おくすり", "ねんね", "ごきげん"];
 
 let seqCreated = 0;
 ITEMS.forEach((x) => { x.created = seqCreated++; }); // 一覧の並び替え用の作成順
@@ -1887,6 +1893,16 @@ function toast(msg) {
   t.classList.remove("opacity-0");
   clearTimeout(t._t);
   t._t = setTimeout(() => t.classList.add("opacity-0"), 1900);
+}
+// 未連携の担当への案内。1 人目だけでなく全員ぶん出す
+function unlinkedNotice(members) {
+  if (!members.length) return "";
+  return members.map((u) => `<div class="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-xs ring-1 ring-border">
+    <span class="min-w-0 flex-1 text-muted-foreground">
+      <b class="font-semibold text-foreground">${u.name}</b> は${u.link === "invited" ? "招待に応じていません" : "アカウント未連携です"}。連携すると本人のスマホにも予定が出ます。
+    </span>
+    <button type="button" onclick="openInvite('${u.id}')" class="shrink-0 rounded-lg border border-border px-2.5 py-1.5 font-medium transition hover:bg-surface-muted">招待</button>
+  </div>`).join("");
 }
 function statusBadge(st) {
   if (st === "done") return `<span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900">${svg("check", "h-3 w-3")}記録ずみ</span>`;
@@ -2021,7 +2037,11 @@ function weekDays() {
 }
 // 時間が重なるブロックを横に並べる。同じ列に全幅で重ねると、
 // 後から描いたものが前のものを完全に隠してしまう
+const MIN_BLOCK_MIN = 22 / ROW * 60; // ブロックの最小高さ（22px）を分に直したもの
 function layoutDay(list) {
+  // 12:00〜12:05 のような短い予定も画面上は 22px を占めるので、
+  // 実時間だけで重なりを見ると、隣り合う短い予定が視覚的に重なってしまう
+  const endOf = (x) => Math.max(min(x.end), min(x.start) + MIN_BLOCK_MIN);
   const sorted = list.slice().sort((a, b) => min(a.start) - min(b.start) || min(a.end) - min(b.end));
   const out = [];
   let cluster = [];
@@ -2033,7 +2053,7 @@ function layoutDay(list) {
     for (const x of cluster) {
       let c = colEnds.findIndex((end) => min(x.start) >= end);
       if (c === -1) { c = colEnds.length; colEnds.push(0); }
-      colEnds[c] = min(x.end);
+      colEnds[c] = endOf(x);
       placed.push({ x, col: c });
     }
     for (const q of placed) out.push({ ...q, total: colEnds.length });
@@ -2043,7 +2063,7 @@ function layoutDay(list) {
   for (const x of sorted) {
     if (cluster.length && min(x.start) >= clusterEnd) flush();
     cluster.push(x);
-    clusterEnd = Math.max(clusterEnd, min(x.end));
+    clusterEnd = Math.max(clusterEnd, endOf(x));
   }
   flush();
   return out;
@@ -2161,9 +2181,7 @@ function renderAssignBoard() {
 
   $("assignBoard").innerHTML = rows +
     (ro ? `<p class="rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、担当は変更できません。</p>` : "") +
-    (!ro && unlinked.length ? `<div class="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs ring-1 ring-border">
-      <span class="min-w-0 flex-1 text-muted-foreground"><b class="font-semibold text-foreground">${unlinked.map((m) => m.name).join("・")}</b> はアカウント未連携です。連携すると本人のスマホにも予定が出ます。</span>
-      <button type="button" onclick="openInvite('${unlinked[0].id}')" class="shrink-0 rounded-lg border border-border px-2.5 py-1.5 font-medium transition hover:bg-surface-muted">招待</button></div>` : "") +
+    (!ro && unlinked.length ? `<div class="space-y-2">${unlinkedNotice(unlinked)}</div>` : "") +
     (ro ? "" : `<button type="button" ${dirty ? "" : "disabled"} onclick="assignSave()"
       class="w-full rounded-xl py-3 text-sm font-bold transition ${dirty ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "bg-surface-muted text-muted-foreground"}">
       ${dirty ? "保存する（未保存の変更あり）" : "保存する"}</button>`);
@@ -2307,13 +2325,9 @@ function renderSheet() {
         }).join("")}
       </div>`;
     }
-    const un = t.roles.map(([k]) => (p.who || {})[k]).filter(Boolean).map(member).filter((m) => m && m.link !== "linked");
-    if (un.length && !ro) {
-      h += `<div class="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-xs ring-1 ring-border">
-        <span class="min-w-0 flex-1 text-muted-foreground"><b class="font-semibold text-foreground">${un[0].name}</b> は${un[0].link === "invited" ? "招待に応じていません" : "アカウント未連携です"}。連携すると本人のスマホにも予定が出ます。</span>
-        <button type="button" onclick="openInvite('${un[0].id}')" class="shrink-0 rounded-lg border border-border px-2.5 py-1.5 font-medium transition hover:bg-surface-muted">招待</button>
-      </div>`;
-    }
+    const un = [...new Set(t.roles.map(([k]) => (p.who || {})[k]).filter(Boolean))]
+      .map(member).filter((m) => m && m.link !== "linked");
+    if (un.length && !ro) h += `<div class="space-y-2">${unlinkedNotice(un)}</div>`;
     h += `</div>`;
   }
 
@@ -2408,7 +2422,9 @@ function commit(x) {
   delete row.fromRule;
   const i = ITEMS.findIndex((y) => y.id === row.id);
   if (i >= 0) ITEMS[i] = row; else ITEMS.push(row);
-  CANCELLED.delete(x.date);
+  // 打ち消しを解くのは「その日の予定」を保存したときだけ。
+  // 併存しているだけの記録を編集して、消したルールが戻ってきては困る
+  if (row.overridesRule !== false) CANCELLED.delete(x.date);
 }
 function savePlan() {
   const p = DRAFT;
@@ -2660,11 +2676,7 @@ function renderRules() {
     return type(r.type).roles.map(([k]) => (r.who || {})[k]).filter(Boolean);
   }))].map(member).filter((m) => m && m.link !== "linked");
   $("ruleUnlinked").classList.toggle("hidden", ro || un.length === 0);
-  if (un.length && !ro) {
-    $("ruleUnlinked").innerHTML =
-      `<span class="min-w-0 flex-1 text-muted-foreground"><b class="font-semibold text-foreground">${un.map((m) => m.name).join("・")}</b> はアカウント未連携です。連携すると本人のスマホにも予定が出ます。</span>
-       <button type="button" onclick="openInvite('${un[0].id}')" class="shrink-0 rounded-lg border border-border px-2.5 py-1.5 font-medium transition hover:bg-surface-muted">招待</button>`;
-  }
+  if (un.length && !ro) $("ruleUnlinked").innerHTML = unlinkedNotice(un);
 
   const days = ["日", "月", "火", "水", "木", "金", "土"];
   const active = Object.keys(RULES).filter((w) => latestRule(w));
