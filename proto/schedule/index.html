@@ -1856,6 +1856,7 @@ let DONE_DRAFT = null;
 let CONFIRM_DELETE = false; // 記録削除の確認state
 let CONFIRM_CLOSE = false;  // 編集を捨てるときの確認state
 let OPEN_SIG = null;        // 開いた時点の内容（変更の有無を見る）
+let PENDING_SWITCH = null;  // 確認後に開く行（同じ日のほかの記録・予定）
 let CONFIRM_CLOSE_DONE = false;
 let DONE_OPEN_SIG = null;
 let ASSIGN_DRAFT = null;
@@ -2236,8 +2237,11 @@ function renderWeek() {
       // レンジ外にはみ出さないよう、両端を切り詰めてから高さを出す
       const s0 = Math.max(min(x.start), H_START * 60);
       const e0 = Math.min(min(x.end), H_END * 60);
-      const top = (s0 - H_START * 60) / 60 * ROW;
-      const hgt2 = Math.max(22, (e0 - s0) / 60 * ROW);
+      const gridH = (H_END - H_START) * ROW;
+      const hgt2 = Math.min(gridH, Math.max(22, (e0 - s0) / 60 * ROW));
+      // 23:55〜23:59 のような短い予定は最小高さ 22px が枠の下へはみ出す。
+      // 下端で止める（列は overflow を切っていないので、そのままだと重なる）
+      const top = Math.min((s0 - H_START * 60) / 60 * ROW, gridH - hgt2);
       const done = x.status === "done";
       const who = t.roles.map(([k]) => (x.who || {})[k]).filter(Boolean);
       return `<button type="button" onclick="openDay('${ds}','${x.id}')"
@@ -2376,6 +2380,7 @@ function assignSave() {
 function openDay(d, id) {
   openDate = d;
   CONFIRM_DELETE = false;
+  PENDING_SWITCH = null;
   // id を渡されたらその行を開く（さいきんの記録から、予定ではなく記録を開くため）
   const cur = (id && itemsOn(d).find((x) => x.id === id)) || planOn(d);
   DRAFT = cur ? JSON.parse(JSON.stringify(cur)) : null;
@@ -2399,7 +2404,19 @@ function sheetDirty() {
   return sig(DRAFT) !== OPEN_SIG || !!DRAFT.repeat;
 }
 // ✕ / 背景 / Esc から呼ぶ。変更があれば確認をはさむ
+// 同じ日のほかの行へ切り替える。未保存の編集があれば確認をはさむ
+function requestSwitchItem(d, id) {
+  if (sheetDirty()) {
+    PENDING_SWITCH = { d, id };
+    CONFIRM_CLOSE = true;
+    renderSheet();
+    $("sheet").scrollTop = 0;
+    return;
+  }
+  openDay(d, id);
+}
 function requestCloseSheet() {
+  PENDING_SWITCH = null;
   if (sheetDirty()) {
     CONFIRM_CLOSE = true;
     renderSheet();
@@ -2410,7 +2427,10 @@ function requestCloseSheet() {
 }
 function discardSheet() {
   CONFIRM_CLOSE = false;
-  closeSheet();
+  const go2 = PENDING_SWITCH;
+  PENDING_SWITCH = null;
+  if (go2) openDay(go2.d, go2.id); // 切り替え先があればそのまま開く
+  else closeSheet();
 }
 function closeSheet() {
   $("sheet").classList.add("invisible", "translate-y-full");
@@ -2432,11 +2452,11 @@ function renderSheet() {
 
   if (CONFIRM_CLOSE) {
     h += `<div class="space-y-2 rounded-xl border border-border bg-surface-muted p-3">
-      <p class="text-sm font-medium">編集をやめますか？</p>
+      <p class="text-sm font-medium">${PENDING_SWITCH ? "編集をやめて、そちらを開きますか？" : "編集をやめますか？"}</p>
       <p class="text-xs text-muted-foreground">保存していない変更は失われます。</p>
       <div class="flex gap-2">
-        <button type="button" onclick="CONFIRM_CLOSE = false; renderSheet()" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">編集に戻る</button>
-        <button type="button" onclick="discardSheet()" class="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background">やめる</button>
+        <button type="button" onclick="CONFIRM_CLOSE = false; PENDING_SWITCH = null; renderSheet()" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">編集に戻る</button>
+        <button type="button" onclick="discardSheet()" class="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background">${PENDING_SWITCH ? "開く" : "やめる"}</button>
       </div>
     </div>`;
   }
@@ -2586,7 +2606,7 @@ function renderSheet() {
       <h3 class="text-xs font-bold text-muted-foreground">この日のほかの記録・予定</h3>
       ${others.map((x) => {
         const t2 = type(x.type);
-        return `<button type="button" onclick="openDay('${d}','${x.id}')"
+        return `<button type="button" onclick="requestSwitchItem('${d}','${x.id}')"
           class="flex w-full items-center gap-2 rounded-xl bg-surface-muted px-3 py-2.5 text-left text-sm transition hover:bg-muted">
           <span class="shrink-0">${t2.emoji}</span>
           <span class="w-20 shrink-0 text-xs tabular-nums text-muted-foreground">${x.untimed ? "時刻なし" : `${x.start}〜${x.end}`}</span>
