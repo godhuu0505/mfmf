@@ -8,8 +8,11 @@
 //                       許可リストから外れてログイン自体が壊れる。
 export const POST_LOGIN_NEXT_COOKIE = "mfmf-post-login-next";
 
-/** Cookie の寿命（秒）。ログインを終えるまでの数分だけ持てばよい。 */
-export const POST_LOGIN_NEXT_MAX_AGE = 10 * 60;
+// Cookie の寿命（秒）。ログイン済みになった時点で middleware が消すので実質は
+// 短いが、パスワード再設定（招待 → ログイン →「パスワードをお忘れの方」）は
+// メールの往復を挟むため、再設定リンクの有効期限（supabase/config.toml の
+// otp_expiry = 3600）まで持たせないと戻り先を失う。
+export const POST_LOGIN_NEXT_MAX_AGE = 60 * 60;
 
 // オープンリダイレクト防止: 自サイト内の絶対パスだけを許可する。
 // 弾く例: "https://evil.example"（別オリジン）, "//evil.example"（プロトコル相対）,

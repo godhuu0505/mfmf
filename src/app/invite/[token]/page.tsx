@@ -38,7 +38,7 @@ export default async function InvitePage({
   const { data: invite, error } = await supabase
     .from("household_invites")
     .select(
-      "email, role, expires_at, accepted_at, accepted_by, revoked_at, valid_from, valid_to",
+      "household_id, email, role, expires_at, accepted_at, accepted_by, revoked_at, valid_from, valid_to",
     )
     .eq("token", token)
     .maybeSingle();
@@ -50,12 +50,25 @@ export default async function InvitePage({
     });
   }
 
+  // ゲスト招待は「既に世帯メンバーなら不要」= accept_household_invite が P0001 で
+  // 弾く（何度押しても必ず失敗する）。受諾フォームを出さない終端状態にするが、
+  // 判定は **現在の** メンバーシップで行う —— ?error=already_member は過去に
+  // 失敗した記録でしかなく、その後に退出していれば受諾はもう通る。
+  const isGuestRole = invite?.role?.startsWith("guest:") ?? false;
+  let alreadyMember = false;
+  if (isGuestRole && invite?.household_id) {
+    const { data: membership } = await supabase
+      .from("household_members")
+      .select("user_id")
+      .eq("household_id", invite.household_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    alreadyMember = membership !== null;
+  }
+
   const userEmail = (user.email ?? "").trim().toLowerCase();
   const status = (() => {
     if (error) return "load_failed" as const;
-    // 既に世帯メンバーがゲスト招待を開いた場合（P0001）は、DB 側の状態が変わらない
-    // ＝何度押しても必ず失敗するので、受諾フォームを出さない終端状態として扱う。
-    if (errorReason === "already_member") return "already_member" as const;
     if (!invite) return "not_found" as const;
     if (invite.revoked_at !== null) return "revoked" as const;
     if (invite.accepted_at !== null) {
@@ -65,8 +78,10 @@ export default async function InvitePage({
     }
     if (new Date(invite.expires_at).getTime() < Date.now())
       return "expired" as const;
+    // RPC はメール一致（42501）を先に見るので、判定順もそれに合わせる。
     if ((invite.email ?? "").trim().toLowerCase() !== userEmail)
       return "mismatch" as const;
+    if (alreadyMember) return "already_member" as const;
     return "ok" as const;
   })();
 
