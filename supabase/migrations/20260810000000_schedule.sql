@@ -555,3 +555,93 @@ $$;
 
 comment on function public.delete_own_household(uuid) is
   'owner が参照データの無い世帯を削除する（UC-H09 の部分集合）。毎週の予定ルール・打ち消しも「データあり」に数える。SECURITY DEFINER + search_path 固定。';
+
+-- ---------------------------------------------------------------
+-- 9. 世帯を抜けた人の担当を外す
+--    担当は auth.users への FK なので、household_members を消しても残る。
+--    残したままだと、これからの送り迎えが「もう世帯に居ない人」に割り当たり、
+--    画面には ? としか出せない。
+--    ・これからの予定（planned）… その場で外す
+--    ・今日以降から効くルールの版 … その場で外す
+--    ・いま効いている版         … 過去を書き換えず「今日からの版」を積んで外す
+--    済んだ記録・過去の版は履歴なので触らない。
+-- ---------------------------------------------------------------
+create or replace function public.prune_schedule_assignments()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_today date := (now() at time zone 'Asia/Tokyo')::date;
+  r record;
+  v_new uuid;
+begin
+  -- 世帯ごと削除の途中（delete_own_household）では何もしない。
+  -- ここで版を積むと、消えていく世帯に子行を作ってしまう
+  if coalesce(current_setting('mfmf.deleting_household', true), '') = old.household_id::text then
+    return old;
+  end if;
+  if not exists (select 1 from public.households where id = old.household_id) then
+    return old;
+  end if;
+
+  delete from public.record_assignees a
+   using public.daycare_records rec
+   where a.record_id = rec.id
+     and rec.household_id = old.household_id
+     and rec.status = 'planned'
+     and a.user_id = old.user_id;
+
+  delete from public.schedule_rule_assignees a
+   using public.schedule_rules s
+   where a.rule_id = s.id
+     and s.household_id = old.household_id
+     and s.since >= v_today
+     and a.user_id = old.user_id;
+
+  for r in
+    select distinct on (s.weekday) s.*
+      from public.schedule_rules s
+     where s.household_id = old.household_id
+       and s.since < v_today
+     order by s.weekday, s.since desc
+  loop
+    -- 墓標（kind is null）は担当を持たない
+    continue when r.kind is null;
+    continue when not exists (
+      select 1 from public.schedule_rule_assignees a
+       where a.rule_id = r.id and a.user_id = old.user_id
+    );
+    -- 今日からの版がすでにあるなら、上の delete で外れている
+    continue when exists (
+      select 1 from public.schedule_rules s2
+       where s2.household_id = r.household_id
+         and s2.weekday = r.weekday
+         and s2.since = v_today
+    );
+
+    insert into public.schedule_rules
+      (household_id, weekday, since, kind, start_time, end_time, created_by)
+    values
+      (r.household_id, r.weekday, v_today, r.kind, r.start_time, r.end_time, r.created_by)
+    returning id into v_new;
+
+    insert into public.schedule_rule_assignees (rule_id, role, user_id)
+    select v_new, a.role, a.user_id
+      from public.schedule_rule_assignees a
+     where a.rule_id = r.id
+       and a.user_id <> old.user_id;
+  end loop;
+
+  return old;
+end;
+$$;
+
+comment on function public.prune_schedule_assignments() is
+  '世帯を抜けた人の担当を、これからの予定と今日からのルール版から外す（過去は書き換えない）。SECURITY DEFINER + search_path 固定';
+
+drop trigger if exists household_members_prune_schedule on public.household_members;
+create trigger household_members_prune_schedule
+  after delete on public.household_members
+  for each row execute function public.prune_schedule_assignments();

@@ -14,7 +14,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(33);
+select plan(35);
 
 -- fixture: HA に A(owner) / E(editor) / V(viewer)、別世帯 HB に B(owner)
 insert into auth.users (id, email) values
@@ -337,6 +337,43 @@ select throws_ok(
   'P0001',
   null,
   '毎週のルールだけがある世帯は「空」ではないので消せない'
+);
+
+-- ---------------------------------------------------------------
+-- 8. 世帯を抜けた人の担当は、これからのぶんから外れる
+-- ---------------------------------------------------------------
+reset role;
+insert into public.household_members (household_id, user_id, role)
+  values ('33333333-3333-3333-3333-333333333333',
+          'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'editor');
+insert into public.schedule_rules
+  (id, household_id, weekday, since, kind, start_time, end_time, created_by)
+values
+  ('cccc0000-0000-0000-0000-000000000009',
+   '33333333-3333-3333-3333-333333333333', 5, public.jst_today() - 7, 'daycare',
+   '09:00', '18:00', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+insert into public.schedule_rule_assignees (rule_id, role, user_id) values
+  ('cccc0000-0000-0000-0000-000000000009', 'drop', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'),
+  ('cccc0000-0000-0000-0000-000000000009', 'pick', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+
+delete from public.household_members
+ where household_id = '33333333-3333-3333-3333-333333333333'
+   and user_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+
+select results_eq(
+  $$select count(*)::int from public.schedule_rules
+     where household_id = '33333333-3333-3333-3333-333333333333'
+       and weekday = 5 and since = public.jst_today()$$,
+  $$values (1)$$,
+  '抜けた人がいた曜日は「今日からの版」が積まれる（過去の版は残る）'
+);
+select results_eq(
+  $$select a.role from public.schedule_rule_assignees a
+      join public.schedule_rules s on s.id = a.rule_id
+     where s.household_id = '33333333-3333-3333-3333-333333333333'
+       and s.weekday = 5 and s.since = public.jst_today()$$,
+  $$values ('pick'::text)$$,
+  '新しい版には残った人の担当だけが乗る'
 );
 
 reset role;

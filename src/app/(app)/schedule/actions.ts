@@ -162,11 +162,14 @@ async function syncAssignees(
   const ids = [...new Set(Object.values(who).filter(Boolean))] as string[];
   let members = new Set<string>();
   if (ids.length > 0) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("household_members")
       .select("user_id")
       .eq("household_id", householdId)
       .in("user_id", ids);
+    // ここを空として続けると、下の「残らなかった役割を消す」が
+    // 全部の担当を消してしまう
+    if (error) throw new Error(`担当の保存に失敗しました: ${error.message}`);
     members = new Set((data ?? []).map((m) => m.user_id as string));
   }
 
@@ -393,12 +396,31 @@ export async function clearPlan(formData: FormData) {
   const recordId = String(formData.get("record_id") || "").trim();
 
   if (UUID_RE.test(recordId)) {
-    await requireEditableRecordHousehold(supabase, user.id, recordId);
+    const rowHousehold = await requireEditableRecordHousehold(
+      supabase,
+      user.id,
+      recordId,
+    );
+    const { data: current } = await supabase
+      .from("daycare_records")
+      .select("overrides_rule")
+      .eq("id", recordId)
+      .maybeSingle();
     const { error } = await supabase
       .from("daycare_records")
       .delete()
       .eq("id", recordId);
     if (error) throw new Error(`削除に失敗しました: ${error.message}`);
+    // ルールを置き換えていた行を消すと、その日のルールがまた出てくる。
+    // 「消した」を保つために、日付ごとの打ち消しに置き換える
+    if (current?.overrides_rule) {
+      await supabase
+        .from("schedule_rule_skips")
+        .upsert(
+          { household_id: rowHousehold, on_date: date, created_by: user.id },
+          { onConflict: "household_id,on_date", ignoreDuplicates: true },
+        );
+    }
     revalidateSchedule();
     return;
   }

@@ -28,6 +28,42 @@ export const EMPTY_SCHEDULE: ScheduleData = {
   skippedDates: new Set(),
 };
 
+/** PostgREST の 1 回あたりの上限（supabase/config.toml の max_rows）に合わせる。 */
+const PAGE = 1000;
+
+/**
+ * その期間の記録を**全部**取る。1 回で取ると max_rows で黙って打ち切られ、
+ * 日付の昇順なので後ろの日が丸ごと落ちる —— 落ちた行に overrides_rule = true が
+ * あると、消したはずの毎週の予定が戻り、完了すると記録が二重にできる。
+ */
+async function fetchAllRecords(
+  supabase: Supabase,
+  householdId: string,
+  from: string,
+  to: string,
+) {
+  const rows: Record<string, unknown>[] = [];
+  for (let page = 0; ; page += 1) {
+    const { data, error } = await supabase
+      .from("daycare_records")
+      .select(
+        "id, record_date, source, status, start_time, end_time, overrides_rule, body, record_photos(count), record_assignees(role, user_id)",
+      )
+      .eq("household_id", householdId)
+      .gte("record_date", from)
+      .lte("record_date", to)
+      .order("record_date", { ascending: true })
+      .order("start_time", { ascending: true, nullsFirst: true })
+      .order("id", { ascending: true })
+      .range(page * PAGE, page * PAGE + PAGE - 1);
+    if (error) return { data: null, error };
+    const got = (data ?? []) as Record<string, unknown>[];
+    rows.push(...got);
+    if (got.length < PAGE) break;
+  }
+  return { data: rows, error: null };
+}
+
 /**
  * from〜to（YYYY-MM-DD、両端を含む）の予定・記録と、毎週のルールを取る。
  * ルールは期間より前に作られた版も効く。版は消さずに積むので、素朴に世帯ぶん
@@ -41,16 +77,7 @@ export async function fetchSchedule(
   to: string,
 ): Promise<ScheduleData> {
   const [recordsRes, rulesRes, skipsRes] = await Promise.all([
-    supabase
-      .from("daycare_records")
-      .select(
-        "id, record_date, source, status, start_time, end_time, overrides_rule, body, record_photos(count), record_assignees(role, user_id)",
-      )
-      .eq("household_id", householdId)
-      .gte("record_date", from)
-      .lte("record_date", to)
-      .order("record_date", { ascending: true })
-      .order("start_time", { ascending: true, nullsFirst: true }),
+    fetchAllRecords(supabase, householdId, from, to),
     supabase.rpc("schedule_rules_for_range", {
       p_household: householdId,
       p_from: from,
@@ -133,7 +160,9 @@ export async function fetchSchedule(
   }
 
   const skippedDates = new Set(
-    (skipsRes.data ?? []).map((s) => String((s as { on_date: string }).on_date)),
+    (skipsRes.data ?? []).map((s) =>
+      String((s as { on_date: string }).on_date),
+    ),
   );
 
   return { records, rules, ruleAssignees, skippedDates };
