@@ -234,14 +234,14 @@
   .top-1 {
     top: var(--spacing);
   }
-  .top-4 {
-    top: calc(var(--spacing) * 4);
+  .top-\[max\(1rem\,env\(safe-area-inset-top\)\)\] {
+    top: max(1rem, env(safe-area-inset-top));
   }
   .right-1 {
     right: var(--spacing);
   }
-  .right-4 {
-    right: calc(var(--spacing) * 4);
+  .right-\[max\(1rem\,env\(safe-area-inset-right\)\)\] {
+    right: max(1rem, env(safe-area-inset-right));
   }
   .bottom-0 {
     bottom: 0px;
@@ -1381,7 +1381,7 @@ input[type="date"] {
 </main>
 
 <!-- ===== ボトムタブバー（AppTabBar 相当。フォーム画面では出さない） ===== -->
-<nav data-chrome-tabbar aria-label="メインナビゲーション"
+<nav data-chrome-tabbar data-app-tabbar aria-label="メインナビゲーション"
   class="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur">
   <div class="mx-auto grid max-w-2xl grid-cols-5">
     <button type="button" data-tab="home" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium transition">
@@ -1447,7 +1447,7 @@ input[type="date"] {
 
 <!-- ===== ライトボックス（PhotoGallery 相当） ===== -->
 <div data-lightbox hidden class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
-  <button type="button" data-lightbox-close class="absolute right-4 top-4 z-10 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white">✕ 閉じる</button>
+  <button type="button" data-lightbox-close class="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-10 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white">✕ 閉じる</button>
   <img data-lightbox-img hidden alt="" class="max-h-full max-w-full object-contain" />
   <video data-lightbox-video hidden controls playsinline preload="none" class="max-h-full max-w-full bg-black"></video>
   <p data-lightbox-caption class="absolute inset-x-0 bottom-6 text-center text-sm text-white/80"></p>
@@ -1513,6 +1513,8 @@ input[type="date"] {
     editingId: null,   // 編集中の記録 id（null なら新規）
     items: [],         // フォームで追加中のメディア
     checking: 0,       // 取り込みの検査待ち件数（確認中タイルの数）
+    formGen: 0,        // フォームを開くたびに増える。取り込みの帰属先を見分ける
+    ingesting: 0,      // 進行中の取り込み数（保存をブロックする）
     existing: [],      // 編集時の「登録済み」メディア
     source: "daycare",
     records: [
@@ -1564,8 +1566,11 @@ input[type="date"] {
     // フォームは全画面モーダル。ヘッダーもタブバーも出さない（AppTabBar / HideOnFormRoute）
     const isForm = screen === "form";
     $("[data-chrome-header]").hidden = isForm;
-    $("[data-chrome-tabbar]").hidden = isForm;
-    document.body.style.paddingBottom = isForm ? "0" : "";
+    const tabbar = $("[data-chrome-tabbar]");
+    tabbar.hidden = isForm;
+    // 本番は下端余白を `body:has([data-app-tabbar]) main` で確保している。
+    // フォームはタブバーごと消える画面なので、マーカーも外す。
+    tabbar.toggleAttribute("data-app-tabbar", !isForm);
     $$("[data-tab]").forEach((b) => {
       const on = b.dataset.tab === screen || (screen === "detail" && b.dataset.tab === "home");
       b.className =
@@ -1605,6 +1610,7 @@ input[type="date"] {
 
   // ---------------- フォーム ----------------
   function openForm(recordId) {
+    state.formGen += 1; // 前のフォーム宛ての取り込みを無効化する
     state.editingId = recordId;
     state.items.forEach(release);
     state.items = [];
@@ -1643,7 +1649,13 @@ input[type="date"] {
   });
 
   $("[data-form-save]").addEventListener("click", () => {
-    if (state.items.some((i) => i.status !== "ready")) {
+    // 検査中・取り込み中のファイルは state.items にまだ入っていない。
+    // ここでブロックしないと、選んだメディアが保存から抜け落ちる。
+    if (
+      state.checking > 0 ||
+      state.ingesting > 0 ||
+      state.items.some((i) => i.status !== "ready")
+    ) {
       toast("処理が終わるまでお待ちください");
       return;
     }
@@ -1772,10 +1784,15 @@ input[type="date"] {
   function handleFiles(fileList) {
     const files = Array.from(fileList);
     if (files.length === 0) return;
-    ingestChain = ingestChain.then(() => ingest(files)).catch(() => {});
+    const gen = state.formGen;
+    state.ingesting += 1;
+    ingestChain = ingestChain
+      .then(() => ingest(files, gen))
+      .catch(() => {})
+      .finally(() => { state.ingesting -= 1; });
   }
 
-  async function ingest(files) {
+  async function ingest(files, gen) {
     const errors = [];
     const queue = [];
     // 動画のメタデータ待ちの間、選んだぶんは「確認中」のタイルで見せる。
@@ -1826,8 +1843,16 @@ input[type="date"] {
         item.duration = meta.duration;
       }
       queue.push(item);
+      if (gen !== state.formGen) break; // フォームが切り替わった
     }
     state.checking = 0;
+
+    // 別のフォームに移っていたら、このぶんは捨てる（違う記録に混ざらないように）
+    if (gen !== state.formGen) {
+      queue.forEach(release);
+      renderAll();
+      return;
+    }
 
     // await の間に上限を下げられている可能性があるので、確定の直前に照らし直す
     const accepted = [];
@@ -1989,7 +2014,12 @@ input[type="date"] {
         c.height = Math.max(1, Math.round(vh * scale));
         c.getContext("2d")?.drawImage(v, 0, 0, c.width, c.height);
         item.thumb = c.toDataURL("image/jpeg", 0.7);
+        // 保存直後にコマ抽出が終わることがある。フォームだけでなく
+        // 一覧・詳細・アルバムも描き直さないとサムネが空のままになる。
         renderAll();
+        renderHome();
+        renderDetail();
+        renderAlbum();
       } catch (_) { /* プロトなので失敗は無視 */ }
     };
     v.currentTime = 0.1;
@@ -2201,12 +2231,20 @@ input[type="date"] {
     el.innerHTML = `
       <h2 class="mb-2 text-sm font-semibold text-muted-foreground">2026年8月</h2>
       <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
-        ${all.map(({ m }) => `
-          <div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted">
+        ${all.map(({ m, r }) => `
+          <button type="button" data-album-record="${r.id}" data-album-media="${m.id}"
+            class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted">
             ${thumbImg(m.thumb)}
             ${m.kind === "video" ? `<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ ${fmtDur(m.duration)}</span>` : ""}
-          </div>`).join("")}
+          </button>`).join("")}
       </div>`;
+    // 「タップすると拡大できます」と書いてあるので、ここからも開けるようにする
+    $$("[data-album-media]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        state.viewingId = b.dataset.albumRecord;
+        openLightbox(Number(b.dataset.albumMedia));
+      }),
+    );
   }
 
   // ---------------- 起動 ----------------

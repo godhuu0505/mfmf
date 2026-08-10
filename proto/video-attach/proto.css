@@ -230,14 +230,14 @@
   .top-1 {
     top: var(--spacing);
   }
-  .top-4 {
-    top: calc(var(--spacing) * 4);
+  .top-\[max\(1rem\,env\(safe-area-inset-top\)\)\] {
+    top: max(1rem, env(safe-area-inset-top));
   }
   .right-1 {
     right: var(--spacing);
   }
-  .right-4 {
-    right: calc(var(--spacing) * 4);
+  .right-\[max\(1rem\,env\(safe-area-inset-right\)\)\] {
+    right: max(1rem, env(safe-area-inset-right));
   }
   .bottom-0 {
     bottom: 0px;
