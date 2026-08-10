@@ -1661,13 +1661,35 @@ input[type="date"] {
   }
 
   // ---------------- クイック記録シート ----------------
+  let quickPrevFocus = null;
+  let quickInertTargets = [];
   const quickOpen = (open) => {
-    $("[data-quick-backdrop]").hidden = !open;
-    $("[data-quick-sheet]").hidden = !open;
+    const sheet = $("[data-quick-sheet]");
+    const backdrop = $("[data-quick-backdrop]");
+    backdrop.hidden = !open;
+    sheet.hidden = !open;
+    if (open) {
+      quickPrevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      quickInertTargets = Array.from(document.body.children).filter(
+        (el) => el instanceof HTMLElement && el !== sheet && el !== backdrop,
+      );
+      quickInertTargets.forEach((el) => { el.inert = true; });
+      requestAnimationFrame(() =>
+        $("[data-quick-detailed]").focus({ preventScroll: true }),
+      );
+    } else {
+      quickInertTargets.forEach((el) => { el.inert = false; });
+      quickInertTargets = [];
+      quickPrevFocus?.focus({ preventScroll: true });
+      quickPrevFocus = null;
+    }
   };
   $("[data-open-quick]").addEventListener("click", () => quickOpen(true));
   $("[data-quick-close]").addEventListener("click", () => quickOpen(false));
   $("[data-quick-backdrop]").addEventListener("click", () => quickOpen(false));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("[data-quick-sheet]").hidden) quickOpen(false);
+  });
   $("[data-quick-detailed]").addEventListener("click", () => {
     quickOpen(false);
     openForm(null);
@@ -1768,6 +1790,13 @@ input[type="date"] {
       label: "破棄してもどる",
       danger: true,
       onOk: () => {
+        // 世代を進めて、走っている検査・変換をこの下書きのものではなくする。
+        // 進めないと破棄後も CPU と blob を抱えたままになる。
+        state.formGen += 1;
+        state.checking = 0;
+        state.items.forEach(forget);
+        state.items = [];
+        state.existing = [];
         if (state.editingId) { show("detail"); renderDetail(); }
         else show("home");
       },
@@ -2036,13 +2065,30 @@ input[type="date"] {
     renderAll();
     if (errors.length) addErrors(errors.splice(0));
 
-    for (const item of accepted) {
-      if (!alive(item)) continue;
-      const n = errors.length;
-      await processItem(item, errors);
-      if (errors.length > n) addErrors(errors.splice(n));
+    // 変換・縮小はこのチェーンの外へ出す。ここで待つと、同じフォームで
+    // 2回目に選んだファイルの「確認中」タイルが変換の後ろに並んで出てこない。
+    accepted.forEach((item) => processQueue.push({ item, gen }));
+    pumpProcessing();
+  }
+
+  // 重い処理（変換・縮小）は 1 件ずつ。端末側の再エンコードは並列にしても速くならない。
+  const processQueue = [];
+  let processing = false;
+  async function pumpProcessing() {
+    if (processing) return;
+    processing = true;
+    try {
+      while (processQueue.length > 0) {
+        const { item, gen } = processQueue.shift();
+        if (!alive(item) || gen !== state.formGen) continue; // 消された / 別のフォームへ移った
+        const errors = [];
+        await processItem(item, errors);
+        if (errors.length) addErrors(errors);
+      }
+    } finally {
+      processing = false;
+      renderAll();
     }
-    renderAll();
   }
 
   const alive = (item) => state.items.includes(item);
