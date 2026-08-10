@@ -169,6 +169,7 @@ sequenceDiagram
   - **`auth.users` テーブル** — 13 箇所の外部キーの参照先。Identity Platform を正とし、
     サインイン時に `id` / `email` を upsert して同期する
 - **`withUser()` ヘルパー**（`src/lib/db/`）— 上のシーケンスの `SET LOCAL` を必ず通す唯一の入口
+- **接続プール専用のログインロール** —— これが無いと上のシーケンスは 1 行目で落ちます（下記）
 
 > **claims には `email` も必ず入れること。** `sub` と `role` だけでは足りません。
 > `20260704010000_household_invites.sql:79` の `invites_select_invitee` は
@@ -177,11 +178,39 @@ sequenceDiagram
 > 入れる値は **ID プロバイダが検証済みとしている email** に限ること（自己申告の email を
 > 入れると、他人の招待を受諾できる経路になります）。
 
-> **シムは migration 履歴より前に流すこと。** `20260616130704_init.sql` が最初の 1 行目から
-> `auth.users` を参照しているので、**新しいタイムスタンプの migration として足すと間に合いません**
-> （履歴の最後に来るため）。`supabase/bootstrap/000_auth_shim.sql` のような
-> **プレマイグレーション**として、CI・staging・災害復旧のいずれでも履歴の再生前に適用します。
-> `just check` と CI の DB 起動手順にこの 1 ステップを組み込むこと。
+> **接続プールのロールを別に用意すること。** 普通のログインロールは、`authenticated` を
+> **GRANT されていない限り `SET ROLE authenticated` を実行できません**（毎クエリの 1 行目で落ちます）。
+> かといって手近な `postgres` / migration 用アカウントで通すと、**スーパーユーザーまたは
+> テーブル所有者として RLS を素通りする**ので、`withUser()` を 1 箇所でも迂回した瞬間に
+> テナント分離が消えます（一次防衛線が消える = 最悪の失敗の仕方）。用意するのは
+> **スーパーユーザーでない・テーブル所有者でない・`BYPASSRLS` を持たない専用ログインロール**で、
+> `authenticated` を `NOINHERIT` で GRANT します（明示的に `SET ROLE` したときだけ権限が乗る）。
+> **migration 用の資格情報はアプリのプールに入れないこと。**
+
+### 4.1.1 履歴をそのまま再生できるようにする —— ベースラインを切る
+
+シムの話には続きがあります。**`auth` だけ用意しても、素の `postgres:16` では履歴の再生は
+`init.sql` で止まります。** 依存しているのは `auth` だけではないからです。
+
+| 依存 | 場所 |
+| --- | --- |
+| `storage.buckets` への `insert` | `20260616130704_init.sql:128` |
+| `storage.objects` へのポリシー、`storage.foldername()` | `init.sql:134-155` ほか、後続の migration 多数 |
+| `extensions` スキーマ（`pg_trgm` の置き場所） | `20260616130707_record_search.sql:11` |
+
+既存の migration は編集しない方針なので、選択肢は 2 つです。
+
+1. **ベースラインを切る（推す）** —— P3 の切替時点のスキーマをダンプし、
+   **Storage 関連を除いた `0000_baseline.sql`** を新しい起点にする。以後の CI・staging・
+   災害復旧はベースライン＋それ以降の migration だけを再生する。**Storage の残骸を
+   1 行も持ち込まずに済む**のが利点で、履歴の再生自体は P3 で一度きりなので失うものは少ない
+2. **Storage 互換スキーマも bootstrap に入れる** —— `storage.buckets` / `storage.objects` /
+   `storage.foldername()` の**空の器**を作って履歴を通す。手数は少ないが、**誰も読まない
+   テーブルにポリシー 43 本がインストールされた状態**が残る
+
+**2 を採る場合は、その器が不活性であることを明示すること。** §4.2 で「ダミースキーマで
+pgTAP を緑にするのは最悪手」と書いたのと同じ罠が、ここでも口を開けています ——
+器があると、Storage の pgTAP が**何も守っていないのに通ってしまう**。
 
 これで **`public` の 90 本のポリシー**と、**Storage を参照しない 18 本の関数定義**、
 **9 ファイル中 5 ファイルの pgTAP** は 1 行も変えずに動きます。
@@ -196,6 +225,20 @@ sequenceDiagram
 書き換えが要るのは **`supabase.from(...)` を呼んでいる箇所**（Server Action と Server Component の
 データ取得）です。ここは素の SQL でも Kysely 等でも構いませんが、`withUser()` の外では
 実行できない形にしておきます。
+
+**`supabase.rpc(...)` の呼び出しも同じだけ書き換えが要ります。** 関数定義を DB に残すことと、
+それを呼ぶ HTTP 経路（PostgREST）を残すことは別の話です。PostgREST を落とすと、
+以下の 5 箇所は**実行経路を失います**（`withUser()` 経由のパラメータ化した関数呼び出しへ移す）。
+
+| 呼び出し元 | 関数 | 失われる機能 |
+| --- | --- | --- |
+| `src/app/onboarding/actions.ts:21` | `create_own_household` | 世帯未所属ユーザーのオンボーディング |
+| `src/app/invite/actions.ts:15` | `accept_household_invite` | 内部/ゲスト招待の受諾 |
+| `src/app/(app)/settings/page.tsx:63` | `get_household_members` | メンバー一覧の表示 |
+| `src/app/(app)/settings/page.tsx:100` | `get_household_guests` | ゲスト一覧の表示 |
+| `src/app/(app)/settings/actions.ts:391` | `delete_own_household` | 世帯の削除 |
+
+これらのテストも併せて移します。
 
 ### 4.2 難所その 2 — Storage の 43 本のポリシーを何に置き換えるか
 
@@ -237,6 +280,15 @@ sequenceDiagram
 - バケットは **均一バケットレベルアクセス**＋**公開アクセス防止**を強制。匿名で読める経路をなくす
 - 署名 URL は**オブジェクト名まで固定**して発行する。パスはクライアントの申告ではなく
   `buildStoragePath()` がサーバー側で組み立てる（`src/lib/storagePath.ts` はそのまま使える）
+- **署名アップロード要求には `household_id` を含め、その世帯を直接検証する。**
+  上の図は「`record_id` とファイル名」と書きましたが、**新規作成ではそれだけでは世帯を決められません** ——
+  `RecordForm` は `crypto.randomUUID()` で `record_id` をクライアント生成し、
+  `daycare_records` の行ができる**前に**アップロードするからです（`RecordForm.tsx:71,163`）。
+  かといって**「現在世帯」の Cookie で代用してはいけません** —— 複数世帯に属するユーザーが
+  別タブで世帯を切り替えると、**画面 A の記録に世帯 B のパスを署名**してしまい、
+  保存が落ちたうえに孤児オブジェクトが残ります（`CLAUDE.md` が名指しで警告している取り違え）。
+  **新規は画面が描画された世帯 id を要求に載せてメンバーシップと編集権を検証し、
+  既存記録への追加は対象行の `household_id` から導出する**、と分けます
 - 署名は**サービスアカウント鍵ではなく IAM の `signBlob`** で行う。Cloud Run のサービス
   アカウントに自分自身への `roles/iam.serviceAccountTokenCreator` を与えれば、鍵ファイル無しで V4 署名できる
 - **バケットに CORS 設定を入れる。** 署名 V4 の PUT は GCS 側では通っても、`Content-Type` を
@@ -357,12 +409,21 @@ flowchart TB
 | `supabase db push` | migration 適用専用の **Cloud Run ジョブ**（アプリと同じイメージ・同じ VPC） |
 | デプロイ前に `pg_dump` して Artifact に 90 日保存（**唯一のロールバック資産**） | **Cloud SQL の自動バックアップ ＋ PITR（7 日）**。加えてデプロイ直前にオンデマンドバックアップ |
 | `vercel deploy --prebuilt --prod` | `gcloud run deploy --no-traffic` → `--to-latest` |
-| 失敗したら Artifact から手で復元 | `gcloud run services update-traffic --to-revisions=前リビジョン=100`（数十秒） |
+| 失敗したら Artifact から手で復元 | `gcloud run services update-traffic --to-revisions=前リビジョン=100`（数十秒）。**ただし下記の条件つき** |
 | ローカルは `supabase start` | `docker compose`（postgres + Auth エミュレータ + fake-gcs-server） |
 | CI で `supabase/setup-cli` を固定バージョン取得 | 不要になる（GitHub API のレートリミットで CI が落ちる問題も消える） |
 
 `ci.yml` に昇格権限を足さない制約（`deploy-production.yml` からの `workflow_call` 再利用）は
 そのまま守ります。WIF の権限はデプロイ側のワークフローにだけ持たせます。
+
+> **「前リビジョンへ戻せる」は無条件ではありません。** migration はトラフィック切替の**前**に
+> 適用されるので、その migration が**前リビジョンのイメージが使っている列・関数・契約を
+> 壊していると、リビジョンを戻すコマンドは成功するのにアプリは動きません**（DB はもう新しい形）。
+> デプロイ直前のバックアップは即時の戻し先にはならず、復元すれば切替後の書き込みも消えます。
+> したがって **migration は expand / contract で書き、ロールバック窓が閉じるまで新旧どちらの
+> リビジョンでも動く形を保つ**ことを規約にします（列は「足す → 使う → 消す」を別リリースに割る）。
+> これを守らないリリースをするときは、**リビジョンのロールバックが効かないことを承知のうえで
+> DB 復元を含む手順を先に決めてから**出すこと。
 
 **環境は 2 つに増やせます。** Supabase Free は「active 2 プロジェクト」の制約があり
 [D22](./decisions.md) は preview 用の別プロジェクトを断念していますが、Cloud SQL なら
@@ -414,7 +475,7 @@ flowchart LR
 | --- | --- | --- |
 | **P0** | GCP プロジェクト、VPC、Artifact Registry、WIF、Secret Manager、Terraform 化。本番は Vercel + Supabase のまま | 何も本番に触っていない |
 | **P1** | `output: "standalone"` 化と Dockerfile 整備、Cloud Run へデプロイ、ドメイン切替。**接続先は Supabase のまま** | DNS を Vercel に戻す |
-| **P2** | GCS バケット作成、`rclone` で既存オブジェクトを同期（Supabase Storage は S3 互換なのでそのまま繋がる）、署名 URL 方式へ実装変更、**読み取りは一定期間 GCS 優先・無ければ Supabase にフォールバック**、差分再同期 | 読み取りのフォールバックを逆向きにする |
+| **P2** | GCS バケット作成、`rclone` で既存オブジェクトを同期（Supabase Storage は S3 互換なのでそのまま繋がる）、署名 URL 方式へ実装変更、**読み取りは一定期間 GCS 優先・無ければ Supabase にフォールバック**（下記のとおり存在確認が要る）、差分再同期 | 読み取りのフォールバックを逆向きにする |
 | **P3** | `auth` 互換シムを**プレマイグレーション**として整備、`withUser()` とデータアクセス層の書き換え、pgTAP をローカル Postgres で緑にする。**本番は読み取り専用にして `pg_dump` → Cloud SQL へ復元 → 接続先切替**。ここだけ停止が要る | **書き込みを再度止め、Cloud SQL の差分を Supabase へ逆同期してから**接続先を戻す（下記） |
 | **P4** | Identity Platform 設定、UID 保存の一括インポート、セッション Cookie 実装、Drive 用 OAuth の分離、`auth.users` 同期 | **パスワード変更・リセットを凍結したうえで** ID プロバイダを Supabase Auth に戻す（下記） |
 | **P5** | Vercel プロジェクト削除、Supabase プロジェクト一時停止（**すぐ消さず 1 か月置く**）、予算アラート・稼働監視・バックアップ復元手順の整備 | — |
@@ -422,6 +483,15 @@ flowchart LR
 **P3 の前に、本番データのコピーで復元リハーサルを 1 回通してください。**
 `pg_dump` から Cloud SQL 復元、pgTAP 緑、アプリ起動、写真表示まで。
 ここを踏まずに当日やると、停止時間が読めません。
+
+> **P2 の「GCS 優先・無ければ Supabase」は、署名するだけでは実装できません。**
+> **署名 URL は存在しないオブジェクトに対しても生成できる**ので、保存されたパスを機械的に
+> 署名した時点で「GCS にある」と決めつけたことになり、フォールバックは永久に発火しません。
+> これは初回同期の後も起きます —— 古いバンドルを掴んだままのタブやインストール済み PWA が
+> **Supabase にだけ**新しいオブジェクトを上げつつ `record_photos` の行は普通に作るので、
+> 新しい画面はもっともらしい GCS の URL を返して **404 になり、Supabase には辿り着きません。**
+> **署名の前に GCS のメタデータで存在確認をする**か、**両方の URL を返してクライアント側で
+> エラー時に切り替える**かのどちらかにし、**「混在した状態」を P2 の Integration テストに含めること。**
 
 ### 7.1 ロールバックは「接続先を戻すだけ」では済まない
 
