@@ -207,6 +207,24 @@ export default function QuickRecordSheet({
     });
   }
 
+  /**
+   * きょうの予定を完了にする。**成功してから閉じる** ——
+   * 先に閉じると、失敗したときに完了したように見えて、やり直す手がかりも消える。
+   */
+  function completeToday(fd: FormData) {
+    if (isPending) return;
+    startTransition(async () => {
+      try {
+        await completePlan(fd);
+      } catch {
+        setError("完了にできませんでした。時間をおいて再度お試しください。");
+        return;
+      }
+      closeSheet();
+      resetSheet();
+    });
+  }
+
   return (
     <>
       {/* 入口はタブバー中央の「＋」（AppTabBar → mfmf:quick-record-open イベント）。
@@ -270,7 +288,7 @@ export default function QuickRecordSheet({
 
           {/* きょうの予定があるときだけ。無ければ今までどおり（2 タップのまま） */}
           {todayPlan && (
-            <form action={completePlan} className="mb-3">
+            <form action={completeToday} className="mb-3">
               <input type="hidden" name="record_id" value={todayPlan.recordId} />
               <input type="hidden" name="record_date" value={todayPlan.date} />
               <input type="hidden" name="source" value={todayPlan.source} />
@@ -288,8 +306,8 @@ export default function QuickRecordSheet({
               ))}
               <button
                 type="submit"
-                onClick={() => setOpen(false)}
-                className="flex w-full items-center gap-2 rounded-xl border-2 border-emerald-600 px-3 py-2.5 text-left text-sm transition hover:bg-emerald-50 dark:border-emerald-400 dark:hover:bg-emerald-950"
+                disabled={isPending}
+                className="flex w-full items-center gap-2 rounded-xl border-2 border-emerald-600 px-3 py-2.5 text-left text-sm transition hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-400 dark:hover:bg-emerald-950"
               >
                 <span className="text-lg" aria-hidden="true">
                   {SOURCE_EMOJI[todayPlan.source]}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { canEdit, getCurrentMembership } from "@/lib/household";
 import { EMPTY_SCHEDULE, fetchSchedule } from "@/lib/scheduleQuery";
-import { ruleForDate } from "@/lib/schedule";
+import { ruleForDate, weekdayOf } from "@/lib/schedule";
 import { jstTodayISO } from "@/lib/dateRange";
 import ScheduleRuleRow from "@/components/ScheduleRuleRow";
 
@@ -30,8 +30,12 @@ export default async function ScheduleRulesPage() {
   const householdId = membership?.householdId ?? null;
   const editable = membership !== null && canEdit(membership.role);
 
+  // プレビューは「today を含む週」= 最大 6 日先まで見る。today までしか取らないと、
+  // 未来から効く版（「これから毎週」で作った先の版）が見えず、そのまま保存すると
+  // replace_schedule_rule がその版を消してしまう
+  const previewEnd = dateOfWeekday(today, (weekdayOf(today) + 6) % 7);
   const schedule = householdId
-    ? await fetchSchedule(supabase, householdId, today, today)
+    ? await fetchSchedule(supabase, householdId, today, previewEnd)
     : EMPTY_SCHEDULE;
 
   const { data: memberRows } = householdId

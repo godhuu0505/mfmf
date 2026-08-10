@@ -64,6 +64,13 @@ export async function fetchSchedule(
       .lte("on_date", to),
   ]);
 
+  // どれかが落ちたら空として扱わない。記録だけ欠けるとルール由来の予定が
+  // 復活して見え、完了すると同じ日の記録が二重にできる
+  const failed = [recordsRes, rulesRes, skipsRes].find((r) => r.error);
+  if (failed?.error) {
+    throw new Error(`予定の読み込みに失敗しました: ${failed.error.message}`);
+  }
+
   const records: SavedRecordInput[] = (recordsRes.data ?? []).map((r) => {
     const row = r as Record<string, unknown>;
     const photos = row.record_photos as { count: number }[] | null;
@@ -106,13 +113,16 @@ export async function fetchSchedule(
   // 担当は RPC に埋め込めないので、返ってきた版のぶんだけ引く
   const ruleAssignees: ScheduleData["ruleAssignees"] = {};
   if (rules.length > 0) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("schedule_rule_assignees")
       .select("rule_id, role, user_id")
       .in(
         "rule_id",
         rules.map((r) => r.id),
       );
+    if (error) {
+      throw new Error(`予定の読み込みに失敗しました: ${error.message}`);
+    }
     for (const a of (data ?? []) as {
       rule_id: string;
       role: AssigneeRole;

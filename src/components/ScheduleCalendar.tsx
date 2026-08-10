@@ -1060,7 +1060,10 @@ export default function ScheduleCalendar({
                     {/* 消せるのは予定だけ。記録・見送りは履歴なので、写真ごと消える
                         取り返しのつかない操作を確認なしで置かない（記録の削除は
                         記録詳細の「…」から確認つきで行う） */}
-                    {(!openItem || openItem.status === "planned") && (
+                    {/* 「もう 1 件足す」の下書き（additional）には出さない ——
+                        record_id が空のまま送ると、その日のルールごと打ち消して
+                        しまい、保存していない下書きを捨てるだけにならない */}
+                    {!additional && (!openItem || openItem.status === "planned") && (
                       <SubmitButton
                         formAction={submit(clearPlan)}
                         className="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted"
