@@ -59,20 +59,30 @@ export default async function AppLayout({
       skippedDates: schedule.skippedDates,
     }),
   );
-  const todayPlan = plan
-    ? {
-        recordId: plan.fromRule ? "" : plan.id,
-        // ルール由来を完了するときに作る行の id（押し直しても増やさない）
-        draftId: crypto.randomUUID(),
-        date: todayStr,
-        source: plan.source,
-        label: SOURCE_LABEL[plan.source],
-        start: plan.start,
-        end: plan.end,
-        body: plan.body,
-        who: plan.who,
-      }
-    : null;
+  // 2 頭以上いる世帯では、ルール由来の予定を ＋ シートから完了できない
+  // （どの子かを選べないため）。カレンダーの日別シートへ回す
+  const { count: petCount } =
+    plan?.fromRule && membership
+      ? await supabase
+          .from("pets")
+          .select("id", { count: "exact", head: true })
+          .eq("household_id", membership.householdId)
+      : { count: 0 };
+  const todayPlan =
+    plan && !(plan.fromRule && (petCount ?? 0) > 1)
+      ? {
+          recordId: plan.fromRule ? "" : plan.id,
+          // ルール由来を完了するときに作る行の id（押し直しても増やさない）
+          draftId: crypto.randomUUID(),
+          date: todayStr,
+          source: plan.source,
+          label: SOURCE_LABEL[plan.source],
+          start: plan.start,
+          end: plan.end,
+          body: plan.body,
+          who: plan.who,
+        }
+      : null;
 
   return (
     <>

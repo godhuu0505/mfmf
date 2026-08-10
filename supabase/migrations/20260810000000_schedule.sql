@@ -665,15 +665,20 @@ declare
   v_date      date;
   v_overrides boolean;
 begin
+  -- 消せるのは「予定」だけ。別のタブで完了された行をこの経路で消せると、
+  -- 確認なしで記録と写真が消える
   select household_id, record_date, overrides_rule
     into v_household, v_date, v_overrides
     from public.daycare_records
-   where id = p_record;
+   where id = p_record
+     and status = 'planned';
   if v_household is null then
-    raise exception '予定が見つかりません（または権限がありません）' using errcode = '42501';
+    raise exception '予定が見つかりません（すでに記録になっている可能性があります）'
+      using errcode = '42501';
   end if;
 
-  delete from public.daycare_records where id = p_record;
+  delete from public.daycare_records
+   where id = p_record and status = 'planned';
   if not found then
     raise exception '予定を消せませんでした（権限がありません）' using errcode = '42501';
   end if;

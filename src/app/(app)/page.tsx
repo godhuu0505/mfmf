@@ -138,6 +138,15 @@ export default async function HomePage({
   const { data: planMemberRows } = todayPlan
     ? await supabase.rpc("get_household_members", { p_household: householdId })
     : { data: null };
+  // 2 頭以上いる世帯では、ルール由来の予定をこのカードから完了できない
+  // （どの子かを選べないため）。カレンダーの日別シートへ回す
+  const { count: petCount } =
+    todayPlan?.fromRule && householdId
+      ? await supabase
+          .from("pets")
+          .select("id", { count: "exact", head: true })
+          .eq("household_id", householdId)
+      : { count: 0 };
   const planMembers = (
     ((planMemberRows as unknown) ?? []) as {
       user_id: string;
@@ -371,6 +380,7 @@ export default async function HomePage({
         {/* きょうの予定。ここから完了して記録にできる（D34） */}
         <TodayPlanCard
           plan={todayPlan}
+          multiPet={(petCount ?? 0) > 1}
           today={todayStr}
           members={planMembers}
           canEdit={canAdd}

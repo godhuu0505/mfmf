@@ -332,6 +332,7 @@ export default function ScheduleCalendar({
 
   /** ✕ / 背景 / Esc から呼ぶ。書きかけがあれば確認をはさむ。 */
   function requestClose() {
+    if (pending) return;
     if (dirty()) {
       setConfirmClose(true);
       requestAnimationFrame(() =>
@@ -402,7 +403,14 @@ export default function ScheduleCalendar({
    */
   function submit(fn: (formData: FormData) => Promise<void>) {
     return async (formData: FormData) => {
-      await fn(formData);
+      // 送信中は ✕・背景・Esc を塞ぐ。閉じられると、あとで失敗しても
+      // 何が起きたのか分からないまま「終わった」ように見える
+      setPending(true);
+      try {
+        await fn(formData);
+      } finally {
+        setPending(false);
+      }
       close();
     };
   }

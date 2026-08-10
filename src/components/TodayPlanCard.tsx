@@ -29,6 +29,8 @@ export type TodayPlan = {
 
 type Props = {
   plan: TodayPlan | null;
+  /** 世帯に 2 頭以上いるか。ルール由来の完了はどの子か選べないので出さない */
+  multiPet?: boolean;
   today: string;
   members: { id: string; name: string; initial: string }[];
   canEdit: boolean;
@@ -45,6 +47,7 @@ export default function TodayPlanCard({
   members,
   canEdit,
   householdId,
+  multiPet = false,
 }: Props) {
   if (!plan) {
     return (
@@ -111,46 +114,50 @@ export default function TodayPlanCard({
       )}
 
       <div className="mt-3 flex gap-2">
-        {canEdit && plan.status === "planned" && (
-          // 完了は種類・時刻・担当をそのまま引き継ぐ（書き直させない）
-          <form action={completePlan} className="flex-1">
-            <input
-              type="hidden"
-              name="record_id"
-              value={plan.fromRule ? "" : plan.id}
-            />
-            {/* ルール由来を完了するときは新しい行を作る。押し直しても同じ id に
-                上書きされるよう、id はここで決めておく */}
-            {plan.fromRule && (
-              <input type="hidden" name="draft_id" value={plan.draftId} />
-            )}
-            <input type="hidden" name="record_date" value={today} />
-            <input type="hidden" name="source" value={plan.source} />
-            <input type="hidden" name="start_time" value={plan.start ?? ""} />
-            <input type="hidden" name="end_time" value={plan.end ?? ""} />
-            <input type="hidden" name="body" value={plan.body} />
-            {(["drop", "pick", "care"] as AssigneeRole[]).map((role) => (
+        {/* ルール由来の予定はまだ行が無いので、どの子かをここで選べない。
+            2 頭以上いる世帯ではカレンダーの日別シートへ回す */}
+        {canEdit &&
+          plan.status === "planned" &&
+          !(plan.fromRule && multiPet) && (
+            // 完了は種類・時刻・担当をそのまま引き継ぐ（書き直させない）
+            <form action={completePlan} className="flex-1">
               <input
-                key={role}
                 type="hidden"
-                name={`who_${role}`}
-                value={plan.who[role] ?? ""}
+                name="record_id"
+                value={plan.fromRule ? "" : plan.id}
               />
-            ))}
-            {householdId && (
-              <input type="hidden" name="household_id" value={householdId} />
-            )}
-            {/* 1 日に何件でも持てる設計なので、二重送信は一意制約に当たらず
+              {/* ルール由来を完了するときは新しい行を作る。押し直しても同じ id に
+                上書きされるよう、id はここで決めておく */}
+              {plan.fromRule && (
+                <input type="hidden" name="draft_id" value={plan.draftId} />
+              )}
+              <input type="hidden" name="record_date" value={today} />
+              <input type="hidden" name="source" value={plan.source} />
+              <input type="hidden" name="start_time" value={plan.start ?? ""} />
+              <input type="hidden" name="end_time" value={plan.end ?? ""} />
+              <input type="hidden" name="body" value={plan.body} />
+              {(["drop", "pick", "care"] as AssigneeRole[]).map((role) => (
+                <input
+                  key={role}
+                  type="hidden"
+                  name={`who_${role}`}
+                  value={plan.who[role] ?? ""}
+                />
+              ))}
+              {householdId && (
+                <input type="hidden" name="household_id" value={householdId} />
+              )}
+              {/* 1 日に何件でも持てる設計なので、二重送信は一意制約に当たらず
                 そのまま 2 件の記録になる。押下中は塞ぐ */}
-            <SubmitButton
-              pendingLabel="記録にしています…"
-              className="w-full rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950"
-            >
-              <Check className="mr-1 inline h-4 w-4" aria-hidden="true" />
-              完了して記録にする
-            </SubmitButton>
-          </form>
-        )}
+              <SubmitButton
+                pendingLabel="記録にしています…"
+                className="w-full rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950"
+              >
+                <Check className="mr-1 inline h-4 w-4" aria-hidden="true" />
+                完了して記録にする
+              </SubmitButton>
+            </form>
+          )}
         <Link
           href="/calendar"
           className="flex-1 rounded-xl border border-border py-2.5 text-center text-sm font-medium transition hover:bg-surface-muted"
