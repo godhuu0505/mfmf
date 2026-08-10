@@ -11,6 +11,7 @@ import {
   type DaycareRecord,
   type RecordPhoto,
   type RecordTagJoin,
+  SOURCE_BADGE,
 } from "@/types/database";
 import RecordForm from "@/components/RecordForm";
 import RecordActionsSheet from "@/components/RecordActionsSheet";
@@ -189,9 +190,7 @@ export default async function RecordDetailPage({
                   <span
                     className={
                       "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium " +
-                      (record.source === "home"
-                        ? "bg-amber-100 text-amber-900"
-                        : "bg-sky-100 text-sky-900")
+                      SOURCE_BADGE[record.source]
                     }
                   >
                     <SourceIcon source={record.source} className="h-3.5 w-3.5" />

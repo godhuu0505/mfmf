@@ -7,6 +7,7 @@ import {
   tagsFromJoin,
   type RecordSource,
   type RecordWithPhotos,
+  SOURCE_BADGE,
 } from "@/types/database";
 import {
   buildIlikeOr,
@@ -48,12 +49,11 @@ function excerpt(body: string, max = 80) {
 }
 
 function SourceBadge({ source }: { source: RecordSource }) {
-  const isHome = source === "home";
   return (
     <span
       className={
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
-        (isHome ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-900")
+        SOURCE_BADGE[source]
       }
     >
       <SourceIcon source={source} className="h-3.5 w-3.5" />

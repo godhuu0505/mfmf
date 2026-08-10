@@ -212,11 +212,10 @@ create policy "schedule_rules_insert_member"
     and public.is_household_member(household_id, created_by)
   );
 
-drop policy if exists "schedule_rules_update_member" on public.schedule_rules;
-create policy "schedule_rules_update_member"
-  on public.schedule_rules for update
-  using (public.has_household_role(household_id, array['owner','editor']))
-  with check (public.has_household_role(household_id, array['owner','editor']));
+-- update ポリシーは**作らない**。Data API から直接 since / weekday / kind を書き換え
+-- られると、その版が効いていた過去の日まで別の内容になってしまう（版で積む意味が
+-- 消える）。変更は「新しい版を積む」= insert、取り消しは delete で行う。
+revoke update on public.schedule_rules from authenticated;
 
 drop policy if exists "schedule_rules_delete_member" on public.schedule_rules;
 create policy "schedule_rules_delete_member"
@@ -313,7 +312,9 @@ comment on table public.schedule_rule_skips is
   'その日だけ曜日ルールを効かせない（打ち消し）。行を消すとルールに戻る';
 
 alter table public.schedule_rule_skips enable row level security;
-grant select, insert, update, delete on public.schedule_rule_skips to authenticated;
+-- 打ち消しは「あるか無いか」だけ。更新する意味がないので update は渡さない
+-- （同じ日を 2 度消しても ON CONFLICT DO NOTHING で通る）
+grant select, insert, delete on public.schedule_rule_skips to authenticated;
 grant all on public.schedule_rule_skips to service_role;
 
 drop policy if exists "schedule_rule_skips_select_member" on public.schedule_rule_skips;
@@ -335,7 +336,35 @@ create policy "schedule_rule_skips_delete_member"
   using (public.has_household_role(household_id, array['owner','editor']));
 
 -- ---------------------------------------------------------------
--- 6. updated_at の維持（既存テーブルと同じトリガ関数を使う）
+-- 6. ゲストの経路は「記録」だけに閉じる
+--    daycare_records に status / overrides_rule が増えたので、20260705000000 の
+--    ゲストポリシーをそのままにすると、ゲストが planned の行や overrides_rule = true
+--    の行を作れてしまう（世帯の毎週の予定を隠せる）。読み書きとも done に限る。
+-- ---------------------------------------------------------------
+drop policy if exists "records_select_guest" on public.daycare_records;
+create policy "records_select_guest"
+  on public.daycare_records for select
+  using (
+    status = 'done'
+    and pet_id is not null
+    and (owner_id = auth.uid() or guest_visible)
+    and public.has_guest_record_access(household_id, pet_id, record_date)
+  );
+
+drop policy if exists "records_insert_guest" on public.daycare_records;
+create policy "records_insert_guest"
+  on public.daycare_records for insert
+  with check (
+    status = 'done'
+    and overrides_rule = false
+    and pet_id is not null
+    and owner_id = auth.uid()
+    and guest_visible = false
+    and public.has_guest_record_access(household_id, pet_id, record_date)
+  );
+
+-- ---------------------------------------------------------------
+-- 7. updated_at の維持（既存テーブルと同じトリガ関数を使う）
 -- ---------------------------------------------------------------
 drop trigger if exists schedule_rules_set_updated_at on public.schedule_rules;
 create trigger schedule_rules_set_updated_at

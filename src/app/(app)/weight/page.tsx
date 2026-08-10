@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHouseholdId, householdScopeFilter } from "@/lib/household";
 import { jstTodayISO, minusMonthsISO } from "@/lib/dateRange";
-import { SOURCE_LABEL, type DaycareRecord } from "@/types/database";
+import { SOURCE_LABEL, type DaycareRecord, SOURCE_BADGE } from "@/types/database";
 import SourceIcon from "@/components/SourceIcon";
 import WeightChart, { type WeightPoint } from "@/components/WeightChart";
 
@@ -167,9 +167,7 @@ export default async function WeightPage({
                       <span
                         className={
                           "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
-                          (r.source === "home"
-                            ? "bg-amber-100 text-amber-900"
-                            : "bg-sky-100 text-sky-900")
+                          SOURCE_BADGE[r.source]
                         }
                       >
                         <SourceIcon source={r.source} className="h-3 w-3" />

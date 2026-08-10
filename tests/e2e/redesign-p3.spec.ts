@@ -30,7 +30,7 @@ test("UC-F01: 記録フォームのキャンセルは確認してから破棄す
   await page.waitForURL((url) => url.pathname === "/");
 });
 
-test("UC-C01: カレンダーの日タップでその日の記録シートが開く", async ({
+test("UC-C01: カレンダーの日タップでその日の予定シートが開く", async ({
   page,
 }) => {
   const marker = `E2E-calendar-${Date.now()}`;
@@ -38,20 +38,22 @@ test("UC-C01: カレンダーの日タップでその日の記録シートが開
   await quickRecord(page, marker);
 
   await page.goto("/calendar");
-  // 今日のセル（記録あり）をタップ → 日別シートに今日の記録が出る
-  await page
-    .getByRole("button", { name: /記録\d+件/ })
-    .last()
-    .click();
-  const sheet = page.getByRole("dialog", { name: /の記録$/ });
+  // JST の今日のセル（いま作った記録がある日）を開く
+  const jstToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+  }).format(new Date());
+  await page.locator(`[data-day="${jstToday}"]`).click();
+
+  const sheet = page.getByRole("dialog", { name: /の予定$/ });
   await expect(sheet).toBeVisible();
+  // クイック記録は「記録ずみ」。予定の編集欄と一緒に、その記録も見える
   await expect(sheet.getByText(marker)).toBeVisible();
   await expect(
-    sheet.getByRole("link", { name: "この日の記録を追加" }),
+    sheet.getByRole("button", { name: "予定を保存する" }),
   ).toBeVisible();
 
-  // シートの記録行から詳細へ
-  await sheet.getByText(marker).click();
+  // 記録を開くと詳細へ
+  await sheet.getByRole("link", { name: "記録を開く" }).click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/);
 });
 

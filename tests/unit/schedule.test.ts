@@ -192,11 +192,11 @@ describe("sortItems / planOnDate", () => {
     expect(sorted.map((x) => x.id)).toEqual(["a", "c", "b"]);
   });
 
-  it("予定があれば予定を、無ければ先頭を返す", () => {
+  it("予定があれば予定を返す。記録だけの日は null（記録を予定として開かない）", () => {
     const done = { ...base, id: "d", status: "done" as const, start: null, end: null };
     const planned = { ...base, id: "p", status: "planned" as const, start: "09:00", end: "10:00" };
     expect(planOnDate([done, planned])?.id).toBe("p");
-    expect(planOnDate([done])?.id).toBe("d");
+    expect(planOnDate([done])).toBeNull();
     expect(planOnDate([])).toBeNull();
   });
 });

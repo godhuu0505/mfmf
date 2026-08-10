@@ -189,8 +189,9 @@ export function sortItems(items: ScheduleItem[]): ScheduleItem[] {
 
 /**
  * その日の「予定」。編集シートや担当のまとめ入力が扱う 1 件。
- * 記録だけを足した日でも、ルール由来の予定はここに出る。
+ * 予定が無ければ null —— 記録だけの日に、済んだ記録を「その日の予定」として
+ * 差し出すと、新しい予定を入れるつもりが記録の編集になってしまう。
  */
 export function planOnDate(items: ScheduleItem[]): ScheduleItem | null {
-  return items.find((x) => x.status === "planned") ?? items[0] ?? null;
+  return items.find((x) => x.status === "planned") ?? null;
 }

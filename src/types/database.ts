@@ -29,6 +29,20 @@ export const SOURCE_LABEL: Record<RecordSource, string> = {
   other: "その他",
 };
 
+// バッジの配色。種類が増えたので、非 home をすべて保育園色にしない
+export const SOURCE_BADGE: Record<RecordSource, string> = {
+  daycare: "bg-sky-100 text-sky-900",
+  home: "bg-amber-100 text-amber-900",
+  family: "bg-emerald-100 text-emerald-900",
+  clinic: "bg-violet-100 text-violet-900",
+  outing: "bg-rose-100 text-rose-900",
+  other: "bg-slate-100 text-slate-900",
+};
+
+// クイック記録とゲストの記入で選べる種類。ここは「記録元」の意味のままにする
+// （通院・おでかけは予定から作るものなので、最小の記入経路には出さない）
+export const QUICK_SOURCES: RecordSource[] = ["daycare", "home"];
+
 // 種類ごとの絵文字（プロトで合意した見た目。アイコンは SourceIcon 側）
 export const SOURCE_EMOJI: Record<RecordSource, string> = {
   daycare: "🏫",

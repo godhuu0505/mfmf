@@ -7,6 +7,7 @@ import {
   SOURCE_LABEL,
   type DaycareRecord,
   type RecordSource,
+  SOURCE_BADGE,
 } from "@/types/database";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import SourceIcon from "@/components/SourceIcon";
@@ -119,9 +120,7 @@ export default async function GuestPage() {
                         <span
                           className={
                             "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
-                            (r.source === "home"
-                              ? "bg-amber-100 text-amber-900"
-                              : "bg-sky-100 text-sky-900")
+                            SOURCE_BADGE[r.source as RecordSource]
                           }
                         >
                           <SourceIcon

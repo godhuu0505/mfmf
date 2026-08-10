@@ -1,17 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import {
-  canEdit,
-  getCurrentMembership,
-  householdScopeFilter,
-} from "@/lib/household";
-import { SOURCE_LABEL, type RecordWithPhotos } from "@/types/database";
-import CalendarMonth, {
-  type CalendarDayRecord,
-} from "@/components/CalendarMonth";
-import SourceIcon from "@/components/SourceIcon";
+import { canEdit, getCurrentMembership } from "@/lib/household";
+import ScheduleCalendar, {
+  type CalendarItem,
+  type CalendarMember,
+} from "@/components/ScheduleCalendar";
+import { EMPTY_SCHEDULE, fetchSchedule } from "@/lib/scheduleQuery";
+import { itemsOnDate } from "@/lib/schedule";
 import { jstTodayISO } from "@/lib/dateRange";
-import { Camera } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -42,8 +38,34 @@ function ymString(year: number, month: number) {
 }
 
 function shiftMonth(year: number, month: number, delta: number) {
-  const idx = (year * 12 + (month - 1)) + delta;
+  const idx = year * 12 + (month - 1) + delta;
   return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
+}
+
+/** iso の n 日後（YYYY-MM-DD）。実行 TZ に依存させない。 */
+function addDays(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
+}
+
+/** iso を含む週（日曜はじまり）の 7 日。 */
+function weekOf(iso: string): string[] {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  const start = addDays(iso, -dow);
+  return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+/** 表示名が無い人も「誰か」が分かるように、メール名 → 「メンバー」の順で落とす。 */
+function memberLabel(row: {
+  display_name: string | null;
+  email: string | null;
+}): string {
+  const name = row.display_name?.trim();
+  if (name) return name;
+  const local = row.email?.split("@")[0]?.trim();
+  return local || "メンバー";
 }
 
 export default async function CalendarPage({
@@ -66,32 +88,54 @@ export default async function CalendarPage({
   const lastDay = `${year}-${pad(month)}-${pad(lastDate)}`;
 
   const supabase = await createClient();
-  // 読み取りは household 基準へ寄せる（未所属は owner_id RLS にフォールバック）。
   const membership = await getCurrentMembership(supabase);
   const householdId = membership?.householdId ?? null;
   const canAdd = membership !== null && canEdit(membership.role);
-  let query = supabase
-    .from("daycare_records")
-    .select("*, record_photos(*)")
-    .gte("record_date", firstDay)
-    .lte("record_date", lastDay)
-    .order("record_date", { ascending: true })
-    .order("created_at", { ascending: true });
-  if (householdId) query = query.or(householdScopeFilter(householdId));
-  const { data } = await query.returns<RecordWithPhotos[]>();
 
-  const records = data ?? [];
+  // 週表示は「その月の今日」を含む週。別の月を見ているときはその月の 1 日の週。
+  const weekAnchor =
+    year === todayYear && month === todayMonth ? todayStr : firstDay;
+  const weekDays = weekOf(weekAnchor);
 
-  // 日付(YYYY-MM-DD) -> その日の記録
-  const byDate = new Map<string, RecordWithPhotos[]>();
-  for (const r of records) {
-    const list = byDate.get(r.record_date) ?? [];
-    list.push(r);
-    byDate.set(r.record_date, list);
+  // 月グリッドと週表示の両方を賄う範囲でまとめて取る
+  const from = weekDays[0] < firstDay ? weekDays[0] : firstDay;
+  const to = weekDays[6] > lastDay ? weekDays[6] : lastDay;
+
+  const schedule = householdId
+    ? await fetchSchedule(supabase, householdId, from, to)
+    : EMPTY_SCHEDULE;
+
+  const { data: memberRows } = householdId
+    ? await supabase.rpc("get_household_members", { p_household: householdId })
+    : { data: null };
+  const members: CalendarMember[] = (
+    ((memberRows as unknown) ?? []) as {
+      user_id: string;
+      display_name: string | null;
+      email: string | null;
+    }[]
+  ).map((m) => {
+    const name = memberLabel(m);
+    return { id: m.user_id, name, initial: [...name][0] ?? "?" };
+  });
+
+  // 月グリッド + 週の 7 日ぶんを、同じ規則（ルール由来を足す）で組み立てる
+  const dates = new Set<string>(weekDays);
+  for (let d = 1; d <= lastDate; d++) dates.add(`${year}-${pad(month)}-${pad(d)}`);
+  const itemsByDate: Record<string, CalendarItem[]> = {};
+  for (const date of dates) {
+    const items = itemsOnDate({
+      date,
+      records: schedule.records,
+      rules: schedule.rules,
+      ruleAssignees: schedule.ruleAssignees,
+      skippedDates: schedule.skippedDates,
+    });
+    if (items.length > 0) itemsByDate[date] = items;
   }
 
   // カレンダーグリッド（前後の空白セルを含む）
-  const firstWeekday = new Date(year, month - 1, 1).getDay(); // 0=日
+  const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay(); // 0=日
   const cells: (number | null)[] = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
   for (let d = 1; d <= lastDate; d++) cells.push(d);
@@ -100,131 +144,73 @@ export default async function CalendarPage({
   const prev = shiftMonth(year, month, -1);
   const next = shiftMonth(year, month, 1);
   const isCurrentMonth = year === todayYear && month === todayMonth;
+  const monthCount = Object.entries(itemsByDate).filter(
+    ([date]) => date >= firstDay && date <= lastDay,
+  ).length;
 
   return (
-    <>
-      <main id="main" className="mx-auto max-w-2xl px-4 py-6">
-        <div className="mb-4 flex items-center justify-between">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← 一覧へ戻る
-          </Link>
-        </div>
-
-        <div className="mb-4 flex items-center justify-between">
-          <Link
-            href={`/calendar?ym=${ymString(prev.year, prev.month)}`}
-            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
-            aria-label="前の月"
-          >
-            ‹ 前月
-          </Link>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-foreground">
-              {year}年{month}月
-            </h1>
-            {/* 今月へのショートカット（proto 合意 / notes.md）。今月表示中は出さない。
-                素の <a>（フル遷移）にしている: CI 環境でこのリンクだけ Link の
-                クライアント遷移が確定しない事象が再現し（最小再現では起きず、
-                計装との相互作用が疑い）、月ジャンプは毎回サーバー描画なので
-                フル遷移でも体感差がないため、確実に動く方を取る。 */}
-            {!isCurrentMonth && (
-              <a
-                href={`/calendar?ym=${ymString(todayYear, todayMonth)}`}
-                className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
-              >
-                今日
-              </a>
-            )}
-          </div>
-          <Link
-            href={`/calendar?ym=${ymString(next.year, next.month)}`}
-            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
-            aria-label="次の月"
-          >
-            翌月 ›
-          </Link>
-        </div>
-
-        {/* 月カレンダー（日タップでその日のシートが開く / UC-C01） */}
-        <CalendarMonth
-          year={year}
-          month={month}
-          cells={cells}
-          todayStr={todayStr}
-          canAdd={canAdd}
-          days={Object.fromEntries(
-            [...byDate.entries()].map(([date, rs]) => [
-              date,
-              rs.map(
-                (r): CalendarDayRecord => ({
-                  id: r.id,
-                  source: r.source,
-                  body: r.body,
-                  photoCount: r.record_photos?.length ?? 0,
-                }),
-              ),
-            ]),
+    <main id="main" className="mx-auto max-w-2xl px-4 py-6">
+      <div className="mb-4 flex items-center justify-between">
+        <Link
+          href={`/calendar?ym=${ymString(prev.year, prev.month)}`}
+          className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
+          aria-label="前の月"
+        >
+          ‹ 前月
+        </Link>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-bold text-foreground">
+            {year}年{month}月
+          </h1>
+          {/* 今月へのショートカット（proto 合意 / notes.md）。今月表示中は出さない。
+              素の <a>（フル遷移）にしている: CI 環境でこのリンクだけ Link の
+              クライアント遷移が確定しない事象が再現し（最小再現では起きず、
+              計装との相互作用が疑い）、月ジャンプは毎回サーバー描画なので
+              フル遷移でも体感差がないため、確実に動く方を取る。 */}
+          {!isCurrentMonth && (
+            <a
+              href={`/calendar?ym=${ymString(todayYear, todayMonth)}`}
+              className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
+            >
+              今日
+            </a>
           )}
-        />
+        </div>
+        <Link
+          href={`/calendar?ym=${ymString(next.year, next.month)}`}
+          className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
+          aria-label="次の月"
+        >
+          翌月 ›
+        </Link>
+      </div>
 
-        {/* この月の記録（日付ごと） */}
-        <section className="mt-8">
-          <h2 className="mb-3 text-sm font-medium text-foreground">
-            この月の記録（{records.length}件）
-          </h2>
-          {records.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-              この月の記録はありません。
-            </div>
-          ) : (
-            <ul className="space-y-4">
-              {[...byDate.entries()].map(([date, dayRecords]) => (
-                <li key={date} id={`day-${date}`} className="scroll-mt-4">
-                  <p className="mb-1.5 text-sm font-semibold text-foreground">
-                    {new Intl.DateTimeFormat("ja-JP", {
-                      month: "long",
-                      day: "numeric",
-                      weekday: "short",
-                    }).format(new Date(date))}
-                  </p>
-                  <ul className="space-y-2">
-                    {dayRecords.map((r) => (
-                      <li key={r.id}>
-                        <Link
-                          href={`/records/${r.id}`}
-                          className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm shadow-sm ring-1 ring-border transition hover:ring-border"
-                        >
-                          <span
-                            className={
-                              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
-                              (r.source === "home"
-                                ? "bg-amber-100 text-amber-900"
-                                : "bg-sky-100 text-sky-900")
-                            }
-                          >
-                            <SourceIcon source={r.source} className="h-3.5 w-3.5" />
-                            {SOURCE_LABEL[r.source]}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-foreground">
-                            {r.body.replace(/\s+/g, " ").trim() || "（本文なし）"}
-                          </span>
-                          {(r.record_photos?.length ?? 0) > 0 && (
-                            <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                              <Camera className="h-3.5 w-3.5" aria-hidden="true" />
-                              <span className="sr-only">写真</span>
-                              {r.record_photos.length}
-                            </span>
-                          )}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </main>
-    </>
+      <ScheduleCalendar
+        year={year}
+        month={month}
+        cells={cells}
+        todayStr={todayStr}
+        itemsByDate={itemsByDate}
+        weekDays={weekDays}
+        members={members}
+        skippedDates={[...schedule.skippedDates]}
+        canEdit={canAdd}
+        householdId={householdId}
+      />
+
+      <p className="mt-6 text-sm text-muted-foreground">
+        {monthCount === 0
+          ? "この月の予定・記録はまだありません。日をタップして予定を入れられます。"
+          : `この月は ${monthCount} 日ぶんの予定・記録があります。`}
+      </p>
+      <p className="mt-2 text-sm">
+        <Link
+          href="/schedule/rules"
+          className="text-primary underline underline-offset-4"
+        >
+          毎週の予定ルールを決める
+        </Link>
+      </p>
+    </main>
   );
 }

@@ -12,7 +12,7 @@ import {
 } from "@/components/FormConfirm";
 import {
   PHOTO_BUCKET,
-  RECORD_SOURCES,
+  QUICK_SOURCES,
   SOURCE_LABEL,
   type RecordSource,
 } from "@/types/database";
@@ -223,7 +223,7 @@ export default function RecordForm({
         </span>
         <input type="hidden" name="source" value={source} />
         <div className="inline-flex rounded-lg border border-border p-0.5">
-          {RECORD_SOURCES.map((s) => (
+          {QUICK_SOURCES.map((s) => (
             <button
               key={s}
               type="button"
