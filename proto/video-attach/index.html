@@ -1514,7 +1514,7 @@ input[type="date"] {
     items: [],         // フォームで追加中のメディア
     checking: 0,       // 取り込みの検査待ち件数（確認中タイルの数）
     formGen: 0,        // フォームを開くたびに増える。取り込みの帰属先を見分ける
-    ingesting: 0,      // 進行中の取り込み数（保存をブロックする）
+    ingesting: new Map(), // 世代 → 進行中の取り込み数（保存のブロックに使う）
     existing: [],      // 編集時の「登録済み」メディア
     source: "daycare",
     records: [
@@ -1611,6 +1611,7 @@ input[type="date"] {
   // ---------------- フォーム ----------------
   function openForm(recordId) {
     state.formGen += 1; // 前のフォーム宛ての取り込みを無効化する
+    state.checking = 0;
     state.editingId = recordId;
     state.items.forEach(release);
     state.items = [];
@@ -1651,9 +1652,10 @@ input[type="date"] {
   $("[data-form-save]").addEventListener("click", () => {
     // 検査中・取り込み中のファイルは state.items にまだ入っていない。
     // ここでブロックしないと、選んだメディアが保存から抜け落ちる。
+    // 前のフォーム宛ての取り込みがまだ動いていても、いまのフォームの保存は止めない
     if (
       state.checking > 0 ||
-      state.ingesting > 0 ||
+      (state.ingesting.get(state.formGen) ?? 0) > 0 ||
       state.items.some((i) => i.status !== "ready")
     ) {
       toast("処理が終わるまでお待ちください");
@@ -1785,11 +1787,15 @@ input[type="date"] {
     const files = Array.from(fileList);
     if (files.length === 0) return;
     const gen = state.formGen;
-    state.ingesting += 1;
+    state.ingesting.set(gen, (state.ingesting.get(gen) ?? 0) + 1);
     ingestChain = ingestChain
       .then(() => ingest(files, gen))
       .catch(() => {})
-      .finally(() => { state.ingesting -= 1; });
+      .finally(() => {
+        const n = (state.ingesting.get(gen) ?? 1) - 1;
+        if (n > 0) state.ingesting.set(gen, n);
+        else state.ingesting.delete(gen);
+      });
   }
 
   async function ingest(files, gen) {
@@ -1803,6 +1809,7 @@ input[type="date"] {
     // 動画は枠を取る前に長さを検査する。ダメな動画が先に枠を取ると、
     // 後ろの正しい動画まで本数上限で弾かれて結局どちらも残らない。
     for (let idx = 0; idx < files.length; idx++) {
+      if (gen !== state.formGen) break; // フォームが切り替わった
       const file = files[idx];
       state.checking = files.length - idx; // これから確認するぶん
       renderAll();
@@ -1843,7 +1850,6 @@ input[type="date"] {
         item.duration = meta.duration;
       }
       queue.push(item);
-      if (gen !== state.formGen) break; // フォームが切り替わった
     }
     state.checking = 0;
 
@@ -1984,26 +1990,40 @@ input[type="date"] {
       v.preload = "metadata";
       v.muted = true;
       let settled = false;
-      const done = (dur) => { if (!settled) { settled = true; resolve({ url, duration: dur }); } };
+      let timer = null;
+      const done = (dur) => {
+        if (settled) return;
+        settled = true;
+        // タイマーと一時 video を残すとデコーダのバッファごと居座る。
+        // objectURL は採用したアイテムが使うのでここでは revoke しない。
+        if (timer) clearTimeout(timer);
+        v.onloadedmetadata = v.ondurationchange = v.onerror = null;
+        v.removeAttribute("src");
+        v.load();
+        resolve({ url, duration: dur });
+      };
       // loadedmetadata の時点で duration が Infinity / NaN のことがある
       // （ブラウザで録画した WebM など）。確定させず durationchange を待つ。
       const settleIfKnown = () => { if (isFinite(v.duration) && v.duration > 0) done(v.duration); };
       v.onloadedmetadata = settleIfKnown;
       v.ondurationchange = settleIfKnown;
       v.onerror = () => done(null);
-      setTimeout(() => done(isFinite(v.duration) && v.duration > 0 ? v.duration : null), 15000);
+      timer = setTimeout(
+        () => done(isFinite(v.duration) && v.duration > 0 ? v.duration : null),
+        15000,
+      );
       v.src = url;
     });
   }
 
   // 1フレーム目をサムネにする（実装では poster として別途 Storage に保存する想定）
-  let thumbJob = 0;
   function grabVideoThumb(item) {
-    const job = ++thumbJob;
     const v = document.createElement("video");
     v.preload = "metadata"; v.muted = true; v.playsInline = true; v.src = item.url;
     v.onloadeddata = () => {
-      if (job !== thumbJob || !itemExists(item)) return;
+      // 複数本を並行して処理することがあるので、打ち切りの判断はアイテム単位で行う
+      // （共通のカウンタだと、後から始まった生成が先のものを取り消してしまう）
+      if (!itemExists(item)) return;
       try {
         // 4K をそのまま載せると 30MB 超のバッファを確保してしまう
         const MAX = 640;
