@@ -1534,6 +1534,12 @@ input[type="date"] {
   const fmtBytes = (b) =>
     b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`;
   const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const WD = ["日", "月", "火", "水", "木", "金", "土"];
+  const formatLabel = (iso) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    const wd = WD[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+    return `${m}月${d}日(${wd})`;
+  };
   const fmtDurJa = (s) => {
     const t = Math.round(s);
     return t >= 60 ? `${Math.floor(t / 60)}分${t % 60}秒` : `${t}秒`;
@@ -1621,6 +1627,9 @@ input[type="date"] {
     state.source = recordId
       ? state.records.find((r) => r.id === recordId).source
       : "home";
+    const rec = recordId ? state.records.find((r) => r.id === recordId) : null;
+    $("#author").value = rec?.author ?? "";
+    $("#body").value = rec && rec.body !== "（本文なし）" ? rec.body : "";
     $("[data-form-title]").hidden = !recordId;
     $("[data-form-submit-label]").textContent = recordId ? "更新する" : "保存する";
     $("[data-existing-section]").hidden = !recordId || state.existing.length === 0;
@@ -1663,18 +1672,29 @@ input[type="date"] {
     }
     if (state.editingId) {
       const rec = state.records.find((r) => r.id === state.editingId);
-      rec.media = [...state.existing, ...state.items];
+      const next = [...state.existing, ...state.items];
+      // 編集で外したものはここで確定。objectURL を残すとブラウザが blob を抱え続ける
+      rec.media.filter((m) => !next.includes(m)).forEach(forget);
+      rec.media = next;
       rec.source = state.source;
+      rec.author = $("#author").value.trim();
+      rec.body = $("#body").value.trim() || "（本文なし）";
       state.items = [];
       state.viewingId = rec.id;
       renderHome(); renderAlbum(); renderDetail();
       show("detail");
       toast("更新しました");
     } else {
+      // 画面に入れた値をそのまま使う（固定値だと保存後の見え方が確かめられない）
+      const dateValue = $("#date").value || "2026-08-10";
       const rec = {
-        id: "n" + Date.now(), date: "2026-08-10", label: "今日",
-        source: state.source, author: "おかあさん",
-        body: "今日の様子を残しました。", tags: [], media: state.items,
+        id: "n" + Date.now(),
+        date: dateValue,
+        label: dateValue === "2026-08-10" ? "今日" : formatLabel(dateValue),
+        source: state.source,
+        author: $("#author").value.trim(),
+        body: $("#body").value.trim() || "（本文なし）",
+        tags: [], media: state.items,
       };
       state.records.unshift(rec);
       state.items = [];
@@ -1819,10 +1839,6 @@ input[type="date"] {
         errors.push({ msg: `${file.name} — 合計${MAX_ITEMS}件までです` }); continue;
       }
       if (file.size === 0) { errors.push({ msg: `${file.name} — 中身が空のようです` }); continue; }
-      if (file.size > MAX_OBJECT_BYTES) {
-        errors.push({ msg: `${file.name} — ${fmtBytes(file.size)}。1ファイル ${MAX_OBJECT_MB}MB までです` });
-        continue;
-      }
       const item = {
         id: ++seq, kind, name: file.name || (kind === "video" ? "動画" : "写真"),
         file, size: file.size, after: null, url: null, thumb: null,
@@ -1902,9 +1918,10 @@ input[type="date"] {
     if (item.kind === "photo") {
       const out = await resizePhoto(item.file);
       if (!alive(item)) { if (out.url) URL.revokeObjectURL(out.url); return; }
+      // 縮小できなかった経路（デコード不可・GIF/SVG）は元のまま。ここで上限に当てる
       if (out.size > MAX_OBJECT_BYTES) {
         URL.revokeObjectURL(out.url);
-        errors.push({ msg: `${item.name} — ${fmtBytes(out.size)}。1ファイル ${MAX_OBJECT_MB}MB までです` });
+        errors.push({ msg: `${item.name} — 保存サイズが ${fmtBytes(out.size)} で、上限の ${MAX_OBJECT_MB}MB を超えます` });
         drop(item); return;
       }
       item.after = out.size; item.url = out.url; item.thumb = out.url;
@@ -1919,6 +1936,10 @@ input[type="date"] {
     if (!alive(item)) return;
     // 必ず H.264 へ再エンコードするので出力はビットレートで決まる
     item.after = estVideoBytes(item.duration);
+    if (item.after > MAX_OBJECT_BYTES) {
+      errors.push({ msg: `${item.name} — 保存サイズが ${fmtBytes(item.after)} で、上限の ${MAX_OBJECT_MB}MB を超えます` });
+      drop(item); return;
+    }
     item.status = "ready";
     renderAll();
     grabVideoThumb(item);
@@ -2173,8 +2194,8 @@ input[type="date"] {
     const r = current();
     if (!r) return;
     $("[data-detail-badges]").innerHTML = badge(r.source);
-    $("[data-detail-date]").textContent =
-      r.label === "今日" ? "2026年8月10日(月)" : `2026年${r.label}`;
+    // 詳細は「今日/昨日」ではなく実日付を出す（本番の formatDate と同じ粒度）
+    $("[data-detail-date]").textContent = `2026年${formatLabel(r.date)}`;
     $("[data-detail-author]").textContent = r.author ? `記入者: ${r.author}` : "";
     $("[data-detail-body]").textContent = r.body || "（本文なし）";
     $("[data-detail-tags]").innerHTML = r.tags
