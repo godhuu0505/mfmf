@@ -1303,7 +1303,7 @@ input[type="date"] {
       </button>
     </div>
 
-    <h1 data-form-title hidden class="text-xl font-bold text-foreground">記録を編集</h1>
+    <h1 data-form-title class="text-xl font-bold text-foreground">記録を追加</h1>
 
     <div>
       <span class="mb-1 block text-sm font-medium text-foreground">記録元</span>
@@ -1511,7 +1511,7 @@ input[type="date"] {
 </div>
 
 <!-- ===== プロト専用: 上限の設定シート ===== -->
-<div data-settings hidden class="fixed inset-0 z-50">
+<div data-settings hidden role="dialog" aria-modal="true" aria-label="上限を試す" class="fixed inset-0 z-50">
   <div class="absolute inset-0 bg-black/40" data-close-settings></div>
   <div class="safe-px absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-border bg-surface py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
     <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
@@ -1641,6 +1641,9 @@ input[type="date"] {
       b.className =
         "flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium transition " +
         (on ? "text-primary" : "text-muted-foreground hover:text-foreground");
+      // 現在地を色だけで伝えない（本番の AppTabBar と同じ）
+      if (on) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
     });
     window.scrollTo({ top: 0 });
   }
@@ -1710,9 +1713,11 @@ input[type="date"] {
       : "home";
     const rec = recordId ? state.records.find((r) => r.id === recordId) : null;
     $("#date").value = rec?.date ?? "2026-08-10";
+    $("#pet").value = rec?.pet ?? "もふ";
+    $("#weight").value = rec?.weight ?? "";
     $("#author").value = rec?.author ?? "";
     $("#body").value = rec && rec.body !== "（本文なし）" ? rec.body : "";
-    $("[data-form-title]").hidden = !recordId;
+    $("[data-form-title]").textContent = recordId ? "記録を編集" : "記録を追加";
     $("[data-form-submit-label]").textContent = recordId ? "更新する" : "保存する";
     $("[data-existing-section]").hidden = !recordId || state.existing.length === 0;
     clearErrors();
@@ -1834,6 +1839,8 @@ input[type="date"] {
       rec.date = $("#date").value || rec.date;
       rec.label = rec.date === "2026-08-10" ? "今日" : formatLabel(rec.date);
       rec.author = $("#author").value.trim();
+      rec.pet = $("#pet").value;
+      rec.weight = $("#weight").value;
       rec.body = $("#body").value.trim() || "（本文なし）";
       state.items = [];
       state.viewingId = rec.id;
@@ -1848,6 +1855,8 @@ input[type="date"] {
         date: dateValue,
         label: dateValue === "2026-08-10" ? "今日" : formatLabel(dateValue),
         source: state.source,
+        pet: $("#pet").value,
+        weight: $("#weight").value,
         author: $("#author").value.trim(),
         body: $("#body").value.trim() || "（本文なし）",
         tags: [], media: state.items,
@@ -1890,9 +1899,30 @@ input[type="date"] {
     b.addEventListener("click", () => { state.maxVideos = Number(b.dataset.maxvideos); onLimitsChanged(); }));
   $$("[data-quality]").forEach((b) =>
     b.addEventListener("click", () => { state.quality = Number(b.dataset.quality); onLimitsChanged(); }));
-  $("[data-open-settings]").addEventListener("click", () => ($("[data-settings]").hidden = false));
-  $$("[data-close-settings]").forEach((b) =>
-    b.addEventListener("click", () => ($("[data-settings]").hidden = true)));
+  let settingsPrevFocus = null;
+  let settingsInertTargets = [];
+  $("[data-open-settings]").addEventListener("click", () => {
+    const sheet = $("[data-settings]");
+    sheet.hidden = false;
+    settingsPrevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    settingsInertTargets = Array.from(document.body.children).filter(
+      (el) => el instanceof HTMLElement && el !== sheet,
+    );
+    settingsInertTargets.forEach((el) => { el.inert = true; });
+    requestAnimationFrame(() => $("[data-cap='30']").focus({ preventScroll: true }));
+  });
+  function closeSettings() {
+    if ($("[data-settings]").hidden) return;
+    $("[data-settings]").hidden = true;
+    settingsInertTargets.forEach((el) => { el.inert = false; });
+    settingsInertTargets = [];
+    settingsPrevFocus?.focus({ preventScroll: true });
+    settingsPrevFocus = null;
+  }
+  $$("[data-close-settings]").forEach((b) => b.addEventListener("click", closeSettings));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeSettings();
+  });
 
   function onLimitsChanged() {
     renderSettings();
@@ -1988,16 +2018,15 @@ input[type="date"] {
     const queue = [];
     // 動画のメタデータ待ちの間、選んだぶんは「確認中」のタイルで見せる。
     // 何も起きていないように見えると、＋タイルから重ねて選ばれてしまう。
-    state.checking = files.length;
-    renderAll();
+    if (gen === state.formGen) { state.checking = files.length; renderAll(); }
 
     // 動画は枠を取る前に長さを検査する。ダメな動画が先に枠を取ると、
     // 後ろの正しい動画まで本数上限で弾かれて結局どちらも残らない。
     for (let idx = 0; idx < files.length; idx++) {
       if (gen !== state.formGen) break; // フォームが切り替わった
       const file = files[idx];
-      state.checking = files.length - idx; // これから確認するぶん
-      renderAll();
+      // 別世代の検査が今のフォームの「確認中」を消さないようにする
+      if (gen === state.formGen) { state.checking = files.length - idx; renderAll(); }
       const kind = classify(file);
       if (!kind) { errors.push({ msg: `${file.name} — 写真でも動画でもないようです` }); continue; }
       if (allCount() + queue.length >= MAX_ITEMS) {
@@ -2032,7 +2061,7 @@ input[type="date"] {
       }
       queue.push(item);
     }
-    state.checking = 0;
+    if (gen === state.formGen) state.checking = 0;
 
     // 別のフォームに移っていたら、このぶんは捨てる（違う記録に混ざらないように）
     if (gen !== state.formGen) {
