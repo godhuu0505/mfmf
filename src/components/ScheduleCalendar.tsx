@@ -40,6 +40,8 @@ export type CalendarItem = {
   body: string;
   photoCount: number;
   who: Partial<Record<AssigneeRole, string>>;
+  /** どの子の予定・記録か。ルール由来と未設定は null */
+  petId: string | null;
   fromRule: boolean;
 };
 
@@ -153,6 +155,10 @@ type Draft = {
   end: string;
   who: Partial<Record<AssigneeRole, string>>;
   body: string;
+  /** どの子か（ペットが 2 頭以上の世帯だけ選ばせる）。空は未設定 */
+  petId: string;
+  /** 「これから毎週」にチェックが入っているか */
+  repeat: boolean;
   /** 時刻を手で触ったか。触るまでは種類の既定に追従する */
   timeDirty: boolean;
 };
@@ -194,6 +200,8 @@ function draftOf(item: CalendarItem | null): Draft {
       end: t.end,
       who: {},
       body: "",
+      petId: "",
+      repeat: false,
       timeDirty: false,
     };
   }
@@ -205,6 +213,8 @@ function draftOf(item: CalendarItem | null): Draft {
     end: item.end ?? "",
     who: { ...item.who },
     body: item.body,
+    petId: item.petId ?? "",
+    repeat: false,
     timeDirty: true,
   };
 }
@@ -326,6 +336,8 @@ export default function ScheduleCalendar({
       draft.start !== openDraft.start ||
       draft.end !== openDraft.end ||
       draft.body !== openDraft.body ||
+      draft.petId !== openDraft.petId ||
+      draft.repeat !== openDraft.repeat ||
       JSON.stringify(draft.who) !== JSON.stringify(openDraft.who)
     );
   }
@@ -972,7 +984,7 @@ export default function ScheduleCalendar({
                     <input type="hidden" name="draft_id" value={draftId} />
                     {/* ペットが 2 頭以上のときだけ選ばせる。1 頭なら
                         Server Action がその子を当てる */}
-                    {pets.length > 1 && (!openItem || openItem.fromRule) && (
+                    {pets.length > 1 && (
                       <div>
                         <label
                           htmlFor="schedule-pet"
@@ -983,7 +995,10 @@ export default function ScheduleCalendar({
                         <select
                           id="schedule-pet"
                           name="pet_id"
-                          defaultValue=""
+                          value={draft.petId}
+                          onChange={(e) =>
+                            setDraft({ ...draft, petId: e.target.value })
+                          }
                           className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
                         >
                           <option value="">（未設定）</option>
@@ -1149,7 +1164,15 @@ export default function ScheduleCalendar({
 
                     {(!openItem || openItem.status === "planned") && (
                       <label className="flex items-center gap-2 text-sm">
-                        <input type="checkbox" name="repeat" value="1" />
+                        <input
+                          type="checkbox"
+                          name="repeat"
+                          value="1"
+                          checked={draft.repeat}
+                          onChange={(e) =>
+                            setDraft({ ...draft, repeat: e.target.checked })
+                          }
+                        />
                         これから毎週
                         {WEEKDAYS[new Date(`${openDate}T00:00:00`).getDay()]}
                         曜も同じにする
@@ -1269,6 +1292,9 @@ export default function ScheduleCalendar({
                               </span>
                               <span className="min-w-0 flex-1 truncate">
                                 {x.body || SOURCE_LABEL[x.source]}
+                                {pets.length > 1 && x.petId
+                                  ? `（${pets.find((p) => p.id === x.petId)?.name ?? "?"}）`
+                                  : ""}
                               </span>
                               <span className="shrink-0 text-xs text-muted-foreground">
                                 {statusLabel(x.status, x.fromRule)}

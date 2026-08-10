@@ -181,6 +181,7 @@ describe("sortItems / planOnDate", () => {
     body: "",
     photoCount: 0,
     who: {},
+    petId: null,
     fromRule: false,
   };
 

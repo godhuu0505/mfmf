@@ -266,13 +266,21 @@ async function savePlanRow(
     // 「実体の無い日を開いて保存した」ときだけで、それは下の insert が担う。
     // ここで立て直すと、「もう 1 件足す」で足した予定を直しただけで
     // その日の毎週のルールが黙って消える
-    const { data: current } = await supabase
+    const { data: current, error: currentError } = await supabase
       .from("daycare_records")
       .select("overrides_rule")
       .eq("id", recordId)
       .maybeSingle();
+    // 読めなかったのを false と同じに扱うと、上書きの印を黙って落として
+    // その日の毎週の予定が並んで出てくる
+    if (currentError) {
+      throw new Error(`予定の保存に失敗しました: ${currentError.message}`);
+    }
     overridesRule = Boolean(current?.overrides_rule);
-    const { error } = await supabase
+    // 完了 / 見送りは「まだ予定の行」だけ。別のタブで完了された記録を
+    // あとから見送りに落とすと、写真ごと一覧から消える
+    const transition = nextStatus === "done" || nextStatus === "skipped";
+    let update = supabase
       .from("daycare_records")
       .update({
         source,
@@ -282,7 +290,14 @@ async function savePlanRow(
         ...(nextStatus ? { status: nextStatus } : {}),
       })
       .eq("id", recordId);
+    if (transition) update = update.eq("status", "planned");
+    const { data: updated, error } = await update.select("id");
     if (error) throw new Error(`予定の保存に失敗しました: ${error.message}`);
+    if (transition && (updated?.length ?? 0) === 0) {
+      throw new Error(
+        "この予定はすでに変わっています。画面を開き直してください",
+      );
+    }
     targetId = recordId;
   } else {
     householdId = await resolveWritableHousehold(supabase, userId, formData);

@@ -96,6 +96,8 @@ export type ScheduleItem = {
   body: string;
   photoCount: number;
   who: Partial<Record<AssigneeRole, string>>;
+  /** どの子の予定・記録か。ルール由来と未設定は null */
+  petId: string | null;
   /** 曜日ルールから作った仮の行（DB には無い）。保存すると実体になる */
   fromRule: boolean;
 };
@@ -111,6 +113,7 @@ export type SavedRecordInput = {
   body: string;
   photoCount?: number;
   who?: Partial<Record<AssigneeRole, string>>;
+  pet_id?: string | null;
 };
 
 /** ルール由来の仮 id。実体の UUID とぶつからない形にしておく。 */
@@ -149,6 +152,7 @@ export function itemsOnDate(input: {
       body: r.body,
       photoCount: r.photoCount ?? 0,
       who: r.who ?? {},
+      petId: r.pet_id ?? null,
       fromRule: false,
     }));
 
@@ -169,6 +173,7 @@ export function itemsOnDate(input: {
           body: "",
           photoCount: 0,
           who: ruleAssignees[rule.id] ?? {},
+          petId: null,
           fromRule: true,
         },
       ]

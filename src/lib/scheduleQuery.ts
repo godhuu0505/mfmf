@@ -47,7 +47,7 @@ async function fetchAllRecords(
     const { data, error } = await supabase
       .from("daycare_records")
       .select(
-        "id, record_date, source, status, start_time, end_time, overrides_rule, body, record_photos(count), record_assignees(role, user_id)",
+        "id, record_date, source, status, start_time, end_time, overrides_rule, body, pet_id, record_photos(count), record_assignees(role, user_id)",
       )
       .eq("household_id", householdId)
       .gte("record_date", from)
@@ -117,6 +117,7 @@ export async function fetchSchedule(
       overrides_rule: Boolean(row.overrides_rule),
       body: String(row.body ?? ""),
       photoCount: photos?.[0]?.count ?? 0,
+      pet_id: (row.pet_id as string | null) ?? null,
       who,
     };
   });
