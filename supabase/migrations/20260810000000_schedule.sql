@@ -263,6 +263,9 @@ create policy "schedule_rule_assignees_select_member"
     )
   );
 
+-- 担当も「今日以降から効く版」だけ触れるようにする。過去から効いている版の担当を
+-- 直接書き換えられると、その版が効いていた日の送り迎えが後から変わってしまう
+-- （Server Action は今日の版へ複製してから差し替えている）。
 drop policy if exists "schedule_rule_assignees_insert_member" on public.schedule_rule_assignees;
 create policy "schedule_rule_assignees_insert_member"
   on public.schedule_rule_assignees for insert
@@ -270,6 +273,7 @@ create policy "schedule_rule_assignees_insert_member"
     exists (
       select 1 from public.schedule_rules s
       where s.id = schedule_rule_assignees.rule_id
+        and s.since >= current_date
         and public.has_household_role(s.household_id, array['owner','editor'])
         and public.is_household_member(s.household_id, schedule_rule_assignees.user_id)
     )
@@ -282,6 +286,7 @@ create policy "schedule_rule_assignees_update_member"
     exists (
       select 1 from public.schedule_rules s
       where s.id = schedule_rule_assignees.rule_id
+        and s.since >= current_date
         and public.has_household_role(s.household_id, array['owner','editor'])
     )
   )
@@ -289,6 +294,7 @@ create policy "schedule_rule_assignees_update_member"
     exists (
       select 1 from public.schedule_rules s
       where s.id = schedule_rule_assignees.rule_id
+        and s.since >= current_date
         and public.has_household_role(s.household_id, array['owner','editor'])
         and public.is_household_member(s.household_id, schedule_rule_assignees.user_id)
     )
@@ -301,6 +307,7 @@ create policy "schedule_rule_assignees_delete_member"
     exists (
       select 1 from public.schedule_rules s
       where s.id = schedule_rule_assignees.rule_id
+        and s.since >= current_date
         and public.has_household_role(s.household_id, array['owner','editor'])
     )
   );

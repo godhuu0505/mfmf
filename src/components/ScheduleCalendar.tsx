@@ -220,6 +220,8 @@ export default function ScheduleCalendar({
   const [confirmClose, setConfirmClose] = useState(false);
   /** 確認のあとに開く行（この日のほかの記録・予定から選んだもの） */
   const [pendingSwitch, setPendingSwitch] = useState<string | null>(null);
+  /** 「もう 1 件足す」で開いた下書き（その日のルールを隠さない） */
+  const [additional, setAdditional] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [pending, setPending] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -289,6 +291,7 @@ export default function ScheduleCalendar({
     setDraft(next);
     setOpenDraft(next);
     setConfirmClose(false);
+    setAdditional(false);
     requestAnimationFrame(() => sheetRef.current?.focus({ preventScroll: true }));
   }
 
@@ -324,6 +327,7 @@ export default function ScheduleCalendar({
     setOpenDraft(next);
     setConfirmClose(false);
     setPendingSwitch(null);
+    setAdditional(false);
   }
 
   requestCloseRef.current = requestClose;
@@ -885,6 +889,7 @@ export default function ScheduleCalendar({
                     {householdId && (
                       <input type="hidden" name="household_id" value={householdId} />
                     )}
+                    {additional && <input type="hidden" name="additional" value="1" />}
                     {(["drop", "pick", "care"] as AssigneeRole[]).map((role) => (
                       <input
                         key={role}
@@ -1073,6 +1078,7 @@ export default function ScheduleCalendar({
                       setOpenDraft(next);
                       setConfirmClose(false);
                       setPendingSwitch(null);
+                      setAdditional(true);
                     }}
                     className="mt-3 w-full rounded-xl border border-dashed border-border py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted"
                   >

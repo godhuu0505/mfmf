@@ -222,11 +222,16 @@ export async function savePlan(formData: FormData) {
   revalidateSchedule();
 }
 
-/** savePlan の中身。作った / 更新した行の id を返す（完了の経路からも使う）。 */
+/**
+ * savePlan の中身。作った / 更新した行の id を返す（完了・見送りの経路からも使う）。
+ * nextStatus を渡すと、保存と状態変更を **1 文**で行う —— 分けて投げると、
+ * 状態変更だけ失敗したときに「予定が増えたのに完了していない」行が残る。
+ */
 async function savePlanRow(
   supabase: Supabase,
   userId: string,
   formData: FormData,
+  nextStatus?: "planned" | "done" | "skipped",
 ): Promise<{ recordId: string; householdId: string }> {
   const date = String(formData.get("record_date") || "");
   if (!DATE_RE.test(date)) throw new Error("不正なリクエストです");
@@ -257,7 +262,13 @@ async function savePlanRow(
       current?.status === "planned" ? true : Boolean(current?.overrides_rule);
     const { error } = await supabase
       .from("daycare_records")
-      .update({ source, ...times, body, overrides_rule: overrides })
+      .update({
+        source,
+        ...times,
+        body,
+        overrides_rule: overrides,
+        ...(nextStatus ? { status: nextStatus } : {}),
+      })
       .eq("id", recordId);
     if (error) throw new Error(`予定の保存に失敗しました: ${error.message}`);
     targetId = recordId;
@@ -271,11 +282,13 @@ async function savePlanRow(
         household_id: householdId,
         record_date: date,
         source,
-        status: "planned",
+        status: nextStatus ?? "planned",
         ...times,
         body,
         pet_id: petId,
-        overrides_rule: true,
+        // 「もう 1 件足す」で作る予定は、その日の毎週のルールを隠さない
+        // （足したつもりが、毎週の保育園を消してしまう）
+        overrides_rule: String(formData.get("additional") || "") !== "1",
       })
       .select("id")
       .single();
@@ -319,22 +332,13 @@ export async function completePlan(formData: FormData) {
   const supabase = await createClient();
   const user = await requireUser(supabase);
 
-  const body = String(formData.get("body") || "").trim();
-
-  // 完了もいったん保存を通す。ここを飛ばすと、同じフォームで直した種類・時刻・
-  // 担当が黙って捨てられる（ルール由来はこの保存で実体になる）
-  const { recordId: target } = await savePlanRow(supabase, user.id, formData);
-  await markDone(supabase, target, body);
+  // 完了も保存を通す。ここを飛ばすと、同じフォームで直した種類・時刻・担当が
+  // 黙って捨てられる（ルール由来はこの保存で実体になる）。
+  // 状態は同じ 1 文で done にするので、「行はできたが完了していない」は起きない
+  await savePlanRow(supabase, user.id, formData, "done");
   revalidateSchedule();
 }
 
-async function markDone(supabase: Supabase, recordId: string, body: string) {
-  const { error } = await supabase
-    .from("daycare_records")
-    .update({ status: "done", body })
-    .eq("id", recordId);
-  if (error) throw new Error(`記録の保存に失敗しました: ${error.message}`);
-}
 
 /**
  * 見送り。行かなかった日も消さずに残す（カレンダーには取り消し線で出る）。
@@ -344,12 +348,7 @@ export async function skipPlan(formData: FormData) {
   const supabase = await createClient();
   const user = await requireUser(supabase);
 
-  const { recordId: target } = await savePlanRow(supabase, user.id, formData);
-  const { error } = await supabase
-    .from("daycare_records")
-    .update({ status: "skipped" })
-    .eq("id", target);
-  if (error) throw new Error(`見送りにできませんでした: ${error.message}`);
+  await savePlanRow(supabase, user.id, formData, "skipped");
   revalidateSchedule();
 }
 

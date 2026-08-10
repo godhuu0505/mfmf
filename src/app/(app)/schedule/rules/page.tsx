@@ -79,7 +79,9 @@ export default async function ScheduleRulesPage() {
           const rule = ruleForDate(schedule.rules, sample);
           return (
             <li
-              key={label}
+              // 別タブで世帯が切り替わったら、行の下書き（種類・時刻・担当）ごと
+              // 作り直す。key を曜日だけにすると前の世帯の入力が残る
+              key={`${householdId ?? "none"}-${label}`}
               className="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border"
             >
               <ScheduleRuleRow
