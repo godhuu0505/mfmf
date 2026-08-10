@@ -60,16 +60,17 @@ alter table public.daycare_records
   add constraint daycare_records_time_order_check
   check (start_time is null or end_time > start_time);
 
--- source は「記録元」から「どう過ごす日か（種類）」へ広げる。
+-- source は「記録元」から「どう過ごす日か（種類）」へ広げる（保育園 / おうち /
+-- 病院 / サロン / その他）。
 -- 既存の 'daycare' / 'home' はそのまま通る（値は変えない）。
 alter table public.daycare_records
   drop constraint if exists daycare_records_source_check;
 alter table public.daycare_records
   add constraint daycare_records_source_check
-  check (source in ('daycare', 'home', 'family', 'clinic', 'outing', 'other'));
+  check (source in ('daycare', 'home', 'clinic', 'salon', 'other'));
 
 comment on column public.daycare_records.source is
-  '種類: daycare=保育園 / home=おうち / family=家族が来る / clinic=通院 / outing=おでかけ / other=その他';
+  '種類: daycare=保育園 / home=おうち / clinic=病院 / salon=サロン / other=その他';
 comment on column public.daycare_records.status is
   'planned=予定 / done=記録ずみ / skipped=見送り。完了すると予定が記録になる（D34）';
 comment on column public.daycare_records.start_time is
@@ -172,7 +173,7 @@ create table if not exists public.schedule_rules (
   household_id uuid        not null references public.households (id) on delete cascade,
   weekday      smallint    not null check (weekday between 0 and 6), -- 0=日曜
   since        date        not null,
-  kind         text        check (kind in ('daycare', 'home', 'family', 'clinic', 'outing', 'other')),
+  kind         text        check (kind in ('daycare', 'home', 'clinic', 'salon', 'other')),
   start_time   time,
   end_time     time,
   created_by   uuid        not null references auth.users (id) on delete cascade,

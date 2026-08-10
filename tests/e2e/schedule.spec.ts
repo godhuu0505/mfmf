@@ -33,14 +33,14 @@ test("UC-P01: 予定を入れるとカレンダーに出る", async ({ page }) =
   const date = addDays(jstToday(), 3);
 
   const sheet = await openDay(page, date);
-  await sheet.getByRole("radio", { name: /通院/ }).click();
+  await sheet.getByRole("radio", { name: /病院/ }).click();
   await sheet.getByLabel("ひとことメモ（任意）").fill("ワクチン2回目");
   await sheet.getByRole("button", { name: "予定を保存する" }).click();
   await expect(sheet).not.toBeVisible();
 
   // 月表示のセルに種類が出る（予定は中抜きの点）
   const cell = page.locator(`[data-day="${date}"]`);
-  await expect(cell).toContainText("通院");
+  await expect(cell).toContainText("病院");
   await expect(cell).toHaveAttribute("aria-label", /予定1件/);
 });
 
@@ -51,7 +51,7 @@ test("UC-P02: 予定を完了すると記録になり、種類と時間を引き
   const date = addDays(jstToday(), 4);
 
   let sheet = await openDay(page, date);
-  await sheet.getByRole("radio", { name: /おでかけ/ }).click();
+  await sheet.getByRole("radio", { name: /サロン/ }).click();
   await sheet.getByLabel("開始時刻").fill("10:00");
   await sheet.getByLabel("終了時刻").fill("16:00");
   await sheet.getByRole("button", { name: "予定を保存する" }).click();
@@ -59,13 +59,13 @@ test("UC-P02: 予定を完了すると記録になり、種類と時間を引き
 
   // 完了して記録にする（本文だけ足す。種類・時刻はそのまま）
   sheet = await openDay(page, date);
-  await sheet.getByLabel("ひとことメモ（任意）").fill("海！");
+  await sheet.getByLabel("ひとことメモ（任意）").fill("シャンプー");
   await sheet.getByRole("button", { name: "完了して記録にする" }).click();
   await expect(sheet).not.toBeVisible();
 
   sheet = await openDay(page, date);
   await expect(sheet.getByText("記録ずみ")).toBeVisible();
-  await expect(sheet.getByText("海！")).toBeVisible();
+  await expect(sheet.getByText("シャンプー")).toBeVisible();
   // 引き継いだ時刻がそのまま残っている
   await expect(sheet.getByLabel("開始時刻")).toHaveValue("10:00");
   await expect(sheet.getByLabel("終了時刻")).toHaveValue("16:00");
@@ -76,7 +76,7 @@ test("UC-P03: 見送りにしても消えず、予定に戻せる", async ({ pag
   const date = addDays(jstToday(), 5);
 
   let sheet = await openDay(page, date);
-  await sheet.getByRole("radio", { name: /家族が来る/ }).click();
+  await sheet.getByRole("radio", { name: /サロン/ }).click();
   await sheet.getByRole("button", { name: "予定を保存する" }).click();
   await expect(sheet).not.toBeVisible();
 

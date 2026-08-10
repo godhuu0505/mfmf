@@ -83,23 +83,17 @@ const COLOR: Record<RecordSource, { soft: string; solid: string; ring: string; d
     ring: "border-amber-500",
     dot: "bg-amber-500",
   },
-  family: {
-    soft: "bg-emerald-50 text-emerald-900 border-emerald-500 dark:bg-emerald-950 dark:text-emerald-100",
-    solid: "bg-emerald-700 text-white",
-    ring: "border-emerald-500",
-    dot: "bg-emerald-500",
-  },
   clinic: {
     soft: "bg-violet-50 text-violet-900 border-violet-500 dark:bg-violet-950 dark:text-violet-100",
     solid: "bg-violet-700 text-white",
     ring: "border-violet-500",
     dot: "bg-violet-500",
   },
-  outing: {
-    soft: "bg-rose-50 text-rose-900 border-rose-500 dark:bg-rose-950 dark:text-rose-100",
-    solid: "bg-rose-700 text-white",
-    ring: "border-rose-500",
-    dot: "bg-rose-500",
+  salon: {
+    soft: "bg-emerald-50 text-emerald-900 border-emerald-500 dark:bg-emerald-950 dark:text-emerald-100",
+    solid: "bg-emerald-700 text-white",
+    ring: "border-emerald-500",
+    dot: "bg-emerald-500",
   },
   other: {
     soft: "bg-slate-50 text-slate-900 border-slate-500 dark:bg-slate-900 dark:text-slate-100",

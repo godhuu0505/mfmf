@@ -2,7 +2,7 @@
 -- mfmf / 予定と担当（D34）の pgTAP 証明
 --
 -- 20260810000000_schedule.sql の検証:
---   - daycare_records: status / 時刻の対・順序 / 広げた source の CHECK
+--   - daycare_records: status / 時刻の対・順序 / 広げた source（5 種）の CHECK
 --   - record_assignees: 世帯メンバーだけが読み、editor 以上だけが書ける。
 --     担当に選べるのは同じ世帯のメンバーだけ（他世帯のユーザーは入れられない）
 --   - schedule_rules: 版（weekday, since）の一意性、墓標（kind is null）の時刻なし、
@@ -74,7 +74,7 @@ select throws_ok(
 select lives_ok(
   $$insert into public.daycare_records (owner_id, household_id, source, body)
     values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'clinic', '')$$,
-  'source は通院など 6 種まで広がった'
+  'source は病院・サロンなど 5 種に広がった'
 );
 select throws_ok(
   $$insert into public.daycare_records (owner_id, household_id, source, body)

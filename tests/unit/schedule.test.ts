@@ -106,7 +106,8 @@ describe("rolesFor / defaultTimesFor", () => {
   it("種類に必要な担当だけを返す", () => {
     expect(rolesFor("daycare")).toEqual(["drop", "pick"]);
     expect(rolesFor("home")).toEqual(["care"]);
-    expect(rolesFor("outing")).toEqual([]);
+    expect(rolesFor("salon")).toEqual(["drop", "pick"]);
+    expect(rolesFor("other")).toEqual([]);
   });
   it("種類ごとの既定の時間帯がある", () => {
     expect(defaultTimesFor("daycare")).toEqual({ start: "09:00", end: "18:00" });

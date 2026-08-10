@@ -6,26 +6,23 @@
 export type RecordSource =
   | "daycare"
   | "home"
-  | "family"
   | "clinic"
-  | "outing"
+  | "salon"
   | "other";
 
 export const RECORD_SOURCES: RecordSource[] = [
   "daycare",
   "home",
-  "family",
   "clinic",
-  "outing",
+  "salon",
   "other",
 ];
 
 export const SOURCE_LABEL: Record<RecordSource, string> = {
   daycare: "保育園",
   home: "おうち",
-  family: "家族が来る",
-  clinic: "通院",
-  outing: "おでかけ",
+  clinic: "病院",
+  salon: "サロン",
   other: "その他",
 };
 
@@ -33,9 +30,8 @@ export const SOURCE_LABEL: Record<RecordSource, string> = {
 export const SOURCE_BADGE: Record<RecordSource, string> = {
   daycare: "bg-sky-100 text-sky-900",
   home: "bg-amber-100 text-amber-900",
-  family: "bg-emerald-100 text-emerald-900",
   clinic: "bg-violet-100 text-violet-900",
-  outing: "bg-rose-100 text-rose-900",
+  salon: "bg-emerald-100 text-emerald-900",
   other: "bg-slate-100 text-slate-900",
 };
 
@@ -47,9 +43,8 @@ export const QUICK_SOURCES: RecordSource[] = ["daycare", "home"];
 export const SOURCE_EMOJI: Record<RecordSource, string> = {
   daycare: "🏫",
   home: "🏡",
-  family: "👵",
   clinic: "🏥",
-  outing: "✈️",
+  salon: "✂️",
   other: "📌",
 };
 
@@ -60,9 +55,8 @@ export const SOURCE_DEFAULT_TIME: Record<
 > = {
   daycare: { start: "09:00", end: "18:00" },
   home: { start: "09:00", end: "18:00" },
-  family: { start: "10:00", end: "17:00" },
   clinic: { start: "09:30", end: "11:00" },
-  outing: { start: "10:00", end: "16:00" },
+  salon: { start: "10:00", end: "12:00" },
   other: { start: "10:00", end: "11:00" },
 };
 
@@ -102,9 +96,8 @@ export const ASSIGNEE_ROLE_LABEL: Record<AssigneeRole, string> = {
 export const SOURCE_ROLES: Record<RecordSource, AssigneeRole[]> = {
   daycare: ["drop", "pick"],
   home: ["care"],
-  family: ["care"],
-  clinic: ["care"],
-  outing: [],
+  clinic: ["care"], // 連れて行く人
+  salon: ["drop", "pick"], // 預けて迎えに行く形は保育園と同じ
   other: [],
 };
 

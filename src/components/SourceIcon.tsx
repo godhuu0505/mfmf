@@ -1,22 +1,20 @@
 import {
   House,
-  Users,
   Stethoscope,
-  Plane,
+  Scissors,
   Pin,
   School,
   type LucideIcon,
 } from "lucide-react";
 import type { RecordSource } from "@/types/database";
 
-// 種類（保育園 / おうち / 家族が来る / 通院 / おでかけ / その他）を表す小さなアイコン。
+// 種類（保育園 / おうち / 病院 / サロン / その他）を表す小さなアイコン。
 // 色は currentColor 継承なので、置き場所のテキスト色（テーマトークン）に追従する。
 const ICON: Record<RecordSource, LucideIcon> = {
   daycare: School,
   home: House,
-  family: Users,
   clinic: Stethoscope,
-  outing: Plane,
+  salon: Scissors,
   other: Pin,
 };
 
