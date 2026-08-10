@@ -122,6 +122,21 @@ function formatDay(dateStr: string) {
   }).format(new Date(`${dateStr}T00:00:00`));
 }
 
+/** 月セルの読み上げ。件数でまとめる（1 日に何件もあると読み切れない）。 */
+function summaryOf(list: CalendarItem[]): string {
+  if (list.length === 0) return "予定なし";
+  const n = (s: RecordStatus) => list.filter((x) => x.status === s).length;
+  return (
+    [
+      n("planned") > 0 ? `予定${n("planned")}件` : "",
+      n("done") > 0 ? `記録${n("done")}件` : "",
+      n("skipped") > 0 ? `見送り${n("skipped")}件` : "",
+    ]
+      .filter(Boolean)
+      .join("、") || "予定なし"
+  );
+}
+
 function statusLabel(status: RecordStatus, fromRule: boolean) {
   if (status === "done") return "記録ずみ";
   if (status === "skipped") return "見送り";
@@ -201,10 +216,13 @@ export default function ScheduleCalendar({
   }, [openDate]);
 
   const openItems = openDate ? (itemsByDate[openDate] ?? []) : [];
+  // 開くのは「その日の予定」。記録しかない日は null = これから入れる予定の下書きに
+  // する（済んだ記録を予定として開くと、書き換えるつもりのない記録に手が入り、
+  // overrides_rule が立って毎週のルールまで隠れてしまう）。
+  // 下の一覧から明示的に選んだときだけ、その行を開く。
   const openItem =
-    openItems.find((x) => x.id === openId) ??
+    (openId ? (openItems.find((x) => x.id === openId) ?? null) : null) ??
     openItems.find((x) => x.status === "planned") ??
-    openItems[0] ??
     null;
 
   function open(dateStr: string, id?: string) {
@@ -213,9 +231,8 @@ export default function ScheduleCalendar({
     }
     const list = itemsByDate[dateStr] ?? [];
     const item =
-      (id ? list.find((x) => x.id === id) : null) ??
+      (id ? (list.find((x) => x.id === id) ?? null) : null) ??
       list.find((x) => x.status === "planned") ??
-      list[0] ??
       null;
     setOpenDate(dateStr);
     setOpenId(item?.id ?? null);
@@ -425,16 +442,7 @@ export default function ScheduleCalendar({
                 data-day={dateStr}
                 onClick={() => open(dateStr)}
                 aria-haspopup="dialog"
-                aria-label={`${month}月${d}日 ${
-                  list.length > 0
-                    ? list
-                        .map(
-                          (x) =>
-                            `${SOURCE_LABEL[x.source]} ${statusLabel(x.status, x.fromRule)}`,
-                        )
-                        .join("、")
-                    : "予定なし"
-                }`}
+                aria-label={`${month}月${d}日 ${summaryOf(list)}`}
                 className="flex min-h-24 flex-col items-stretch gap-0.5 border-b border-r border-border p-1 text-left transition hover:bg-surface-muted"
               >
                 <span
@@ -891,7 +899,7 @@ export default function ScheduleCalendar({
                   </form>
                 )}
 
-                {openItems.length > 1 && (
+                {openItems.filter((x) => x.id !== openItem?.id).length > 0 && (
                   <div className="mt-4">
                     <p className="mb-2 text-xs font-bold text-muted-foreground">
                       この日のほかの記録・予定

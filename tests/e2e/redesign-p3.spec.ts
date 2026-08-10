@@ -46,13 +46,18 @@ test("UC-C01: カレンダーの日タップでその日の予定シートが開
 
   const sheet = page.getByRole("dialog", { name: /の予定$/ });
   await expect(sheet).toBeVisible();
-  // クイック記録は「記録ずみ」。予定の編集欄と一緒に、その記録も見える
-  await expect(sheet.getByText(marker)).toBeVisible();
+  // 記録しかない日なので、開くのは「これから入れる予定」。記録は下の一覧に出る
   await expect(
     sheet.getByRole("button", { name: "予定を保存する" }),
   ).toBeVisible();
+  const row = sheet.getByRole("button", { name: new RegExp(marker) });
+  await expect(row).toBeVisible();
 
-  // 記録を開くと詳細へ
+  // 一覧からその記録に切り替えると、記録として開ける
+  await row.click();
+  await expect(
+    sheet.getByRole("button", { name: "変更を保存する" }),
+  ).toBeVisible();
   await sheet.getByRole("link", { name: "記録を開く" }).click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/);
 });
