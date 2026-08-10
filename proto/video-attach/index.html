@@ -234,11 +234,14 @@
   .left-1 {
     left: var(--spacing);
   }
-  .z-20 {
-    z-index: 20;
+  .z-10 {
+    z-index: 10;
   }
   .z-30 {
     z-index: 30;
+  }
+  .-mx-4 {
+    margin-inline: calc(var(--spacing) * -4);
   }
   .mx-auto {
     margin-inline: auto;
@@ -901,7 +904,7 @@ input[type="date"] {
 </style>
 
 <div class="mx-auto min-h-screen max-w-md">
-  <header class="safe-pt sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
+  <header class="safe-pt border-b border-border bg-background/90 backdrop-blur">
     <div class="safe-px flex items-center justify-between gap-3 py-2.5">
       <div>
         <p class="text-sm font-semibold text-foreground">写真 / 動画の保存</p>
@@ -925,9 +928,12 @@ input[type="date"] {
 
     <!-- ============ 記録フォーム ============ -->
     <section data-panel="form" class="space-y-5">
-      <div class="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
+      <!-- 本番の RecordForm と同じ形。フォーム画面はヘッダーのない全画面モーダルで、
+           キャンセル / 保存はセーフエリア直下に貼り付く（IME が出ても隠れない）。
+           上のヘッダーとタブはプロト用の枠なので固定しない。 -->
+      <div class="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-2.5 backdrop-blur">
         <span class="text-sm text-muted-foreground">キャンセル</span>
-        <span class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground">保存</span>
+        <span class="rounded-lg bg-primary px-5 py-2 font-medium text-primary-foreground">保存</span>
       </div>
 
       <div>
