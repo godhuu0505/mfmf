@@ -19,6 +19,19 @@ function addDays(iso: string, n: number): string {
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
 }
 
+/**
+ * その日のセルの読み上げ（aria-label）を確かめる。**読み直してから**見る ——
+ * シートは Server Action の完了で閉じるが、カレンダーの再描画はそのあとに届く。
+ * ここで見たいのは「保存されたか」なので、サーバから引き直した状態で判定する。
+ */
+async function expectDayLabel(page: Page, date: string, re: RegExp) {
+  await page.goto(`/calendar?ym=${date.slice(0, 7)}`);
+  await expect(page.locator(`[data-day="${date}"]`)).toHaveAttribute(
+    "aria-label",
+    re,
+  );
+}
+
 /** その日のセルを開く。月をまたぐ日付にも対応する。 */
 async function openDay(page: Page, date: string) {
   await page.goto(`/calendar?ym=${date.slice(0, 7)}`);
@@ -41,9 +54,8 @@ test("UC-P01: 予定を入れるとカレンダーに出る", async ({ page }) =
   await expect(sheet).not.toBeVisible();
 
   // 月表示のセルに種類が出る（予定は中抜きの点）
-  const cell = page.locator(`[data-day="${date}"]`);
-  await expect(cell).toContainText("病院");
-  await expect(cell).toHaveAttribute("aria-label", /予定1件/);
+  await expectDayLabel(page, date, /予定1件/);
+  await expect(page.locator(`[data-day="${date}"]`)).toContainText("病院");
 });
 
 test("UC-P02: 予定を完了すると記録になり、種類と時間を引き継ぐ", async ({
@@ -89,8 +101,7 @@ test("UC-P03: 見送りにしても消えず、予定に戻せる", async ({ pag
   await sheet.getByRole("button", { name: "見送り", exact: true }).click();
   await expect(sheet).not.toBeVisible();
 
-  const cell = page.locator(`[data-day="${date}"]`);
-  await expect(cell).toHaveAttribute("aria-label", /見送り1件/);
+  await expectDayLabel(page, date, /見送り1件/);
 
   // 見送ったあとの日は「これから入れる予定」の下書きで開く（UC-C01）。
   // 戻すときは下の一覧からその行を選ぶ
@@ -98,10 +109,7 @@ test("UC-P03: 見送りにしても消えず、予定に戻せる", async ({ pag
   await sheet.getByRole("button", { name: /サロン/ }).click();
   await sheet.getByRole("button", { name: "予定に戻す" }).click();
   await expect(sheet).not.toBeVisible();
-  await expect(page.locator(`[data-day="${date}"]`)).toHaveAttribute(
-    "aria-label",
-    /予定1件/,
-  );
+  await expectDayLabel(page, date, /予定1件/);
 });
 
 test("UC-P04: 毎週のルールがカレンダーに入り、記録を足しても消えない", async ({
@@ -145,7 +153,9 @@ test("UC-P05: 書きかけのまま閉じると確認をはさむ", async ({ pag
 
   await expect(sheet.getByText("編集をやめますか？")).toBeVisible();
   await sheet.getByRole("button", { name: "編集に戻る" }).click();
-  await expect(sheet.getByLabel("ひとことメモ（任意）")).toHaveValue("書きかけ");
+  await expect(sheet.getByLabel("ひとことメモ（任意）")).toHaveValue(
+    "書きかけ",
+  );
 
   await page.keyboard.press("Escape");
   await sheet.getByRole("button", { name: "やめる" }).click();
@@ -168,6 +178,14 @@ test("UC-P06: ホームのきょうカードから完了して記録にできる
   const card = page.locator("main > div").first();
   await expect(card).toContainText("きょう");
   await card.getByRole("button", { name: "完了して記録にする" }).click();
+  // 送信が終わるとボタンごと消える。終わる前に遷移すると保存が途中で切れる
+  await expect(
+    card.getByRole("button", { name: "完了して記録にする" }),
+  ).toBeHidden();
 
-  await expect(card.getByText("記録ずみ")).toBeVisible();
+  // 保存されたかを見たいので、読み直してから確かめる
+  await page.goto("/");
+  await expect(
+    page.locator("main > div").first().getByText("記録ずみ"),
+  ).toBeVisible();
 });
