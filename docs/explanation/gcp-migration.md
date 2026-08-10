@@ -329,13 +329,21 @@ sequenceDiagram
 
 写真だけ設計して終わりにはできません。**private バケットは 2 つあります。**
 `AvatarUploader` は `buildAvatarPath()` で `avatars` バケットへ直接上げており、
-規約は `{scope_id}/avatars/{...}`、**`scope_id` はユーザー / 世帯 / ペットの 3 通り**、
-参照元テーブルも認可スコープも別々です（`20260706120000_avatars.sql` の
+規約は `{scope_id}/avatars/{...}`、参照元テーブルは 3 つ（`profiles` / `households` / `pets`）ですが、
+**`scope_id` は 2 通りしかありません** —— **ユーザーアバターは `owner_id`、世帯アバターと
+ペットアバターはどちらも `household_id`** です（`20260706120000_avatars.sql` の
 `avatars_{select,insert,delete}_scope` 3 本）。写真用の「`record_id` を渡す」経路も
 `buildStoragePath()` の規約もそのまま流用できません。
 
-したがって **P2 では署名 URL の発行口をスコープごとに分けて用意します**
-（ユーザー本人 / 世帯メンバーシップ / ペットの所属世帯）。判定は写真と同じく
+> **ペットの `scope_id` に `pet_id` を使ってはいけません。** 現状の更新経路は
+> `isAvatarPathForScope(newPath, pet.household_id)`（`pets/actions.ts:127`）で
+> **そのペットの所属世帯で始まるパスしか受け付けない**ので、`{pet_id}/avatars/...` に署名すると
+> **GCS への PUT だけ先に成功し、そのあと Server Action がパスを弾いて**
+> ペットのアバター更新が必ず壊れます。ペット用の発行口は**対象のペット行を引いて、
+> その `household_id` でパスを組む**こと。
+
+したがって **P2 では署名 URL の発行口を認可スコープごとに分けて用意します**
+（ユーザー本人 / 世帯メンバーシップ ―― ペットはその所属世帯として後者に入る）。判定は写真と同じく
 「RLS が返したか」に寄せ、**差し替え時の旧オブジェクト削除**（いま
 `settings/actions.ts` と `pets/actions.ts` が `remove()` でやっていること）も
 サーバー側の削除経路として作り直します。ここを P2 のスコープに入れ忘れると、
@@ -419,6 +427,24 @@ D22 が「写真の事故からは戻せないことを許容」と書いた穴�
   記録や写真を書き込むことになる）。POST を発行元のブラウザに束縛する CSRF トークンを要求し、
   `createSessionCookie` を呼ぶ前に **`auth_time` が十分新しいこと**を確認します
 - **移行時に全員が 1 度だけ再ログインします。** 事前に告知が要る唯一の利用者影響です
+
+> **UID を保てるのは「移行してくる既存ユーザー」だけです。** P4 以降に新規登録する人には
+> Identity Platform が**独自形式の不透明な UID**を振ります。一方 `auth.users.id` も
+> 13 テーブルの `owner_id` / `user_id` も `auth.uid()` の契約も **`uuid` 型**なので、
+> **新規ユーザーは互換テーブルに入らず `/onboarding` を完了できません。**
+> どちらかを決めること —— **(a) サーバー側のプロビジョニング経路で UUID を採番し、
+> それを UID に指定してアカウントを作る**（Admin SDK は UID 指定で作成できる）か、
+> **(b) 外部 UID → 内部 UUID の対応表を持ち、RLS の claim には内部 UUID を入れる**。
+> **(a) のほうが `auth.uid()` の契約に手を入れずに済みます。**
+
+> **P4 の作業は `src/middleware.ts` だけでは終わりません。** リポジトリには
+> **`.auth.*` の呼び出しが 48 箇所**あります。内訳は「セッション確認」（`getUser()` が大半で、
+> Server Component と Server Action の冒頭に散っている）と「認証操作そのもの」
+> —— `signUp` / `signInWithPassword` / `signInWithOAuth` / `updateUser({ password })` /
+> `resetPasswordForEmail` / `signOut` / `exchangeCodeForSession`。
+> **`__Host-session` を発行・検証できるようにしただけでは、これらは古いプロバイダを見続けます。**
+> P5 で Supabase を止めた時点で、認証済みのページと更新系が**壊れるか、より悪いことに
+> 古いプロバイダを信頼し続けます。** P4 の完了条件に **48 箇所の棚卸しと置き換え**を含めること。
 
 **見落としやすい罠が 1 つあります。** `google_credentials` の refresh token です。
 今は Supabase の Google OAuth が `provider_refresh_token` を返してくれるので
@@ -592,6 +618,25 @@ P4 が動き始めると、パスワード変更・パスワードリセット�
 **パスワード変更・リセットを凍結する**か、**新しい資格情報を GoTrue へ書き戻す逆手順を用意する**
 かのどちらかが要ります。実務的には、**P4 の切替直後 24 時間はパスワード変更系の導線を
 一時的に閉じておく**のが一番安く済みます。
+
+### 7.2 P3 と P4 の「間」で `auth.users` が古いまま止まる
+
+ロールバックとは別に、フェーズの**隙間**にも穴がありました。
+**`auth.users` の同期を P4 の作業として書いていましたが、それでは遅すぎます。**
+
+P3 が終わった時点で DB は Cloud SQL、**認証はまだ Supabase** です。この間に新規登録した人
+（あるいは初めてログインした人）は **Supabase Auth にしか存在せず**、Cloud SQL の
+`auth.users` はダンプ時点のスナップショットのまま止まっています。13 テーブルの外部キーの
+参照先がその表である以上、**その人は `/onboarding` に案内されたうえで
+`create_own_household` が失敗します**（UID が Cloud SQL に無いため）。しかも
+**「世帯未所属で `/onboarding` に来るのは正常」なので、故障が正常系に見えて原因が分かりにくい。**
+
+**対応は 2 つのどちらか。P3 の作業として決めること。**
+
+- **サインイン時に Supabase のユーザーを Cloud SQL の `auth.users` へ upsert する**（推奨。
+  P4 の同期処理を前倒しで作るだけなので、捨てる実装にならない）
+- **P4 まで新規登録を凍結する**（`SIGNUP_ENABLED=false`。家族向けなので現実的だが、
+  招待経由の初回ログインも塞がる点に注意）
 
 ---
 
