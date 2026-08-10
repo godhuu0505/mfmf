@@ -1502,7 +1502,8 @@ input[type="date"] {
 </div>
 
 <!-- ===== ライトボックス（PhotoGallery 相当） ===== -->
-<div data-lightbox hidden class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+<div data-lightbox hidden role="dialog" aria-modal="true" aria-label="写真・動画の表示"
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
   <button type="button" data-lightbox-close class="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-10 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white">✕ 閉じる</button>
   <img data-lightbox-img hidden alt="" class="max-h-full max-w-full object-contain" />
   <video data-lightbox-video hidden controls playsinline preload="none" class="max-h-full max-w-full bg-black"></video>
@@ -1930,20 +1931,27 @@ input[type="date"] {
     return null;
   }
 
-  let ingestChain = Promise.resolve();
+  // 直列化は**世代ごと**に行う。ひとつのチェーンにすると、前のフォームで
+  // 止まっている検査（最大15秒）の後ろに今のフォームの取り込みが並んでしまう。
+  const ingestChains = new Map();
   function handleFiles(fileList) {
     const files = Array.from(fileList);
     if (files.length === 0) return;
     const gen = state.formGen;
     state.ingesting.set(gen, (state.ingesting.get(gen) ?? 0) + 1);
-    ingestChain = ingestChain
+    const chain = (ingestChains.get(gen) ?? Promise.resolve())
       .then(() => ingest(files, gen))
       .catch(() => {})
       .finally(() => {
         const n = (state.ingesting.get(gen) ?? 1) - 1;
-        if (n > 0) state.ingesting.set(gen, n);
-        else state.ingesting.delete(gen);
+        if (n > 0) {
+          state.ingesting.set(gen, n);
+        } else {
+          state.ingesting.delete(gen);
+          ingestChains.delete(gen);
+        }
       });
+    ingestChains.set(gen, chain);
   }
 
   async function ingest(files, gen) {
@@ -2056,6 +2064,7 @@ input[type="date"] {
       await wait(PHOTO_PROCESS_MS);
       if (!alive(item)) return;
       item.status = "ready";
+      item.file = null; // 縮小後は元ファイルを使わない。参照を残さない
       renderAll();
       return;
     }
@@ -2069,6 +2078,7 @@ input[type="date"] {
       drop(item); return;
     }
     item.status = "ready";
+    item.file = null; // 変換後は元ファイルを使わない
     renderAll();
     grabVideoThumb(item);
   }
@@ -2359,6 +2369,8 @@ input[type="date"] {
   $("[data-detail-edit]").addEventListener("click", () => openForm(state.viewingId));
 
   // ---------------- ライトボックス ----------------
+  let lightboxPrevFocus = null;
+  let lightboxInertTargets = [];
   function openLightbox(id) {
     const m = current()?.media.find((x) => x.id === id);
     if (!m) return;
@@ -2376,14 +2388,27 @@ input[type="date"] {
       img.src = m.thumb || "";
       $("[data-lightbox-caption]").textContent = m.name;
     }
-    $("[data-lightbox]").hidden = false;
+    const box = $("[data-lightbox]");
+    box.hidden = false;
+    // 確認ダイアログと同じ作法。背景を inert にして閉じるボタンへフォーカスを移す
+    lightboxPrevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    lightboxInertTargets = Array.from(document.body.children).filter(
+      (el) => el instanceof HTMLElement && el !== box,
+    );
+    lightboxInertTargets.forEach((el) => { el.inert = true; });
+    requestAnimationFrame(() => $("[data-lightbox-close]").focus({ preventScroll: true }));
   }
   function closeLightbox() {
+    if ($("[data-lightbox]").hidden) return;
     const vid = $("[data-lightbox-video]");
     vid.pause(); vid.removeAttribute("src"); vid.hidden = true;
     $("[data-lightbox-img]").hidden = true;
     $("[data-lightbox]").hidden = true;
     playingLightboxId = null;
+    lightboxInertTargets.forEach((el) => { el.inert = false; });
+    lightboxInertTargets = [];
+    lightboxPrevFocus?.focus({ preventScroll: true });
+    lightboxPrevFocus = null;
   }
   $("[data-lightbox-close]").addEventListener("click", closeLightbox);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLightbox(); });
