@@ -23,6 +23,8 @@ export type TodayPlan = {
   body: string;
   who: Partial<Record<AssigneeRole, string>>;
   fromRule: boolean;
+  /** ルール由来を完了するときに作る行の id（押し直しても増やさない） */
+  draftId: string;
 };
 
 type Props = {
@@ -112,7 +114,16 @@ export default function TodayPlanCard({
         {canEdit && plan.status === "planned" && (
           // 完了は種類・時刻・担当をそのまま引き継ぐ（書き直させない）
           <form action={completePlan} className="flex-1">
-            <input type="hidden" name="record_id" value={plan.fromRule ? "" : plan.id} />
+            <input
+              type="hidden"
+              name="record_id"
+              value={plan.fromRule ? "" : plan.id}
+            />
+            {/* ルール由来を完了するときは新しい行を作る。押し直しても同じ id に
+                上書きされるよう、id はここで決めておく */}
+            {plan.fromRule && (
+              <input type="hidden" name="draft_id" value={plan.draftId} />
+            )}
             <input type="hidden" name="record_date" value={today} />
             <input type="hidden" name="source" value={plan.source} />
             <input type="hidden" name="start_time" value={plan.start ?? ""} />

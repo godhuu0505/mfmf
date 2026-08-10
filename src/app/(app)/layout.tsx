@@ -62,6 +62,8 @@ export default async function AppLayout({
   const todayPlan = plan
     ? {
         recordId: plan.fromRule ? "" : plan.id,
+        // ルール由来を完了するときに作る行の id（押し直しても増やさない）
+        draftId: crypto.randomUUID(),
         date: todayStr,
         source: plan.source,
         label: SOURCE_LABEL[plan.source],

@@ -288,9 +288,13 @@ async function savePlanRow(
     householdId = await resolveWritableHousehold(supabase, userId, formData);
     const petId = await resolvePetId(supabase, householdId, formData);
     overridesRule = String(formData.get("additional") || "") !== "1";
+    // 行の id はクライアントが決める。担当の保存で失敗して押し直したとき、
+    // 同じ id なら上書きになり、記録が 2 件にならない
+    const draftId = String(formData.get("draft_id") || "").trim();
     const { data, error } = await supabase
       .from("daycare_records")
-      .insert({
+      .upsert({
+        ...(UUID_RE.test(draftId) ? { id: draftId } : {}),
         owner_id: userId,
         household_id: householdId,
         record_date: date,
@@ -396,31 +400,11 @@ export async function clearPlan(formData: FormData) {
   const recordId = String(formData.get("record_id") || "").trim();
 
   if (UUID_RE.test(recordId)) {
-    const rowHousehold = await requireEditableRecordHousehold(
-      supabase,
-      user.id,
-      recordId,
-    );
-    const { data: current } = await supabase
-      .from("daycare_records")
-      .select("overrides_rule")
-      .eq("id", recordId)
-      .maybeSingle();
-    const { error } = await supabase
-      .from("daycare_records")
-      .delete()
-      .eq("id", recordId);
+    await requireEditableRecordHousehold(supabase, user.id, recordId);
+    // 削除と「その日の打ち消し」は同じトランザクションで行う。分けて投げると、
+    // 打ち消しだけ失敗したときに「消したのに毎週の予定が戻っている」状態になる
+    const { error } = await supabase.rpc("delete_plan", { p_record: recordId });
     if (error) throw new Error(`削除に失敗しました: ${error.message}`);
-    // ルールを置き換えていた行を消すと、その日のルールがまた出てくる。
-    // 「消した」を保つために、日付ごとの打ち消しに置き換える
-    if (current?.overrides_rule) {
-      await supabase
-        .from("schedule_rule_skips")
-        .upsert(
-          { household_id: rowHousehold, on_date: date, created_by: user.id },
-          { onConflict: "household_id,on_date", ignoreDuplicates: true },
-        );
-    }
     revalidateSchedule();
     return;
   }

@@ -50,6 +50,8 @@ type Props = {
    */
   todayPlan?: {
     recordId: string; // ルール由来はまだ行が無いので空文字
+    /** ルール由来を完了するときに作る行の id（押し直しても増やさない） */
+    draftId: string;
     date: string;
     source: RecordSource;
     label: string;
@@ -87,7 +89,9 @@ export default function QuickRecordSheet({
   // シート表示中は背景（[data-quick-record-bg]）を inert にして
   // Tab / 支援技術がモーダルの外へ出ないようにする（FAB 自身も対象）。
   useEffect(() => {
-    const els = document.querySelectorAll<HTMLElement>("[data-quick-record-bg]");
+    const els = document.querySelectorAll<HTMLElement>(
+      "[data-quick-record-bg]",
+    );
     els.forEach((el) => {
       el.inert = open;
     });
@@ -139,7 +143,9 @@ export default function QuickRecordSheet({
     setError(null);
     setOpen(true);
     // 開いた直後はダイアログ自体へフォーカス（IME は開かない）
-    requestAnimationFrame(() => sheetRef.current?.focus({ preventScroll: true }));
+    requestAnimationFrame(() =>
+      sheetRef.current?.focus({ preventScroll: true }),
+    );
   }
 
   function closeSheet() {
@@ -260,7 +266,9 @@ export default function QuickRecordSheet({
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted" />
 
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-bold text-foreground">クイック記録</h2>
+            <h2 className="text-base font-bold text-foreground">
+              クイック記録
+            </h2>
             <div className="flex items-center gap-2">
               <p className="text-sm text-muted-foreground">
                 {open ? formatToday() : ""}
@@ -289,11 +297,30 @@ export default function QuickRecordSheet({
           {/* きょうの予定があるときだけ。無ければ今までどおり（2 タップのまま） */}
           {todayPlan && (
             <form action={completeToday} className="mb-3">
-              <input type="hidden" name="record_id" value={todayPlan.recordId} />
+              <input
+                type="hidden"
+                name="record_id"
+                value={todayPlan.recordId}
+              />
+              {!todayPlan.recordId && (
+                <input
+                  type="hidden"
+                  name="draft_id"
+                  value={todayPlan.draftId}
+                />
+              )}
               <input type="hidden" name="record_date" value={todayPlan.date} />
               <input type="hidden" name="source" value={todayPlan.source} />
-              <input type="hidden" name="start_time" value={todayPlan.start ?? ""} />
-              <input type="hidden" name="end_time" value={todayPlan.end ?? ""} />
+              <input
+                type="hidden"
+                name="start_time"
+                value={todayPlan.start ?? ""}
+              />
+              <input
+                type="hidden"
+                name="end_time"
+                value={todayPlan.end ?? ""}
+              />
               <input type="hidden" name="body" value={todayPlan.body} />
               <input type="hidden" name="household_id" value={householdId} />
               {(["drop", "pick", "care"] as AssigneeRole[]).map((role) => (
@@ -383,7 +410,10 @@ export default function QuickRecordSheet({
           )}
 
           {/* 定型チップ */}
-          <div className="mb-4 flex flex-wrap gap-2" aria-label="定型のできごと">
+          <div
+            className="mb-4 flex flex-wrap gap-2"
+            aria-label="定型のできごと"
+          >
             {CHIPS.map((chip) => {
               const active = selected.includes(chip);
               return (

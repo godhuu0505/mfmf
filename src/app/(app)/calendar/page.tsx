@@ -118,6 +118,19 @@ export default async function CalendarPage({
   const { data: memberRows } = householdId
     ? await supabase.rpc("get_household_members", { p_household: householdId })
     : { data: null };
+  // ペットが 2 頭以上いる世帯では、どの子の予定かを選べるようにする
+  // （選ばないと記録になったときにどの子か分からず、ゲスト共有にも乗らない）
+  const { data: petRows } = householdId
+    ? await supabase
+        .from("pets")
+        .select("id, name")
+        .eq("household_id", householdId)
+        .order("created_at", { ascending: true })
+    : { data: null };
+  const pets = ((petRows ?? []) as { id: string; name: string }[]).map((p) => ({
+    id: p.id,
+    name: p.name,
+  }));
   const members: CalendarMember[] = (
     ((memberRows as unknown) ?? []) as {
       user_id: string;
@@ -131,7 +144,8 @@ export default async function CalendarPage({
 
   // 月グリッド + 週の 7 日ぶんを、同じ規則（ルール由来を足す）で組み立てる
   const dates = new Set<string>(weekDays);
-  for (let d = 1; d <= lastDate; d++) dates.add(`${year}-${pad(month)}-${pad(d)}`);
+  for (let d = 1; d <= lastDate; d++)
+    dates.add(`${year}-${pad(month)}-${pad(d)}`);
   const itemsByDate: Record<string, CalendarItem[]> = {};
   for (const date of dates) {
     const items = itemsOnDate({
@@ -203,6 +217,7 @@ export default async function CalendarPage({
         itemsByDate={itemsByDate}
         weekDays={weekDays}
         members={members}
+        pets={pets}
         skippedDates={[...schedule.skippedDates]}
         canEdit={canAdd}
         householdId={householdId}

@@ -64,6 +64,8 @@ type Props = {
   /** 初期表示（?view=week で開いたときに週から始める） */
   initialView?: "month" | "week";
   members: CalendarMember[];
+  /** 世帯のペット。2 頭以上のときだけシートで選ばせる */
+  pets?: { id: string; name: string }[];
   /** その日が打ち消されている（曜日ルールを効かせていない） */
   skippedDates: string[];
   canEdit: boolean;
@@ -215,6 +217,7 @@ export default function ScheduleCalendar({
   itemsByDate,
   weekDays,
   members,
+  pets = [],
   skippedDates,
   canEdit,
   householdId,
@@ -232,6 +235,8 @@ export default function ScheduleCalendar({
   const [pendingSwitch, setPendingSwitch] = useState<string | null>(null);
   /** 「もう 1 件足す」で開いた下書き（その日のルールを隠さない） */
   const [additional, setAdditional] = useState(false);
+  /** 新しく作る行の id。押し直しても同じ行に上書きされる（記録が 2 件にならない） */
+  const [draftId, setDraftId] = useState<string>("");
   const [mounted, setMounted] = useState(false);
   const [pending, setPending] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -249,6 +254,7 @@ export default function ScheduleCalendar({
     setConfirmClose(false);
     setPendingSwitch(null);
     setAdditional(false);
+    setDraftId(crypto.randomUUID());
   }, [householdId]);
 
   // Esc のハンドラは openDate だけを見て張り替わるので、素で requestClose を
@@ -306,6 +312,7 @@ export default function ScheduleCalendar({
     setOpenDraft(next);
     setConfirmClose(false);
     setAdditional(false);
+    setDraftId(crypto.randomUUID());
     requestAnimationFrame(() =>
       sheetRef.current?.focus({ preventScroll: true }),
     );
@@ -344,6 +351,7 @@ export default function ScheduleCalendar({
     setConfirmClose(false);
     setPendingSwitch(null);
     setAdditional(false);
+    setDraftId(crypto.randomUUID());
   }
 
   requestCloseRef.current = requestClose;
@@ -953,6 +961,32 @@ export default function ScheduleCalendar({
                       name="record_id"
                       value={openItem && !openItem.fromRule ? openItem.id : ""}
                     />
+                    <input type="hidden" name="draft_id" value={draftId} />
+                    {/* ペットが 2 頭以上のときだけ選ばせる。1 頭なら
+                        Server Action がその子を当てる */}
+                    {pets.length > 1 && (!openItem || openItem.fromRule) && (
+                      <div>
+                        <label
+                          htmlFor="schedule-pet"
+                          className="mb-1 block text-xs font-bold text-muted-foreground"
+                        >
+                          どの子
+                        </label>
+                        <select
+                          id="schedule-pet"
+                          name="pet_id"
+                          defaultValue=""
+                          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+                        >
+                          <option value="">（未設定）</option>
+                          {pets.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     {householdId && (
                       <input
                         type="hidden"
@@ -1187,6 +1221,7 @@ export default function ScheduleCalendar({
                       setConfirmClose(false);
                       setPendingSwitch(null);
                       setAdditional(true);
+                      setDraftId(crypto.randomUUID());
                     }}
                     className="mt-3 w-full rounded-xl border border-dashed border-border py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted"
                   >

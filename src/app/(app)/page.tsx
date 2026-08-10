@@ -125,11 +125,16 @@ export default async function HomePage({
   // カードは「きょうの様子」を出す枠なので、予定が無ければ記録ずみ・見送りも出す
   // （完了した直後に「予定はまだありません」に戻ると、何が起きたのか分からない）。
   // 完了ボタンは status === "planned" のときだけ出る
-  const todayPlan: TodayPlan | null =
+  const todayItem =
     planOnDate(todayItems) ??
     todayItems.find((x) => x.status === "done") ??
     todayItems[0] ??
     null;
+  // ルール由来を完了するときに作る行の id。押し直しても上書きになり、
+  // 記録が 2 件にならない
+  const todayPlan: TodayPlan | null = todayItem
+    ? { ...todayItem, draftId: crypto.randomUUID() }
+    : null;
   const { data: planMemberRows } = todayPlan
     ? await supabase.rpc("get_household_members", { p_household: householdId })
     : { data: null };

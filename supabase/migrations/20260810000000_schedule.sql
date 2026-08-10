@@ -27,6 +27,8 @@
 --     drop column if exists start_time,
 --     drop column if exists end_time,
 --     drop column if exists overrides_rule;
+--   drop function if exists public.delete_plan(uuid);
+--   drop function if exists public.prune_schedule_assignments() cascade;
 --   drop function if exists public.schedule_rules_for_range(uuid, date, date);
 --   drop function if exists public.jst_today();
 --   （source の check は 20260616130705_record_metadata.sql の定義に戻す）
@@ -645,3 +647,47 @@ drop trigger if exists household_members_prune_schedule on public.household_memb
 create trigger household_members_prune_schedule
   after delete on public.household_members
   for each row execute function public.prune_schedule_assignments();
+
+-- ---------------------------------------------------------------
+-- 10. 予定を消す（打ち消しとセットで 1 トランザクション）
+--     ルールを置き換えていた行（overrides_rule = true）を消すだけだと、
+--     その日のルールがまた出てくる。削除と打ち消しを分けて投げると、
+--     打ち消しだけ失敗したときに「消したのに戻っている」状態になる。
+-- ---------------------------------------------------------------
+create or replace function public.delete_plan(p_record uuid)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_household uuid;
+  v_date      date;
+  v_overrides boolean;
+begin
+  select household_id, record_date, overrides_rule
+    into v_household, v_date, v_overrides
+    from public.daycare_records
+   where id = p_record;
+  if v_household is null then
+    raise exception '予定が見つかりません（または権限がありません）' using errcode = '42501';
+  end if;
+
+  delete from public.daycare_records where id = p_record;
+  if not found then
+    raise exception '予定を消せませんでした（権限がありません）' using errcode = '42501';
+  end if;
+
+  if v_overrides then
+    insert into public.schedule_rule_skips (household_id, on_date, created_by)
+    values (v_household, v_date, auth.uid())
+    on conflict (household_id, on_date) do nothing;
+  end if;
+end;
+$$;
+
+comment on function public.delete_plan(uuid) is
+  '予定を消す。ルールを置き換えていた行なら、その日の打ち消しも同じトランザクションで入れる。RLS は呼び出しユーザーのまま効く';
+
+revoke all on function public.delete_plan(uuid) from public;
+grant execute on function public.delete_plan(uuid) to authenticated;
