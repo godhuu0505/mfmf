@@ -872,6 +872,20 @@
   .first\:mt-0:first-child {
     margin-top: 0px;
   }
+  .focus-within\:outline:focus-within {
+    outline-style: var(--tw-outline-style);
+    outline-width: 1px;
+  }
+  .focus-within\:outline-2:focus-within {
+    outline-style: var(--tw-outline-style);
+    outline-width: 2px;
+  }
+  .focus-within\:outline-offset-2:focus-within {
+    outline-offset: 2px;
+  }
+  .focus-within\:outline-\[var\(--focus-ring\)\]:focus-within {
+    outline-color: var(--focus-ring);
+  }
   @media (hover: hover) {
     .hover\:bg-black\/80:hover {
       background-color: color-mix(in srgb, #000 80%, transparent);
@@ -1173,6 +1187,11 @@ input[type="date"] {
   syntax: "*";
   inherits: false;
 }
+@property --tw-outline-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
 @layer properties {
   @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
     *, ::before, ::after, ::backdrop {
@@ -1208,6 +1227,7 @@ input[type="date"] {
       --tw-backdrop-saturate: initial;
       --tw-backdrop-sepia: initial;
       --tw-duration: initial;
+      --tw-outline-style: solid;
     }
   }
 }
@@ -1528,7 +1548,7 @@ input[type="date"] {
 </div>
 
 <!-- トースト -->
-<div data-toast class="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-1/2 z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-0 shadow-lg transition-opacity duration-300"></div>
+<div data-toast role="status" aria-live="polite" class="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-1/2 z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-0 shadow-lg transition-opacity duration-300"></div>
 
 <script>
 (() => {
@@ -1576,6 +1596,8 @@ input[type="date"] {
     const wd = WD[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
     return `${m}月${d}日(${wd})`;
   };
+  // 詳細は年も出す。年を固定にすると 2027 年の記録が 2026 年と表示される
+  const formatFullDate = (iso) => `${iso.split("-")[0]}年${formatLabel(iso)}`;
   const fmtDurJa = (s) => {
     const t = Math.round(s);
     return t >= 60 ? `${Math.floor(t / 60)}分${t % 60}秒` : `${t}秒`;
@@ -1691,7 +1713,12 @@ input[type="date"] {
   );
 
   // 確認ダイアログ（D33）。キャンセルにも保存にも挟む
+  // Artifact は <html> を自前で書けないので、言語はここで宣言する
+  document.documentElement.lang = "ja";
+
   let confirmAction = null;
+  let confirmPrevFocus = null;
+  let confirmInertTargets = [];
   function askConfirm({ title, message, label, danger, onOk }) {
     $("[data-confirm-title]").textContent = title;
     $("[data-confirm-message]").textContent = message;
@@ -1703,12 +1730,29 @@ input[type="date"] {
         ? "bg-red-600 text-white hover:bg-red-700"
         : "bg-primary text-primary-foreground hover:bg-primary-hover");
     confirmAction = onOk;
-    $("[data-confirm]").hidden = false;
+    const dialog = $("[data-confirm]");
+    dialog.hidden = false;
+    // 本番の ConfirmDialog と同じ作法: 背景を inert にしてダイアログへフォーカスを移し、
+    // 閉じたら元の場所へ戻す（role=dialog だけではフォーカスは閉じ込められない）。
+    confirmPrevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    confirmInertTargets = Array.from(document.body.children).filter(
+      (el) => el instanceof HTMLElement && el !== dialog,
+    );
+    confirmInertTargets.forEach((el) => { el.inert = true; });
+    requestAnimationFrame(() => ok.focus({ preventScroll: true }));
   }
   function closeConfirm() {
     $("[data-confirm]").hidden = true;
     confirmAction = null;
+    confirmInertTargets.forEach((el) => { el.inert = false; });
+    confirmInertTargets = [];
+    confirmPrevFocus?.focus({ preventScroll: true });
+    confirmPrevFocus = null;
   }
+  // Esc で閉じる（キーボード / スイッチ利用者の脱出路）
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("[data-confirm]").hidden) closeConfirm();
+  });
   $$("[data-confirm-cancel]").forEach((b) => b.addEventListener("click", closeConfirm));
   $("[data-confirm-ok]").addEventListener("click", () => {
     const fn = confirmAction;
@@ -1794,6 +1838,8 @@ input[type="date"] {
       b.className =
         "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition " +
         (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface-muted");
+      // 選択状態を色だけで伝えない
+      b.setAttribute("aria-pressed", String(on));
     });
   }
   function renderSettings() {
@@ -2177,7 +2223,7 @@ input[type="date"] {
       return `<div class="flex aspect-square items-center justify-center rounded-lg border border-dashed border-border px-1 text-center text-[10px] text-muted-foreground">${MAX_ITEMS}件まで</div>`;
     }
     return `
-      <label class="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border transition hover:bg-surface-muted">
+      <label class="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border transition hover:bg-surface-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus-ring)]">
         <span class="text-2xl leading-none text-muted-foreground" aria-hidden="true">＋</span>
         <span class="px-1 text-center text-[10px] text-muted-foreground">写真 / 動画</span>
         <input type="file" accept="image/*,video/*" multiple data-media-input class="sr-only" />
@@ -2277,7 +2323,7 @@ input[type="date"] {
     if (!r) return;
     $("[data-detail-badges]").innerHTML = badge(r.source);
     // 詳細は「今日/昨日」ではなく実日付を出す（本番の formatDate と同じ粒度）
-    $("[data-detail-date]").textContent = `2026年${formatLabel(r.date)}`;
+    $("[data-detail-date]").textContent = formatFullDate(r.date);
     $("[data-detail-author]").textContent = r.author ? `記入者: ${r.author}` : "";
     $("[data-detail-body]").textContent = r.body || "（本文なし）";
     $("[data-detail-tags]").innerHTML = r.tags

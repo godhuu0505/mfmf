@@ -868,6 +868,20 @@
   .first\:mt-0:first-child {
     margin-top: 0px;
   }
+  .focus-within\:outline:focus-within {
+    outline-style: var(--tw-outline-style);
+    outline-width: 1px;
+  }
+  .focus-within\:outline-2:focus-within {
+    outline-style: var(--tw-outline-style);
+    outline-width: 2px;
+  }
+  .focus-within\:outline-offset-2:focus-within {
+    outline-offset: 2px;
+  }
+  .focus-within\:outline-\[var\(--focus-ring\)\]:focus-within {
+    outline-color: var(--focus-ring);
+  }
   @media (hover: hover) {
     .hover\:bg-black\/80:hover {
       background-color: color-mix(in srgb, #000 80%, transparent);
@@ -1169,6 +1183,11 @@ input[type="date"] {
   syntax: "*";
   inherits: false;
 }
+@property --tw-outline-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
 @layer properties {
   @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
     *, ::before, ::after, ::backdrop {
@@ -1204,6 +1223,7 @@ input[type="date"] {
       --tw-backdrop-saturate: initial;
       --tw-backdrop-sepia: initial;
       --tw-duration: initial;
+      --tw-outline-style: solid;
     }
   }
 }
