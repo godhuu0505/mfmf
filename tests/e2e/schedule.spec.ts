@@ -30,7 +30,9 @@ async function openDay(page: Page, date: string) {
 
 test("UC-P01: 予定を入れるとカレンダーに出る", async ({ page }) => {
   await login(page);
-  const date = addDays(jstToday(), 3);
+  // 日付は過去にする。未来日の記録を作ると、日付の新しい順の一覧で先頭に居座り、
+  // 「いま作った記録が先頭」を前提にしている他の spec を壊す
+  const date = addDays(jstToday(), -3);
 
   const sheet = await openDay(page, date);
   await sheet.getByRole("radio", { name: /病院/ }).click();
@@ -48,7 +50,7 @@ test("UC-P02: 予定を完了すると記録になり、種類と時間を引き
   page,
 }) => {
   await login(page);
-  const date = addDays(jstToday(), 4);
+  const date = addDays(jstToday(), -4);
 
   let sheet = await openDay(page, date);
   await sheet.getByRole("radio", { name: /サロン/ }).click();
@@ -63,17 +65,20 @@ test("UC-P02: 予定を完了すると記録になり、種類と時間を引き
   await sheet.getByRole("button", { name: "完了して記録にする" }).click();
   await expect(sheet).not.toBeVisible();
 
+  // 完了するとその日の「予定」は無くなり、記録は下の一覧に並ぶ。
+  // 選び直すと記録として開ける（種類・時刻が引き継がれている）
   sheet = await openDay(page, date);
-  await expect(sheet.getByText("記録ずみ")).toBeVisible();
-  await expect(sheet.getByText("シャンプー")).toBeVisible();
-  // 引き継いだ時刻がそのまま残っている
+  await sheet.getByRole("button", { name: /シャンプー/ }).click();
+  await expect(
+    sheet.getByRole("button", { name: "変更を保存する" }),
+  ).toBeVisible();
   await expect(sheet.getByLabel("開始時刻")).toHaveValue("10:00");
   await expect(sheet.getByLabel("終了時刻")).toHaveValue("16:00");
 });
 
 test("UC-P03: 見送りにしても消えず、予定に戻せる", async ({ page }) => {
   await login(page);
-  const date = addDays(jstToday(), 5);
+  const date = addDays(jstToday(), -5);
 
   let sheet = await openDay(page, date);
   await sheet.getByRole("radio", { name: /サロン/ }).click();
@@ -81,7 +86,7 @@ test("UC-P03: 見送りにしても消えず、予定に戻せる", async ({ pag
   await expect(sheet).not.toBeVisible();
 
   sheet = await openDay(page, date);
-  await sheet.getByRole("button", { name: "見送り" }).click();
+  await sheet.getByRole("button", { name: "見送り", exact: true }).click();
   await expect(sheet).not.toBeVisible();
 
   const cell = page.locator(`[data-day="${date}"]`);
@@ -129,7 +134,7 @@ test("UC-P04: 毎週のルールがカレンダーに入り、記録を足して
 
 test("UC-P05: 書きかけのまま閉じると確認をはさむ", async ({ page }) => {
   await login(page);
-  const date = addDays(jstToday(), 6);
+  const date = addDays(jstToday(), -6);
 
   const sheet = await openDay(page, date);
   await sheet.getByLabel("ひとことメモ（任意）").fill("書きかけ");
@@ -161,5 +166,5 @@ test("UC-P06: ホームのきょうカードから完了して記録にできる
   await expect(card).toContainText("きょう");
   await card.getByRole("button", { name: "完了して記録にする" }).click();
 
-  await expect(page.getByText("記録ずみ")).toBeVisible();
+  await expect(card.getByText("記録ずみ")).toBeVisible();
 });

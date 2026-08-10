@@ -111,15 +111,21 @@ export default async function HomePage({
     todayStr,
     todayStr,
   ).catch(() => EMPTY_SCHEDULE);
-  const todayPlan: TodayPlan | null = planOnDate(
-    itemsOnDate({
-      date: todayStr,
-      records: todaySchedule.records,
-      rules: todaySchedule.rules,
-      ruleAssignees: todaySchedule.ruleAssignees,
-      skippedDates: todaySchedule.skippedDates,
-    }),
-  );
+  const todayItems = itemsOnDate({
+    date: todayStr,
+    records: todaySchedule.records,
+    rules: todaySchedule.rules,
+    ruleAssignees: todaySchedule.ruleAssignees,
+    skippedDates: todaySchedule.skippedDates,
+  });
+  // カードは「きょうの様子」を出す枠なので、予定が無ければ記録ずみ・見送りも出す
+  // （完了した直後に「予定はまだありません」に戻ると、何が起きたのか分からない）。
+  // 完了ボタンは status === "planned" のときだけ出る
+  const todayPlan: TodayPlan | null =
+    planOnDate(todayItems) ??
+    todayItems.find((x) => x.status === "done") ??
+    todayItems[0] ??
+    null;
   const { data: planMemberRows } = todayPlan
     ? await supabase.rpc("get_household_members", { p_household: householdId })
     : { data: null };
