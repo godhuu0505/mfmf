@@ -14,7 +14,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(30);
+select plan(32);
 
 -- fixture: HA に A(owner) / E(editor) / V(viewer)、別世帯 HB に B(owner)
 insert into auth.users (id, email) values
@@ -293,6 +293,28 @@ select results_eq(
     where household_id = '11111111-1111-1111-1111-111111111111'$$,
   $$values (0)$$,
   '他世帯の打ち消しは見えない'
+);
+
+-- ---------------------------------------------------------------
+-- 6. schedule_rules_for_range（期間に要る版だけ返す）
+-- ---------------------------------------------------------------
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+select results_eq(
+  $$select count(*)::int from public.schedule_rules_for_range(
+      '11111111-1111-1111-1111-111111111111',
+      public.jst_today(), public.jst_today() + 13)$$,
+  $$values (1)$$,
+  '期間に効く版だけが返る（曜日ごとに 1 本）'
+);
+select set_config('request.jwt.claims',
+  '{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+select results_eq(
+  $$select count(*)::int from public.schedule_rules_for_range(
+      '11111111-1111-1111-1111-111111111111',
+      public.jst_today(), public.jst_today() + 13)$$,
+  $$values (0)$$,
+  '他世帯のルールは RPC 経由でも返らない（RLS が効く）'
 );
 
 reset role;

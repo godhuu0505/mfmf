@@ -30,8 +30,9 @@ export const EMPTY_SCHEDULE: ScheduleData = {
 
 /**
  * from〜to（YYYY-MM-DD、両端を含む）の予定・記録と、毎週のルールを取る。
- * ルールは期間より前に作られた版も効くので、**期間で絞らずに世帯ぶん全部**取る
- * （曜日 7 本 × 版なので小さい。ここで絞ると過去の版が消えて古い日が空になる）。
+ * ルールは期間より前に作られた版も効く。版は消さずに積むので、素朴に世帯ぶん
+ * 全部取ると PostgREST の max_rows で新しい版から打ち切られてしまう ——
+ * 「その期間に要る版だけ」を RPC（schedule_rules_for_range）で受け取る。
  */
 export async function fetchSchedule(
   supabase: Supabase,
@@ -50,13 +51,11 @@ export async function fetchSchedule(
       .lte("record_date", to)
       .order("record_date", { ascending: true })
       .order("start_time", { ascending: true, nullsFirst: true }),
-    supabase
-      .from("schedule_rules")
-      .select(
-        "id, household_id, weekday, since, kind, start_time, end_time, created_by, created_at, updated_at, schedule_rule_assignees(role, user_id)",
-      )
-      .eq("household_id", householdId)
-      .order("since", { ascending: true }),
+    supabase.rpc("schedule_rules_for_range", {
+      p_household: householdId,
+      p_from: from,
+      p_to: to,
+    }),
     supabase
       .from("schedule_rule_skips")
       .select("on_date")
@@ -88,16 +87,8 @@ export async function fetchSchedule(
     };
   });
 
-  const ruleAssignees: ScheduleData["ruleAssignees"] = {};
-  const rules: ScheduleRule[] = (rulesRes.data ?? []).map((r) => {
-    const row = r as Record<string, unknown>;
-    const assignees = (row.schedule_rule_assignees ?? []) as {
-      role: AssigneeRole;
-      user_id: string;
-    }[];
-    const who: Partial<Record<AssigneeRole, string>> = {};
-    for (const a of assignees) who[a.role] = a.user_id;
-    ruleAssignees[String(row.id)] = who;
+  const ruleRows = (rulesRes.data ?? []) as Record<string, unknown>[];
+  const rules: ScheduleRule[] = ruleRows.map((row) => {
     return {
       id: String(row.id),
       household_id: String(row.household_id),
@@ -111,6 +102,25 @@ export async function fetchSchedule(
       updated_at: String(row.updated_at),
     };
   });
+
+  // 担当は RPC に埋め込めないので、返ってきた版のぶんだけ引く
+  const ruleAssignees: ScheduleData["ruleAssignees"] = {};
+  if (rules.length > 0) {
+    const { data } = await supabase
+      .from("schedule_rule_assignees")
+      .select("rule_id, role, user_id")
+      .in(
+        "rule_id",
+        rules.map((r) => r.id),
+      );
+    for (const a of (data ?? []) as {
+      rule_id: string;
+      role: AssigneeRole;
+      user_id: string;
+    }[]) {
+      (ruleAssignees[a.rule_id] ??= {})[a.role] = a.user_id;
+    }
+  }
 
   const skippedDates = new Set(
     (skipsRes.data ?? []).map((s) => String((s as { on_date: string }).on_date)),

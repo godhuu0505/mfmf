@@ -251,15 +251,16 @@ async function savePlanRow(
       userId,
       recordId,
     );
-    // 記録（done）・見送り（skipped）を編集しただけで overrides_rule を立てない。
-    // 立てると、その日の毎週のルール由来の予定が黙って消える
+    // 保存済みの行は overrides_rule をそのまま保つ。ルール由来を上書きするのは
+    // 「実体の無い日を開いて保存した」ときだけで、それは下の insert が担う。
+    // ここで立て直すと、「もう 1 件足す」で足した予定を直しただけで
+    // その日の毎週のルールが黙って消える
     const { data: current } = await supabase
       .from("daycare_records")
-      .select("status, overrides_rule")
+      .select("overrides_rule")
       .eq("id", recordId)
       .maybeSingle();
-    const overrides =
-      current?.status === "planned" ? true : Boolean(current?.overrides_rule);
+    const overrides = Boolean(current?.overrides_rule);
     const { error } = await supabase
       .from("daycare_records")
       .update({

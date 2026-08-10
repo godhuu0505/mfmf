@@ -27,6 +27,7 @@
 --     drop column if exists start_time,
 --     drop column if exists end_time,
 --     drop column if exists overrides_rule;
+--   drop function if exists public.schedule_rules_for_range(uuid, date, date);
 --   drop function if exists public.jst_today();
 --   （source の check は 20260616130705_record_metadata.sql の定義に戻す）
 -- =============================================================
@@ -419,6 +420,44 @@ comment on function public.replace_schedule_rule(uuid, smallint, date, text, tim
 
 revoke all on function public.replace_schedule_rule(uuid, smallint, date, text, time, time, jsonb) from public;
 grant execute on function public.replace_schedule_rule(uuid, smallint, date, text, time, time, jsonb) to authenticated;
+
+-- 期間を描くのに要る版だけを返す。版は消さずに積むので、素朴に世帯ぶん全部取ると
+-- PostgREST の max_rows（supabase/config.toml）で**新しい版から**打ち切られ、
+-- カレンダーが古いルールで描かれてしまう。
+--   ・p_from 時点で効いている版（曜日ごとに 1 本）
+--   ・期間の途中で切り替わる版
+-- security invoker なので RLS（select はメンバーのみ）はそのまま効く。
+create or replace function public.schedule_rules_for_range(
+  p_household uuid,
+  p_from      date,
+  p_to        date
+)
+returns setof public.schedule_rules
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select * from (
+    select distinct on (r.weekday) r.*
+      from public.schedule_rules r
+     where r.household_id = p_household
+       and r.since <= p_from
+     order by r.weekday, r.since desc
+  ) active
+  union all
+  select r.*
+    from public.schedule_rules r
+   where r.household_id = p_household
+     and r.since > p_from
+     and r.since <= p_to
+$$;
+
+comment on function public.schedule_rules_for_range(uuid, date, date) is
+  'その期間のカレンダーを描くのに要るルールの版だけを返す（版が増えても打ち切られない）';
+
+revoke all on function public.schedule_rules_for_range(uuid, date, date) from public;
+grant execute on function public.schedule_rules_for_range(uuid, date, date) to authenticated;
 
 -- ---------------------------------------------------------------
 -- 6. ゲストの経路は「記録」だけに閉じる

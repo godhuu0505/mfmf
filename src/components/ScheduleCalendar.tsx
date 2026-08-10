@@ -238,6 +238,7 @@ export default function ScheduleCalendar({
     setOpenId(null);
     setConfirmClose(false);
     setPendingSwitch(null);
+    setAdditional(false);
   }, [householdId]);
 
   // Esc のハンドラは openDate だけを見て張り替わるので、素で requestClose を
@@ -271,10 +272,13 @@ export default function ScheduleCalendar({
   // する（済んだ記録を予定として開くと、書き換えるつもりのない記録に手が入り、
   // overrides_rule が立って毎週のルールまで隠れてしまう）。
   // 下の一覧から明示的に選んだときだけ、その行を開く。
-  const openItem =
-    (openId ? (openItems.find((x) => x.id === openId) ?? null) : null) ??
-    openItems.find((x) => x.status === "planned") ??
-    null;
+  // additional のときは何も開かない。ここで予定へ落ちると、「もう 1 件足す」の
+  // 下書きに既存の予定の id が戻り、足したつもりが書き換えになる
+  const openItem = additional
+    ? null
+    : ((openId ? (openItems.find((x) => x.id === openId) ?? null) : null) ??
+      openItems.find((x) => x.status === "planned") ??
+      null);
 
   function open(dateStr: string, id?: string) {
     if (document.activeElement instanceof HTMLElement) {
@@ -337,6 +341,7 @@ export default function ScheduleCalendar({
     setPendingSwitch(null);
     setOpenDate(null);
     setOpenId(null);
+    setAdditional(false);
     requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }));
   }
 
