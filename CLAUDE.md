@@ -83,6 +83,9 @@ CSS は Tailwind CLI に `@source` でその HTML を渡して生成し、本番
   「今はしない」と決めただけで、永久に却下したのではない。**判定条件は
   [mobile-app-tech-selection.md §5-3](./docs/explanation/mobile-app-tech-selection.md#5-3-方針を覆す条件これが起きたら-c-へ)**
   （通知の取りこぼし / 他アプリの共有シートから mfmf へ送る経路 / Apple の PWA サポート後退）。
+  **通知は「届かなかった」だけでは該当しない** —— 許可の取り消し・購読の期限切れ・送信側や VAPID の
+  不具合・端末オフラインが原因なら、ネイティブへ移っても直らない。**iOS の Web Push 側の制約で、
+  かつネイティブ push なら解決すると切り分けられたときだけ**トリガーとして扱う。
   該当したら黙って web で迂回実装せず、**Capacitor 案（C）の再検討を提案する**。
   ただし**写真の撮影・選択はトリガーではない** —— `RecordForm` の
   `<input type="file" accept="image/*">` でモバイルのカメラは既に開ける
