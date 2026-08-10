@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Camera, Plus, X } from "lucide-react";
+import type { RecordSource } from "@/types/database";
 
 // 月カレンダー + 日タップで開くボトムシート（UC-C01 / D33）。
 // 現行のページ内アンカージャンプを置き換える。データはサーバーから
@@ -13,7 +14,7 @@ const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
 export type CalendarDayRecord = {
   id: string;
-  source: "home" | "daycare";
+  source: RecordSource;
   body: string;
   photoCount: number;
 };
