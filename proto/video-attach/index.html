@@ -931,7 +931,7 @@ input[type="date"] {
       <!-- 本番の RecordForm と同じ形。フォーム画面はヘッダーのない全画面モーダルで、
            キャンセル / 保存はセーフエリア直下に貼り付く（IME が出ても隠れない）。
            上のヘッダーとタブはプロト用の枠なので固定しない。 -->
-      <div class="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-2.5 backdrop-blur">
+      <div class="safe-pt sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-2.5 backdrop-blur">
         <span class="text-sm text-muted-foreground">キャンセル</span>
         <span class="rounded-lg bg-primary px-5 py-2 font-medium text-primary-foreground">保存</span>
       </div>
@@ -1427,13 +1427,13 @@ input[type="date"] {
   // 写真は本番と同じ方針（長辺1600px / JPEG q0.8）で実際に縮小する。
   // 表示するサイズが実測値になるので、合計サイズの体感がぶれない。
   async function resizePhoto(file) {
-    // 本番と同じく GIF / SVG は触らない（キャンバスに載せると GIF がコマ止めになる）。
-    // type が空のまま拡張子で受け入れた経路があるので、拡張子でも見る。
-    if (
-      file.type === "image/gif" ||
-      file.type === "image/svg+xml" ||
-      /\.(gif|svg)$/i.test(file.name)
-    ) {
+    // 本番の resizeImage() と同じ素通し条件にそろえる。
+    // - MIME が image/ で始まらないものは触らない（拡張子で受け入れた type 無しの経路が該当）
+    // - GIF / SVG は触らない（キャンバスに載せると GIF がコマ止めになる）
+    if (!file.type.startsWith("image/")) {
+      return { size: file.size, url: URL.createObjectURL(file) };
+    }
+    if (file.type === "image/gif" || file.type === "image/svg+xml") {
       return { size: file.size, url: URL.createObjectURL(file) };
     }
     // 本番の resizeImage() と同じく、API が無い環境では元ファイルのまま通す
@@ -1472,9 +1472,14 @@ input[type="date"] {
       v.muted = true;
       let settled = false;
       const done = (dur) => { if (!settled) { settled = true; resolve({ url, duration: dur }); } };
-      // 長さ 0（空・途中で切れたファイル）は再生できないので弾く
-      v.onloadedmetadata = () =>
-        done(isFinite(v.duration) && v.duration > 0 ? v.duration : null);
+      // 長さ 0（空・途中で切れたファイル）は再生できないので弾く。
+      // ただし loadedmetadata の時点では duration が Infinity / NaN のことがある
+      // （ブラウザで録画した WebM など）。その場合は確定させず durationchange を待つ。
+      const settleIfKnown = () => {
+        if (isFinite(v.duration) && v.duration > 0) done(v.duration);
+      };
+      v.onloadedmetadata = settleIfKnown;
+      v.ondurationchange = settleIfKnown;
       v.onerror = () => done(null);
       // 保険。短すぎると「大きい動画を選んだだけ」で対応外扱いになる
       setTimeout(() => done(isFinite(v.duration) && v.duration > 0 ? v.duration : null), 15000);
