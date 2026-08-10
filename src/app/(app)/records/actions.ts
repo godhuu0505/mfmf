@@ -319,21 +319,6 @@ export async function createRecord(formData: FormData) {
     throw new Error(`記録の作成に失敗しました: ${error.message}`);
   }
 
-  // 種類を変えたら、その種類に無い役割の担当は落とす（D34）。残すと、
-  // 種類を戻したときに古い担当が黙って復活する
-  const keepRoles = rolesFor(fields.source);
-  const dropRoles = ASSIGNEE_ROLES.filter((r) => !keepRoles.includes(r));
-  if (dropRoles.length > 0) {
-    const { error: assigneeError } = await supabase
-      .from("record_assignees")
-      .delete()
-      .eq("record_id", recordId)
-      .in("role", dropRoles);
-    if (assigneeError) {
-      throw new Error(`記録の更新に失敗しました: ${assigneeError.message}`);
-    }
-  }
-
   await attachPhotoPaths(
     supabase,
     user.id,
@@ -445,6 +430,39 @@ export async function updateRecord(recordId: string, formData: FormData) {
 
   if (error) {
     throw new Error(`記録の更新に失敗しました: ${error.message}`);
+  }
+
+  // 元の日は「毎週の予定を消してある日」だったので、日付ごとの打ち消しに
+  // 置き換える。印を外すだけだと、動かした瞬間に元の日のルールが戻ってくる
+  if (moved && before) {
+    const { error: skipError } = await supabase
+      .from("schedule_rule_skips")
+      .upsert(
+        {
+          household_id: householdId,
+          on_date: before.record_date,
+          created_by: user.id,
+        },
+        { onConflict: "household_id,on_date", ignoreDuplicates: true },
+      );
+    if (skipError) {
+      throw new Error(`記録の更新に失敗しました: ${skipError.message}`);
+    }
+  }
+
+  // 種類を変えたら、その種類に無い役割の担当は落とす（D34）。残すと、
+  // 種類を戻したときに古い担当が黙って復活する
+  const keepRoles = rolesFor(fields.source);
+  const dropRoles = ASSIGNEE_ROLES.filter((r) => !keepRoles.includes(r));
+  if (dropRoles.length > 0) {
+    const { error: assigneeError } = await supabase
+      .from("record_assignees")
+      .delete()
+      .eq("record_id", recordId)
+      .in("role", dropRoles);
+    if (assigneeError) {
+      throw new Error(`記録の更新に失敗しました: ${assigneeError.message}`);
+    }
   }
 
   await attachPhotoPaths(

@@ -119,19 +119,25 @@ async function resolvePetId(
 ): Promise<string | null> {
   const petId = String(formData.get("pet_id") || "").trim();
   if (UUID_RE.test(petId)) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("pets")
       .select("id")
       .eq("id", petId)
       .eq("household_id", householdId)
       .maybeSingle();
+    // 読めなかったのを「選ばれていない」と同じに扱うと、選んだ子が
+    // 付かないまま保存され、その子のゲスト共有にも乗らない
+    if (error) throw new Error(`予定の保存に失敗しました: ${error.message}`);
     if (data) return petId;
   }
-  const { data: pets } = await supabase
+  const { data: pets, error: petsError } = await supabase
     .from("pets")
     .select("id")
     .eq("household_id", householdId)
     .limit(2);
+  if (petsError) {
+    throw new Error(`予定の保存に失敗しました: ${petsError.message}`);
+  }
   return pets && pets.length === 1 ? (pets[0].id as string) : null;
 }
 
