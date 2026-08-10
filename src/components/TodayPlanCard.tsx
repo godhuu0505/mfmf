@@ -10,6 +10,7 @@ import {
   type RecordStatus,
 } from "@/types/database";
 import { rolesFor } from "@/lib/schedule";
+import SubmitButton from "@/components/SubmitButton";
 import { completePlan } from "@/app/(app)/schedule/actions";
 
 export type TodayPlan = {
@@ -128,13 +129,15 @@ export default function TodayPlanCard({
             {householdId && (
               <input type="hidden" name="household_id" value={householdId} />
             )}
-            <button
-              type="submit"
-              className="w-full rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950"
+            {/* 1 日に何件でも持てる設計なので、二重送信は一意制約に当たらず
+                そのまま 2 件の記録になる。押下中は塞ぐ */}
+            <SubmitButton
+              pendingLabel="記録にしています…"
+              className="w-full rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950"
             >
               <Check className="mr-1 inline h-4 w-4" aria-hidden="true" />
               完了して記録にする
-            </button>
+            </SubmitButton>
           </form>
         )}
         <Link

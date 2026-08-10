@@ -169,18 +169,18 @@ select set_config('request.jwt.claims',
 select lives_ok(
   $$insert into public.schedule_rules (id, household_id, weekday, since, kind, start_time, end_time, created_by)
     values ('cccc0000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-            1, current_date, 'daycare', '09:00', '18:00', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
+            1, public.jst_today(), 'daycare', '09:00', '18:00', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   'owner は毎週のルールを作れる'
 );
 select lives_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 1, current_date + 7, null,
+    values ('11111111-1111-1111-1111-111111111111', 1, public.jst_today() + 7, null,
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   '「それ以降なし」は kind = null の版で表せる（過去の版は残る）'
 );
 select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 1, current_date - 1, 'home',
+    values ('11111111-1111-1111-1111-111111111111', 1, public.jst_today() - 1, 'home',
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   '42501',
   null,
@@ -188,7 +188,7 @@ select throws_ok(
 );
 select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, start_time, end_time, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 1, current_date + 14, null, '09:00', '18:00',
+    values ('11111111-1111-1111-1111-111111111111', 1, public.jst_today() + 14, null, '09:00', '18:00',
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   '23514',
   null,
@@ -196,7 +196,7 @@ select throws_ok(
 );
 select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 1, current_date, 'home',
+    values ('11111111-1111-1111-1111-111111111111', 1, public.jst_today(), 'home',
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   '23505',
   null,
@@ -204,7 +204,7 @@ select throws_ok(
 );
 select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 7, current_date, 'home',
+    values ('11111111-1111-1111-1111-111111111111', 7, public.jst_today(), 'home',
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   '23514',
   null,
@@ -221,7 +221,7 @@ select results_eq(
 );
 select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 3, current_date, 'home',
+    values ('11111111-1111-1111-1111-111111111111', 3, public.jst_today(), 'home',
             'dddddddd-dddd-dddd-dddd-dddddddddddd')$$,
   '42501',
   null,
@@ -238,7 +238,7 @@ select results_eq(
 );
 select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 4, current_date, 'home',
+    values ('11111111-1111-1111-1111-111111111111', 4, public.jst_today(), 'home',
             'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')$$,
   '42501',
   null,
@@ -250,7 +250,7 @@ select set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 select lives_ok(
   $$select public.replace_schedule_rule(
-      '11111111-1111-1111-1111-111111111111', 1::smallint, current_date, 'home',
+      '11111111-1111-1111-1111-111111111111', 1::smallint, public.jst_today(), 'home',
       '10:00'::time, '16:00'::time,
       jsonb_build_object('care', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'))$$,
   '版の差し替え（削除 + 作成 + 担当）が 1 回で通る'

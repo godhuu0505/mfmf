@@ -92,7 +92,10 @@ test("UC-P03: 見送りにしても消えず、予定に戻せる", async ({ pag
   const cell = page.locator(`[data-day="${date}"]`);
   await expect(cell).toHaveAttribute("aria-label", /見送り1件/);
 
+  // 見送ったあとの日は「これから入れる予定」の下書きで開く（UC-C01）。
+  // 戻すときは下の一覧からその行を選ぶ
   sheet = await openDay(page, date);
+  await sheet.getByRole("button", { name: /サロン/ }).click();
   await sheet.getByRole("button", { name: "予定に戻す" }).click();
   await expect(sheet).not.toBeVisible();
   await expect(page.locator(`[data-day="${date}"]`)).toHaveAttribute(

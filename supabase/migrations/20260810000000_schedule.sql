@@ -27,8 +27,27 @@
 --     drop column if exists start_time,
 --     drop column if exists end_time,
 --     drop column if exists overrides_rule;
+--   drop function if exists public.jst_today();
 --   （source の check は 20260616130705_record_metadata.sql の定義に戻す）
 -- =============================================================
+
+-- ---------------------------------------------------------------
+-- 0. アプリの「今日」は JST
+--    DB セッションは UTC なので、素の current_date は 00:00〜08:59 JST のあいだ
+--    「JST の昨日」を指す。その時間帯だけ過去日の版を差し込めてしまうので、
+--    ポリシーの日付判定はアプリと同じ Asia/Tokyo で出す。
+-- ---------------------------------------------------------------
+create or replace function public.jst_today()
+returns date
+language sql
+stable
+set search_path = ''
+as $$ select (now() at time zone 'Asia/Tokyo')::date $$;
+
+comment on function public.jst_today() is 'アプリと同じ「今日」（Asia/Tokyo）。RLS の日付判定に使う';
+
+revoke all on function public.jst_today() from public;
+grant execute on function public.jst_today() to authenticated, anon, service_role;
 
 -- ---------------------------------------------------------------
 -- 1. daycare_records — 予定として持てるようにする
@@ -213,7 +232,7 @@ create policy "schedule_rules_insert_member"
   with check (
     public.has_household_role(household_id, array['owner','editor'])
     and public.is_household_member(household_id, created_by)
-    and since >= current_date
+    and since >= public.jst_today()
   );
 
 -- update ポリシーは**作らない**。Data API から直接 since / weekday / kind を書き換え
@@ -229,7 +248,7 @@ create policy "schedule_rules_delete_member"
   on public.schedule_rules for delete
   using (
     public.has_household_role(household_id, array['owner','editor'])
-    and since >= current_date
+    and since >= public.jst_today()
   );
 
 -- ---------------------------------------------------------------
@@ -273,7 +292,7 @@ create policy "schedule_rule_assignees_insert_member"
     exists (
       select 1 from public.schedule_rules s
       where s.id = schedule_rule_assignees.rule_id
-        and s.since >= current_date
+        and s.since >= public.jst_today()
         and public.has_household_role(s.household_id, array['owner','editor'])
         and public.is_household_member(s.household_id, schedule_rule_assignees.user_id)
     )
@@ -286,7 +305,7 @@ create policy "schedule_rule_assignees_update_member"
     exists (
       select 1 from public.schedule_rules s
       where s.id = schedule_rule_assignees.rule_id
-        and s.since >= current_date
+        and s.since >= public.jst_today()
         and public.has_household_role(s.household_id, array['owner','editor'])
     )
   )
@@ -294,7 +313,7 @@ create policy "schedule_rule_assignees_update_member"
     exists (
       select 1 from public.schedule_rules s
       where s.id = schedule_rule_assignees.rule_id
-        and s.since >= current_date
+        and s.since >= public.jst_today()
         and public.has_household_role(s.household_id, array['owner','editor'])
         and public.is_household_member(s.household_id, schedule_rule_assignees.user_id)
     )
@@ -307,7 +326,7 @@ create policy "schedule_rule_assignees_delete_member"
     exists (
       select 1 from public.schedule_rules s
       where s.id = schedule_rule_assignees.rule_id
-        and s.since >= current_date
+        and s.since >= public.jst_today()
         and public.has_household_role(s.household_id, array['owner','editor'])
     )
   );

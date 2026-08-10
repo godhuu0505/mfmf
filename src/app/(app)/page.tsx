@@ -17,7 +17,11 @@ import {
   parseFilters,
 } from "@/lib/recordQuery";
 import { getTagDictionary } from "@/lib/tags";
-import { canEdit, getCurrentMembership, householdScopeFilter } from "@/lib/household";
+import {
+  canEdit,
+  getCurrentMembership,
+  householdScopeFilter,
+} from "@/lib/household";
 import { hasActiveGuestGrant } from "@/lib/guest";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import RecordFilters from "@/components/RecordFilters";
@@ -84,7 +88,7 @@ export default async function HomePage({
   // 絞り込み UI 用に世帯のタグ辞書を取得し、選択中タグを特定する。
   const dictionaryTags = await getTagDictionary();
   const activeTag = tagParam
-    ? dictionaryTags.find((t) => t.id === tagParam) ?? null
+    ? (dictionaryTags.find((t) => t.id === tagParam) ?? null)
     : null;
 
   // 読み取りは household 基準へ寄せる（Phase 3.5 S1 手順7）。所属世帯を解決できれば
@@ -169,7 +173,8 @@ export default async function HomePage({
     if (filters.to) query = query.lte("record_date", filters.to);
     if (filters.q) query = query.or(buildIlikeOr(filters.q));
     // 該当が 0 件なら確実に空にする（in([]) は全件にならないよう注意）。
-    if (taggedIds) query = query.in("id", taggedIds.length > 0 ? taggedIds : [""]);
+    if (taggedIds)
+      query = query.in("id", taggedIds.length > 0 ? taggedIds : [""]);
 
     switch (filters.sort) {
       case "date_asc":
@@ -379,7 +384,10 @@ export default async function HomePage({
         />
 
         {/* 記録元チップ（常設・ワンタップ） */}
-        <div className="mb-3 flex items-center gap-1.5" aria-label="記録元で絞り込み">
+        <div
+          className="mb-3 flex items-center gap-1.5"
+          aria-label="記録元で絞り込み"
+        >
           {sourceChips.map((c) => {
             const isActive = filters.source === c.value;
             return (
@@ -443,49 +451,55 @@ export default async function HomePage({
           </div>
         )}
 
-        {list.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
-            {active ? (
-              <>条件に該当する記録はありません。</>
-            ) : readOnly ? (
-              // viewer には中央の「＋」が無いので、追加の案内はしない（UC-A06）
-              <>
-                まだ記録がありません。
-                <br />
-                ご家族が記録を追加すると、ここに表示されます。
-              </>
-            ) : (
-              <>
-                まだ記録がありません。
-                <br />
-                下の「＋」から最初の記録を追加しましょう。
-              </>
-            )}
-          </div>
-        ) : groupByDate ? (
-          <div className="space-y-5">
-            {dateGroups.map((g) => {
-              const rel = relativeLabel(g.date);
-              return (
-                <section key={g.date} aria-label={formatDate(g.date)}>
-                  <h2 className="mb-2 flex items-baseline gap-2 text-sm font-semibold text-foreground">
-                    {rel ?? formatDate(g.date)}
-                    {rel && (
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {formatDate(g.date)}
-                      </span>
-                    )}
-                  </h2>
-                  <ul className="space-y-3">
-                    {g.items.map((r) => recordCard(r, false))}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
-        ) : (
-          <ul className="space-y-3">{list.map((r) => recordCard(r, true))}</ul>
-        )}
+        {/* 一覧の本体。上の「きょう」カードと同じ本文が出ることがあるので、
+            絞り込みの結果を見る側（E2E / 支援技術）が区別できるよう囲む */}
+        <div data-record-list>
+          {list.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
+              {active ? (
+                <>条件に該当する記録はありません。</>
+              ) : readOnly ? (
+                // viewer には中央の「＋」が無いので、追加の案内はしない（UC-A06）
+                <>
+                  まだ記録がありません。
+                  <br />
+                  ご家族が記録を追加すると、ここに表示されます。
+                </>
+              ) : (
+                <>
+                  まだ記録がありません。
+                  <br />
+                  下の「＋」から最初の記録を追加しましょう。
+                </>
+              )}
+            </div>
+          ) : groupByDate ? (
+            <div className="space-y-5">
+              {dateGroups.map((g) => {
+                const rel = relativeLabel(g.date);
+                return (
+                  <section key={g.date} aria-label={formatDate(g.date)}>
+                    <h2 className="mb-2 flex items-baseline gap-2 text-sm font-semibold text-foreground">
+                      {rel ?? formatDate(g.date)}
+                      {rel && (
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {formatDate(g.date)}
+                        </span>
+                      )}
+                    </h2>
+                    <ul className="space-y-3">
+                      {g.items.map((r) => recordCard(r, false))}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {list.map((r) => recordCard(r, true))}
+            </ul>
+          )}
+        </div>
 
         {/* もっと見る: 表示済みは保ったまま次のバッチを足す（scroll 位置も保持） */}
         {list.length < total && (
