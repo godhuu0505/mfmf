@@ -14,8 +14,9 @@ Vercel Hobby + Supabase Free（[D18](./decisions.md)）で動いている mfmf �
 | | |
 | --- | --- |
 | **採る形** | Cloud Run（Next.js）＋ Cloud SQL for PostgreSQL ＋ Identity Platform ＋ Cloud Storage |
-| **守るもの** | `supabase/migrations/` の **RLS 90 本と SECURITY DEFINER 関数 19 本をそのまま動かす**。pgTAP も一字も直さない |
-| **捨てるもの** | ブラウザ → PostgREST の直接アクセス（`supabase-js` のクエリビルダ）。Storage の行レベルポリシー 43 本 |
+| **守るもの** | `public` の **RLS 90 本**、**Storage に触らない関数定義 18 本**、**pgTAP 5 ファイル**を無改変で動かす |
+| **作り直すもの** | Storage の行レベルポリシー 43 本、**`delete_own_household` 1 本**、**pgTAP 4 ファイル**（§4.2） |
+| **捨てるもの** | ブラウザ → PostgREST の直接アクセス（`supabase-js` のクエリビルダ） |
 | **費用** | **月 ¥0 → 約 ¥2,000**（Cloud SQL がほぼ全部）。D18 の「無料枠で完結」は成立しなくなる |
 | **止まる時間** | DB 切替の 1 回だけ、30〜60 分程度 |
 
@@ -37,8 +38,8 @@ D18（無料枠で完結・運用対象を増やさない）と正面から衝�
 | Postgres のテーブル | 13 | 低（`pg_dump` / `pg_restore`） |
 | **`public` の RLS ポリシー** | **90** | **中 — `auth.uid()` を自前で再現できるかに全部かかっている** |
 | **`storage.objects` の RLS ポリシー** | **43** | **高 — Cloud Storage に等価物が無い。設計を変える** |
-| SECURITY DEFINER 関数 | 19 | 低（`auth.users` さえあればそのまま動く） |
-| pgTAP のテナント分離テスト | 9 ファイル | 低（むしろ素の Postgres の方が回しやすい） |
+| SECURITY DEFINER ほかの関数定義 | 19 | 低 — ただし **`delete_own_household` だけは `storage.objects` / `storage.foldername()` を直接引く**ので作り直し（§4.2） |
+| pgTAP のテナント分離テスト | 9 ファイル | **5 ファイルは無改変。4 ファイルは Storage を触るので作り直し**（§4.2） |
 | Auth（Google OAuth + email/password、Cookie セッション） | — | 中（UID を保ったまま移せるかが鍵） |
 | Storage（private バケット 2 つ、ブラウザ直アップロード、署名 URL） | — | 高 |
 | Realtime / Edge Functions | **未使用** | — |
@@ -124,7 +125,7 @@ flowchart TB
 | 論点 | 決め |
 | --- | --- |
 | 独自ドメイン | **Cloud Run のドメインマッピング**を使う。グローバル外部 ALB は転送ルールだけで月 ¥2,700 ほどかかり、家族 5 人のアプリでは CDN と Cloud Armor の価値が費用に見合わない |
-| コールドスタート | **最小インスタンス 0**。常時 1 台にすると月 ¥1,500〜9,000 上乗せになる。Next.js standalone なら 1〜2 秒。PWA の起動は Service Worker のシェルが先に出るので体感は薄い |
+| コールドスタート | **最小インスタンス 0**。常時 1 台にすると月 ¥1,500〜9,000 上乗せになる。**遅延は利用者に見えます** —— `public/sw.js` はナビゲーションを `fetch(request).catch(() => caches.match("/offline"))` で処理しており、**ネットワーク応答を待ちます**（アプリシェルを先に出す実装ではない）。したがって初回遷移はコールドスタート分だけ白いまま。P1 で実測し、許容できなければ最小 1 台へ倒す |
 | next/image の最適化 | **不要**。リモート画像は全て `unoptimized` で、縮小はブラウザ側（[D20](./decisions.md)）。`sharp` を積む必要がない |
 | リージョン | `asia-northeast1`（東京）。利用者も Cloud SQL も同じ場所に置く |
 
@@ -149,28 +150,43 @@ sequenceDiagram
   participant DB as Cloud SQL
 
   B->>CR: セッション Cookie 付きリクエスト
-  CR->>CR: Cookie 検証 → user_id を得る
+  CR->>CR: Cookie 検証 → user_id と検証済み email を得る
   CR->>P: withUser(userId) でトランザクション開始
   P->>DB: BEGIN
   P->>DB: SET LOCAL role = 'authenticated'
-  P->>DB: SET LOCAL request.jwt.claims = '{"sub":"...","role":"authenticated"}'
+  P->>DB: SET LOCAL request.jwt.claims = '{"sub":"…","email":"…","role":"authenticated"}'
   CR->>DB: SELECT ... FROM daycare_records
-  DB->>DB: ポリシーが auth.uid() を評価<br/>= current_setting('request.jwt.claims')->>'sub'
+  DB->>DB: ポリシーが auth.uid() / auth.jwt()->>'email' を評価<br/>= current_setting('request.jwt.claims')
   DB-->>CR: 権限のある行だけ
   P->>DB: COMMIT（SET LOCAL は自動で消える）
 ```
 
 用意するのは以下だけです。
 
-- **`auth` スキーマの互換シム**（新しい migration 1 本）
+- **`auth` スキーマの互換シム** —— **通常の migration として後ろに足してはいけません**（後述）
   - `auth.uid()` / `auth.jwt()` / `auth.role()` — `current_setting('request.jwt.claims', true)` を読む
   - ロール `anon` / `authenticated` / `service_role`
   - **`auth.users` テーブル** — 13 箇所の外部キーの参照先。Identity Platform を正とし、
     サインイン時に `id` / `email` を upsert して同期する
-- **`withUser()` ヘルパー**（`src/lib/db/`）— 上のシーケンスの `SET LOCAL` 2 行を必ず通す唯一の入口
+- **`withUser()` ヘルパー**（`src/lib/db/`）— 上のシーケンスの `SET LOCAL` を必ず通す唯一の入口
 
-これで **90 本のポリシーと 19 本の関数、9 ファイルの pgTAP は 1 行も変えずに動きます。**
-むしろ pgTAP は `supabase` CLI を起動せず素の `postgres:16` コンテナで回せるようになり、CI は速くなります。
+> **claims には `email` も必ず入れること。** `sub` と `role` だけでは足りません。
+> `20260704010000_household_invites.sql:79` の `invites_select_invitee` は
+> `lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))` で判定しているため、
+> `email` が空だと**招待の受諾画面（`/invite/[token]`）が全ての有効な招待を「無効」と表示します。**
+> 入れる値は **ID プロバイダが検証済みとしている email** に限ること（自己申告の email を
+> 入れると、他人の招待を受諾できる経路になります）。
+
+> **シムは migration 履歴より前に流すこと。** `20260616130704_init.sql` が最初の 1 行目から
+> `auth.users` を参照しているので、**新しいタイムスタンプの migration として足すと間に合いません**
+> （履歴の最後に来るため）。`supabase/bootstrap/000_auth_shim.sql` のような
+> **プレマイグレーション**として、CI・staging・災害復旧のいずれでも履歴の再生前に適用します。
+> `just check` と CI の DB 起動手順にこの 1 ステップを組み込むこと。
+
+これで **`public` の 90 本のポリシー**と、**Storage を参照しない 18 本の関数定義**、
+**9 ファイル中 5 ファイルの pgTAP** は 1 行も変えずに動きます。
+残りは Storage 側の事情で作り直しになります（§4.2）。
+なお pgTAP は `supabase` CLI を起動せず素の `postgres:16` コンテナで回せるようになり、CI は速くなります。
 
 > **`SET LOCAL` であることが重要です。** 接続プールで使い回すので、`SET`（セッション単位）だと
 > 前のリクエストのユーザー権限が次のリクエストに漏れます。トランザクション外で DB に触る
@@ -223,8 +239,65 @@ sequenceDiagram
   `buildStoragePath()` がサーバー側で組み立てる（`src/lib/storagePath.ts` はそのまま使える）
 - 署名は**サービスアカウント鍵ではなく IAM の `signBlob`** で行う。Cloud Run のサービス
   アカウントに自分自身への `roles/iam.serviceAccountTokenCreator` を与えれば、鍵ファイル無しで V4 署名できる
+- **バケットに CORS 設定を入れる。** 署名 V4 の PUT は GCS 側では通っても、`Content-Type` を
+  付けるためブラウザが preflight（`OPTIONS`）を投げます。アプリのオリジン・`PUT`・
+  必要なヘッダを許可しておかないと、**署名が正しくても全てのアップロードがブラウザで落ちます。**
+  P2 のインフラ手順に必ず含めること
 - **PUT だけ成功して INSERT が失敗した孤児オブジェクト**は必ず出るので、Cloud Scheduler +
-  Cloud Run ジョブで日次掃除する（`record_photos` に無いオブジェクトを削除）
+  Cloud Run ジョブで日次掃除する（`record_photos` に無いオブジェクトを削除）。
+  **ただし「作成から一定時間（例: 24 時間）以上経過したもの」に限ること** —— 正常な
+  アップロードでも PUT 成功から INSERT までには必ず間があり、その隙に掃除が走ると
+  **INSERT は成功するのに実体が消えた行**ができます
+
+#### アバターのバケットも設計する
+
+写真だけ設計して終わりにはできません。**private バケットは 2 つあります。**
+`AvatarUploader` は `buildAvatarPath()` で `avatars` バケットへ直接上げており、
+規約は `{scope_id}/avatars/{...}`、**`scope_id` はユーザー / 世帯 / ペットの 3 通り**、
+参照元テーブルも認可スコープも別々です（`20260706120000_avatars.sql` の
+`avatars_{select,insert,delete}_scope` 3 本）。写真用の「`record_id` を渡す」経路も
+`buildStoragePath()` の規約もそのまま流用できません。
+
+したがって **P2 では署名 URL の発行口をスコープごとに分けて用意します**
+（ユーザー本人 / 世帯メンバーシップ / ペットの所属世帯）。判定は写真と同じく
+「RLS が返したか」に寄せ、**差し替え時の旧オブジェクト削除**（いま
+`settings/actions.ts` と `pets/actions.ts` が `remove()` でやっていること）も
+サーバー側の削除経路として作り直します。ここを P2 のスコープに入れ忘れると、
+アバターの表示・変更・削除が丸ごと壊れます。
+
+#### `delete_own_household` は書き直しになる
+
+「関数はそのまま動く」の唯一の例外です。`20260705040000_household_delete.sql` の
+`delete_own_household` は `storage.objects` を直接引き、`storage.foldername(o.name)[1]` で
+**その世帯の写真が残っている間は削除を拒否する**ガードを持っています。
+Supabase Storage のスキーマが無くなればこの関数は**インストールすら失敗**し、
+空の互換テーブルを置けば**ガードが常に素通りして、実体の残った GCS オブジェクトを
+置き去りに世帯とメンバーシップだけが消えます**（どちらも許容できない）。
+
+**GCS のプレフィックス確認は、認可済みの削除フロー側（Server Action）へ移します。**
+DB 側の関数からは Storage 依存のガードを外し、「オブジェクトが残っていないこと」の
+確認と実削除はアプリが行う、という分担にします。
+
+#### pgTAP は 5 ファイル残り、4 ファイルは作り直す
+
+「pgTAP 9 ファイルを無改変」とは書けません。`storage.` を参照しているのは 4 ファイルで、
+Storage スキーマの無い素の Postgres では**そのまま落ちます**。
+互換用のダミースキーマを置いて緑にするのは**最悪手**です —— 新しい GCS 認可を
+何も検証しないまま「テストは通っている」ように見えるからです（V4: 壊れても緑に見える）。
+
+| pgTAP ファイル | `storage.` 参照 | 移行後 |
+| --- | --- | --- |
+| `guest_grants_test` / `guest_invites_test` / `household_invites_test` / `household_provisioning_test` / `household_rls_test` | 0 | **無改変** |
+| `household_delete_test` | 1 | Storage ガードの分だけ剥がす |
+| `household_rbac_test` | 5 | Storage 部分を剥がす |
+| `household_storage_tags_test` | 21 | Storage 部分は削除し、tags 部分だけ残す |
+| `avatars_test` | 24 | **ほぼ全部が Storage ポリシー**。作り直し |
+
+剥がした分の担保は **Integration 層（Vitest + 実 DB + fake-gcs-server）へ移します** ——
+「どのスコープなら署名 URL が発行されるか / されないか」を検証する層です。
+[D30](./decisions.md) の割り当て原則（その層でしか捕まらないものを置く）に従うと、
+アプリ層の認可判断は元々 Integration の担当なので、位置としても正しい移動になります。
+**この移し替えを P2 の完了条件に含めること。**
 
 **これは `CLAUDE.md` の記述を変える変更です。** 「一次防衛線は RLS」は DB については変わりませんが、
 **Storage については「アプリ層の認可 ＋ 短命の署名 URL」に変わります。**
@@ -342,13 +415,40 @@ flowchart LR
 | **P0** | GCP プロジェクト、VPC、Artifact Registry、WIF、Secret Manager、Terraform 化。本番は Vercel + Supabase のまま | 何も本番に触っていない |
 | **P1** | `output: "standalone"` 化と Dockerfile 整備、Cloud Run へデプロイ、ドメイン切替。**接続先は Supabase のまま** | DNS を Vercel に戻す |
 | **P2** | GCS バケット作成、`rclone` で既存オブジェクトを同期（Supabase Storage は S3 互換なのでそのまま繋がる）、署名 URL 方式へ実装変更、**読み取りは一定期間 GCS 優先・無ければ Supabase にフォールバック**、差分再同期 | 読み取りのフォールバックを逆向きにする |
-| **P3** | `auth` 互換シムの migration 追加、`withUser()` とデータアクセス層の書き換え、pgTAP をローカル Postgres で緑にする。**本番は読み取り専用にして `pg_dump` → Cloud SQL へ復元 → 接続先切替**。ここだけ停止が要る | 接続先を Supabase に戻す（停止中は書き込みが無いのでデータの分岐が起きない） |
-| **P4** | Identity Platform 設定、UID 保存の一括インポート、セッション Cookie 実装、Drive 用 OAuth の分離、`auth.users` 同期 | ID プロバイダを Supabase Auth に戻す（`auth.users` ミラーはそのまま残る） |
+| **P3** | `auth` 互換シムを**プレマイグレーション**として整備、`withUser()` とデータアクセス層の書き換え、pgTAP をローカル Postgres で緑にする。**本番は読み取り専用にして `pg_dump` → Cloud SQL へ復元 → 接続先切替**。ここだけ停止が要る | **書き込みを再度止め、Cloud SQL の差分を Supabase へ逆同期してから**接続先を戻す（下記） |
+| **P4** | Identity Platform 設定、UID 保存の一括インポート、セッション Cookie 実装、Drive 用 OAuth の分離、`auth.users` 同期 | **パスワード変更・リセットを凍結したうえで** ID プロバイダを Supabase Auth に戻す（下記） |
 | **P5** | Vercel プロジェクト削除、Supabase プロジェクト一時停止（**すぐ消さず 1 か月置く**）、予算アラート・稼働監視・バックアップ復元手順の整備 | — |
 
 **P3 の前に、本番データのコピーで復元リハーサルを 1 回通してください。**
 `pg_dump` から Cloud SQL 復元、pgTAP 緑、アプリ起動、写真表示まで。
 ここを踏まずに当日やると、停止時間が読めません。
+
+### 7.1 ロールバックは「接続先を戻すだけ」では済まない
+
+上の表の「戻し方」は、**切替直後（まだ 1 件も書き込みが起きていない時点）でしか成立しません。**
+ここを楽観していたので、明示的に直しておきます。
+
+**P3 —— サービス再開後に書かれたものは Cloud SQL にしかありません。**
+読み取り専用にするのは初回ダンプと切替の間だけなので、Cloud SQL で動き始めた瞬間から
+新しい記録・編集は Cloud SQL 側にだけ積まれます。この状態で単に接続先を Supabase へ戻すと、
+**その間の記録が消えます。**ロールバック手順は必ずこうします。
+
+1. 書き込みを**再度**止める（メンテナンスモード）
+2. Cloud SQL の差分を Supabase へ**逆方向にコピー**する（`pg_dump --data-only` ＋ 突き合わせ）
+3. 逆同期の完了を確認してから接続先を戻す
+
+これが重すぎるなら、**切替後 N 日間は論理レプリケーションか二重書き込みを維持する**か、
+**「切替から N 時間を過ぎたら前に進むだけ（ロールバックしない）」と決めて**、
+問題は Cloud SQL 側で直す方針にします。どちらを採るかは P3 の実施前に決めること。
+
+**P4 —— 認証は「戻せば元通り」ではありません。**
+P4 が動き始めると、パスワード変更・パスワードリセットは **Identity Platform 側だけ**を
+更新します。同期は `auth.users` を Cloud SQL へ写すだけで、**Supabase の GoTrue には何も戻しません。**
+この間にパスワードを変えた利用者がいる状態で Supabase Auth へ戻すと、**古い資格情報が復活し、
+本人がログインできなくなります。**ロールバック時は、
+**パスワード変更・リセットを凍結する**か、**新しい資格情報を GoTrue へ書き戻す逆手順を用意する**
+かのどちらかが要ります。実務的には、**P4 の切替直後 24 時間はパスワード変更系の導線を
+一時的に閉じておく**のが一番安く済みます。
 
 ---
 
