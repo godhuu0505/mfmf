@@ -1379,9 +1379,11 @@ input[type="date"] {
     <div>
       <span class="mb-1 block text-sm font-medium text-foreground">タグ<span class="ml-1 text-xs font-normal text-muted-foreground">（任意）</span></span>
       <div class="flex flex-wrap gap-1.5">
-        <span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs text-muted-foreground">#おさんぽ</span>
         <span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs text-muted-foreground">＋ タグを追加</span>
       </div>
+      <p class="mt-1 text-xs text-muted-foreground">
+        既存の TagInput をそのまま使うため、このプロトでは動かしていません。
+      </p>
     </div>
 
     <!-- 編集のときだけ出る。既存の写真・動画はここから消す（PhotoEditTile 相当） -->
@@ -1575,12 +1577,12 @@ input[type="date"] {
     existing: [],      // 編集時の「登録済み」メディア
     source: "daycare",
     records: [
-      { id: "r1", date: "2026-08-09", label: "8月9日(土)", source: "daycare",
+      { id: "r1", date: "2026-08-09", source: "daycare",
         author: "担当スタッフ", body: "お友だちとよく走り回っていました。おやつも完食です。",
         tags: ["おさんぽ"], media: [] },
-      { id: "r2", date: "2026-08-08", label: "8月8日(金)", source: "home",
+      { id: "r2", date: "2026-08-08", source: "home",
         author: "おかあさん", body: "おうちでお昼寝。よく寝ていました。", tags: [], media: [] },
-      { id: "r3", date: "2026-08-07", label: "8月7日(木)", source: "home",
+      { id: "r3", date: "2026-08-07", source: "home",
         author: "", body: "はじめてのシャンプー。がんばりました。", tags: ["おふろ"], media: [] },
     ],
     viewingId: "r1",
@@ -1599,6 +1601,8 @@ input[type="date"] {
   };
   // 詳細は年も出す。年を固定にすると 2027 年の記録が 2026 年と表示される
   const formatFullDate = (iso) => `${iso.split("-")[0]}年${formatLabel(iso)}`;
+  // 一覧の見出し。今日だけ「今日」（本番の relativeLabel と同じ考え方）
+  const listLabel = (iso) => (iso === "2026-08-10" ? "今日" : formatLabel(iso));
   const fmtDurJa = (s) => {
     const t = Math.round(s);
     return t >= 60 ? `${Math.floor(t / 60)}分${t % 60}秒` : `${t}秒`;
@@ -1837,7 +1841,6 @@ input[type="date"] {
       rec.media = next;
       rec.source = state.source;
       rec.date = $("#date").value || rec.date;
-      rec.label = rec.date === "2026-08-10" ? "今日" : formatLabel(rec.date);
       rec.author = $("#author").value.trim();
       rec.pet = $("#pet").value;
       rec.weight = $("#weight").value;
@@ -1853,7 +1856,6 @@ input[type="date"] {
       const rec = {
         id: "n" + Date.now(),
         date: dateValue,
-        label: dateValue === "2026-08-10" ? "今日" : formatLabel(dateValue),
         source: state.source,
         pet: $("#pet").value,
         weight: $("#weight").value,
@@ -1930,7 +1932,7 @@ input[type="date"] {
     let kept = 0;
     state.items = state.items.filter((it) => {
       if (it.kind !== "video") return true;
-      if (it.duration > state.cap + 0.5) {
+      if (Math.floor(it.duration) > state.cap) {
         dropped.push({ msg: `${it.name} — ${fmtDurJa(it.duration)}（上限 ${state.cap}秒 を超えました）`, duration: true });
         forget(it); return false;
       }
@@ -2045,7 +2047,7 @@ input[type="date"] {
           errors.push({ msg: `${file.name} — 読み込めませんでした（対応していない形式かもしれません）` });
           continue;
         }
-        if (meta.duration > state.cap + 0.5) {
+        if (Math.floor(meta.duration) > state.cap) {
           URL.revokeObjectURL(meta.url);
           errors.push({ msg: `${file.name} — ${fmtDurJa(meta.duration)}。${state.cap}秒までにしてください`, duration: true });
           continue;
@@ -2077,7 +2079,7 @@ input[type="date"] {
         release(item); errors.push({ msg: `${item.name} — 合計${MAX_ITEMS}件までです` }); continue;
       }
       if (item.kind === "video") {
-        if (item.duration > state.cap + 0.5) {
+        if (Math.floor(item.duration) > state.cap) {
           release(item);
           errors.push({ msg: `${item.name} — ${fmtDurJa(item.duration)}。${state.cap}秒までにしてください`, duration: true });
           continue;
@@ -2365,7 +2367,10 @@ input[type="date"] {
 
   // ---------------- 描画: ホーム ----------------
   function renderHome() {
+    // 本番の一覧は record_date の降順。日付を編集したら並びも追従する
     $("[data-home-list]").innerHTML = state.records
+      .slice()
+      .sort((a, b) => b.date.localeCompare(a.date))
       .map((r) => {
         const first = r.media[0];
         const nPhoto = r.media.filter((m) => m.kind === "photo").length;
@@ -2382,7 +2387,7 @@ input[type="date"] {
           </div>
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-1.5">${badge(r.source)}</div>
-            <p class="mt-1 text-sm font-semibold text-foreground">${esc(r.label)}</p>
+            <p class="mt-1 text-sm font-semibold text-foreground">${esc(listLabel(r.date))}</p>
             <p class="mt-0.5 text-sm text-muted-foreground">${esc(r.body)}</p>
             ${r.tags.length ? `<div class="mt-1 flex flex-wrap gap-1">${r.tags.map((t) => `<span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted-foreground">#${esc(t)}</span>`).join("")}</div>` : ""}
             ${meta ? `<p class="mt-1 text-xs text-muted-foreground">${meta}</p>` : ""}
