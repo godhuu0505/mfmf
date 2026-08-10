@@ -17,7 +17,7 @@
 | **Server Action** | **8 ファイル / 30 関数**（`records` `pets` `settings` `feedback` `onboarding` `guest` `invite`） | **静的エクスポート系の案で全部作り直しになる最大の障害** |
 | Client Component | 30 ファイル | そのまま持ち込める部分 |
 | Route Handler / middleware | `auth/callback` `auth/signout` `api/vitals` ＋ `src/middleware.ts`（Cookie セッション更新） | 認証モデルの移植ポイント |
-| DB | migration 32 本、RLS ＋ pgTAP でテナント分離を担保 | **バックエンドは案によらず変わらない**（＝差が出るのはクライアント側だけ） |
+| DB | migration 32 本、RLS ＋ pgTAP でテナント分離を担保 | **DB スキーマと RLS は案によらず共有できる**（テーブル設計をやり直す案は無い）。ただし**「バックエンドが一切変わらない」わけではない** —— C の Edge Function 経路なら Deno 関数・デプロイ経路・シークレット管理が増え、通知を入れれば送信側が要り、ネイティブ系は OAuth / セッションの経路が変わる |
 | テスト基盤 | Playwright E2E 13 spec ＋ VRT（D25 / D30 / D31） | ブラウザ前提。**web UI を残す限り失効はしない**が、ネイティブ UI には一切届かないので**別系統の追加**が要る |
 | 運用制約 | Vercel Hobby ＋ Supabase Free の**無料枠で完結**（D18） | 金銭コストの許容度が低い |
 | **通知** | **未実装。** `public/sw.js` のリスナは `install` / `activate` / `fetch` の 3 つだけで、`PushManager` の購読・許可フロー・VAPID・送信側のいずれも存在しない | **どの案でも「通知」は新規実装**。案の優劣ではなく共通コストなので、比較では「実装した先に何が届くか」だけを見る |
@@ -130,7 +130,9 @@ production 公開の前に**クローズドテストで 12 人以上を 14 日�
 ### 4-3. 各案の読み解き
 
 **A（89 点 / C1 は N/A）— 現状維持＋インストール導線の強化.**
-コストゼロで、**iOS / Android 双方で「アプリとして」起動する状態は既に手に入っている**のが効いている。
+**増分コストが最も小さく**、**iOS / Android 双方で「アプリとして」起動する状態は既に手に入っている**のが効いている。
+**ゼロではない** —— §5-2 のインストール導線 UI と VRT は新規作業で、UI が付く以上
+D24 の静的プロトタイプ・実機合意・D25 の E2E も要る。ただし**すべて web 側だけで完結する**。
 失点は C5 だけ：iOS では**自動インストールプロンプトが出せない**（手動で「ホーム画面に追加」を案内するしかない）、
 Web Push は**ホーム画面インストール済み**が条件でブラウザタブでは届かない、バックグラウンド処理が乏しい。
 逆に追い風もあり、**iOS 26 ではホーム画面に追加したサイトが既定で web app として開く**ようになった。
@@ -180,14 +182,18 @@ Android / iOS を 1 つの web コードベースで賄える唯一の現実解�
 それでも低いのは、**11.7k 行と 25 画面を UI ごと書き直し（C2）、web と RN の 2 UI を永続的に保守（C3）**
 が同時に来るため。**React と TypeScript と Supabase クライアントの知識は再利用でき**（そこが F・G との差）、
 **フレームワーク非依存の TypeScript はそのまま持ち込める**（`@supabase/supabase-js` は React Native で動く）——
-`src/types/database.ts`（274 行）＋ `dateRange` `storagePath` `recordQuery` `quickDraft` `guest`
-`householdSync` `signup` `google/*` で **716 行**（import を推移的に辿って確認した実測値）。
+`src/types/database.ts`（274 行）＋ `dateRange` `storagePath` `recordQuery` `guest` で **515 行**
+（import を推移的に辿り、さらにランタイム API の使用も確認した実測値）。
 **再利用できないのは UI とサーバ結合部**: 25 画面の DOM、Server Action、
 `imageResize.ts`（`createImageBitmap` / `canvas.toBlob` を使うブラウザ専用）、
-そして **`photos` `tags` `pets` `profile` `avatars` `userAvatar` は `@/lib/supabase/server`
-（＝ `next/headers` と HttpOnly Cookie セッション）に依存している**ので、
-クライアント注入の形に直さない限りそのままは動かない（ロジック自体は移せるが refactor が要る）。
-**716 行は 11.7k 行の約 6%** なので、**C2 は 2 のまま**とした。
+そして次の 2 群も**そのままは動かない**：
+- **`photos` `tags` `pets` `profile` `avatars` `userAvatar`** は `@/lib/supabase/server`
+  （＝ `next/headers` と HttpOnly Cookie セッション）に依存 —— クライアント注入の形に直せば移せる
+- **`google/crypto`（`node:crypto`）・`google/token`（`GOOGLE_CLIENT_SECRET`）・`signup`（`SIGNUP_ENABLED`）**
+  は**サーバーに残すべきもの**、**`quickDraft`（`sessionStorage`）・`householdSync`（`BroadcastChannel`）**
+  は**ブラウザ API 依存**でプラットフォーム別アダプタが要る
+
+**515 行は 11.7k 行の約 4%** なので、**C2 は 2 のまま**とした。
 **C6 は「既存 Playwright 基盤が失効する」ではなく「ネイティブ用のテスト基盤を新設して二重に持つ」の減点**
 —— web UI を残す前提なら既存の E2E / VRT は web を守り続けるので、失効するわけではない
 （2 UI を保守するコスト自体は C3 で数えているため、C6 で二重に取らない）。
@@ -217,6 +223,8 @@ Supabase の TS クライアントも捨てる**。E を上回る理由がこの
 ### 5-2. いま実際にやること（A の中身）
 
 - iOS / Android 向けの**「ホーム画面に追加」導線**を UI に用意する（iOS は手動導線しか無いため案内が必須）。
+  **ゼロからではない** —— `src/app/(app)/help/page.tsx` に文章での案内が既にある。
+  足りないのは**気づける場所への導線**と、Android の `beforeinstallprompt`（リポジトリ全体に実装なし）。
 - `manifest` / アイコン / スプラッシュを実機で確認し、**スタンドアロン起動時の見た目**を VRT（D31）に足す。
 - **Web Push は未実装**なので、入れるなら実装として起票する（`sw.js` の `push` ハンドラ、購読フロー、VAPID、送信側）。
   iOS は **16.4+ かつホーム画面インストール済み**が条件で、ブラウザタブには届かない。
@@ -263,7 +271,9 @@ C の移行コストは目に見えて下がる。**アプリ層の認可を省�
 「審査を完全に回避できる」と言えるのは **internal（＋コンソールアカウント配布）か Ad Hoc（＋ UDID 管理）**
 に限られ、**いずれも C1 で浮いたぶんを C3 の恒久運用で払い直す**構造になっている。
 これが「家族に配るだけならストア不要」という話の実際のコストで、
-**四半期ごとに誰かが必ずビルドを上げ直す**という運用を受け入れられるかが分岐点になる。
+**その周期の運用を受け入れられるか**が分岐点になる —— **TestFlight なら四半期ごとのアップロード**
+（開発者側で完結）、**Ad Hoc なら年 1 回の再署名と全端末の入れ直し**（家族の端末を回る作業）。
+頻度は Ad Hoc の方が低いが、**手間の質はこちらの方が重い**。
 
 ---
 
