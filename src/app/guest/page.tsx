@@ -51,6 +51,7 @@ export default async function GuestPage() {
   const { data: recordRows } = await supabase
     .from("daycare_records")
     .select("*")
+    .eq("status", "done") // ゲストに予定は見せない（RLS でも弾いている）
     .in("pet_id", petIds)
     .order("record_date", { ascending: false })
     .order("created_at", { ascending: false })

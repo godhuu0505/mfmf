@@ -118,6 +118,9 @@ export default async function HomePage({
         withCount ? { count: "exact" } : undefined,
       );
 
+    // 一覧は「起きたこと」だけ。予定（planned）や見送り（skipped）が混ざると、
+    // これからの日が履歴の先頭に並び、件数・ページングにも入ってしまう（D34）
+    query = query.eq("status", "done");
     if (householdId) query = query.or(householdScopeFilter(householdId));
     if (filters.source !== "all") query = query.eq("source", filters.source);
     if (filters.from) query = query.gte("record_date", filters.from);

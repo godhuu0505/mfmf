@@ -49,6 +49,7 @@ export default async function WeightPage({
   let query = supabase
     .from("daycare_records")
     .select("id, record_date, weight_kg, source")
+    .eq("status", "done") // 予定・見送りは体重を持たないが、混ぜない（D34）
     .not("weight_kg", "is", null)
     .order("record_date", { ascending: true });
   if (rangeDef.months != null) {

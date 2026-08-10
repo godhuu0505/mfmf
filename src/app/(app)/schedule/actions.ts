@@ -15,6 +15,7 @@ import {
   requireEditableHousehold,
 } from "@/lib/household";
 import { rolesFor, timeProblem, weekdayOf } from "@/lib/schedule";
+import { jstTodayISO } from "@/lib/dateRange";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -217,9 +218,18 @@ async function savePlanRow(
       userId,
       recordId,
     );
+    // 記録（done）・見送り（skipped）を編集しただけで overrides_rule を立てない。
+    // 立てると、その日の毎週のルール由来の予定が黙って消える
+    const { data: current } = await supabase
+      .from("daycare_records")
+      .select("status, overrides_rule")
+      .eq("id", recordId)
+      .maybeSingle();
+    const overrides =
+      current?.status === "planned" ? true : Boolean(current?.overrides_rule);
     const { error } = await supabase
       .from("daycare_records")
-      .update({ source, ...times, body, overrides_rule: true })
+      .update({ source, ...times, body, overrides_rule: overrides })
       .eq("id", recordId);
     if (error) throw new Error(`予定の保存に失敗しました: ${error.message}`);
     targetId = recordId;
@@ -415,19 +425,23 @@ async function applyRepeat(
   },
 ) {
   const weekday = input.weekday ?? weekdayOf(input.date);
+  // 「これから毎週」なので、過去の日から積まない（過去の版を消せてしまうと、
+  // その版が効いていた日のカレンダーが変わる。RLS 側も今日以降しか消させない）
+  const today = jstTodayISO();
+  const since = input.date < today ? today : input.date;
   await supabase
     .from("schedule_rules")
     .delete()
     .eq("household_id", householdId)
     .eq("weekday", weekday)
-    .gte("since", input.date);
+    .gte("since", since);
 
   const { data, error } = await supabase
     .from("schedule_rules")
     .insert({
       household_id: householdId,
       weekday,
-      since: input.date,
+      since,
       kind: input.source,
       start_time: input.start_time,
       end_time: input.end_time,

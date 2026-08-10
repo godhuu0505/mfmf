@@ -217,10 +217,16 @@ create policy "schedule_rules_insert_member"
 -- 消える）。変更は「新しい版を積む」= insert、取り消しは delete で行う。
 revoke update on public.schedule_rules from authenticated;
 
+-- delete は「今日以降から効く版」だけに限る。
+-- 過去から効いている版を消せると、その版が効いていた日のカレンダーが
+-- 別の内容に変わってしまう（update を塞いだ意味が無くなる）。
 drop policy if exists "schedule_rules_delete_member" on public.schedule_rules;
 create policy "schedule_rules_delete_member"
   on public.schedule_rules for delete
-  using (public.has_household_role(household_id, array['owner','editor']));
+  using (
+    public.has_household_role(household_id, array['owner','editor'])
+    and since >= current_date
+  );
 
 -- ---------------------------------------------------------------
 -- 4. schedule_rule_assignees — ルールの担当

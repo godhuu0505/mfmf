@@ -2,15 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { canEdit, getCurrentMembership } from "@/lib/household";
 import { EMPTY_SCHEDULE, fetchSchedule } from "@/lib/scheduleQuery";
-import { ruleForDate, rolesFor } from "@/lib/schedule";
+import { ruleForDate } from "@/lib/schedule";
 import { jstTodayISO } from "@/lib/dateRange";
-import {
-  ASSIGNEE_ROLE_LABEL,
-  RECORD_SOURCES,
-  SOURCE_EMOJI,
-  SOURCE_LABEL,
-} from "@/types/database";
-import { saveRule } from "@/app/(app)/schedule/actions";
+import ScheduleRuleRow from "@/components/ScheduleRuleRow";
 
 export const dynamic = "force-dynamic";
 
@@ -83,95 +77,29 @@ export default async function ScheduleRulesPage() {
         {WEEKDAYS.map((label, weekday) => {
           const sample = dateOfWeekday(today, weekday);
           const rule = ruleForDate(schedule.rules, sample);
-          const who = rule ? (schedule.ruleAssignees[rule.id] ?? {}) : {};
-          const roles = rule ? rolesFor(rule.kind!) : [];
           return (
             <li
               key={label}
               className="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border"
             >
-              <form action={saveRule} className="space-y-3">
-                <input type="hidden" name="weekday" value={weekday} />
-                <input type="hidden" name="since" value={today} />
-                {householdId && (
-                  <input type="hidden" name="household_id" value={householdId} />
-                )}
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="w-8 shrink-0 text-sm font-bold">
-                    {label}曜
-                  </span>
-                  <label className="sr-only" htmlFor={`source-${weekday}`}>
-                    {label}曜の種類
-                  </label>
-                  <select
-                    id={`source-${weekday}`}
-                    name="source"
-                    defaultValue={rule?.kind ?? "none"}
-                    disabled={!editable}
-                    className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
-                  >
-                    <option value="none">なし</option>
-                    {RECORD_SOURCES.map((s) => (
-                      <option key={s} value={s}>
-                        {SOURCE_EMOJI[s]} {SOURCE_LABEL[s]}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="time"
-                    name="start_time"
-                    aria-label={`${label}曜の開始時刻`}
-                    defaultValue={rule?.start_time ?? ""}
-                    disabled={!editable}
-                    className="w-28 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm tabular-nums"
-                  />
-                  <span className="text-sm text-muted-foreground">〜</span>
-                  <input
-                    type="time"
-                    name="end_time"
-                    aria-label={`${label}曜の終了時刻`}
-                    defaultValue={rule?.end_time ?? ""}
-                    disabled={!editable}
-                    className="w-28 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm tabular-nums"
-                  />
-                </div>
-
-                {roles.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 pl-10">
-                    {roles.map((role) => (
-                      <label key={role} className="flex items-center gap-1.5 text-xs">
-                        <span className="text-muted-foreground">
-                          {ASSIGNEE_ROLE_LABEL[role]}
-                        </span>
-                        <select
-                          name={`who_${role}`}
-                          defaultValue={who[role] ?? ""}
-                          disabled={!editable}
-                          aria-label={`${label}曜の${ASSIGNEE_ROLE_LABEL[role]}`}
-                          className="rounded-lg border border-border bg-surface px-2 py-1 text-xs"
-                        >
-                          <option value="">未定</option>
-                          {members.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                {editable && (
-                  <button
-                    type="submit"
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted"
-                  >
-                    {label}曜を今日から変える
-                  </button>
-                )}
-              </form>
+              <ScheduleRuleRow
+                weekday={weekday}
+                label={label}
+                today={today}
+                householdId={householdId}
+                members={members}
+                editable={editable}
+                current={
+                  rule
+                    ? {
+                        source: rule.kind!,
+                        start: rule.start_time,
+                        end: rule.end_time,
+                        who: schedule.ruleAssignees[rule.id] ?? {},
+                      }
+                    : null
+                }
+              />
             </li>
           );
         })}

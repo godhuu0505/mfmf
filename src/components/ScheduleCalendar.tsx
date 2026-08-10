@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Camera, Check, X } from "lucide-react";
@@ -153,6 +154,33 @@ type Draft = {
   timeDirty: boolean;
 };
 
+/**
+ * 送信ボタン。Server Action の実行中は全部の submit を塞ぐ ——
+ * 1 日に複数の予定を持てる設計なので、二重送信は DB 側の一意制約に当たらず
+ * そのまま 2 件になってしまう。
+ */
+function SubmitButton({
+  children,
+  className,
+  formAction,
+}: {
+  children: React.ReactNode;
+  className: string;
+  formAction?: (formData: FormData) => void | Promise<void>;
+}) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      formAction={formAction}
+      disabled={pending}
+      className={className + " disabled:opacity-50"}
+    >
+      {children}
+    </button>
+  );
+}
+
 function draftOf(item: CalendarItem | null): Draft {
   if (!item) {
     const t = defaultTimesFor("daycare");
@@ -185,10 +213,16 @@ export default function ScheduleCalendar({
   const [openDate, setOpenDate] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => draftOf(null));
+  /** 開いた時点の下書き。閉じるときに「変えたかどうか」を見る */
+  const [openDraft, setOpenDraft] = useState<Draft>(() => draftOf(null));
+  const [confirmClose, setConfirmClose] = useState(false);
+  /** 確認のあとに開く行（この日のほかの記録・予定から選んだもの） */
+  const [pendingSwitch, setPendingSwitch] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [pending, setPending] = useState(false);
   useEffect(() => setMounted(true), []);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
 
   const skipped = useMemo(() => new Set(skippedDates), [skippedDates]);
@@ -202,7 +236,7 @@ export default function ScheduleCalendar({
       el.inert = true;
     });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") requestClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -234,13 +268,52 @@ export default function ScheduleCalendar({
       (id ? (list.find((x) => x.id === id) ?? null) : null) ??
       list.find((x) => x.status === "planned") ??
       null;
+    const next = draftOf(item);
     setOpenDate(dateStr);
     setOpenId(item?.id ?? null);
-    setDraft(draftOf(item));
+    setDraft(next);
+    setOpenDraft(next);
+    setConfirmClose(false);
     requestAnimationFrame(() => sheetRef.current?.focus({ preventScroll: true }));
   }
 
+  /** 開いた時点から中身が変わっているか（本番の記録フォームと同じ判定の考え方）。 */
+  function dirty() {
+    if (!canEdit) return false;
+    return (
+      draft.source !== openDraft.source ||
+      draft.start !== openDraft.start ||
+      draft.end !== openDraft.end ||
+      draft.body !== openDraft.body ||
+      JSON.stringify(draft.who) !== JSON.stringify(openDraft.who)
+    );
+  }
+
+  /** ✕ / 背景 / Esc から呼ぶ。書きかけがあれば確認をはさむ。 */
+  function requestClose() {
+    if (dirty()) {
+      setConfirmClose(true);
+      requestAnimationFrame(() =>
+        confirmRef.current?.focus({ preventScroll: true }),
+      );
+      return;
+    }
+    close();
+  }
+
+  /** 一覧の行へ切り替える（開いている日はそのまま）。 */
+  function switchTo(item: CalendarItem) {
+    setOpenId(item.id);
+    const next = draftOf(item);
+    setDraft(next);
+    setOpenDraft(next);
+    setConfirmClose(false);
+    setPendingSwitch(null);
+  }
+
   function close() {
+    setConfirmClose(false);
+    setPendingSwitch(null);
     setOpenDate(null);
     setOpenId(null);
     requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }));
@@ -267,6 +340,19 @@ export default function ScheduleCalendar({
       ...d,
       who: { ...d.who, [role]: d.who[role] === memberId ? undefined : memberId },
     }));
+  }
+
+  /**
+   * Server Action を実行してからシートを閉じる。
+   * 送信と同時に閉じると、実行中にフォームごと外れてしまう。また、ルール由来の
+   * 予定は完了・見送りで実体になって id が変わるため、開いたままだと「新規の
+   * 下書き」に見えてしまう —— 終わったら閉じるのがいちばん素直。
+   */
+  function submit(fn: (formData: FormData) => Promise<void>) {
+    return async (formData: FormData) => {
+      await fn(formData);
+      close();
+    };
   }
 
   async function run(fn: () => Promise<void>) {
@@ -636,7 +722,7 @@ export default function ScheduleCalendar({
         createPortal(
           <>
             <div
-              onClick={close}
+              onClick={requestClose}
               className="fixed inset-0 z-40 bg-black/40 transition-opacity"
               aria-hidden="true"
             />
@@ -661,13 +747,56 @@ export default function ScheduleCalendar({
                   )}
                   <button
                     type="button"
-                    onClick={close}
+                    onClick={requestClose}
                     aria-label="閉じる"
                     className="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted"
                   >
                     <X className="h-5 w-5" aria-hidden="true" />
                   </button>
                 </div>
+
+                {confirmClose && (
+                  <div
+                    ref={confirmRef}
+                    role="alert"
+                    tabIndex={-1}
+                    className="mb-4 space-y-2 rounded-xl border border-border bg-surface-muted p-3 outline-none"
+                  >
+                    <p className="text-sm font-medium">
+                      {pendingSwitch
+                        ? "編集をやめて、そちらを開きますか？"
+                        : "編集をやめますか？"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      保存していない変更は失われます。
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmClose(false);
+                          setPendingSwitch(null);
+                        }}
+                        className="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium"
+                      >
+                        編集に戻る
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = pendingSwitch
+                            ? openItems.find((x) => x.id === pendingSwitch)
+                            : null;
+                          if (target) switchTo(target);
+                          else close();
+                        }}
+                        className="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background"
+                      >
+                        {pendingSwitch ? "開く" : "やめる"}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {openItem?.status === "done" && (
                   <div className="mb-4 rounded-xl bg-surface-muted p-3">
@@ -708,7 +837,7 @@ export default function ScheduleCalendar({
                     閲覧のみの権限のため、変更できません。
                   </p>
                 ) : (
-                  <form action={savePlan} className="space-y-4">
+                  <form action={submit(savePlan)} className="space-y-4">
                     <input type="hidden" name="record_date" value={openDate} />
                     <input
                       type="hidden"
@@ -845,34 +974,26 @@ export default function ScheduleCalendar({
                       </label>
                     )}
 
-                    <button
-                      type="submit"
-                      disabled={pending}
-                      className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover disabled:opacity-50"
-                    >
+                    <SubmitButton className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">
                       {openItem?.status === "done" ? "変更を保存する" : "予定を保存する"}
-                    </button>
+                    </SubmitButton>
 
                     {(!openItem || openItem.status === "planned") && (
                       <div className="flex gap-2">
-                        <button
-                          type="submit"
-                          formAction={completePlan}
-                          disabled={pending}
-                          className="flex-1 rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950"
+                        <SubmitButton
+                          formAction={submit(completePlan)}
+                          className="flex-1 rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950"
                         >
                           <Check className="mr-1 inline h-4 w-4" aria-hidden="true" />
                           完了して記録にする
-                        </button>
+                        </SubmitButton>
                         {openItem && (
-                          <button
-                            type="submit"
-                            formAction={skipPlan}
-                            disabled={pending}
-                            className="rounded-xl border border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted disabled:opacity-50"
+                          <SubmitButton
+                            formAction={submit(skipPlan)}
+                            className="rounded-xl border border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted"
                           >
                             見送り
-                          </button>
+                          </SubmitButton>
                         )}
                       </div>
                     )}
@@ -888,14 +1009,17 @@ export default function ScheduleCalendar({
                       </button>
                     )}
 
-                    <button
-                      type="submit"
-                      formAction={clearPlan}
-                      disabled={pending}
-                      className="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted disabled:opacity-50"
-                    >
-                      この日の予定を消す
-                    </button>
+                    {/* 消せるのは予定だけ。記録・見送りは履歴なので、写真ごと消える
+                        取り返しのつかない操作を確認なしで置かない（記録の削除は
+                        記録詳細の「…」から確認つきで行う） */}
+                    {(!openItem || openItem.status === "planned") && (
+                      <SubmitButton
+                        formAction={submit(clearPlan)}
+                        className="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted"
+                      >
+                        この日の予定を消す
+                      </SubmitButton>
+                    )}
                   </form>
                 )}
 
@@ -912,8 +1036,15 @@ export default function ScheduleCalendar({
                             <button
                               type="button"
                               onClick={() => {
-                                setOpenId(x.id);
-                                setDraft(draftOf(x));
+                                if (dirty()) {
+                                  setPendingSwitch(x.id);
+                                  setConfirmClose(true);
+                                  requestAnimationFrame(() =>
+                                    confirmRef.current?.focus({ preventScroll: true }),
+                                  );
+                                  return;
+                                }
+                                switchTo(x);
                               }}
                               className="flex w-full items-center gap-2 rounded-xl bg-surface-muted px-3 py-2 text-left text-sm transition hover:bg-muted/40"
                             >
