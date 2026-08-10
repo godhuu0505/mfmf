@@ -995,13 +995,14 @@ export default function ScheduleCalendar({
                         <select
                           id="schedule-pet"
                           name="pet_id"
+                          required
                           value={draft.petId}
                           onChange={(e) =>
                             setDraft({ ...draft, petId: e.target.value })
                           }
                           className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
                         >
-                          <option value="">（未設定）</option>
+                          <option value="">選んでください</option>
                           {pets.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name}
@@ -1162,22 +1163,25 @@ export default function ScheduleCalendar({
                       />
                     </div>
 
-                    {(!openItem || openItem.status === "planned") && (
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          name="repeat"
-                          value="1"
-                          checked={draft.repeat}
-                          onChange={(e) =>
-                            setDraft({ ...draft, repeat: e.target.checked })
-                          }
-                        />
-                        これから毎週
-                        {WEEKDAYS[new Date(`${openDate}T00:00:00`).getDay()]}
-                        曜も同じにする
-                      </label>
-                    )}
+                    {/* 「もう 1 件足す」は毎週にしない。足したぶんでルールを
+                        差し替えると、その日に同じ予定が二重に出る */}
+                    {!additional &&
+                      (!openItem || openItem.status === "planned") && (
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            name="repeat"
+                            value="1"
+                            checked={draft.repeat}
+                            onChange={(e) =>
+                              setDraft({ ...draft, repeat: e.target.checked })
+                            }
+                          />
+                          これから毎週
+                          {WEEKDAYS[new Date(`${openDate}T00:00:00`).getDay()]}
+                          曜も同じにする
+                        </label>
+                      )}
 
                     {/* ルール由来を触らずに保存すると、その日だけ実体になって
                         あとの毎週の変更が効かなくなる。何も変えていなければ
@@ -1240,15 +1244,14 @@ export default function ScheduleCalendar({
                     {/* 「もう 1 件足す」の下書き（additional）には出さない ——
                         record_id が空のまま送ると、その日のルールごと打ち消して
                         しまい、保存していない下書きを捨てるだけにならない */}
-                    {!additional &&
-                      (!openItem || openItem.status === "planned") && (
-                        <SubmitButton
-                          formAction={submit(clearPlan)}
-                          className="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted"
-                        >
-                          この日の予定を消す
-                        </SubmitButton>
-                      )}
+                    {!additional && openItem?.status === "planned" && (
+                      <SubmitButton
+                        formAction={submit(clearPlan)}
+                        className="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted"
+                      >
+                        この日の予定を消す
+                      </SubmitButton>
+                    )}
                   </form>
                 )}
 

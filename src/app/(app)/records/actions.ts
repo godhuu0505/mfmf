@@ -423,9 +423,24 @@ export async function updateRecord(recordId: string, formData: FormData) {
   );
   const pet_id = await resolvePetId(supabase, user.id, householdId, formData);
 
+  // 日付を動かしたら「その日のルールを置き換えている」印は外す。
+  // 置き換えていたのは元の日なので、動かしたまま持ち回ると
+  // 元の日の毎週の予定が消えたままになり、移った先の別の予定を隠す
+  const { data: before, error: beforeError } = await supabase
+    .from("daycare_records")
+    .select("record_date, overrides_rule")
+    .eq("id", recordId)
+    .maybeSingle();
+  if (beforeError) {
+    throw new Error(`記録の更新に失敗しました: ${beforeError.message}`);
+  }
+  const moved =
+    before?.overrides_rule === true &&
+    before.record_date !== fields.record_date;
+
   const { error } = await supabase
     .from("daycare_records")
-    .update({ ...fields, pet_id })
+    .update({ ...fields, pet_id, ...(moved ? { overrides_rule: false } : {}) })
     .eq("id", recordId);
 
   if (error) {
