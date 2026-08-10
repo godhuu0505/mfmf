@@ -189,7 +189,12 @@ async function syncAssignees(
   }
   const stale = ASSIGNEE_ROLES.filter((role) => !keep.includes(role));
   if (stale.length > 0) {
-    await supabase.from(table).delete().eq(key, ownerRowId).in("role", stale);
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq(key, ownerRowId)
+      .in("role", stale);
+    if (error) throw new Error(`担当の保存に失敗しました: ${error.message}`);
   }
 }
 

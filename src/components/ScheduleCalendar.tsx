@@ -70,7 +70,10 @@ type Props = {
   householdId: string | null;
 };
 
-const COLOR: Record<RecordSource, { soft: string; solid: string; ring: string; dot: string }> = {
+const COLOR: Record<
+  RecordSource,
+  { soft: string; solid: string; ring: string; dot: string }
+> = {
   daycare: {
     soft: "bg-sky-50 text-sky-900 border-sky-500 dark:bg-sky-950 dark:text-sky-100",
     solid: "bg-sky-700 text-white",
@@ -183,7 +186,14 @@ function draftOf(item: CalendarItem | null): Draft {
   if (!item) {
     // 新しく入れる予定だけ、種類の既定時間から始める
     const t = defaultTimesFor("daycare");
-    return { source: "daycare", start: t.start, end: t.end, who: {}, body: "", timeDirty: false };
+    return {
+      source: "daycare",
+      start: t.start,
+      end: t.end,
+      who: {},
+      body: "",
+      timeDirty: false,
+    };
   }
   // 保存済みの行は持っている値のまま。時刻なしの記録に既定を入れると、
   // ひとことを直しただけで 09:00〜18:00 の予定に化ける
@@ -296,7 +306,9 @@ export default function ScheduleCalendar({
     setOpenDraft(next);
     setConfirmClose(false);
     setAdditional(false);
-    requestAnimationFrame(() => sheetRef.current?.focus({ preventScroll: true }));
+    requestAnimationFrame(() =>
+      sheetRef.current?.focus({ preventScroll: true }),
+    );
   }
 
   /** 開いた時点から中身が変わっているか（本番の記録フォームと同じ判定の考え方）。 */
@@ -342,7 +354,9 @@ export default function ScheduleCalendar({
     setOpenDate(null);
     setOpenId(null);
     setAdditional(false);
-    requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }));
+    requestAnimationFrame(() =>
+      triggerRef.current?.focus({ preventScroll: true }),
+    );
   }
 
   function pickType(source: RecordSource) {
@@ -350,7 +364,8 @@ export default function ScheduleCalendar({
       const t = defaultTimesFor(source);
       // 種類に無い役割の担当は落とす（保育園 → おうちで「送り」が残らないように）
       const keep: Partial<Record<AssigneeRole, string>> = {};
-      for (const role of rolesFor(source)) if (d.who[role]) keep[role] = d.who[role];
+      for (const role of rolesFor(source))
+        if (d.who[role]) keep[role] = d.who[role];
       return {
         ...d,
         source,
@@ -364,7 +379,10 @@ export default function ScheduleCalendar({
   function toggleWho(role: AssigneeRole, memberId: string) {
     setDraft((d) => ({
       ...d,
-      who: { ...d.who, [role]: d.who[role] === memberId ? undefined : memberId },
+      who: {
+        ...d.who,
+        [role]: d.who[role] === memberId ? undefined : memberId,
+      },
     }));
   }
 
@@ -409,13 +427,14 @@ export default function ScheduleCalendar({
       );
     }
     return (
-      <span key={item.id} className="flex items-center gap-1 rounded px-0.5 text-[10px]">
+      <span
+        key={item.id}
+        className="flex items-center gap-1 rounded px-0.5 text-[10px]"
+      >
         <span
           className={
             "h-2 w-2 shrink-0 rounded-full " +
-            (item.status === "done"
-              ? c.dot
-              : `border-[1.5px] ${c.ring}`) +
+            (item.status === "done" ? c.dot : `border-[1.5px] ${c.ring}`) +
             (item.fromRule ? " opacity-50" : "")
           }
         />
@@ -426,7 +445,10 @@ export default function ScheduleCalendar({
         )}
         <span className="truncate">{SOURCE_LABEL[item.source]}</span>
         {item.photoCount > 0 && (
-          <Camera className="h-2.5 w-2.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Camera
+            className="h-2.5 w-2.5 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
         )}
       </span>
     );
@@ -453,7 +475,10 @@ export default function ScheduleCalendar({
     const s0 = Math.max(minutesOf(x.start), hStart * 60);
     const e0 = Math.min(minutesOf(x.end), hEnd * 60);
     const h = Math.min(gridH, Math.max(MIN_BLOCK_PX, ((e0 - s0) / 60) * ROW));
-    const top = Math.max(0, Math.min(((s0 - hStart * 60) / 60) * ROW, gridH - h));
+    const top = Math.max(
+      0,
+      Math.min(((s0 - hStart * 60) / 60) * ROW, gridH - h),
+    );
     return { top, h, bottom: top + h };
   }
 
@@ -461,13 +486,22 @@ export default function ScheduleCalendar({
     const sorted = list
       .map((x) => ({ x, g: geom(x) }))
       .sort((a, b) => a.g.top - b.g.top || a.g.bottom - b.g.bottom);
-    const out: { x: CalendarItem; g: ReturnType<typeof geom>; col: number; total: number }[] = [];
+    const out: {
+      x: CalendarItem;
+      g: ReturnType<typeof geom>;
+      col: number;
+      total: number;
+    }[] = [];
     let cluster: typeof sorted = [];
     let clusterEnd = -1;
     const flush = () => {
       if (cluster.length === 0) return;
       const colEnds: number[] = [];
-      const placed: { x: CalendarItem; g: ReturnType<typeof geom>; col: number }[] = [];
+      const placed: {
+        x: CalendarItem;
+        g: ReturnType<typeof geom>;
+        col: number;
+      }[] = [];
       for (const q of cluster) {
         let c = colEnds.findIndex((end) => q.g.top >= end);
         if (c === -1) {
@@ -527,7 +561,11 @@ export default function ScheduleCalendar({
               key={w}
               className={
                 "border-b border-r border-border py-1 text-xs font-medium " +
-                (i === 0 ? "text-rose-500" : i === 6 ? "text-sky-500" : "text-muted-foreground")
+                (i === 0
+                  ? "text-rose-500"
+                  : i === 6
+                    ? "text-sky-500"
+                    : "text-muted-foreground")
               }
             >
               {w}
@@ -588,7 +626,9 @@ export default function ScheduleCalendar({
               >
                 ‹ 前週
               </Link>
-              <p className="text-sm font-medium tabular-nums">{weekNav.label}</p>
+              <p className="text-sm font-medium tabular-nums">
+                {weekNav.label}
+              </p>
               <Link
                 href={weekNav.nextHref}
                 aria-label="次の週"
@@ -599,154 +639,166 @@ export default function ScheduleCalendar({
             </div>
           )}
           <div className="overflow-x-auto">
-          <div className="min-w-[44rem]">
-            <div className="grid grid-cols-[3rem_repeat(7,1fr)] border-b border-border">
-              <div />
-              {weekDays.map((ds, i) => {
-                const day = Number(ds.slice(-2));
-                const isToday = ds === todayStr;
-                return (
-                  <div key={ds} className="border-l border-border py-1 text-center">
+            <div className="min-w-[44rem]">
+              <div className="grid grid-cols-[3rem_repeat(7,1fr)] border-b border-border">
+                <div />
+                {weekDays.map((ds, i) => {
+                  const day = Number(ds.slice(-2));
+                  const isToday = ds === todayStr;
+                  return (
                     <div
-                      className={
-                        "text-[10px] " +
-                        (i === 0
-                          ? "text-rose-500"
-                          : i === 6
-                            ? "text-sky-500"
-                            : "text-muted-foreground")
-                      }
+                      key={ds}
+                      className="border-l border-border py-1 text-center"
                     >
-                      {WEEKDAYS[i]}
-                    </div>
-                    <div
-                      className={
-                        "mx-auto flex h-7 w-7 items-center justify-center rounded-full text-sm " +
-                        (isToday
-                          ? "bg-primary font-bold text-primary-foreground"
-                          : "font-medium")
-                      }
-                    >
-                      {day}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* 終日（時刻なしの記録・見送り） */}
-            <div className="grid grid-cols-[3rem_repeat(7,1fr)] border-b border-border">
-              <div className="py-1 pr-1 text-right text-[10px] text-muted-foreground">
-                終日
-              </div>
-              {weekDays.map((ds) => (
-                <div key={ds} className="min-h-6 border-l border-border p-0.5">
-                  {(itemsByDate[ds] ?? [])
-                    .filter((x) => x.status === "skipped" || !x.start)
-                    .map((x) => (
-                      <button
-                        key={x.id}
-                        type="button"
-                        onClick={() => open(ds, x.id)}
-                        aria-label={`${formatDay(ds)} ${
-                          x.status === "skipped" ? "見送り" : "時刻なしの記録"
-                        } ${x.body || SOURCE_LABEL[x.source]}`}
+                      <div
                         className={
-                          "block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] " +
-                          (x.status === "skipped"
-                            ? "text-muted-foreground line-through"
-                            : "text-foreground")
+                          "text-[10px] " +
+                          (i === 0
+                            ? "text-rose-500"
+                            : i === 6
+                              ? "text-sky-500"
+                              : "text-muted-foreground")
                         }
                       >
-                        {SOURCE_EMOJI[x.source]}
-                        {x.body || SOURCE_LABEL[x.source]}
-                      </button>
-                    ))}
-                </div>
-              ))}
-            </div>
-
-            {/* 時間軸 + ブロック */}
-            <div className="grid grid-cols-[3rem_repeat(7,1fr)]">
-              <div className="relative" style={{ height: gridH }}>
-                {Array.from({ length: hEnd - hStart }, (_, i) => hStart + i).map((h) => (
-                  <div
-                    key={h}
-                    className="absolute right-1 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground"
-                    style={{ top: (h - hStart) * ROW }}
-                  >
-                    {pad(h)}:00
-                  </div>
-                ))}
+                        {WEEKDAYS[i]}
+                      </div>
+                      <div
+                        className={
+                          "mx-auto flex h-7 w-7 items-center justify-center rounded-full text-sm " +
+                          (isToday
+                            ? "bg-primary font-bold text-primary-foreground"
+                            : "font-medium")
+                        }
+                      >
+                        {day}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              {weekDays.map((ds) => {
-                const list = (itemsByDate[ds] ?? []).filter(
-                  (x) => x.status !== "skipped" && x.start && x.end,
-                );
-                return (
+
+              {/* 終日（時刻なしの記録・見送り） */}
+              <div className="grid grid-cols-[3rem_repeat(7,1fr)] border-b border-border">
+                <div className="py-1 pr-1 text-right text-[10px] text-muted-foreground">
+                  終日
+                </div>
+                {weekDays.map((ds) => (
                   <div
                     key={ds}
-                    className="relative border-l border-border"
-                    style={{ height: gridH }}
+                    className="min-h-6 border-l border-border p-0.5"
                   >
-                    {Array.from({ length: hEnd - hStart }, (_, i) => hStart + i).map((h) => (
-                      <div
-                        key={h}
-                        className="absolute inset-x-0 border-t border-border"
-                        style={{ top: (h - hStart) * ROW }}
-                      />
-                    ))}
-                    {layout(list).map(({ x, g, col, total }) => {
-                      const c = COLOR[x.source];
-                      const done = x.status === "done";
-                      const who = rolesFor(x.source)
-                        .map((r) => memberOf(x.who[r]))
-                        .filter(Boolean);
-                      return (
+                    {(itemsByDate[ds] ?? [])
+                      .filter((x) => x.status === "skipped" || !x.start)
+                      .map((x) => (
                         <button
                           key={x.id}
                           type="button"
                           onClick={() => open(ds, x.id)}
-                          aria-label={`${formatDay(ds)} ${x.start}から${x.end} ${
-                            SOURCE_LABEL[x.source]
-                          }${done ? " 記録ずみ" : ""}`}
+                          aria-label={`${formatDay(ds)} ${
+                            x.status === "skipped" ? "見送り" : "時刻なしの記録"
+                          } ${x.body || SOURCE_LABEL[x.source]}`}
                           className={
-                            "absolute flex flex-col items-stretch justify-start overflow-hidden rounded border-l-4 px-1 py-0.5 text-left text-[10px] leading-tight " +
-                            (done ? `${c.solid} border-l-black/20` : c.soft) +
-                            (x.fromRule ? " border-dashed" : "")
+                            "block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] " +
+                            (x.status === "skipped"
+                              ? "text-muted-foreground line-through"
+                              : "text-foreground")
                           }
-                          style={{
-                            top: g.top,
-                            height: g.h,
-                            left: `calc(${(col / total) * 100}% + 2px)`,
-                            width: `calc(${100 / total}% - 4px)`,
-                          }}
                         >
-                          <span className="block truncate font-medium">
-                            {SOURCE_EMOJI[x.source]} {SOURCE_LABEL[x.source]}
-                          </span>
-                          <span className="block truncate tabular-nums">
-                            {x.start}〜{x.end}
-                          </span>
-                          {who.length > 0 && (
-                            <span className="mt-0.5 flex gap-0.5">
-                              {who.map((m) => (
-                                <span
-                                  key={m!.id}
-                                  className="flex h-4 w-4 items-center justify-center rounded-full bg-surface text-[9px] font-bold text-foreground ring-1 ring-border"
-                                >
-                                  {m!.initial}
-                                </span>
-                              ))}
-                            </span>
-                          )}
+                          {SOURCE_EMOJI[x.source]}
+                          {x.body || SOURCE_LABEL[x.source]}
                         </button>
-                      );
-                    })}
+                      ))}
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+
+              {/* 時間軸 + ブロック */}
+              <div className="grid grid-cols-[3rem_repeat(7,1fr)]">
+                <div className="relative" style={{ height: gridH }}>
+                  {Array.from(
+                    { length: hEnd - hStart },
+                    (_, i) => hStart + i,
+                  ).map((h) => (
+                    <div
+                      key={h}
+                      className="absolute right-1 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground"
+                      style={{ top: (h - hStart) * ROW }}
+                    >
+                      {pad(h)}:00
+                    </div>
+                  ))}
+                </div>
+                {weekDays.map((ds) => {
+                  const list = (itemsByDate[ds] ?? []).filter(
+                    (x) => x.status !== "skipped" && x.start && x.end,
+                  );
+                  return (
+                    <div
+                      key={ds}
+                      className="relative border-l border-border"
+                      style={{ height: gridH }}
+                    >
+                      {Array.from(
+                        { length: hEnd - hStart },
+                        (_, i) => hStart + i,
+                      ).map((h) => (
+                        <div
+                          key={h}
+                          className="absolute inset-x-0 border-t border-border"
+                          style={{ top: (h - hStart) * ROW }}
+                        />
+                      ))}
+                      {layout(list).map(({ x, g, col, total }) => {
+                        const c = COLOR[x.source];
+                        const done = x.status === "done";
+                        const who = rolesFor(x.source)
+                          .map((r) => memberOf(x.who[r]))
+                          .filter(Boolean);
+                        return (
+                          <button
+                            key={x.id}
+                            type="button"
+                            onClick={() => open(ds, x.id)}
+                            aria-label={`${formatDay(ds)} ${x.start}から${x.end} ${
+                              SOURCE_LABEL[x.source]
+                            }${done ? " 記録ずみ" : ""}`}
+                            className={
+                              "absolute flex flex-col items-stretch justify-start overflow-hidden rounded border-l-4 px-1 py-0.5 text-left text-[10px] leading-tight " +
+                              (done ? `${c.solid} border-l-black/20` : c.soft) +
+                              (x.fromRule ? " border-dashed" : "")
+                            }
+                            style={{
+                              top: g.top,
+                              height: g.h,
+                              left: `calc(${(col / total) * 100}% + 2px)`,
+                              width: `calc(${100 / total}% - 4px)`,
+                            }}
+                          >
+                            <span className="block truncate font-medium">
+                              {SOURCE_EMOJI[x.source]} {SOURCE_LABEL[x.source]}
+                            </span>
+                            <span className="block truncate tabular-nums">
+                              {x.start}〜{x.end}
+                            </span>
+                            {who.length > 0 && (
+                              <span className="mt-0.5 flex gap-0.5">
+                                {who.map((m) => (
+                                  <span
+                                    key={m!.id}
+                                    className="flex h-4 w-4 items-center justify-center rounded-full bg-surface text-[9px] font-bold text-foreground ring-1 ring-border"
+                                  >
+                                    {m!.initial}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -754,7 +806,8 @@ export default function ScheduleCalendar({
 
       <p className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full border-[1.5px] border-sky-500" /> 予定
+          <span className="h-2 w-2 rounded-full border-[1.5px] border-sky-500" />{" "}
+          予定
         </span>
         <span className="flex items-center gap-1">
           <span className="h-2 w-2 rounded-full bg-sky-500" /> 記録ずみ
@@ -847,7 +900,9 @@ export default function ScheduleCalendar({
 
                 {openItem?.status === "done" && (
                   <div className="mb-4 rounded-xl bg-surface-muted p-3">
-                    <p className="mb-1 text-xs font-bold text-muted-foreground">記録</p>
+                    <p className="mb-1 text-xs font-bold text-muted-foreground">
+                      記録
+                    </p>
                     <p className="text-sm">{openItem.body || "（本文なし）"}</p>
                     <Link
                       href={`/records/${openItem.id}`}
@@ -858,14 +913,21 @@ export default function ScheduleCalendar({
                   </div>
                 )}
 
+                {/* 戻したらシートを閉じる。開いたままだと、いま出ている下書き
+                    （既定の保育園）が、戻ってきた別の種類のルールの内容として
+                    保存されてしまう */}
                 {skipped.has(openDate) && canEdit && (
                   <form
-                    action={restoreRuleForDate}
+                    action={submit(restoreRuleForDate)}
                     className="mb-4 flex items-center gap-2 rounded-xl border border-dashed border-border p-3 text-sm"
                   >
                     <input type="hidden" name="record_date" value={openDate} />
                     {householdId && (
-                      <input type="hidden" name="household_id" value={householdId} />
+                      <input
+                        type="hidden"
+                        name="household_id"
+                        value={householdId}
+                      />
                     )}
                     <span className="min-w-0 flex-1 text-muted-foreground">
                       毎週のルールを打ち消しています。
@@ -892,23 +954,35 @@ export default function ScheduleCalendar({
                       value={openItem && !openItem.fromRule ? openItem.id : ""}
                     />
                     {householdId && (
-                      <input type="hidden" name="household_id" value={householdId} />
-                    )}
-                    {additional && <input type="hidden" name="additional" value="1" />}
-                    {(["drop", "pick", "care"] as AssigneeRole[]).map((role) => (
                       <input
-                        key={role}
                         type="hidden"
-                        name={`who_${role}`}
-                        value={draft.who[role] ?? ""}
+                        name="household_id"
+                        value={householdId}
                       />
-                    ))}
+                    )}
+                    {additional && (
+                      <input type="hidden" name="additional" value="1" />
+                    )}
+                    {(["drop", "pick", "care"] as AssigneeRole[]).map(
+                      (role) => (
+                        <input
+                          key={role}
+                          type="hidden"
+                          name={`who_${role}`}
+                          value={draft.who[role] ?? ""}
+                        />
+                      ),
+                    )}
 
                     <div>
                       <p className="mb-2 text-xs font-bold text-muted-foreground">
                         どう過ごす？
                       </p>
-                      <div role="radiogroup" aria-label="種類" className="flex flex-wrap gap-2">
+                      <div
+                        role="radiogroup"
+                        aria-label="種類"
+                        className="flex flex-wrap gap-2"
+                      >
                         {RECORD_SOURCES.map((s) => {
                           const on = draft.source === s;
                           return (
@@ -935,7 +1009,9 @@ export default function ScheduleCalendar({
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-bold text-muted-foreground">時間</p>
+                      <p className="mb-2 text-xs font-bold text-muted-foreground">
+                        時間
+                      </p>
                       <div className="flex items-center gap-2">
                         <input
                           type="time"
@@ -943,18 +1019,28 @@ export default function ScheduleCalendar({
                           aria-label="開始時刻"
                           value={draft.start}
                           onChange={(e) =>
-                            setDraft((d) => ({ ...d, start: e.target.value, timeDirty: true }))
+                            setDraft((d) => ({
+                              ...d,
+                              start: e.target.value,
+                              timeDirty: true,
+                            }))
                           }
                           className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm tabular-nums"
                         />
-                        <span className="shrink-0 text-sm text-muted-foreground">〜</span>
+                        <span className="shrink-0 text-sm text-muted-foreground">
+                          〜
+                        </span>
                         <input
                           type="time"
                           name="end_time"
                           aria-label="終了時刻"
                           value={draft.end}
                           onChange={(e) =>
-                            setDraft((d) => ({ ...d, end: e.target.value, timeDirty: true }))
+                            setDraft((d) => ({
+                              ...d,
+                              end: e.target.value,
+                              timeDirty: true,
+                            }))
                           }
                           className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm tabular-nums"
                         />
@@ -964,7 +1050,10 @@ export default function ScheduleCalendar({
                     {roles.length > 0 && (
                       <div className="space-y-3 rounded-xl bg-surface-muted p-3">
                         {roles.map((role) => (
-                          <div key={role} className="flex flex-wrap items-center gap-2">
+                          <div
+                            key={role}
+                            className="flex flex-wrap items-center gap-2"
+                          >
                             <span className="w-20 shrink-0 text-sm font-medium">
                               {ASSIGNEE_ROLE_LABEL[role]}
                             </span>
@@ -1008,7 +1097,9 @@ export default function ScheduleCalendar({
                         id="plan-note"
                         name="body"
                         value={draft.body}
-                        onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
+                        onChange={(e) =>
+                          setDraft((d) => ({ ...d, body: e.target.value }))
+                        }
                         placeholder="例: パパ出張のため、迎えはばあば"
                         className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm"
                       />
@@ -1018,12 +1109,15 @@ export default function ScheduleCalendar({
                       <label className="flex items-center gap-2 text-sm">
                         <input type="checkbox" name="repeat" value="1" />
                         これから毎週
-                        {WEEKDAYS[new Date(`${openDate}T00:00:00`).getDay()]}曜も同じにする
+                        {WEEKDAYS[new Date(`${openDate}T00:00:00`).getDay()]}
+                        曜も同じにする
                       </label>
                     )}
 
                     <SubmitButton className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">
-                      {openItem?.status === "done" ? "変更を保存する" : "予定を保存する"}
+                      {openItem?.status === "done"
+                        ? "変更を保存する"
+                        : "予定を保存する"}
                     </SubmitButton>
 
                     {(!openItem || openItem.status === "planned") && (
@@ -1032,7 +1126,10 @@ export default function ScheduleCalendar({
                           formAction={submit(completePlan)}
                           className="flex-1 rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950"
                         >
-                          <Check className="mr-1 inline h-4 w-4" aria-hidden="true" />
+                          <Check
+                            className="mr-1 inline h-4 w-4"
+                            aria-hidden="true"
+                          />
                           完了して記録にする
                         </SubmitButton>
                         {openItem && (
@@ -1046,16 +1143,18 @@ export default function ScheduleCalendar({
                       </div>
                     )}
 
-                    {openItem && openItem.status === "skipped" && !openItem.fromRule && (
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => run(() => reopenPlan(openItem.id))}
-                        className="w-full rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted disabled:opacity-50"
-                      >
-                        予定に戻す
-                      </button>
-                    )}
+                    {openItem &&
+                      openItem.status === "skipped" &&
+                      !openItem.fromRule && (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => run(() => reopenPlan(openItem.id))}
+                          className="w-full rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted disabled:opacity-50"
+                        >
+                          予定に戻す
+                        </button>
+                      )}
 
                     {/* 消せるのは予定だけ。記録・見送りは履歴なので、写真ごと消える
                         取り返しのつかない操作を確認なしで置かない（記録の削除は
@@ -1063,14 +1162,15 @@ export default function ScheduleCalendar({
                     {/* 「もう 1 件足す」の下書き（additional）には出さない ——
                         record_id が空のまま送ると、その日のルールごと打ち消して
                         しまい、保存していない下書きを捨てるだけにならない */}
-                    {!additional && (!openItem || openItem.status === "planned") && (
-                      <SubmitButton
-                        formAction={submit(clearPlan)}
-                        className="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted"
-                      >
-                        この日の予定を消す
-                      </SubmitButton>
-                    )}
+                    {!additional &&
+                      (!openItem || openItem.status === "planned") && (
+                        <SubmitButton
+                          formAction={submit(clearPlan)}
+                          className="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted"
+                        >
+                          この日の予定を消す
+                        </SubmitButton>
+                      )}
                   </form>
                 )}
 
@@ -1111,7 +1211,9 @@ export default function ScheduleCalendar({
                                   setPendingSwitch(x.id);
                                   setConfirmClose(true);
                                   requestAnimationFrame(() =>
-                                    confirmRef.current?.focus({ preventScroll: true }),
+                                    confirmRef.current?.focus({
+                                      preventScroll: true,
+                                    }),
                                   );
                                   return;
                                 }
@@ -1119,7 +1221,9 @@ export default function ScheduleCalendar({
                               }}
                               className="flex w-full items-center gap-2 rounded-xl bg-surface-muted px-3 py-2 text-left text-sm transition hover:bg-muted/40"
                             >
-                              <span className="shrink-0">{SOURCE_EMOJI[x.source]}</span>
+                              <span className="shrink-0">
+                                {SOURCE_EMOJI[x.source]}
+                              </span>
                               <span className="min-w-0 flex-1 truncate">
                                 {x.body || SOURCE_LABEL[x.source]}
                               </span>

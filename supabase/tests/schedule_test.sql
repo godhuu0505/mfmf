@@ -14,7 +14,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(32);
+select plan(33);
 
 -- fixture: HA に A(owner) / E(editor) / V(viewer)、別世帯 HB に B(owner)
 insert into auth.users (id, email) values
@@ -315,6 +315,28 @@ select results_eq(
       public.jst_today(), public.jst_today() + 13)$$,
   $$values (0)$$,
   '他世帯のルールは RPC 経由でも返らない（RLS が効く）'
+);
+
+-- ---------------------------------------------------------------
+-- 7. 世帯削除のガード（ルールだけの世帯を「空」と見なさない）
+-- ---------------------------------------------------------------
+reset role;
+insert into public.households (id, name)
+  values ('33333333-3333-3333-3333-333333333333', 'HC');
+insert into public.household_members (household_id, user_id, role)
+  values ('33333333-3333-3333-3333-333333333333',
+          'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'owner');
+insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
+  values ('33333333-3333-3333-3333-333333333333', 2, public.jst_today(), 'daycare',
+          'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+select throws_ok(
+  $$select public.delete_own_household('33333333-3333-3333-3333-333333333333')$$,
+  'P0001',
+  null,
+  '毎週のルールだけがある世帯は「空」ではないので消せない'
 );
 
 reset role;

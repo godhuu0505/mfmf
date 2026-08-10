@@ -494,3 +494,64 @@ drop trigger if exists schedule_rules_set_updated_at on public.schedule_rules;
 create trigger schedule_rules_set_updated_at
   before update on public.schedule_rules
   for each row execute function public.set_updated_at();
+
+-- ---------------------------------------------------------------
+-- 8. 世帯削除のガードに予定を足す
+--    schedule_rules / schedule_rule_skips は households への FK（cascade）を
+--    持つので、ガードに足さないと「ペットも記録も無いが毎週のルールはある」世帯が
+--    「空」と判定され、ルールごと消える。20260705040000 の本体に 2 行足したもの。
+-- ---------------------------------------------------------------
+create or replace function public.delete_own_household(p_household_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'ログインが必要です' using errcode = '42501';
+  end if;
+
+  -- 空判定より前に世帯行をロックし、チェック→削除を FK 子テーブルに対して
+  -- アトミックにする（詳しい理由は 20260705040000_household_delete.sql のコメント）。
+  perform 1 from public.households where id = p_household_id for update;
+
+  if not exists (
+    select 1 from public.household_members m
+    where m.household_id = p_household_id
+      and m.user_id = v_uid
+      and m.role = 'owner'
+  ) then
+    raise exception 'この世帯を削除できるのは owner だけです' using errcode = '42501';
+  end if;
+
+  -- 参照データのある世帯は削除しない（孤児化防止）。1 行でもあれば拒否。
+  -- Storage の残存レースについては 20260705040000 のコメントを参照（#51 へ委ねる）。
+  if exists (select 1 from public.pets                where household_id = p_household_id)
+     or exists (select 1 from public.daycare_records     where household_id = p_household_id)
+     or exists (select 1 from public.record_photos       where household_id = p_household_id)
+     or exists (select 1 from public.tags                where household_id = p_household_id)
+     or exists (select 1 from public.feedback            where household_id = p_household_id)
+     or exists (select 1 from public.household_invites   where household_id = p_household_id)
+     or exists (select 1 from public.guest_grants        where household_id = p_household_id)
+     or exists (select 1 from public.schedule_rules      where household_id = p_household_id)
+     or exists (select 1 from public.schedule_rule_skips where household_id = p_household_id)
+     or exists (
+          select 1 from storage.objects o
+          where o.bucket_id = 'daycare-photos'
+            and (storage.foldername(o.name))[1] = p_household_id::text
+        ) then
+    raise exception 'データのある世帯は削除できません。記録・写真・ペットなどのエクスポート後に削除する導線は準備中です（#51）'
+      using errcode = 'P0001';
+  end if;
+
+  perform set_config('mfmf.deleting_household', p_household_id::text, true);
+  delete from public.households where id = p_household_id;
+  perform set_config('mfmf.deleting_household', '', true);
+end;
+$$;
+
+comment on function public.delete_own_household(uuid) is
+  'owner が参照データの無い世帯を削除する（UC-H09 の部分集合）。毎週の予定ルール・打ち消しも「データあり」に数える。SECURITY DEFINER + search_path 固定。';

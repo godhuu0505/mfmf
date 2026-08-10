@@ -38,9 +38,14 @@ export default async function ScheduleRulesPage() {
     ? await fetchSchedule(supabase, householdId, today, previewEnd)
     : EMPTY_SCHEDULE;
 
-  const { data: memberRows } = householdId
+  // メンバーが引けないまま出すと、担当の <select> に今の担当が並ばず、
+  // 種類や時刻を直しただけで担当が空で保存されてしまう
+  const { data: memberRows, error: memberError } = householdId
     ? await supabase.rpc("get_household_members", { p_household: householdId })
-    : { data: null };
+    : { data: null, error: null };
+  if (memberError) {
+    throw new Error(`メンバーの読み込みに失敗しました: ${memberError.message}`);
+  }
   const members = (
     ((memberRows as unknown) ?? []) as {
       user_id: string;
@@ -65,8 +70,8 @@ export default async function ScheduleRulesPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           いつもの週をここで一度だけ決めます。カレンダーには
           <b className="font-semibold text-foreground">薄く</b>
-          自動で入り、違う日だけ上書きすれば大丈夫です。
-          変更は<b className="font-semibold text-foreground">今日から</b>
+          自動で入り、違う日だけ上書きすれば大丈夫です。 変更は
+          <b className="font-semibold text-foreground">今日から</b>
           効き、それ以前の日は前のままです。
         </p>
       </div>
