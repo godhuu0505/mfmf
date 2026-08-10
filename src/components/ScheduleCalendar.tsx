@@ -1179,11 +1179,24 @@ export default function ScheduleCalendar({
                       </label>
                     )}
 
-                    <SubmitButton className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">
-                      {openItem?.status === "done"
-                        ? "変更を保存する"
-                        : "予定を保存する"}
-                    </SubmitButton>
+                    {/* ルール由来を触らずに保存すると、その日だけ実体になって
+                        あとの毎週の変更が効かなくなる。何も変えていなければ
+                        閉じるだけにする（プロトと同じ扱い） */}
+                    {openItem?.fromRule && !dirty() ? (
+                      <button
+                        type="button"
+                        onClick={close}
+                        className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover"
+                      >
+                        予定を保存する
+                      </button>
+                    ) : (
+                      <SubmitButton className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover">
+                        {openItem?.status === "done"
+                          ? "変更を保存する"
+                          : "予定を保存する"}
+                      </SubmitButton>
+                    )}
 
                     {(!openItem || openItem.status === "planned") && (
                       <div className="flex gap-2">

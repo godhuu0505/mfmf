@@ -121,6 +121,8 @@ export default function TodayPlanCard({
           !(plan.fromRule && multiPet) && (
             // 完了は種類・時刻・担当をそのまま引き継ぐ（書き直させない）
             <form action={completePlan} className="flex-1">
+              {/* 近道は描画時点の写し。保存済みの行に対しては状態だけ進める */}
+              <input type="hidden" name="shortcut" value="1" />
               <input
                 type="hidden"
                 name="record_id"

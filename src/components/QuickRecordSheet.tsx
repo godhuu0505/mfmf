@@ -297,6 +297,8 @@ export default function QuickRecordSheet({
           {/* きょうの予定があるときだけ。無ければ今までどおり（2 タップのまま） */}
           {todayPlan && (
             <form action={completeToday} className="mb-3">
+              {/* 近道は描画時点の写し。保存済みの行に対しては状態だけ進める */}
+              <input type="hidden" name="shortcut" value="1" />
               <input
                 type="hidden"
                 name="record_id"

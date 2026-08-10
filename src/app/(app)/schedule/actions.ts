@@ -280,15 +280,29 @@ async function savePlanRow(
     // 完了 / 見送りは「まだ予定の行」だけ。別のタブで完了された記録を
     // あとから見送りに落とすと、写真ごと一覧から消える
     const transition = nextStatus === "done" || nextStatus === "skipped";
+    // ホーム・＋ シートの近道は、描画した時点の写しを送っている。
+    // そのまま書き戻すと、別のタブで直した内容を古い値で上書きしてしまうので、
+    // 保存済みの行に対しては状態だけを進める
+    const shortcut = String(formData.get("shortcut") || "") === "1";
+    // どの子かは、フォームが選択を持っているときだけ書き換える
+    // （選択を出していない画面から送ると、付いていたペットが外れる）
+    const petFields = formData.has("pet_id")
+      ? { pet_id: await resolvePetId(supabase, householdId, formData) }
+      : {};
     let update = supabase
       .from("daycare_records")
-      .update({
-        source,
-        ...times,
-        body,
-        overrides_rule: overridesRule,
-        ...(nextStatus ? { status: nextStatus } : {}),
-      })
+      .update(
+        shortcut
+          ? { ...(nextStatus ? { status: nextStatus } : {}) }
+          : {
+              source,
+              ...times,
+              body,
+              ...petFields,
+              overrides_rule: overridesRule,
+              ...(nextStatus ? { status: nextStatus } : {}),
+            },
+      )
       .eq("id", recordId);
     if (transition) update = update.eq("status", "planned");
     const { data: updated, error } = await update.select("id");
@@ -328,14 +342,19 @@ async function savePlanRow(
     targetId = data.id as string;
   }
 
-  await syncAssignees(
-    supabase,
-    "record_assignees",
-    "record_id",
-    targetId,
-    householdId,
-    who,
-  );
+  // 近道からの完了は、送った写しで担当を上書きしない（上と同じ理由）
+  if (
+    !(UUID_RE.test(recordId) && String(formData.get("shortcut") || "") === "1")
+  ) {
+    await syncAssignees(
+      supabase,
+      "record_assignees",
+      "record_id",
+      targetId,
+      householdId,
+      who,
+    );
+  }
 
   // その日を打ち消していたなら、**ルールを置き換える行**を入れたときだけ打ち消しを外す。
   // 「もう 1 件足す」で並べた予定まで打ち消しを消すと、消したはずの
@@ -393,11 +412,18 @@ export async function reopenPlan(recordId: string) {
   const user = await requireUser(supabase);
   if (!UUID_RE.test(recordId)) throw new Error("不正なリクエストです");
   await requireEditableRecordHousehold(supabase, user.id, recordId);
-  const { error } = await supabase
+  // 戻せるのは見送りの行だけ。別のタブで完了された記録を予定に落とすと、
+  // 写真ごと一覧から消える
+  const { data: updated, error } = await supabase
     .from("daycare_records")
     .update({ status: "planned" })
-    .eq("id", recordId);
+    .eq("id", recordId)
+    .eq("status", "skipped")
+    .select("id");
   if (error) throw new Error(`予定に戻せませんでした: ${error.message}`);
+  if ((updated?.length ?? 0) === 0) {
+    throw new Error("この予定はすでに変わっています。画面を開き直してください");
+  }
   revalidateSchedule();
 }
 
@@ -534,10 +560,13 @@ export async function saveRule(formData: FormData) {
 
   // 「なし」も日付つきの版で表す（それ以降なしの墓標）。過去は変わらない
   if (raw === "" || raw === "none") {
+    // 画面を日付をまたいで開いたままだと since が「JST の昨日」になり、
+    // insert ポリシー（since >= jst_today()）に落ちる。今日へ寄せる
+    const today = jstTodayISO();
     const { error } = await supabase.rpc("replace_schedule_rule", {
       p_household: householdId,
       p_weekday: weekday,
-      p_since: since,
+      p_since: since < today ? today : since,
       p_kind: null, // それ以降なしを表す墓標
       p_start: null,
       p_end: null,
