@@ -59,6 +59,10 @@ type Props = {
   itemsByDate: Record<string, CalendarItem[]>;
   /** 週表示に出す 7 日（YYYY-MM-DD） */
   weekDays: string[];
+  /** 週表示の前後移動（親が ?w= を差し替える） */
+  weekNav?: { prevHref: string; nextHref: string; label: string };
+  /** 初期表示（?view=week で開いたときに週から始める） */
+  initialView?: "month" | "week";
   members: CalendarMember[];
   /** その日が打ち消されている（曜日ルールを効かせていない） */
   skippedDates: string[];
@@ -183,17 +187,19 @@ function SubmitButton({
 
 function draftOf(item: CalendarItem | null): Draft {
   if (!item) {
+    // 新しく入れる予定だけ、種類の既定時間から始める
     const t = defaultTimesFor("daycare");
     return { source: "daycare", start: t.start, end: t.end, who: {}, body: "", timeDirty: false };
   }
-  const t = defaultTimesFor(item.source);
+  // 保存済みの行は持っている値のまま。時刻なしの記録に既定を入れると、
+  // ひとことを直しただけで 09:00〜18:00 の予定に化ける
   return {
     source: item.source,
-    start: item.start ?? t.start,
-    end: item.end ?? t.end,
+    start: item.start ?? "",
+    end: item.end ?? "",
     who: { ...item.who },
     body: item.body,
-    timeDirty: item.start !== null,
+    timeDirty: true,
   };
 }
 
@@ -208,8 +214,10 @@ export default function ScheduleCalendar({
   skippedDates,
   canEdit,
   householdId,
+  weekNav,
+  initialView = "month",
 }: Props) {
-  const [view, setView] = useState<"month" | "week">("month");
+  const [view, setView] = useState<"month" | "week">(initialView);
   const [openDate, setOpenDate] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => draftOf(null));
@@ -227,6 +235,19 @@ export default function ScheduleCalendar({
 
   const skipped = useMemo(() => new Set(skippedDates), [skippedDates]);
 
+  // 別タブで世帯を切り替えると props だけが差し替わる。開いたままにすると、
+  // 前の世帯の下書きに新しい世帯の household_id が付いて保存されてしまう
+  useEffect(() => {
+    setOpenDate(null);
+    setOpenId(null);
+    setConfirmClose(false);
+    setPendingSwitch(null);
+  }, [householdId]);
+
+  // Esc のハンドラは openDate だけを見て張り替わるので、素で requestClose を
+  // 掴むと「開いた時点の下書き」で判定してしまう。最新の実装を ref で渡す
+  const requestCloseRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     if (!openDate) return;
     const prev = document.body.style.overflow;
@@ -236,7 +257,7 @@ export default function ScheduleCalendar({
       el.inert = true;
     });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") requestClose();
+      if (e.key === "Escape") requestCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -310,6 +331,8 @@ export default function ScheduleCalendar({
     setConfirmClose(false);
     setPendingSwitch(null);
   }
+
+  requestCloseRef.current = requestClose;
 
   function close() {
     setConfirmClose(false);
@@ -552,7 +575,27 @@ export default function ScheduleCalendar({
           })}
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div>
+          {weekNav && (
+            <div className="mb-2 flex items-center justify-between">
+              <Link
+                href={weekNav.prevHref}
+                aria-label="前の週"
+                className="rounded-lg border border-border px-3 py-1.5 text-sm transition hover:bg-surface-muted"
+              >
+                ‹ 前週
+              </Link>
+              <p className="text-sm font-medium tabular-nums">{weekNav.label}</p>
+              <Link
+                href={weekNav.nextHref}
+                aria-label="次の週"
+                className="rounded-lg border border-border px-3 py-1.5 text-sm transition hover:bg-surface-muted"
+              >
+                翌週 ›
+              </Link>
+            </div>
+          )}
+          <div className="overflow-x-auto">
           <div className="min-w-[44rem]">
             <div className="grid grid-cols-[3rem_repeat(7,1fr)] border-b border-border">
               <div />
@@ -700,6 +743,7 @@ export default function ScheduleCalendar({
                   </div>
                 );
               })}
+            </div>
             </div>
           </div>
         </div>
@@ -1021,6 +1065,25 @@ export default function ScheduleCalendar({
                       </SubmitButton>
                     )}
                   </form>
+                )}
+
+                {canEdit && openItem && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // record_id を空にした下書きに切り替える（既存を書き換えず、
+                      // 保育園の隣に通院を足せるようにする）
+                      setOpenId(null);
+                      const next = draftOf(null);
+                      setDraft(next);
+                      setOpenDraft(next);
+                      setConfirmClose(false);
+                      setPendingSwitch(null);
+                    }}
+                    className="mt-3 w-full rounded-xl border border-dashed border-border py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted"
+                  >
+                    ＋ この日に予定をもう 1 件足す
+                  </button>
                 )}
 
                 {openItems.filter((x) => x.id !== openItem?.id).length > 0 && (

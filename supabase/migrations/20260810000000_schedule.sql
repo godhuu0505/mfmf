@@ -204,12 +204,15 @@ create policy "schedule_rules_select_member"
   on public.schedule_rules for select
   using (public.has_household_role(household_id));
 
+-- 版は「今日以降から効く」ものだけ作れる。過去の日付で差し込めると、その日から
+-- あとのカレンダーが後から書き換わり、update / delete を塞いだ意味が無くなる。
 drop policy if exists "schedule_rules_insert_member" on public.schedule_rules;
 create policy "schedule_rules_insert_member"
   on public.schedule_rules for insert
   with check (
     public.has_household_role(household_id, array['owner','editor'])
     and public.is_household_member(household_id, created_by)
+    and since >= current_date
   );
 
 -- update ポリシーは**作らない**。Data API から直接 since / weekday / kind を書き換え
@@ -340,6 +343,55 @@ drop policy if exists "schedule_rule_skips_delete_member" on public.schedule_rul
 create policy "schedule_rule_skips_delete_member"
   on public.schedule_rule_skips for delete
   using (public.has_household_role(household_id, array['owner','editor']));
+
+-- ---------------------------------------------------------------
+-- 5.5 版の差し替えは 1 つの関数（＝1 トランザクション）で行う
+--     「古い版を消す → 新しい版を入れる」を 2 回のリクエストに分けると、
+--     入れる方が失敗したときに版が消えたままになり、以降の予定が前の版や
+--     「ルールなし」に落ちる。SECURITY INVOKER なので RLS はそのまま効く。
+-- ---------------------------------------------------------------
+create or replace function public.replace_schedule_rule(
+  p_household  uuid,
+  p_weekday    smallint,
+  p_since      date,
+  p_kind       text,
+  p_start      time,
+  p_end        time,
+  p_assignees  jsonb default '{}'::jsonb
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  delete from public.schedule_rules
+   where household_id = p_household
+     and weekday = p_weekday
+     and since >= p_since;
+
+  insert into public.schedule_rules
+    (household_id, weekday, since, kind, start_time, end_time, created_by)
+  values
+    (p_household, p_weekday, p_since, p_kind, p_start, p_end, auth.uid())
+  returning id into v_id;
+
+  insert into public.schedule_rule_assignees (rule_id, role, user_id)
+  select v_id, key, value::uuid
+    from jsonb_each_text(coalesce(p_assignees, '{}'::jsonb))
+   where value is not null and value <> '';
+
+  return v_id;
+end;
+$$;
+
+comment on function public.replace_schedule_rule(uuid, smallint, date, text, time, time, jsonb) is
+  '毎週のルールの版を差し替える（削除と作成を 1 トランザクションで行う）。RLS は呼び出しユーザーのまま効く';
+
+revoke all on function public.replace_schedule_rule(uuid, smallint, date, text, time, time, jsonb) from public;
+grant execute on function public.replace_schedule_rule(uuid, smallint, date, text, time, time, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------
 -- 6. ゲストの経路は「記録」だけに閉じる

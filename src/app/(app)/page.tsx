@@ -21,6 +21,10 @@ import { canEdit, getCurrentMembership, householdScopeFilter } from "@/lib/house
 import { hasActiveGuestGrant } from "@/lib/guest";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import RecordFilters from "@/components/RecordFilters";
+import TodayPlanCard, { type TodayPlan } from "@/components/TodayPlanCard";
+import { EMPTY_SCHEDULE, fetchSchedule } from "@/lib/scheduleQuery";
+import { itemsOnDate, planOnDate } from "@/lib/schedule";
+import { jstTodayISO } from "@/lib/dateRange";
 import SourceIcon from "@/components/SourceIcon";
 import { Camera, PawPrint, Scale, X } from "lucide-react";
 
@@ -97,6 +101,38 @@ export default async function HomePage({
   const householdId = membership.householdId;
   // viewer には編集系 UI を出さない（UC-A06。サーバー強制は RLS / Server Action）。
   const readOnly = !canEdit(membership.role);
+  const canAdd = !readOnly;
+
+  // きょうの予定（毎週のルール由来も含む）。ここから完了して記録にする（D34）
+  const todayStr = jstTodayISO();
+  const todaySchedule = await fetchSchedule(
+    supabase,
+    householdId,
+    todayStr,
+    todayStr,
+  ).catch(() => EMPTY_SCHEDULE);
+  const todayPlan: TodayPlan | null = planOnDate(
+    itemsOnDate({
+      date: todayStr,
+      records: todaySchedule.records,
+      rules: todaySchedule.rules,
+      ruleAssignees: todaySchedule.ruleAssignees,
+      skippedDates: todaySchedule.skippedDates,
+    }),
+  );
+  const { data: planMemberRows } = todayPlan
+    ? await supabase.rpc("get_household_members", { p_household: householdId })
+    : { data: null };
+  const planMembers = (
+    ((planMemberRows as unknown) ?? []) as {
+      user_id: string;
+      display_name: string | null;
+      email: string | null;
+    }[]
+  ).map((m) => {
+    const name = m.display_name?.trim() || m.email?.split("@")[0] || "メンバー";
+    return { id: m.user_id, name, initial: [...name][0] ?? "?" };
+  });
 
   // タグ絞り込み: 該当タグを持つ記録 id を先に解決しておく。
   let taggedIds: string[] | null = null;
@@ -316,6 +352,15 @@ export default async function HomePage({
     <>
       {/* inert 範囲・タブバー分の下端余白は (app)/layout.tsx と globals.css が受け持つ */}
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
+        {/* きょうの予定。ここから完了して記録にできる（D34） */}
+        <TodayPlanCard
+          plan={todayPlan}
+          today={todayStr}
+          members={planMembers}
+          canEdit={canAdd}
+          householdId={householdId}
+        />
+
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-foreground">記録一覧</h1>
         </div>

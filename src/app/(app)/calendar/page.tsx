@@ -71,9 +71,9 @@ function memberLabel(row: {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ym?: string }>;
+  searchParams: Promise<{ ym?: string; w?: string; view?: string }>;
 }) {
-  const { ym } = await searchParams;
+  const { ym, w, view } = await searchParams;
   // 「今日」「今月」は JST 基準（サーバーの実行 TZ が UTC だと、日本の 0:00〜8:59
   // に前日・前月扱いになってしまう）。
   const todayStr = jstTodayISO();
@@ -92,10 +92,20 @@ export default async function CalendarPage({
   const householdId = membership?.householdId ?? null;
   const canAdd = membership !== null && canEdit(membership.role);
 
-  // 週表示は「その月の今日」を含む週。別の月を見ているときはその月の 1 日の週。
-  const weekAnchor =
-    year === todayYear && month === todayMonth ? todayStr : firstDay;
+  // 週表示の起点。?w= があればその日を含む週、無ければ「その月の今日」または
+  // その月の 1 日の週（?w= が無いと 9 月の 15 日の週などを一生開けない）
+  const weekAnchor = /^\d{4}-\d{2}-\d{2}$/.test(w ?? "")
+    ? (w as string)
+    : year === todayYear && month === todayMonth
+      ? todayStr
+      : firstDay;
   const weekDays = weekOf(weekAnchor);
+  const weekLabel = `${Number(weekDays[0].slice(5, 7))}/${Number(
+    weekDays[0].slice(8),
+  )} 〜 ${Number(weekDays[6].slice(5, 7))}/${Number(weekDays[6].slice(8))}`;
+  // 週を動かすと、その週の月をそのまま見せる（月表示に戻したときに合う）
+  const weekHref = (anchor: string) =>
+    `/calendar?ym=${anchor.slice(0, 7)}&w=${anchor}&view=week`;
 
   // 月グリッドと週表示の両方を賄う範囲でまとめて取る
   const from = weekDays[0] < firstDay ? weekDays[0] : firstDay;
@@ -196,6 +206,12 @@ export default async function CalendarPage({
         skippedDates={[...schedule.skippedDates]}
         canEdit={canAdd}
         householdId={householdId}
+        initialView={view === "week" ? "week" : "month"}
+        weekNav={{
+          prevHref: weekHref(addDays(weekDays[0], -7)),
+          nextHref: weekHref(addDays(weekDays[0], 7)),
+          label: weekLabel,
+        }}
       />
 
       <p className="mt-6 text-sm text-muted-foreground">

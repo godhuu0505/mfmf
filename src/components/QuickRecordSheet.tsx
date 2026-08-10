@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { jstTodayISO } from "@/lib/dateRange";
 import { saveQuickDraft } from "@/lib/quickDraft";
-import type { RecordSource } from "@/types/database";
+import {
+  SOURCE_EMOJI,
+  type AssigneeRole,
+  type RecordSource,
+} from "@/types/database";
+import { completePlan } from "@/app/(app)/schedule/actions";
 
 // クイック記録の定型チップ（proto/quick-record 合意時の語彙 / D32）。
 // タップで選んだ順に「、」で繋がって本文になる。IME を開かずに 1 件残せる。
@@ -39,12 +44,27 @@ type Props = {
   householdId: string;
   /** プロフィールの既定記入者（画面には出さない） */
   defaultAuthor: string;
+  /**
+   * きょうの未完了の予定（D34）。あるときだけ、シートの先頭に
+   * 「完了して記録にする」を出す（種類・時刻・担当を引き継ぐので入力が要らない）。
+   */
+  todayPlan?: {
+    recordId: string; // ルール由来はまだ行が無いので空文字
+    date: string;
+    source: RecordSource;
+    label: string;
+    start: string | null;
+    end: string | null;
+    body: string;
+    who: Partial<Record<AssigneeRole, string>>;
+  } | null;
 };
 
 export default function QuickRecordSheet({
   action,
   householdId,
   defaultAuthor,
+  todayPlan = null,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -246,6 +266,44 @@ export default function QuickRecordSheet({
             >
               {error}
             </p>
+          )}
+
+          {/* きょうの予定があるときだけ。無ければ今までどおり（2 タップのまま） */}
+          {todayPlan && (
+            <form action={completePlan} className="mb-3">
+              <input type="hidden" name="record_id" value={todayPlan.recordId} />
+              <input type="hidden" name="record_date" value={todayPlan.date} />
+              <input type="hidden" name="source" value={todayPlan.source} />
+              <input type="hidden" name="start_time" value={todayPlan.start ?? ""} />
+              <input type="hidden" name="end_time" value={todayPlan.end ?? ""} />
+              <input type="hidden" name="body" value={todayPlan.body} />
+              <input type="hidden" name="household_id" value={householdId} />
+              {(["drop", "pick", "care"] as AssigneeRole[]).map((role) => (
+                <input
+                  key={role}
+                  type="hidden"
+                  name={`who_${role}`}
+                  value={todayPlan.who[role] ?? ""}
+                />
+              ))}
+              <button
+                type="submit"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2 rounded-xl border-2 border-emerald-600 px-3 py-2.5 text-left text-sm transition hover:bg-emerald-50 dark:border-emerald-400 dark:hover:bg-emerald-950"
+              >
+                <span className="text-lg" aria-hidden="true">
+                  {SOURCE_EMOJI[todayPlan.source]}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <b className="font-bold">
+                    きょうの予定「{todayPlan.label}」を完了にする
+                  </b>
+                  <span className="block text-xs text-muted-foreground">
+                    担当や時間を引き継いで記録にします
+                  </span>
+                </span>
+              </button>
+            </form>
           )}
 
           {/* どこでのできごとか（既定: おうち） */}

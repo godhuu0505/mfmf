@@ -106,6 +106,34 @@ async function requireEditableRuleHousehold(
   return data.household_id;
 }
 
+/**
+ * 予定に紐づけるペット。フォームで選ばれていればそれを、無ければ世帯にペットが
+ * 1 頭だけのときに自動で当てる（完了すると記録になるので、ペットが付いていないと
+ * どの子の記録か分からず、ゲスト共有の対象にもできない）。
+ */
+async function resolvePetId(
+  supabase: Supabase,
+  householdId: string,
+  formData: FormData,
+): Promise<string | null> {
+  const petId = String(formData.get("pet_id") || "").trim();
+  if (UUID_RE.test(petId)) {
+    const { data } = await supabase
+      .from("pets")
+      .select("id")
+      .eq("id", petId)
+      .eq("household_id", householdId)
+      .maybeSingle();
+    if (data) return petId;
+  }
+  const { data: pets } = await supabase
+    .from("pets")
+    .select("id")
+    .eq("household_id", householdId)
+    .limit(2);
+  return pets && pets.length === 1 ? (pets[0].id as string) : null;
+}
+
 /** フォームから担当（役割 → メンバー）を取り出す。種類に無い役割は捨てる。 */
 function readAssignees(
   formData: FormData,
@@ -235,6 +263,7 @@ async function savePlanRow(
     targetId = recordId;
   } else {
     householdId = await resolveWritableHousehold(supabase, userId, formData);
+    const petId = await resolvePetId(supabase, householdId, formData);
     const { data, error } = await supabase
       .from("daycare_records")
       .insert({
@@ -245,6 +274,7 @@ async function savePlanRow(
         status: "planned",
         ...times,
         body,
+        pet_id: petId,
         overrides_rule: true,
       })
       .select("id")
@@ -290,17 +320,10 @@ export async function completePlan(formData: FormData) {
   const user = await requireUser(supabase);
 
   const body = String(formData.get("body") || "").trim();
-  const recordId = String(formData.get("record_id") || "").trim();
 
-  // ルール由来の予定を完了する場合は、この時点で実体にしてから記録にする
-  // （種類・時刻・担当はフォームがそのまま運んでくる）
-  const target = UUID_RE.test(recordId)
-    ? recordId
-    : (await savePlanRow(supabase, user.id, formData)).recordId;
-
-  if (target === recordId) {
-    await requireEditableRecordHousehold(supabase, user.id, recordId);
-  }
+  // 完了もいったん保存を通す。ここを飛ばすと、同じフォームで直した種類・時刻・
+  // 担当が黙って捨てられる（ルール由来はこの保存で実体になる）
+  const { recordId: target } = await savePlanRow(supabase, user.id, formData);
   await markDone(supabase, target, body);
   revalidateSchedule();
 }
@@ -321,13 +344,7 @@ export async function skipPlan(formData: FormData) {
   const supabase = await createClient();
   const user = await requireUser(supabase);
 
-  const recordId = String(formData.get("record_id") || "").trim();
-  const target = UUID_RE.test(recordId)
-    ? recordId
-    : (await savePlanRow(supabase, user.id, formData)).recordId;
-  if (target === recordId) {
-    await requireEditableRecordHousehold(supabase, user.id, recordId);
-  }
+  const { recordId: target } = await savePlanRow(supabase, user.id, formData);
   const { error } = await supabase
     .from("daycare_records")
     .update({ status: "skipped" })
@@ -426,39 +443,30 @@ async function applyRepeat(
 ) {
   const weekday = input.weekday ?? weekdayOf(input.date);
   // 「これから毎週」なので、過去の日から積まない（過去の版を消せてしまうと、
-  // その版が効いていた日のカレンダーが変わる。RLS 側も今日以降しか消させない）
+  // その版が効いていた日のカレンダーが変わる。RLS 側も今日以降しか作らせない）
   const today = jstTodayISO();
   const since = input.date < today ? today : input.date;
-  await supabase
-    .from("schedule_rules")
-    .delete()
-    .eq("household_id", householdId)
-    .eq("weekday", weekday)
-    .gte("since", since);
 
-  const { data, error } = await supabase
-    .from("schedule_rules")
-    .insert({
-      household_id: householdId,
-      weekday,
-      since,
-      kind: input.source,
-      start_time: input.start_time,
-      end_time: input.end_time,
-      created_by: userId,
-    })
-    .select("id")
-    .single();
-  if (error) throw new Error(`毎週のルールの保存に失敗しました: ${error.message}`);
-
-  await syncAssignees(
-    supabase,
-    "schedule_rule_assignees",
-    "rule_id",
-    data.id as string,
-    householdId,
-    input.who,
+  // 差し替えは 1 トランザクション。分けて投げると、作成に失敗したときに
+  // 版が消えたままになり、以降の予定が前の版や「なし」に落ちる
+  const who = Object.fromEntries(
+    ASSIGNEE_ROLES.filter((role) => input.who[role]).map((role) => [
+      role,
+      input.who[role] as string,
+    ]),
   );
+  const { error } = await supabase.rpc("replace_schedule_rule", {
+    p_household: householdId,
+    p_weekday: weekday,
+    p_since: since,
+    p_kind: input.source,
+    p_start: input.start_time,
+    p_end: input.end_time,
+    p_assignees: who,
+  });
+  if (error) {
+    throw new Error(`毎週のルールの保存に失敗しました: ${error.message}`);
+  }
 }
 
 /**
@@ -481,18 +489,14 @@ export async function saveRule(formData: FormData) {
 
   // 「なし」も日付つきの版で表す（それ以降なしの墓標）。過去は変わらない
   if (raw === "" || raw === "none") {
-    await supabase
-      .from("schedule_rules")
-      .delete()
-      .eq("household_id", householdId)
-      .eq("weekday", weekday)
-      .gte("since", since);
-    const { error } = await supabase.from("schedule_rules").insert({
-      household_id: householdId,
-      weekday,
-      since,
-      kind: null,
-      created_by: user.id,
+    const { error } = await supabase.rpc("replace_schedule_rule", {
+      p_household: householdId,
+      p_weekday: weekday,
+      p_since: since,
+      p_kind: null, // それ以降なしを表す墓標
+      p_start: null,
+      p_end: null,
+      p_assignees: {},
     });
     if (error) throw new Error(`ルールの保存に失敗しました: ${error.message}`);
     revalidateSchedule();

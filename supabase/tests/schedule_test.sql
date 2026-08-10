@@ -14,7 +14,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(27);
+select plan(30);
 
 -- fixture: HA に A(owner) / E(editor) / V(viewer)、別世帯 HB に B(owner)
 insert into auth.users (id, email) values
@@ -169,18 +169,26 @@ select set_config('request.jwt.claims',
 select lives_ok(
   $$insert into public.schedule_rules (id, household_id, weekday, since, kind, start_time, end_time, created_by)
     values ('cccc0000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-            1, '2026-08-01', 'daycare', '09:00', '18:00', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
+            1, current_date, 'daycare', '09:00', '18:00', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   'owner は毎週のルールを作れる'
 );
 select lives_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 1, '2026-08-15', null,
+    values ('11111111-1111-1111-1111-111111111111', 1, current_date + 7, null,
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   '「それ以降なし」は kind = null の版で表せる（過去の版は残る）'
 );
 select throws_ok(
+  $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
+    values ('11111111-1111-1111-1111-111111111111', 1, current_date - 1, 'home',
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
+  '42501',
+  null,
+  '過去の日付の版は差し込めない（過去のカレンダーが後から変わらない）'
+);
+select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, start_time, end_time, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 1, '2026-08-22', null, '09:00', '18:00',
+    values ('11111111-1111-1111-1111-111111111111', 1, current_date + 14, null, '09:00', '18:00',
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   '23514',
   null,
@@ -188,7 +196,7 @@ select throws_ok(
 );
 select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 1, '2026-08-01', 'home',
+    values ('11111111-1111-1111-1111-111111111111', 1, current_date, 'home',
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   '23505',
   null,
@@ -196,7 +204,7 @@ select throws_ok(
 );
 select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 7, '2026-08-01', 'home',
+    values ('11111111-1111-1111-1111-111111111111', 7, current_date, 'home',
             'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
   '23514',
   null,
@@ -213,7 +221,7 @@ select results_eq(
 );
 select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 3, '2026-08-01', 'home',
+    values ('11111111-1111-1111-1111-111111111111', 3, current_date, 'home',
             'dddddddd-dddd-dddd-dddd-dddddddddddd')$$,
   '42501',
   null,
@@ -230,11 +238,30 @@ select results_eq(
 );
 select throws_ok(
   $$insert into public.schedule_rules (household_id, weekday, since, kind, created_by)
-    values ('11111111-1111-1111-1111-111111111111', 4, '2026-08-01', 'home',
+    values ('11111111-1111-1111-1111-111111111111', 4, current_date, 'home',
             'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')$$,
   '42501',
   null,
   '他世帯にルールを差し込めない'
+);
+
+-- 版の差し替えは 1 トランザクション（RPC）。過去から効いている版は消せない
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+select lives_ok(
+  $$select public.replace_schedule_rule(
+      '11111111-1111-1111-1111-111111111111', 1::smallint, current_date, 'home',
+      '10:00'::time, '16:00'::time,
+      jsonb_build_object('care', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'))$$,
+  '版の差し替え（削除 + 作成 + 担当）が 1 回で通る'
+);
+select results_eq(
+  $$select count(*)::int from public.schedule_rule_assignees a
+      join public.schedule_rules s on s.id = a.rule_id
+     where s.household_id = '11111111-1111-1111-1111-111111111111'
+       and s.weekday = 1 and a.role = 'care'$$,
+  $$values (1)$$,
+  '差し替えた版に担当が乗る'
 );
 
 -- ---------------------------------------------------------------
