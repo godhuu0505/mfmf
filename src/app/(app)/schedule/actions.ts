@@ -96,7 +96,8 @@ async function requireEditableRuleHousehold(
     .select("household_id")
     .eq("id", ruleId)
     .maybeSingle();
-  if (!data) throw new Error("ルールが見つかりません（または権限がありません）");
+  if (!data)
+    throw new Error("ルールが見つかりません（または権限がありません）");
   const role = await getRoleInHousehold(supabase, userId, data.household_id);
   if (role && !canEdit(role)) {
     throw new Error(
@@ -244,6 +245,8 @@ async function savePlanRow(
   const recordId = String(formData.get("record_id") || "").trim();
   let householdId: string;
   let targetId: string;
+  /** この行がその日の毎週のルールを置き換えるか */
+  let overridesRule: boolean;
 
   if (UUID_RE.test(recordId)) {
     householdId = await requireEditableRecordHousehold(
@@ -260,14 +263,14 @@ async function savePlanRow(
       .select("overrides_rule")
       .eq("id", recordId)
       .maybeSingle();
-    const overrides = Boolean(current?.overrides_rule);
+    overridesRule = Boolean(current?.overrides_rule);
     const { error } = await supabase
       .from("daycare_records")
       .update({
         source,
         ...times,
         body,
-        overrides_rule: overrides,
+        overrides_rule: overridesRule,
         ...(nextStatus ? { status: nextStatus } : {}),
       })
       .eq("id", recordId);
@@ -276,6 +279,7 @@ async function savePlanRow(
   } else {
     householdId = await resolveWritableHousehold(supabase, userId, formData);
     const petId = await resolvePetId(supabase, householdId, formData);
+    overridesRule = String(formData.get("additional") || "") !== "1";
     const { data, error } = await supabase
       .from("daycare_records")
       .insert({
@@ -289,7 +293,7 @@ async function savePlanRow(
         pet_id: petId,
         // 「もう 1 件足す」で作る予定は、その日の毎週のルールを隠さない
         // （足したつもりが、毎週の保育園を消してしまう）
-        overrides_rule: String(formData.get("additional") || "") !== "1",
+        overrides_rule: overridesRule,
       })
       .select("id")
       .single();
@@ -306,12 +310,16 @@ async function savePlanRow(
     who,
   );
 
-  // その日を打ち消していたなら、予定を入れ直した時点で打ち消しは不要
-  await supabase
-    .from("schedule_rule_skips")
-    .delete()
-    .eq("household_id", householdId)
-    .eq("on_date", date);
+  // その日を打ち消していたなら、**ルールを置き換える行**を入れたときだけ打ち消しを外す。
+  // 「もう 1 件足す」で並べた予定まで打ち消しを消すと、消したはずの
+  // 毎週の予定が黙って戻ってくる
+  if (overridesRule) {
+    await supabase
+      .from("schedule_rule_skips")
+      .delete()
+      .eq("household_id", householdId)
+      .eq("on_date", date);
+  }
 
   if (repeat) {
     await applyRepeat(supabase, userId, householdId, {
@@ -339,7 +347,6 @@ export async function completePlan(formData: FormData) {
   await savePlanRow(supabase, user.id, formData, "done");
   revalidateSchedule();
 }
-
 
 /**
  * 見送り。行かなかった日も消さずに残す（カレンダーには取り消し線で出る）。
@@ -391,7 +398,11 @@ export async function clearPlan(formData: FormData) {
     return;
   }
 
-  const householdId = await resolveWritableHousehold(supabase, user.id, formData);
+  const householdId = await resolveWritableHousehold(
+    supabase,
+    user.id,
+    formData,
+  );
   const { error } = await supabase
     .from("schedule_rule_skips")
     // 同じ日を 2 度消しても通るように、衝突は無視する（update ポリシーは無い）
@@ -409,7 +420,11 @@ export async function restoreRuleForDate(formData: FormData) {
   const user = await requireUser(supabase);
   const date = String(formData.get("record_date") || "");
   if (!DATE_RE.test(date)) throw new Error("不正なリクエストです");
-  const householdId = await resolveWritableHousehold(supabase, user.id, formData);
+  const householdId = await resolveWritableHousehold(
+    supabase,
+    user.id,
+    formData,
+  );
   const { error } = await supabase
     .from("schedule_rule_skips")
     .delete()
@@ -484,7 +499,11 @@ export async function saveRule(formData: FormData) {
   const since = String(formData.get("since") || "");
   if (!DATE_RE.test(since)) throw new Error("不正なリクエストです");
 
-  const householdId = await resolveWritableHousehold(supabase, user.id, formData);
+  const householdId = await resolveWritableHousehold(
+    supabase,
+    user.id,
+    formData,
+  );
   const raw = String(formData.get("source") || "").trim();
 
   // 「なし」も日付つきの版で表す（それ以降なしの墓標）。過去は変わらない

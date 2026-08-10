@@ -39,9 +39,16 @@ export default async function AppLayout({
   // ＋ シートの先頭に出す「きょうの予定を完了にする」（D34）。
   // 予定が無ければ今までどおり（2 タップのまま）
   const todayStr = jstTodayISO();
+  // ここは「あれば出す」ショートカットなので、読めなくても落とさない ——
+  // 落とすと (app) 配下の全ページ（設定・メニュー・記録詳細）が描けなくなる
   const schedule =
     membership && editable
-      ? await fetchSchedule(supabase, membership.householdId, todayStr, todayStr)
+      ? await fetchSchedule(
+          supabase,
+          membership.householdId,
+          todayStr,
+          todayStr,
+        ).catch(() => EMPTY_SCHEDULE)
       : EMPTY_SCHEDULE;
   const plan = planOnDate(
     itemsOnDate({

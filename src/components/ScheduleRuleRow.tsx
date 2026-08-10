@@ -66,14 +66,17 @@ export default function ScheduleRuleRow({
   const [who, setWho] = useState<Partial<Record<AssigneeRole, string>>>(
     current?.who ?? {},
   );
+  // 時刻を手で触ったか。触るまでは種類の既定に追従する（proto/schedule で合意）
+  const [timeDirty, setTimeDirty] = useState(current != null);
 
   const roles = source === "none" ? [] : rolesFor(source);
 
   function pickSource(next: RecordSource | "none") {
     setSource(next);
     if (next === "none") return;
-    // 時刻が空のままだと保存できないので、種類の既定を入れておく
-    if (!start || !end) {
+    // 触っていないあいだは種類の既定に追従する。保育園のまま病院に変えると
+    // 09:00〜18:00 の通院になってしまう
+    if (!timeDirty || !start || !end) {
       const t = defaultTimesFor(next);
       setStart(t.start);
       setEnd(t.end);
@@ -115,7 +118,10 @@ export default function ScheduleRuleRow({
               name="start_time"
               aria-label={`${label}曜の開始時刻`}
               value={start}
-              onChange={(e) => setStart(e.target.value)}
+              onChange={(e) => {
+                setTimeDirty(true);
+                setStart(e.target.value);
+              }}
               disabled={!editable}
               className="w-28 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm tabular-nums"
             />
@@ -125,7 +131,10 @@ export default function ScheduleRuleRow({
               name="end_time"
               aria-label={`${label}曜の終了時刻`}
               value={end}
-              onChange={(e) => setEnd(e.target.value)}
+              onChange={(e) => {
+                setTimeDirty(true);
+                setEnd(e.target.value);
+              }}
               disabled={!editable}
               className="w-28 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm tabular-nums"
             />
