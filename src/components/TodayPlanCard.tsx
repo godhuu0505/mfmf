@@ -22,6 +22,7 @@ export type TodayPlan = {
   end: string | null;
   body: string;
   who: Partial<Record<AssigneeRole, string>>;
+  petId: string | null;
   fromRule: boolean;
   /** ルール由来を完了するときに作る行の id（押し直しても増やさない） */
   draftId: string;
@@ -31,6 +32,8 @@ type Props = {
   plan: TodayPlan | null;
   /** 世帯に 2 頭以上いるか。ルール由来の完了はどの子か選べないので出さない */
   multiPet?: boolean;
+  /** どの子の予定か（2 頭以上の世帯で、取り違えないように出す） */
+  petName?: string | null;
   today: string;
   members: { id: string; name: string; initial: string }[];
   canEdit: boolean;
@@ -48,6 +51,7 @@ export default function TodayPlanCard({
   canEdit,
   householdId,
   multiPet = false,
+  petName = null,
 }: Props) {
   if (!plan) {
     return (
@@ -83,7 +87,14 @@ export default function TodayPlanCard({
           {SOURCE_EMOJI[plan.source]}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-bold">{SOURCE_LABEL[plan.source]}</p>
+          <p className="font-bold">
+            {SOURCE_LABEL[plan.source]}
+            {petName && (
+              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                （{petName}）
+              </span>
+            )}
+          </p>
           <p className="text-xs tabular-nums text-muted-foreground">
             {plan.start && plan.end ? `${plan.start}〜${plan.end}` : "時刻なし"}
             {plan.body ? `・${plan.body}` : ""}

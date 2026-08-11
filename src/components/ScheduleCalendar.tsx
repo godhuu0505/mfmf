@@ -722,14 +722,17 @@ export default function ScheduleCalendar({
                           key={x.id}
                           type="button"
                           onClick={() => open(ds, x.id)}
-                          aria-label={`${formatDay(ds)} ${
-                            x.status === "skipped" ? "見送り" : "時刻なしの記録"
-                          } ${x.body || SOURCE_LABEL[x.source]}`}
+                          aria-label={`${formatDay(ds)} 時刻なし ${statusLabel(
+                            x.status,
+                            x.fromRule,
+                          )} ${x.body || SOURCE_LABEL[x.source]}`}
                           className={
                             "block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] " +
                             (x.status === "skipped"
                               ? "text-muted-foreground line-through"
-                              : "text-foreground")
+                              : x.status === "planned"
+                                ? "text-muted-foreground italic"
+                                : "text-foreground")
                           }
                         >
                           {SOURCE_EMOJI[x.source]}

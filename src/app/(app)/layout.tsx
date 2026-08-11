@@ -61,15 +61,17 @@ export default async function AppLayout({
   );
   // 2 頭以上いる世帯では、ルール由来の予定を ＋ シートから完了できない
   // （どの子かを選べないため）。カレンダーの日別シートへ回す
-  const { count: petCount } =
+  const { count: petCount, error: petCountError } =
     plan?.fromRule && membership
       ? await supabase
           .from("pets")
           .select("id", { count: "exact", head: true })
           .eq("household_id", membership.householdId)
-      : { count: 0 };
+      : { count: 0, error: null };
+  // 数えられなかったときは近道を出さない（どの子か付かないまま記録になる）
+  const multiPet = petCountError !== null || (petCount ?? 0) > 1;
   const todayPlan =
-    plan && !(plan.fromRule && (petCount ?? 0) > 1)
+    plan && !(plan.fromRule && multiPet)
       ? {
           recordId: plan.fromRule ? "" : plan.id,
           // ルール由来を完了するときに作る行の id（押し直しても増やさない）

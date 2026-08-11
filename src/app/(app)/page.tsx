@@ -3,6 +3,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
+  RECORD_SOURCES,
   SOURCE_LABEL,
   tagsFromJoin,
   type RecordSource,
@@ -15,6 +16,7 @@ import {
   hasActiveFilters,
   PAGE_SIZE,
   parseFilters,
+  type RecordSourceFilter,
 } from "@/lib/recordQuery";
 import { getTagDictionary } from "@/lib/tags";
 import {
@@ -140,13 +142,25 @@ export default async function HomePage({
     : { data: null };
   // 2 頭以上いる世帯では、ルール由来の予定をこのカードから完了できない
   // （どの子かを選べないため）。カレンダーの日別シートへ回す
-  const { count: petCount } =
+  const { count: petCount, error: petCountError } =
     todayPlan?.fromRule && householdId
       ? await supabase
           .from("pets")
           .select("id", { count: "exact", head: true })
           .eq("household_id", householdId)
-      : { count: 0 };
+      : { count: 0, error: null };
+  // 数えられなかったときは「2 頭以上」側に倒す。近道を出してしまうと、
+  // どの子か付かないまま記録になる
+  const multiPet = petCountError !== null || (petCount ?? 0) > 1;
+  // どの子の予定かを出す（同じ種類の予定が 2 頭ぶん並ぶと取り違える）
+  const { data: planPet } = todayPlan?.petId
+    ? await supabase
+        .from("pets")
+        .select("name")
+        .eq("id", todayPlan.petId)
+        .maybeSingle()
+    : { data: null };
+  const planPetName = (planPet?.name as string | undefined) ?? null;
   const planMembers = (
     ((planMemberRows as unknown) ?? []) as {
       user_id: string;
@@ -264,18 +278,19 @@ export default async function HomePage({
   }
 
   // 記録元チップ（proto 合意: ワンタップで おうち/保育園 を絞り込む。URL が正）。
-  function sourceHref(source: "all" | "home" | "daycare"): string {
+  function sourceHref(source: RecordSourceFilter): string {
     const qs = buildQueryString(filters, { source, page: 1 });
     const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : qs);
     if (activeTag) params.set("tag", activeTag.id);
     const s = params.toString();
     return s ? `/?${s}` : "/";
   }
+  // 種類は 5 つある（D34）。チップを固定で並べると、予定からできた
+  // 病院・サロン・その他の記録が URL を手で書かないと絞り込めない
   const sourceChips = [
-    { value: "all", label: "すべて" },
-    { value: "home", label: "おうち" },
-    { value: "daycare", label: "保育園" },
-  ] as const;
+    { value: "all" as const, label: "すべて" },
+    ...RECORD_SOURCES.map((s) => ({ value: s, label: SOURCE_LABEL[s] })),
+  ];
 
   // 各記録の先頭写真サムネに署名付き URL を付与
   const thumbPaths = list
@@ -380,7 +395,8 @@ export default async function HomePage({
         {/* きょうの予定。ここから完了して記録にできる（D34） */}
         <TodayPlanCard
           plan={todayPlan}
-          multiPet={(petCount ?? 0) > 1}
+          multiPet={multiPet}
+          petName={planPetName}
           today={todayStr}
           members={planMembers}
           canEdit={canAdd}
