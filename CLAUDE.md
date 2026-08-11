@@ -79,7 +79,7 @@ CSS は Tailwind CLI に `@source` でその HTML を渡して生成し、本番
 - 合意時に受け入れ条件を洗い出し、**E2E テスト**にする（D25）
 - バックエンドのみの変更・既存画面の小改修・バグ修正では使わない
 - 採用/却下の結論は [docs/explanation/decisions.md](./docs/explanation/decisions.md) に 1 行残す
-- **その機能が PWA の限界に触れるなら、実装に入る前にそう言うこと。** アプリ化は D34 で
+- **その機能が PWA の限界に触れるなら、実装に入る前にそう言うこと。** アプリ化は D35 で
   「今はしない」と決めただけで、永久に却下したのではない。**判定条件は
   [mobile-app-tech-selection.md §5-3](./docs/explanation/mobile-app-tech-selection.md#5-3-方針を覆す条件これが起きたら-c-へ)**
   （通知の取りこぼし / 他アプリの共有シートから mfmf へ送る経路 / Apple の PWA サポート後退）。
@@ -92,7 +92,7 @@ CSS は Tailwind CLI に `@source` でその HTML を渡して生成し、本番
 - **新しい Server Action を足すときは「そのまま Edge Function へ移せる形か」を意識する**（上の再検討が
   来たときの移行コストが下がる）。**アプリ層の認可を省いてよいという意味ではない** ——
   冒頭の `getUser()` と操作別の世帯 / role チェックは下の「セキュリティ（厳守）」のとおり必須で、
-  移行先が Edge Function でも**同じ判定を関数側に持っていく**（D34 §4-3）
+  移行先が Edge Function でも**同じ判定を関数側に持っていく**（D35 §4-3）
 
 ## セキュリティ（厳守）
 

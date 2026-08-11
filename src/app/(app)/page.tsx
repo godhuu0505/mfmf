@@ -3,10 +3,12 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
+  RECORD_SOURCES,
   SOURCE_LABEL,
   tagsFromJoin,
   type RecordSource,
   type RecordWithPhotos,
+  SOURCE_BADGE,
 } from "@/types/database";
 import {
   buildIlikeOr,
@@ -14,12 +16,21 @@ import {
   hasActiveFilters,
   PAGE_SIZE,
   parseFilters,
+  type RecordSourceFilter,
 } from "@/lib/recordQuery";
 import { getTagDictionary } from "@/lib/tags";
-import { canEdit, getCurrentMembership, householdScopeFilter } from "@/lib/household";
+import {
+  canEdit,
+  getCurrentMembership,
+  householdScopeFilter,
+} from "@/lib/household";
 import { hasActiveGuestGrant } from "@/lib/guest";
 import { createPhotoSignedUrls } from "@/lib/photos";
 import RecordFilters from "@/components/RecordFilters";
+import TodayPlanCard, { type TodayPlan } from "@/components/TodayPlanCard";
+import { EMPTY_SCHEDULE, fetchSchedule } from "@/lib/scheduleQuery";
+import { itemsOnDate, planOnDate } from "@/lib/schedule";
+import { jstTodayISO } from "@/lib/dateRange";
 import SourceIcon from "@/components/SourceIcon";
 import { Camera, PawPrint, Scale, X } from "lucide-react";
 
@@ -48,12 +59,11 @@ function excerpt(body: string, max = 80) {
 }
 
 function SourceBadge({ source }: { source: RecordSource }) {
-  const isHome = source === "home";
   return (
     <span
       className={
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " +
-        (isHome ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-900")
+        SOURCE_BADGE[source]
       }
     >
       <SourceIcon source={source} className="h-3.5 w-3.5" />
@@ -80,7 +90,7 @@ export default async function HomePage({
   // 絞り込み UI 用に世帯のタグ辞書を取得し、選択中タグを特定する。
   const dictionaryTags = await getTagDictionary();
   const activeTag = tagParam
-    ? dictionaryTags.find((t) => t.id === tagParam) ?? null
+    ? (dictionaryTags.find((t) => t.id === tagParam) ?? null)
     : null;
 
   // 読み取りは household 基準へ寄せる（Phase 3.5 S1 手順7）。所属世帯を解決できれば
@@ -97,6 +107,70 @@ export default async function HomePage({
   const householdId = membership.householdId;
   // viewer には編集系 UI を出さない（UC-A06。サーバー強制は RLS / Server Action）。
   const readOnly = !canEdit(membership.role);
+  const canAdd = !readOnly;
+
+  // きょうの予定（毎週のルール由来も含む）。ここから完了して記録にする（D34）
+  const todayStr = jstTodayISO();
+  const todaySchedule = await fetchSchedule(
+    supabase,
+    householdId,
+    todayStr,
+    todayStr,
+  ).catch(() => EMPTY_SCHEDULE);
+  const todayItems = itemsOnDate({
+    date: todayStr,
+    records: todaySchedule.records,
+    rules: todaySchedule.rules,
+    ruleAssignees: todaySchedule.ruleAssignees,
+    skippedDates: todaySchedule.skippedDates,
+  });
+  // カードは「きょうの様子」を出す枠なので、予定が無ければ記録ずみ・見送りも出す
+  // （完了した直後に「予定はまだありません」に戻ると、何が起きたのか分からない）。
+  // 完了ボタンは status === "planned" のときだけ出る
+  const todayItem =
+    planOnDate(todayItems) ??
+    todayItems.find((x) => x.status === "done") ??
+    todayItems[0] ??
+    null;
+  // ルール由来を完了するときに作る行の id。押し直しても上書きになり、
+  // 記録が 2 件にならない
+  const todayPlan: TodayPlan | null = todayItem
+    ? { ...todayItem, draftId: crypto.randomUUID() }
+    : null;
+  const { data: planMemberRows } = todayPlan
+    ? await supabase.rpc("get_household_members", { p_household: householdId })
+    : { data: null };
+  // 2 頭以上いる世帯では、ルール由来の予定をこのカードから完了できない
+  // （どの子かを選べないため）。カレンダーの日別シートへ回す
+  const { count: petCount, error: petCountError } =
+    todayPlan?.fromRule && householdId
+      ? await supabase
+          .from("pets")
+          .select("id", { count: "exact", head: true })
+          .eq("household_id", householdId)
+      : { count: 0, error: null };
+  // 数えられなかったときは「2 頭以上」側に倒す。近道を出してしまうと、
+  // どの子か付かないまま記録になる
+  const multiPet = petCountError !== null || (petCount ?? 0) > 1;
+  // どの子の予定かを出す（同じ種類の予定が 2 頭ぶん並ぶと取り違える）
+  const { data: planPet } = todayPlan?.petId
+    ? await supabase
+        .from("pets")
+        .select("name")
+        .eq("id", todayPlan.petId)
+        .maybeSingle()
+    : { data: null };
+  const planPetName = (planPet?.name as string | undefined) ?? null;
+  const planMembers = (
+    ((planMemberRows as unknown) ?? []) as {
+      user_id: string;
+      display_name: string | null;
+      email: string | null;
+    }[]
+  ).map((m) => {
+    const name = m.display_name?.trim() || m.email?.split("@")[0] || "メンバー";
+    return { id: m.user_id, name, initial: [...name][0] ?? "?" };
+  });
 
   // タグ絞り込み: 該当タグを持つ記録 id を先に解決しておく。
   let taggedIds: string[] | null = null;
@@ -118,13 +192,17 @@ export default async function HomePage({
         withCount ? { count: "exact" } : undefined,
       );
 
+    // 一覧は「起きたこと」だけ。予定（planned）や見送り（skipped）が混ざると、
+    // これからの日が履歴の先頭に並び、件数・ページングにも入ってしまう（D34）
+    query = query.eq("status", "done");
     if (householdId) query = query.or(householdScopeFilter(householdId));
     if (filters.source !== "all") query = query.eq("source", filters.source);
     if (filters.from) query = query.gte("record_date", filters.from);
     if (filters.to) query = query.lte("record_date", filters.to);
     if (filters.q) query = query.or(buildIlikeOr(filters.q));
     // 該当が 0 件なら確実に空にする（in([]) は全件にならないよう注意）。
-    if (taggedIds) query = query.in("id", taggedIds.length > 0 ? taggedIds : [""]);
+    if (taggedIds)
+      query = query.in("id", taggedIds.length > 0 ? taggedIds : [""]);
 
     switch (filters.sort) {
       case "date_asc":
@@ -200,18 +278,19 @@ export default async function HomePage({
   }
 
   // 記録元チップ（proto 合意: ワンタップで おうち/保育園 を絞り込む。URL が正）。
-  function sourceHref(source: "all" | "home" | "daycare"): string {
+  function sourceHref(source: RecordSourceFilter): string {
     const qs = buildQueryString(filters, { source, page: 1 });
     const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : qs);
     if (activeTag) params.set("tag", activeTag.id);
     const s = params.toString();
     return s ? `/?${s}` : "/";
   }
+  // 種類は 5 つある（D34）。チップを固定で並べると、予定からできた
+  // 病院・サロン・その他の記録が URL を手で書かないと絞り込めない
   const sourceChips = [
-    { value: "all", label: "すべて" },
-    { value: "home", label: "おうち" },
-    { value: "daycare", label: "保育園" },
-  ] as const;
+    { value: "all" as const, label: "すべて" },
+    ...RECORD_SOURCES.map((s) => ({ value: s, label: SOURCE_LABEL[s] })),
+  ];
 
   // 各記録の先頭写真サムネに署名付き URL を付与
   const thumbPaths = list
@@ -313,6 +392,17 @@ export default async function HomePage({
     <>
       {/* inert 範囲・タブバー分の下端余白は (app)/layout.tsx と globals.css が受け持つ */}
       <main id="main" className="mx-auto max-w-2xl px-4 py-6">
+        {/* きょうの予定。ここから完了して記録にできる（D34） */}
+        <TodayPlanCard
+          plan={todayPlan}
+          multiPet={multiPet}
+          petName={planPetName}
+          today={todayStr}
+          members={planMembers}
+          canEdit={canAdd}
+          householdId={householdId}
+        />
+
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-foreground">記録一覧</h1>
         </div>
@@ -325,7 +415,10 @@ export default async function HomePage({
         />
 
         {/* 記録元チップ（常設・ワンタップ） */}
-        <div className="mb-3 flex items-center gap-1.5" aria-label="記録元で絞り込み">
+        <div
+          className="mb-3 flex items-center gap-1.5"
+          aria-label="記録元で絞り込み"
+        >
           {sourceChips.map((c) => {
             const isActive = filters.source === c.value;
             return (
@@ -389,49 +482,55 @@ export default async function HomePage({
           </div>
         )}
 
-        {list.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
-            {active ? (
-              <>条件に該当する記録はありません。</>
-            ) : readOnly ? (
-              // viewer には中央の「＋」が無いので、追加の案内はしない（UC-A06）
-              <>
-                まだ記録がありません。
-                <br />
-                ご家族が記録を追加すると、ここに表示されます。
-              </>
-            ) : (
-              <>
-                まだ記録がありません。
-                <br />
-                下の「＋」から最初の記録を追加しましょう。
-              </>
-            )}
-          </div>
-        ) : groupByDate ? (
-          <div className="space-y-5">
-            {dateGroups.map((g) => {
-              const rel = relativeLabel(g.date);
-              return (
-                <section key={g.date} aria-label={formatDate(g.date)}>
-                  <h2 className="mb-2 flex items-baseline gap-2 text-sm font-semibold text-foreground">
-                    {rel ?? formatDate(g.date)}
-                    {rel && (
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {formatDate(g.date)}
-                      </span>
-                    )}
-                  </h2>
-                  <ul className="space-y-3">
-                    {g.items.map((r) => recordCard(r, false))}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
-        ) : (
-          <ul className="space-y-3">{list.map((r) => recordCard(r, true))}</ul>
-        )}
+        {/* 一覧の本体。上の「きょう」カードと同じ本文が出ることがあるので、
+            絞り込みの結果を見る側（E2E / 支援技術）が区別できるよう囲む */}
+        <div data-record-list>
+          {list.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
+              {active ? (
+                <>条件に該当する記録はありません。</>
+              ) : readOnly ? (
+                // viewer には中央の「＋」が無いので、追加の案内はしない（UC-A06）
+                <>
+                  まだ記録がありません。
+                  <br />
+                  ご家族が記録を追加すると、ここに表示されます。
+                </>
+              ) : (
+                <>
+                  まだ記録がありません。
+                  <br />
+                  下の「＋」から最初の記録を追加しましょう。
+                </>
+              )}
+            </div>
+          ) : groupByDate ? (
+            <div className="space-y-5">
+              {dateGroups.map((g) => {
+                const rel = relativeLabel(g.date);
+                return (
+                  <section key={g.date} aria-label={formatDate(g.date)}>
+                    <h2 className="mb-2 flex items-baseline gap-2 text-sm font-semibold text-foreground">
+                      {rel ?? formatDate(g.date)}
+                      {rel && (
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {formatDate(g.date)}
+                        </span>
+                      )}
+                    </h2>
+                    <ul className="space-y-3">
+                      {g.items.map((r) => recordCard(r, false))}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {list.map((r) => recordCard(r, true))}
+            </ul>
+          )}
+        </div>
 
         {/* もっと見る: 表示済みは保ったまま次のバッチを足す（scroll 位置も保持） */}
         {list.length < total && (

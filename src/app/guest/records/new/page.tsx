@@ -10,7 +10,7 @@ import {
 } from "@/components/FormConfirm";
 import { PawPrint } from "lucide-react";
 import { createGuestRecord } from "@/app/guest/actions";
-import { RECORD_SOURCES, SOURCE_LABEL } from "@/types/database";
+import { QUICK_SOURCES, SOURCE_LABEL } from "@/types/database";
 import { jstTodayISO } from "@/lib/dateRange";
 
 export const dynamic = "force-dynamic";
@@ -80,7 +80,7 @@ export default async function GuestNewRecordPage({
               記録元
             </span>
             <div className="inline-flex overflow-hidden rounded-lg border border-border">
-              {RECORD_SOURCES.map((s, i) => (
+              {QUICK_SOURCES.map((s, i) => (
                 <label
                   key={s}
                   className={

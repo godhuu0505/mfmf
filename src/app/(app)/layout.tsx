@@ -7,6 +7,10 @@ import AppTabBar from "@/components/AppTabBar";
 import HideOnFormRoute from "@/components/HideOnFormRoute";
 import HouseholdSyncRefresher from "@/components/HouseholdSyncRefresher";
 import QuickRecordSheet from "@/components/QuickRecordSheet";
+import { EMPTY_SCHEDULE, fetchSchedule } from "@/lib/scheduleQuery";
+import { itemsOnDate, planOnDate } from "@/lib/schedule";
+import { jstTodayISO } from "@/lib/dateRange";
+import { SOURCE_LABEL } from "@/types/database";
 
 // アプリ内画面（要ログイン圏）の共通クローム（D33）。
 // - ヘッダー / ボトムタブバー / クイック記録シートをここで一元描画する。
@@ -32,6 +36,66 @@ export default async function AppLayout({
           .maybeSingle()
       : { data: null };
 
+  // ＋ シートの先頭に出す「きょうの予定を完了にする」（D34）。
+  // 予定が無ければ今までどおり（2 タップのまま）
+  const todayStr = jstTodayISO();
+  // ここは「あれば出す」ショートカットなので、読めなくても落とさない ——
+  // 落とすと (app) 配下の全ページ（設定・メニュー・記録詳細）が描けなくなる
+  const schedule =
+    membership && editable
+      ? await fetchSchedule(
+          supabase,
+          membership.householdId,
+          todayStr,
+          todayStr,
+        ).catch(() => EMPTY_SCHEDULE)
+      : EMPTY_SCHEDULE;
+  const plan = planOnDate(
+    itemsOnDate({
+      date: todayStr,
+      records: schedule.records,
+      rules: schedule.rules,
+      ruleAssignees: schedule.ruleAssignees,
+      skippedDates: schedule.skippedDates,
+    }),
+  );
+  // 2 頭以上いる世帯では、ルール由来の予定を ＋ シートから完了できない
+  // （どの子かを選べないため）。カレンダーの日別シートへ回す
+  const { count: petCount, error: petCountError } =
+    plan?.fromRule && membership
+      ? await supabase
+          .from("pets")
+          .select("id", { count: "exact", head: true })
+          .eq("household_id", membership.householdId)
+      : { count: 0, error: null };
+  // 数えられなかったときは近道を出さない（どの子か付かないまま記録になる）
+  const multiPet = petCountError !== null || (petCount ?? 0) > 1;
+  // どの子の予定かを出す（同じ種類の予定が 2 頭ぶん並ぶと取り違える）
+  const { data: planPet } = plan?.petId
+    ? await supabase
+        .from("pets")
+        .select("name")
+        .eq("id", plan.petId)
+        .maybeSingle()
+    : { data: null };
+  const planPetName = (planPet?.name as string | undefined) ?? null;
+  const todayPlan =
+    plan && !(plan.fromRule && multiPet)
+      ? {
+          recordId: plan.fromRule ? "" : plan.id,
+          // ルール由来を完了するときに作る行の id（押し直しても増やさない）
+          draftId: crypto.randomUUID(),
+          date: todayStr,
+          source: plan.source,
+          label: SOURCE_LABEL[plan.source],
+          start: plan.start,
+          end: plan.end,
+          body: plan.body,
+          who: plan.who,
+          petName: planPetName,
+        }
+      : null;
+
   return (
     <>
       {/* 他タブで世帯が切り替わったらこのレイアウトごと再取得する（UC-H08） */}
@@ -56,6 +120,7 @@ export default async function AppLayout({
           action={createQuickRecord}
           householdId={membership.householdId}
           defaultAuthor={profile?.default_author ?? ""}
+          todayPlan={todayPlan}
         />
       )}
     </>

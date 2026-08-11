@@ -12,12 +12,12 @@
 
 | 項目 | 実測値 | 選定への効き方 |
 | --- | --- | --- |
-| ソース規模 | `src/` 102 ファイル / 11,705 行（TypeScript strict） | 書き直し案のコストの分母 |
-| 画面数 | `page.tsx` 25 枚（App Router、原則 Server Component） | 同上 |
-| **Server Action** | **8 ファイル / 30 関数**（`records` `pets` `settings` `feedback` `onboarding` `guest` `invite`） | **静的エクスポート系の案で全部作り直しになる最大の障害** |
-| Client Component | 30 ファイル | そのまま持ち込める部分 |
+| ソース規模 | `src/` 108 ファイル / 14,980 行（TypeScript strict） | 書き直し案のコストの分母 |
+| 画面数 | `page.tsx` 26 枚（App Router、原則 Server Component） | 同上 |
+| **Server Action** | **9 ファイル / 39 関数**（`records` `schedule` `pets` `settings` `feedback` `onboarding` `guest` `invite`） | **静的エクスポート系の案で全部作り直しになる最大の障害** |
+| Client Component | 31 ファイル | そのまま持ち込める部分 |
 | Route Handler / middleware | `auth/callback` `auth/signout` `api/vitals` ＋ `src/middleware.ts`（Cookie セッション更新） | 認証モデルの移植ポイント |
-| DB | migration 32 本、RLS ＋ pgTAP でテナント分離を担保 | **DB スキーマと RLS は案によらず共有できる**（テーブル設計をやり直す案は無い）。ただし**「バックエンドが一切変わらない」わけではない** —— C の Edge Function 経路なら Deno 関数・デプロイ経路・シークレット管理が増え、通知を入れれば送信側が要り、ネイティブ系は OAuth / セッションの経路が変わる |
+| DB | migration 33 本、RLS ＋ pgTAP でテナント分離を担保 | **DB スキーマと RLS は案によらず共有できる**（テーブル設計をやり直す案は無い）。ただし**「バックエンドが一切変わらない」わけではない** —— C の Edge Function 経路なら Deno 関数・デプロイ経路・シークレット管理が増え、通知を入れれば送信側が要り、ネイティブ系は OAuth / セッションの経路が変わる |
 | テスト基盤 | Playwright E2E 13 spec ＋ VRT（D25 / D30 / D31） | ブラウザ前提。**web UI を残す限り失効はしない**が、ネイティブ UI には一切届かないので**別系統の追加**が要る |
 | 運用制約 | Vercel Hobby ＋ Supabase Free の**無料枠で完結**（D18） | 金銭コストの許容度が低い |
 | **通知** | **未実装。** `public/sw.js` のリスナは `install` / `activate` / `fetch` の 3 つだけで、`PushManager` の購読・許可フロー・VAPID・送信側のいずれも存在しない | **どの案でも「通知」は新規実装**。ただし**実装量は等しくない** —— A・B は Web Push（`sw.js` の `push` ハンドラ・購読・VAPID）、C・E・F・G は **APNs / FCM の資格情報とデバイストークンのライフサイクル管理**で**後者が重い**。**C5 でネイティブ push の確実性を加点している以上、その実装・運用コストは C2 / C3 側に計上する必要があり、C・E・F・G の C3 が低い（2 / 1 / 1 / 1）のはこれも織り込んだ評価**である |
@@ -40,7 +40,7 @@ web から集めた観点を、この プロジェクトの事情で重み付け
 | # | 観点 | 重み | 何を見るか | なぜこの重みか |
 | --- | --- | --- | --- | --- |
 | **C1** | **ストア審査を通過できるか** | 15 | Apple ガイドライン **4.2（Minimum Functionality）**／**Play のポリシー審査**（TWA の Digital Asset Links・Lighthouse はこれとは別の技術要件）／Play の**新規個人アカウント 12 テスター × 14 日**ルール | 通らない案は他がどれだけ良くても成立しない（重みが大きい理由）。**ただし足切りには使わない** —— 「落ちる可能性が高い」と「出荷できない」は別で、前者は減点で表す。**ストアに出さない案には適用されない** —— その場合は N/A として除外し、残りの重みで正規化する（下記の注を参照） |
-| **C2** | **既存資産の再利用率（書き直し量）** | 20 | Server Action 30 本・25 画面・TS 型・Supabase クライアントがどれだけ生き残るか | 11.7k 行を捨てる案は、家族向けアプリの投資対効果に合わない |
+| **C2** | **既存資産の再利用率（書き直し量）** | 20 | Server Action 39 本・26 画面・TS 型・Supabase クライアントがどれだけ生き残るか | 15k 行を捨てる案は、家族向けアプリの投資対効果に合わない |
 | **C3** | **継続運用コスト（手間）** | 20 | ストア審査の列・署名鍵の管理・年次のポリシー対応・SDK 強制アップデート・ビルド系統の本数 | **V1 / D18 の核**。「運用対象を増やさない」がこのプロジェクトの一貫した判断 |
 | **C4** | **金銭コスト** | 10 | Apple Developer Program **$99/年**、Google Play **$25 買い切り**、EAS 等の CI 課金 | D18 の「無料枠で完結」を崩す。ただし額としては小さいので重みは中 |
 | **C5** | **得られるネイティブ機能** | 15 | プッシュの確実性・カメラ・共有シート受け取り・バックグラウンド処理・生体認証・ウィジェット | 「今できないこと」が増えないなら、そもそもアプリ化する意味がない |
@@ -63,7 +63,7 @@ web から集めた観点を、この プロジェクトの事情で重み付け
 | --- | --- | --- |
 | **A** | **現状維持＋ PWA インストール導線の強化**（A2HS 案内、iOS 26 のホーム画面既定 web app、Web Push） | 出ない |
 | **B** | **TWA（Bubblewrap / PWABuilder）で Android のみ Play 公開**、iOS は PWA のまま | Android のみ |
-| **C** | **Capacitor ＋ 静的エクスポート**（`output: 'export'`。Server Action 30 本をクライアント直 Supabase / Edge Function へ移す） | Android ＋ iOS |
+| **C** | **Capacitor ＋ 静的エクスポート**（`output: 'export'`。Server Action 39 本をクライアント直 Supabase / Edge Function へ移す） | Android ＋ iOS |
 | **D** | **Capacitor ＋ `server.url`**（WebView が本番 URL を読むだけの薄いラッパー。**既存コードをほぼそのまま出せる唯一の案**。ただし認証は要改修） | Android ＋ iOS |
 | **E** | **Expo / React Native で書き直し**（Supabase バックエンドは共有、UI は RN） | Android ＋ iOS |
 | **F** | **Flutter で書き直し** | Android ＋ iOS |
@@ -82,7 +82,7 @@ Ionic 自身が「**開発用（live-reload）であって本番用ではない*
 ただし **Ionic の警告は運用上の推奨であって Apple の規則ではなく、実際に出荷している例もある**。
 C についてすぐ下で「4.2 は個別判断でリスクと緩和策の問題」と書いている以上、
 **同じ 4.2 を D にだけ「確実に落ちる」として適用するのは一貫性がない。**
-しかも **D は 30 本の Server Action を書き換えずに済む唯一の案**なので、
+しかも **D は 39 本の Server Action を書き換えずに済む唯一の案**なので、
 足切りで消すと**それだけで結論が決まってしまう**。よって**採点して比較する**（結果は §4-2）。
 
 **B と C はいずれも「通る見込みだが保証はない」。**
@@ -172,7 +172,7 @@ D-U-N-S の法人アカウントなら免除され、12 人を集めること自
 > **B を実際に検討するなら最初に確認すべき事実**なので、仮定であることを明示しておく。
 
 > **D を採点に戻した経緯**（当初は足切りにしていた）: C2 が満点なのは、**hosted な Next.js を
-> そのまま使い続けるので Server Action 30 本が生き残る**ため —— これは他のどの案にも無い長所。
+> そのまま使い続けるので Server Action 39 本が生き残る**ため —— これは他のどの案にも無い長所。
 > 一方 **C3 = 2** は、2 ストア分の運用に加えて **web を更新するたびにネイティブ側のプラグイン版と
 > ズレて壊れうる**という恒常的な破損源を抱えるため。**C5 = 3** は、**プラグイン自体は呼べる**が
 > （live-reload も同じ `server.url` を使う構成で、hosted バンドル側の Capacitor JS が
@@ -221,8 +221,8 @@ web 資産をそのまま使えて（C2 満点）、TWA の技術要件（Digita
 Android / iOS を 1 つの web コードベースで賄える唯一の現実解で、C5 は満点。
 ただし**代償が具体的かつ大きい**：
 - **C2**: `output: 'export'` は **Server Action を実行できない**（サーバが無いので当然）。
-  **30 本の Server Action を全てクライアントからの Supabase 直呼び / Edge Function に書き換える**必要がある。
-  25 画面の Server Component 前提（`getUser()` 冒頭確認、`redirect` / `revalidatePath`）も総見直し。
+  **39 本の Server Action を全てクライアントからの Supabase 直呼び / Edge Function に書き換える**必要がある。
+  26 画面の Server Component 前提（`getUser()` 冒頭確認、`redirect` / `revalidatePath`）も総見直し。
   動的ルート（`/records/[id]` `/invite/[token]` `/share/[token]`）は静的エクスポートで別途手当が要る。
 - **C7**: 移行先を **2 つに区別する必要がある**。
   **(a) クライアントから Supabase を直に呼ぶ**形にすると、アプリ層の認可ヘルパーが消えて **RLS 一枚に依存**する。
@@ -247,12 +247,13 @@ Android / iOS を 1 つの web コードベースで賄える唯一の現実解�
 
 **E（60 点）— Expo / React Native.**
 ネイティブ体験は最良で、Supabase 公式の Expo クイックスタートも整備済み。EAS も無料枠（月 15 ビルド）で足りる。
-それでも低いのは、**11.7k 行と 25 画面を UI ごと書き直し（C2）、web と RN の 2 UI を永続的に保守（C3）**
+それでも低いのは、**15k 行と 26 画面を UI ごと書き直し（C2）、web と RN の 2 UI を永続的に保守（C3）**
 が同時に来るため。**React と TypeScript と Supabase クライアントの知識は再利用でき**（そこが F・G との差）、
 **フレームワーク非依存の TypeScript はそのまま持ち込める**（`@supabase/supabase-js` は React Native で動く）——
-`src/types/database.ts`（274 行）＋ `dateRange` `storagePath` `recordQuery` `guest` で **515 行**
+`src/types/database.ts`（401 行）＋ `schedule`（202 行）`scheduleQuery`（170 行、Supabase クライアントを引数で受ける型のみ依存）
+＋ `dateRange` `storagePath` `recordQuery` `guest` で **1,017 行**
 （import を推移的に辿り、さらにランタイム API の使用も確認した実測値）。
-**再利用できないのは UI とサーバ結合部**: 25 画面の DOM、Server Action、
+**再利用できないのは UI とサーバ結合部**: 26 画面の DOM、Server Action、
 `imageResize.ts`（`createImageBitmap` / `canvas.toBlob` を使うブラウザ専用）、
 そして次の 2 群も**そのままは動かない**：
 - **`photos` `tags` `pets` `profile` `avatars` `userAvatar`** は `@/lib/supabase/server`
@@ -261,7 +262,8 @@ Android / iOS を 1 つの web コードベースで賄える唯一の現実解�
   は**サーバーに残すべきもの**、**`quickDraft`（`sessionStorage`）・`householdSync`（`BroadcastChannel`）**
   は**ブラウザ API 依存**でプラットフォーム別アダプタが要る
 
-**515 行は 11.7k 行の約 4%** なので、**C2 は 2 のまま**とした。
+**1,017 行は 15k 行の約 7%** なので、**C2 は 2 のまま**とした（予定機能（D34）で純粋関数が増えたぶん
+再利用率は 4% → 7% に上がったが、**書き直す 93% の絶対量も増えている**ので評価は動かない）。
 **C6 は「既存 Playwright 基盤が失効する」ではなく「ネイティブ用のテスト基盤を新設して二重に持つ」の減点**
 —— web UI を残す前提なら既存の E2E / VRT は web を守り続けるので、失効するわけではない
 （2 UI を保守するコスト自体は C3 で数えているため、C6 で二重に取らない）。
@@ -274,7 +276,7 @@ Supabase の TS クライアントも捨てる**。E を上回る理由がこの
 
 **D（57 点）— Capacitor ＋ `server.url`.**
 **「ほぼ書き換えずに」Android / iOS に出せる案**（hosted な Next.js をそのまま読むので
-Server Action 30 本が生き残る）。ただし**完全にゼロではない** ——
+Server Action 39 本が生き残る）。ただし**完全にゼロではない** ——
 **Google は OAuth の埋め込みユーザーエージェントを禁止**しているので、
 `signInWithOAuth` をそのまま WebView で走らせることはできず、
 **システムブラウザ経由のサインインを別途作る**ことになる（C2 = 4）。
@@ -300,7 +302,7 @@ A のような閲覧の継続にはならない）、Apple 4.2 の *lazy wrapper
    （A なら Web Push、C/E/F/G なら APNs / FCM。むしろ後者の方が重い）。
    最も点の高いストア案 B ですら、Android で増える機能はほぼ無い。
 2. **ストア公開の主目的（発見・獲得）が家族向けアプリには無い。** 一方でコスト（審査の列、鍵、年次対応）は毎年かかる。
-3. **本命の C は、いま払える額の工事ではない。** Server Action 30 本の撤去は機能追加ゼロの大改修で、
+3. **本命の C は、いま払える額の工事ではない。** Server Action 39 本の撤去は機能追加ゼロの大改修で、
    しかも認可モデル（D16）の再検証を伴う。
 
 ### 5-2. いま実際にやること（A の中身）
@@ -392,6 +394,6 @@ C の移行コストは目に見えて下がる。**アプリ層の認可を省�
 
 ---
 
-- 決定ログの 1 行要約: [decisions.md](./decisions.md) の **D34**
+- 決定ログの 1 行要約: [decisions.md](./decisions.md) の **D35**
 - 判断基準（Mission / Vision / Values）: [principles.md](./principles.md)
 - 元の却下判断: [decisions.md](./decisions.md) の **D18**
