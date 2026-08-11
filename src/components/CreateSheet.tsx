@@ -89,16 +89,22 @@ export default function CreateSheet() {
     const ym = today.slice(0, 7);
     close();
     if (window.location.pathname === "/calendar") {
-      const params = new URLSearchParams(window.location.search);
-      // ふだんは URL に載せて開く（ほかの画面から来たときと同じ道）。
-      // すでに同じ ?open= が載っている（開いて閉じた直後）ときだけ、
+      const current = new URLSearchParams(window.location.search);
+      // すでに今日の月・同じ ?open= を見ている（開いて閉じた直後）ときだけ、
       // URL が変わらず開き直せないのでイベントで直接開く。
-      if (params.get("open") === today) {
+      if (current.get("open") === today && (current.get("ym") ?? ym) === ym) {
         window.dispatchEvent(
           new CustomEvent("mfmf:open-plan", { detail: today }),
         );
         return;
       }
+      // 表示（月/週）は保つが、**範囲は必ず今日へ寄せる** —— 別の月を見たまま
+      // 開くと、その月ぶんしか取っていない一覧に今日が無く、すでにある予定が
+      // 「空の新規」に見えてしまう（保存すると二重／ルールの上書きになる）。
+      const params = new URLSearchParams();
+      if (current.get("view") === "week") params.set("view", "week");
+      params.set("ym", ym);
+      params.set("w", today);
       params.set("open", today);
       router.push(`/calendar?${params.toString()}`);
       return;
