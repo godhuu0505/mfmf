@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { CalendarPlus, NotebookPen, X } from "lucide-react";
 import { jstTodayISO } from "@/lib/dateRange";
 import { lockModalBackground } from "@/lib/modalBackground";
@@ -25,8 +25,6 @@ function todayLabel(): string {
 export default function CreateSheet() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   // シートを開いた要素（タブバー中央ボタン）。閉じたらここへフォーカスを戻す。
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -77,19 +75,32 @@ export default function CreateSheet() {
 
   /**
    * 予定: カレンダーの日別シート（きょう）を開く。
-   * すでにカレンダーで今月を見ているときは、URL を差し替えても
-   * ?open= が同じ値のままで開き直せないので、イベントで直接開く。
+   * すでにカレンダーを開いているときは、URL を差し替えても ?open= が同じ値の
+   * ままで開き直せない場面があるので、イベントで直接開く。
+   *
+   * 判定に usePathname / useSearchParams を使わない —— このシートは
+   * レイアウトに常駐しており、フックで検索パラメータを読むと、そのぶん
+   * 検索パラメータだけが変わる遷移（一覧の絞り込みチップなど）に
+   * レイアウト側が巻き込まれる。ここで要るのは押した瞬間の現在地だけなので、
+   * window.location を直接見る。
    */
   function createPlan() {
     const today = jstTodayISO();
     const ym = today.slice(0, 7);
     close();
-    const sameMonth =
-      pathname === "/calendar" && (searchParams.get("ym") ?? ym) === ym;
-    if (sameMonth) {
-      window.dispatchEvent(
-        new CustomEvent("mfmf:open-plan", { detail: today }),
-      );
+    if (window.location.pathname === "/calendar") {
+      const params = new URLSearchParams(window.location.search);
+      // ふだんは URL に載せて開く（ほかの画面から来たときと同じ道）。
+      // すでに同じ ?open= が載っている（開いて閉じた直後）ときだけ、
+      // URL が変わらず開き直せないのでイベントで直接開く。
+      if (params.get("open") === today) {
+        window.dispatchEvent(
+          new CustomEvent("mfmf:open-plan", { detail: today }),
+        );
+        return;
+      }
+      params.set("open", today);
+      router.push(`/calendar?${params.toString()}`);
       return;
     }
     router.push(`/calendar?ym=${ym}&open=${today}`);

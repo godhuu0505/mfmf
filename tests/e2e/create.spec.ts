@@ -80,7 +80,10 @@ test("UC-N07: カレンダーを開いたままでも「予定」から今日の
 
   await openSheet(page);
   await sheet(page).getByRole("button", { name: /^予定/ }).click();
-  await expect(page.getByRole("dialog", { name: /の予定$/ })).toBeVisible();
+  // カレンダー表示中でも ?open= を足す遷移をはさむので、少し長めに待つ
+  await expect(page.getByRole("dialog", { name: /の予定$/ })).toBeVisible({
+    timeout: 15_000,
+  });
 });
 
 test("UC-N08: Escape で閉じてフォーカスがタブバーの作成ボタンへ戻る", async ({

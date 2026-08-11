@@ -42,11 +42,8 @@ export default async function AppLayout({
           <AppTabBar readOnly={!editable} />
         </Suspense>
       )}
-      {membership && editable && (
-        <Suspense fallback={null}>
-          <CreateSheet />
-        </Suspense>
-      )}
+      {/* 検索パラメータを読まないので Suspense は要らない（AppTabBar とは違う） */}
+      {membership && editable && <CreateSheet />}
     </>
   );
 }
