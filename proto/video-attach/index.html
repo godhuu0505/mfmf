@@ -2024,6 +2024,11 @@ input[type="date"] {
     if (files.length === 0) return;
     const gen = state.formGen;
     state.ingesting.set(gen, (state.ingesting.get(gen) ?? 0) + 1);
+    // 「確認中」の枠は**チェーンに並べる前に**確保する。前の選択の検査
+    //（動画1本あたり最大15秒）が終わるまで何も出ないと、選んだぶんが
+    // 消えたように見えて＋タイルから重ねて選ばれてしまう。
+    state.checking += files.length;
+    renderAll();
     const chain = (ingestChains.get(gen) ?? Promise.resolve())
       .then(() => ingest(files, gen))
       .catch(() => {})
@@ -2042,52 +2047,60 @@ input[type="date"] {
   async function ingest(files, gen) {
     const errors = [];
     const queue = [];
-    // 動画のメタデータ待ちの間、選んだぶんは「確認中」のタイルで見せる。
-    // 何も起きていないように見えると、＋タイルから重ねて選ばれてしまう。
-    if (gen === state.formGen) { state.checking = files.length; renderAll(); }
+    // 「確認中」の枠は handleFiles() が確保済み。ここでは1つ片づくごとに戻す
+    //（代入で数え直すと、並行して選ばれた別のぶんまで消してしまう）。
+    let held = files.length;
+    const releaseHold = (n = 1) => {
+      held -= n;
+      // 世代が変わったときは破棄側で 0 に戻っているので、ここでは触らない
+      if (gen === state.formGen) { state.checking = Math.max(0, state.checking - n); renderAll(); }
+    };
 
     // 動画は枠を取る前に長さを検査する。ダメな動画が先に枠を取ると、
     // 後ろの正しい動画まで本数上限で弾かれて結局どちらも残らない。
     for (let idx = 0; idx < files.length; idx++) {
       if (gen !== state.formGen) break; // フォームが切り替わった
       const file = files[idx];
-      // 別世代の検査が今のフォームの「確認中」を消さないようにする
-      if (gen === state.formGen) { state.checking = files.length - idx; renderAll(); }
-      const kind = classify(file);
-      if (!kind) { errors.push({ msg: `${file.name} — 写真でも動画でもないようです` }); continue; }
-      if (allCount() + queue.length >= MAX_ITEMS) {
-        errors.push({ msg: `${file.name} — 合計${MAX_ITEMS}件までです` }); continue;
+      try {
+        const kind = classify(file);
+        if (!kind) { errors.push({ msg: `${file.name} — 写真でも動画でもないようです` }); continue; }
+        if (allCount() + queue.length >= MAX_ITEMS) {
+          errors.push({ msg: `${file.name} — 合計${MAX_ITEMS}件までです` }); continue;
+        }
+        if (file.size === 0) { errors.push({ msg: `${file.name} — 中身が空のようです` }); continue; }
+        const item = {
+          id: ++seq, kind, name: file.name || (kind === "video" ? "動画" : "写真"),
+          file, size: file.size, after: null, url: null, thumb: null,
+          duration: null, status: "pending", progress: 0,
+        };
+        if (kind === "video") {
+          const meta = await readVideoMeta(file);
+          if (meta.duration == null) {
+            URL.revokeObjectURL(meta.url);
+            errors.push({ msg: `${file.name} — 読み込めませんでした（対応していない形式かもしれません）` });
+            continue;
+          }
+          if (Math.floor(meta.duration) > state.cap) {
+            URL.revokeObjectURL(meta.url);
+            errors.push({ msg: `${file.name} — ${fmtDurJa(meta.duration)}。${state.cap}秒までにしてください`, duration: true });
+            continue;
+          }
+          const queued = queue.filter((q) => q.kind === "video").length;
+          if (allVideos() + queued >= state.maxVideos) {
+            URL.revokeObjectURL(meta.url);
+            errors.push({ msg: `${file.name} — 動画は${state.maxVideos}本までです` });
+            continue;
+          }
+          item.url = meta.url;
+          item.duration = meta.duration;
+        }
+        queue.push(item);
+      } finally {
+        releaseHold();
       }
-      if (file.size === 0) { errors.push({ msg: `${file.name} — 中身が空のようです` }); continue; }
-      const item = {
-        id: ++seq, kind, name: file.name || (kind === "video" ? "動画" : "写真"),
-        file, size: file.size, after: null, url: null, thumb: null,
-        duration: null, status: "pending", progress: 0,
-      };
-      if (kind === "video") {
-        const meta = await readVideoMeta(file);
-        if (meta.duration == null) {
-          URL.revokeObjectURL(meta.url);
-          errors.push({ msg: `${file.name} — 読み込めませんでした（対応していない形式かもしれません）` });
-          continue;
-        }
-        if (Math.floor(meta.duration) > state.cap) {
-          URL.revokeObjectURL(meta.url);
-          errors.push({ msg: `${file.name} — ${fmtDurJa(meta.duration)}。${state.cap}秒までにしてください`, duration: true });
-          continue;
-        }
-        const queued = queue.filter((q) => q.kind === "video").length;
-        if (allVideos() + queued >= state.maxVideos) {
-          URL.revokeObjectURL(meta.url);
-          errors.push({ msg: `${file.name} — 動画は${state.maxVideos}本までです` });
-          continue;
-        }
-        item.url = meta.url;
-        item.duration = meta.duration;
-      }
-      queue.push(item);
     }
-    if (gen === state.formGen) state.checking = 0;
+    // break で抜けたぶんの予約を戻す
+    if (held > 0) releaseHold(held);
 
     // 別のフォームに移っていたら、このぶんは捨てる（違う記録に混ざらないように）
     if (gen !== state.formGen) {
@@ -2217,26 +2230,29 @@ input[type="date"] {
 
   // 写真は本番と同じ方針（長辺1600px / JPEG q0.8）で実際に縮小する
   async function resizePhoto(file) {
-    // 本番の resizeImage() と同じ素通し条件
-    if (!file.type.startsWith("image/")) return { size: file.size, url: URL.createObjectURL(file) };
-    if (file.type === "image/gif" || file.type === "image/svg+xml") {
-      return { size: file.size, url: URL.createObjectURL(file) };
-    }
-    if (typeof createImageBitmap !== "function") return { size: file.size, url: URL.createObjectURL(file) };
+    const asIs = () => ({ size: file.size, url: URL.createObjectURL(file) });
+    // GIF / SVG は触らない（本番の resizeImage() と同じ）
+    if (file.type === "image/gif" || file.type === "image/svg+xml") return asIs();
+    if (/\.(gif|svg)$/i.test(file.name)) return asIs();
+    // MIME が空でも拡張子で写真と判定したものは**デコードを試す**。
+    // ここで素通しすると 50MB の判定が元ファイルのサイズにかかってしまい、
+    // 「縮小後で判定する」（UC-M08b）が破れる。デコードできなければ従来どおり素通し。
+    // ※本番の imageResize.ts は `image/` 以外を即素通しするので、実装時はここを直す。
+    if (typeof createImageBitmap !== "function") return asIs();
     const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => null);
-    if (!bmp) return { size: file.size, url: URL.createObjectURL(file) };
+    if (!bmp) return asIs();
     try {
       const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
       const c = document.createElement("canvas");
       c.width = Math.max(1, Math.round(bmp.width * scale));
       c.height = Math.max(1, Math.round(bmp.height * scale));
       const ctx = c.getContext("2d");
-      if (!ctx) return { size: file.size, url: URL.createObjectURL(file) };
+      if (!ctx) return asIs();
       ctx.drawImage(bmp, 0, 0, c.width, c.height);
       const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.8));
-      if (!blob) return { size: file.size, url: URL.createObjectURL(file) };
+      if (!blob) return asIs();
       // 縮小していないのに圧縮後が大きいなら元を使う（本番と同じ）
-      if (scale === 1 && blob.size >= file.size) return { size: file.size, url: URL.createObjectURL(file) };
+      if (scale === 1 && blob.size >= file.size) return asIs();
       return { size: blob.size, url: URL.createObjectURL(blob) };
     } finally {
       bmp.close?.();

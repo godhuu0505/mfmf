@@ -83,6 +83,11 @@ Android Chrome や PC のブラウザで再生できない。
 
 - 50MB は Supabase Free の **1オブジェクト**上限。元ファイルではなく、縮小・変換して
   実際に保存するサイズにかかる（4K 写真は 60MB でも縮小後は数百 KB）。
+- **`imageResize.ts` の素通し条件を直す必要がある。** 現在は `file.type` が `image/` で
+  始まらないものを即素通しするが、写真の判定は MIME → 拡張子の順にする（上の表）ので、
+  MIME が空で拡張子だけが写真のファイルが縮小されずに 50MB 判定へ届いてしまう。
+  **GIF / SVG 以外はデコードを試し、失敗したときだけ素通しする**形にする
+  （プロトの `resizePhoto()` はこの形にしてある）。
 - 一覧・アルバムでは動画本体を読み込まない（`preload="none"` + poster）。帯域は 5GB/月。
 - Service Worker は署名付き URL をキャッシュしない（CLAUDE.md の不変条件）。
 - DB は `record_photos` を拡張する方向（`kind` / `duration_ms` / `poster_path`）。
