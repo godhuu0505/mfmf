@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PHOTO_BUCKET, normalizeTagName, toSource } from "@/types/database";
+import {
+  ASSIGNEE_ROLES,
+  PHOTO_BUCKET,
+  normalizeTagName,
+  toSource,
+} from "@/types/database";
+import { rolesFor } from "@/lib/schedule";
 import { isPathForRecord } from "@/lib/storagePath";
 import {
   canEdit,
@@ -74,7 +80,9 @@ async function requireEditableRecordHousehold(
   }
   const role = await getRoleInHousehold(supabase, userId, data.household_id);
   if (role && !canEdit(role)) {
-    throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
+    throw new Error(
+      "閲覧のみの権限（viewer）のため、追加・編集・削除はできません",
+    );
   }
   return data.household_id;
 }
@@ -104,15 +112,13 @@ async function attachPhotoPaths(
   if (valid.length === 0) return;
 
   // household_id は親 daycare_records から継承する（バックフィルの「親に追随」と同方針）。
-  const { error } = await supabase
-    .from("record_photos")
-    .insert(
-      valid.map((storage_path) => ({
-        record_id: recordId,
-        storage_path,
-        household_id: householdId,
-      })),
-    );
+  const { error } = await supabase.from("record_photos").insert(
+    valid.map((storage_path) => ({
+      record_id: recordId,
+      storage_path,
+      household_id: householdId,
+    })),
+  );
   if (error) {
     throw new Error(`写真情報の保存に失敗しました: ${error.message}`);
   }
@@ -152,7 +158,10 @@ async function syncRecordTags(
   // 他メンバーの記録への付与も RLS（t.household_id = r.household_id）で弾かれるため。
   // 昇格対象は常に自分のタグに限られる（null タグは owner RLS 経由でしか見えない）。
   const selectTagsByName = async () => {
-    let query = supabase.from("tags").select("id, name, household_id").in("name", tagNames);
+    let query = supabase
+      .from("tags")
+      .select("id, name, household_id")
+      .in("name", tagNames);
     query = householdId
       ? query.or(householdScopeFilter(householdId))
       : query.eq("owner_id", ownerId);
@@ -186,7 +195,9 @@ async function syncRecordTags(
   if (tagNames.length > 0) {
     const idByName = new Map<string, string>();
     // 同名が「世帯の共有タグ」と「移行期の未所属タグ」の両方にある場合は世帯側を優先。
-    const fill = (rows: { id: string; name: string; household_id: string | null }[]) => {
+    const fill = (
+      rows: { id: string; name: string; household_id: string | null }[],
+    ) => {
       rows.forEach((t) => {
         if (!idByName.has(t.name) || t.household_id !== null) {
           idByName.set(t.name, t.id);
@@ -248,12 +259,14 @@ async function syncRecordTags(
     throw new Error(`タグの更新に失敗しました: ${deleteError.message}`);
   }
 
-  const { error: upsertError } = await supabase
-    .from("record_tags")
-    .upsert(
-      tagIds.map((tag_id) => ({ record_id: recordId, tag_id, owner_id: ownerId })),
-      { onConflict: "record_id,tag_id", ignoreDuplicates: true },
-    );
+  const { error: upsertError } = await supabase.from("record_tags").upsert(
+    tagIds.map((tag_id) => ({
+      record_id: recordId,
+      tag_id,
+      owner_id: ownerId,
+    })),
+    { onConflict: "record_id,tag_id", ignoreDuplicates: true },
+  );
   if (upsertError) {
     throw new Error(`タグの付与に失敗しました: ${upsertError.message}`);
   }
@@ -284,7 +297,9 @@ export async function createRecord(formData: FormData) {
       throw new Error("この世帯のメンバーではありません");
     }
     if (!canEdit(role)) {
-      throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
+      throw new Error(
+        "閲覧のみの権限（viewer）のため、追加・編集・削除はできません",
+      );
     }
     householdId = formHousehold;
   } else {
@@ -292,15 +307,13 @@ export async function createRecord(formData: FormData) {
   }
   const pet_id = await resolvePetId(supabase, user.id, householdId, formData);
 
-  const { error } = await supabase
-    .from("daycare_records")
-    .insert({
-      id: recordId,
-      owner_id: user.id,
-      household_id: householdId,
-      ...fields,
-      pet_id,
-    });
+  const { error } = await supabase.from("daycare_records").insert({
+    id: recordId,
+    owner_id: user.id,
+    household_id: householdId,
+    ...fields,
+    pet_id,
+  });
 
   if (error) {
     throw new Error(`記録の作成に失敗しました: ${error.message}`);
@@ -356,7 +369,9 @@ export async function createQuickRecord(formData: FormData) {
       throw new Error("この世帯のメンバーではありません");
     }
     if (!canEdit(role)) {
-      throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
+      throw new Error(
+        "閲覧のみの権限（viewer）のため、追加・編集・削除はできません",
+      );
     }
     householdId = formHousehold;
   } else {
@@ -393,13 +408,61 @@ export async function updateRecord(recordId: string, formData: FormData) {
   );
   const pet_id = await resolvePetId(supabase, user.id, householdId, formData);
 
+  // 日付を動かしたら「その日のルールを置き換えている」印は外す。
+  // 置き換えていたのは元の日なので、動かしたまま持ち回ると
+  // 元の日の毎週の予定が消えたままになり、移った先の別の予定を隠す
+  const { data: before, error: beforeError } = await supabase
+    .from("daycare_records")
+    .select("record_date, overrides_rule")
+    .eq("id", recordId)
+    .maybeSingle();
+  if (beforeError) {
+    throw new Error(`記録の更新に失敗しました: ${beforeError.message}`);
+  }
+  const moved =
+    before?.overrides_rule === true &&
+    before.record_date !== fields.record_date;
+
   const { error } = await supabase
     .from("daycare_records")
-    .update({ ...fields, pet_id })
+    .update({ ...fields, pet_id, ...(moved ? { overrides_rule: false } : {}) })
     .eq("id", recordId);
 
   if (error) {
     throw new Error(`記録の更新に失敗しました: ${error.message}`);
+  }
+
+  // 元の日は「毎週の予定を消してある日」だったので、日付ごとの打ち消しに
+  // 置き換える。印を外すだけだと、動かした瞬間に元の日のルールが戻ってくる
+  if (moved && before) {
+    const { error: skipError } = await supabase
+      .from("schedule_rule_skips")
+      .upsert(
+        {
+          household_id: householdId,
+          on_date: before.record_date,
+          created_by: user.id,
+        },
+        { onConflict: "household_id,on_date", ignoreDuplicates: true },
+      );
+    if (skipError) {
+      throw new Error(`記録の更新に失敗しました: ${skipError.message}`);
+    }
+  }
+
+  // 種類を変えたら、その種類に無い役割の担当は落とす（D34）。残すと、
+  // 種類を戻したときに古い担当が黙って復活する
+  const keepRoles = rolesFor(fields.source);
+  const dropRoles = ASSIGNEE_ROLES.filter((r) => !keepRoles.includes(r));
+  if (dropRoles.length > 0) {
+    const { error: assigneeError } = await supabase
+      .from("record_assignees")
+      .delete()
+      .eq("record_id", recordId)
+      .in("role", dropRoles);
+    if (assigneeError) {
+      throw new Error(`記録の更新に失敗しました: ${assigneeError.message}`);
+    }
   }
 
   await attachPhotoPaths(
@@ -475,22 +538,27 @@ export async function deleteRecord(recordId: string) {
       .remove(photos.map((p) => p.storage_path));
   }
 
-  const { error } = await supabase
-    .from("daycare_records")
-    .delete()
-    .eq("id", recordId);
+  // ルールを置き換えていた記録なら、その日の打ち消しも同じトランザクションで
+  // 入れる（消しただけだと毎週の予定がまた出てくる）
+  const { error } = await supabase.rpc("delete_record_keeping_skip", {
+    p_record: recordId,
+  });
 
   if (error) {
     throw new Error(`記録の削除に失敗しました: ${error.message}`);
   }
 
   revalidatePath("/");
+  revalidatePath("/calendar");
   redirect("/");
 }
 
 // 記録のゲスト共有フラグを切り替える（S4 / D8: 既定 deny、世帯側が記録単位で明示共有）。
 // 対象記録が属する世帯での editor+ を要求（Cookie の現在世帯には依存しない）。
-export async function setRecordGuestVisible(recordId: string, visible: boolean) {
+export async function setRecordGuestVisible(
+  recordId: string,
+  visible: boolean,
+) {
   const supabase = await createClient();
   const {
     data: { user },

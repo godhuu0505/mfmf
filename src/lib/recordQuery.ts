@@ -1,7 +1,7 @@
 // 記録一覧の検索・絞り込み・並び替え条件を URL クエリと相互変換するユーティリティ。
 // Server Component（一覧クエリ）とクライアントのフィルタ UI で共通利用する。
 
-import type { RecordSource } from "@/types/database";
+import { RECORD_SOURCES, type RecordSource } from "@/types/database";
 
 export type SortKey = "date_desc" | "date_asc" | "weight_desc" | "weight_asc";
 
@@ -50,8 +50,11 @@ export function parseFilters(
   };
 
   const sourceRaw = get("source");
-  const source: RecordSourceFilter =
-    sourceRaw === "daycare" || sourceRaw === "home" ? sourceRaw : "all";
+  const source: RecordSourceFilter = RECORD_SOURCES.includes(
+    sourceRaw as RecordSource,
+  )
+    ? (sourceRaw as RecordSource)
+    : "all";
 
   const sortRaw = get("sort");
   const sort: SortKey = (SORT_KEYS as string[]).includes(sortRaw)
