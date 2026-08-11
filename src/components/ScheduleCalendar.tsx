@@ -235,6 +235,9 @@ export default function ScheduleCalendar({
   initialView = "month",
 }: Props) {
   const [view, setView] = useState<"month" | "week">(initialView);
+  // URL が変わったら（月送り・戻る/進む）表示もそれに合わせる。
+  // 初回だけ見ていると、週のまま前月へ送ったときに食い違う
+  useEffect(() => setView(initialView), [initialView]);
   const [openDate, setOpenDate] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => draftOf(null));

@@ -70,6 +70,15 @@ export default async function AppLayout({
       : { count: 0, error: null };
   // 数えられなかったときは近道を出さない（どの子か付かないまま記録になる）
   const multiPet = petCountError !== null || (petCount ?? 0) > 1;
+  // どの子の予定かを出す（同じ種類の予定が 2 頭ぶん並ぶと取り違える）
+  const { data: planPet } = plan?.petId
+    ? await supabase
+        .from("pets")
+        .select("name")
+        .eq("id", plan.petId)
+        .maybeSingle()
+    : { data: null };
+  const planPetName = (planPet?.name as string | undefined) ?? null;
   const todayPlan =
     plan && !(plan.fromRule && multiPet)
       ? {
@@ -83,6 +92,7 @@ export default async function AppLayout({
           end: plan.end,
           body: plan.body,
           who: plan.who,
+          petName: planPetName,
         }
       : null;
 

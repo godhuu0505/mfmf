@@ -74,6 +74,9 @@ export default async function CalendarPage({
   searchParams: Promise<{ ym?: string; w?: string; view?: string }>;
 }) {
   const { ym, w, view } = await searchParams;
+  // 月を送っても表示（月／週）は保つ。URL を正にしておかないと、
+  // クライアントの状態と出ているものが食い違う
+  const viewParam = view === "week" ? "&view=week" : "";
   // 「今日」「今月」は JST 基準（サーバーの実行 TZ が UTC だと、日本の 0:00〜8:59
   // に前日・前月扱いになってしまう）。
   const todayStr = jstTodayISO();
@@ -120,13 +123,18 @@ export default async function CalendarPage({
     : { data: null };
   // ペットが 2 頭以上いる世帯では、どの子の予定かを選べるようにする
   // （選ばないと記録になったときにどの子か分からず、ゲスト共有にも乗らない）
-  const { data: petRows } = householdId
+  const { data: petRows, error: petsError } = householdId
     ? await supabase
         .from("pets")
         .select("id, name")
         .eq("household_id", householdId)
         .order("created_at", { ascending: true })
-    : { data: null };
+    : { data: null, error: null };
+  // 読めないまま「ペットなし」で描くと、2 頭以上いる世帯で「どの子」の選択が
+  // 出ず、どの子か付かないまま保存されてしまう
+  if (petsError) {
+    throw new Error(`ペットの読み込みに失敗しました: ${petsError.message}`);
+  }
   const pets = ((petRows ?? []) as { id: string; name: string }[]).map((p) => ({
     id: p.id,
     name: p.name,
@@ -176,7 +184,7 @@ export default async function CalendarPage({
     <main id="main" className="mx-auto max-w-2xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <Link
-          href={`/calendar?ym=${ymString(prev.year, prev.month)}`}
+          href={`/calendar?ym=${ymString(prev.year, prev.month)}${viewParam}`}
           className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
           aria-label="前の月"
         >
@@ -193,7 +201,7 @@ export default async function CalendarPage({
               フル遷移でも体感差がないため、確実に動く方を取る。 */}
           {!isCurrentMonth && (
             <a
-              href={`/calendar?ym=${ymString(todayYear, todayMonth)}`}
+              href={`/calendar?ym=${ymString(todayYear, todayMonth)}${viewParam}`}
               className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-surface-muted"
             >
               今日
@@ -201,7 +209,7 @@ export default async function CalendarPage({
           )}
         </div>
         <Link
-          href={`/calendar?ym=${ymString(next.year, next.month)}`}
+          href={`/calendar?ym=${ymString(next.year, next.month)}${viewParam}`}
           className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-surface-muted"
           aria-label="次の月"
         >

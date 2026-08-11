@@ -52,6 +52,8 @@ type Props = {
     recordId: string; // ルール由来はまだ行が無いので空文字
     /** ルール由来を完了するときに作る行の id（押し直しても増やさない） */
     draftId: string;
+    /** どの子の予定か（2 頭以上の世帯で取り違えないように出す） */
+    petName?: string | null;
     date: string;
     source: RecordSource;
     label: string;
@@ -343,7 +345,9 @@ export default function QuickRecordSheet({
                 </span>
                 <span className="min-w-0 flex-1">
                   <b className="font-bold">
-                    きょうの予定「{todayPlan.label}」を完了にする
+                    きょうの予定「{todayPlan.label}
+                    {todayPlan.petName ? `・${todayPlan.petName}` : ""}
+                    」を完了にする
                   </b>
                   <span className="block text-xs text-muted-foreground">
                     担当や時間を引き継いで記録にします
