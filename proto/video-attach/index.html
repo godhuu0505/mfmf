@@ -1257,14 +1257,14 @@ input[type="date"] {
 <!-- =========================== ホーム =========================== -->
 <main data-screen="home" class="mx-auto max-w-2xl px-4 py-6">
   <div class="mb-4 flex items-center justify-between">
-    <h1 class="text-xl font-bold text-foreground">記録一覧</h1>
+    <h1 data-screen-title tabindex="-1" class="text-xl font-bold text-foreground">記録一覧</h1>
   </div>
   <ul data-home-list class="space-y-3"></ul>
 </main>
 
 <!-- =========================== アルバム =========================== -->
 <main data-screen="album" hidden class="mx-auto max-w-2xl px-4 py-6">
-  <h1 class="mb-1 text-xl font-bold text-foreground">アルバム</h1>
+  <h1 data-screen-title tabindex="-1" class="mb-1 text-xl font-bold text-foreground">アルバム</h1>
   <p class="mb-6 text-sm text-muted-foreground">
     すべての写真・動画を月ごとに新しい順で表示します。タップすると拡大できます。
   </p>
@@ -1273,7 +1273,7 @@ input[type="date"] {
 
 <!-- =========================== メニュー =========================== -->
 <main data-screen="menu" hidden class="mx-auto max-w-2xl px-4 py-6">
-  <h1 class="mb-4 text-xl font-bold text-foreground">メニュー</h1>
+  <h1 data-screen-title tabindex="-1" class="mb-4 text-xl font-bold text-foreground">メニュー</h1>
   <ul class="divide-y divide-border overflow-hidden rounded-2xl bg-surface ring-1 ring-border">
     <li class="px-4 py-3.5 text-sm text-muted-foreground">ペット</li>
     <li class="px-4 py-3.5 text-sm text-muted-foreground">体重</li>
@@ -1403,7 +1403,7 @@ input[type="date"] {
   <div class="mb-4 flex items-start justify-between gap-3">
     <div class="min-w-0">
       <div class="mb-1 flex flex-wrap items-center gap-2" data-detail-badges></div>
-      <h1 class="text-xl font-bold text-foreground" data-detail-date></h1>
+      <h1 data-screen-title tabindex="-1" class="text-xl font-bold text-foreground" data-detail-date></h1>
       <p class="mt-0.5 text-sm text-muted-foreground" data-detail-author></p>
     </div>
     <div class="flex shrink-0 items-center gap-2">
@@ -1638,7 +1638,7 @@ input[type="date"] {
     videos().length + state.existing.filter((i) => i.kind === "video").length;
 
   // ---------------- 画面遷移 ----------------
-  function show(screen) {
+  function show(screen, { focusTitle = false } = {}) {
     state.screen = screen;
     $$("[data-screen]").forEach((el) => (el.hidden = el.dataset.screen !== screen));
     // フォームは全画面モーダル。ヘッダーもタブバーも出さない（AppTabBar / HideOnFormRoute）
@@ -1659,6 +1659,13 @@ input[type="date"] {
       else b.removeAttribute("aria-current");
     });
     window.scrollTo({ top: 0 });
+    // 画面が入れ替わる操作（確認ダイアログの実行など）では、直前のボタンへフォーカスを
+    // 戻すと hidden になった側に取り残される。行き先の見出しへ移す。
+    if (focusTitle) {
+      requestAnimationFrame(() =>
+        $(`[data-screen="${screen}"] [data-screen-title]`)?.focus({ preventScroll: true }),
+      );
+    }
   }
   $$("[data-tab]").forEach((b) =>
     b.addEventListener("click", () => {
@@ -1786,22 +1793,25 @@ input[type="date"] {
     confirmInertTargets.forEach((el) => { el.inert = true; });
     requestAnimationFrame(() => ok.focus({ preventScroll: true }));
   }
-  function closeConfirm() {
+  // restoreFocus=false は「実行すると画面が入れ替わる」場合。元のボタンへ戻すと
+  // 直後に hidden になる側へフォーカスが取り残されるので、行き先の見出しへ任せる。
+  function closeConfirm(restoreFocus = true) {
     $("[data-confirm]").hidden = true;
     confirmAction = null;
     confirmInertTargets.forEach((el) => { el.inert = false; });
     confirmInertTargets = [];
-    confirmPrevFocus?.focus({ preventScroll: true });
+    if (restoreFocus) confirmPrevFocus?.focus({ preventScroll: true });
     confirmPrevFocus = null;
   }
   // Esc で閉じる（キーボード / スイッチ利用者の脱出路）
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("[data-confirm]").hidden) closeConfirm();
   });
-  $$("[data-confirm-cancel]").forEach((b) => b.addEventListener("click", closeConfirm));
+  $$("[data-confirm-cancel]").forEach((b) => b.addEventListener("click", () => closeConfirm()));
   $("[data-confirm-ok]").addEventListener("click", () => {
     const fn = confirmAction;
-    closeConfirm();
+    // 保存 / 更新 / 破棄はいずれも別画面へ移る。フォーカスは移動先で取り直す。
+    closeConfirm(false);
     fn?.();
   });
 
@@ -1819,8 +1829,8 @@ input[type="date"] {
         state.items.forEach(forget);
         state.items = [];
         state.existing = [];
-        if (state.editingId) { show("detail"); renderDetail(); }
-        else show("home");
+        if (state.editingId) { renderDetail(); show("detail", { focusTitle: true }); }
+        else show("home", { focusTitle: true });
       },
     });
   });
@@ -1861,7 +1871,7 @@ input[type="date"] {
       state.items = [];
       state.viewingId = rec.id;
       renderHome(); renderAlbum(); renderDetail();
-      show("detail");
+      show("detail", { focusTitle: true });
       toast("更新しました");
     } else {
       // 画面に入れた値をそのまま使う（固定値だと保存後の見え方が確かめられない）
@@ -1881,7 +1891,7 @@ input[type="date"] {
       state.viewingId = rec.id;
       renderHome(); renderAlbum(); renderDetail();
       // 本番の createRecord は作成した記録の詳細へ redirect する
-      show("detail");
+      show("detail", { focusTitle: true });
       toast("保存しました");
     }
   }
