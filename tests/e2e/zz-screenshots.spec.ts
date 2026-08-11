@@ -1,5 +1,5 @@
 import { test, type Page } from "@playwright/test";
-import { login } from "./helpers";
+import { issueInviteLink, login } from "./helpers";
 
 // UI 変更 PR 用のスクリーンショット生成（CLAUDE.md「Git / PR」参照）。
 // アサーションは持たない。他 spec の後（zz- 接頭辞で最後）に走らせ、
@@ -74,6 +74,26 @@ test("スクリーンショット一式（ライト）", async ({ page }) => {
   await page.locator('main a[href^="/records/"]').first().click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/);
   await shot(page, "record-detail");
+
+  // 招待リンクの受諾画面（宛先違い）。owner には他人宛ての招待も見えるため、
+  // 招待した本人がリンクを確認したときにここへ来る。
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: new URL(page.url()).origin,
+  });
+  const inviteEmail = `invitee-shot-${Date.now()}@example.com`;
+  await page.goto(await issueInviteLink(page, inviteEmail));
+  await shot(page, "invite-mismatch");
+
+  // 後片付け（招待一覧を溜めない）
+  await page.goto("/settings");
+  await page
+    .locator("li", { hasText: inviteEmail })
+    .first()
+    .getByRole("button", { name: "取り消す" })
+    .click();
+
+  await page.goto("/invite/this-token-does-not-exist");
+  await shot(page, "invite-not-found");
 });
 
 test.describe("ダーク", () => {

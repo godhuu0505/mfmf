@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_AUTH_COOKIE } from "./cookieName";
+import {
+  POST_LOGIN_NEXT_COOKIE,
+  POST_LOGIN_NEXT_MAX_AGE,
+  sanitizeNextPath,
+} from "@/lib/nextPath";
 
 // 認証セッションを更新し、未ログインなら /login へリダイレクトする。
 export async function updateSession(request: NextRequest) {
@@ -54,17 +59,46 @@ export async function updateSession(request: NextRequest) {
     pathname === "/privacy";
 
   if (!user && !isAuthRoute && !isPublicRoute) {
-    // 未ログイン → /login へ
+    // 未ログイン → /login へ。招待リンク（/invite/{token}）のような deep link を
+    // ログインで失わないよう、行き先を ?next= と Cookie の両方で持ち回る
+    // （Cookie が必要な理由は src/lib/nextPath.ts のコメント参照）。
+    const next = sanitizeNextPath(`${pathname}${request.nextUrl.search}`);
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    url.search = "";
+    if (next !== "/") url.searchParams.set("next", next);
+    const redirectResponse = NextResponse.redirect(url);
+    if (next !== "/") {
+      redirectResponse.cookies.set(POST_LOGIN_NEXT_COOKIE, next, {
+        path: "/",
+        maxAge: POST_LOGIN_NEXT_MAX_AGE,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+    }
+    return redirectResponse;
   }
 
   if (user && isAuthRoute) {
-    // ログイン済みで /login に来たら一覧へ
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+    // ログイン済みで /login に来たら、指定があればその行き先へ（なければ一覧へ）
+    const next = sanitizeNextPath(request.nextUrl.searchParams.get("next"));
+    return NextResponse.redirect(new URL(next, request.url));
+  }
+
+  // ログイン済みのユーザーに戻り先 Cookie が残っていたら、ここで使い切る。
+  // メール/パスワードログインは ?next= だけを見てクライアントで遷移するため、
+  // 消さないと Cookie が最大 10 分残り、その間に別アカウントで Google OAuth を
+  // 始めると /auth/callback が古い行き先（前の招待）へ飛ばしてしまう。
+  // /auth/* は callback 自身が、/reset-password は更新後の行き先として
+  // Cookie を読むので触らない（回復セッションで到達＝ログイン済みになる）。
+  if (
+    user &&
+    !pathname.startsWith("/auth") &&
+    pathname !== "/reset-password" &&
+    request.cookies.has(POST_LOGIN_NEXT_COOKIE)
+  ) {
+    supabaseResponse.cookies.delete(POST_LOGIN_NEXT_COOKIE);
   }
 
   return supabaseResponse;

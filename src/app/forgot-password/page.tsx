@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sanitizeNextPath, withNext } from "@/lib/nextPath";
+import { keepPostLoginNext } from "@/lib/keepPostLoginNext";
 
 const inputClass =
   "w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground";
@@ -13,10 +15,21 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  // 招待リンク等からの戻り先。送信時に貼り直すほか、ログインへ戻る導線にも引き継ぐ。
+  const [next, setNext] = useState("/");
+
+  useEffect(() => {
+    setNext(
+      sanitizeNextPath(new URLSearchParams(window.location.search).get("next")),
+    );
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+
+    // 招待リンクなどの戻り先はここで貼り直す（メールの往復に耐えるように）。
+    await keepPostLoginNext(next);
 
     const supabase = createClient();
     // 再設定リンク → /auth/callback で code をセッションへ交換 → /reset-password。
@@ -79,7 +92,7 @@ export default function ForgotPasswordPage() {
 
           <p className="text-center text-xs">
             <Link
-              href="/login"
+              href={withNext("/login", next)}
               className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
             >
               ログインへ戻る
