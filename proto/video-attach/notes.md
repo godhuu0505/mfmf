@@ -88,7 +88,7 @@ Android Chrome や PC のブラウザで再生できない。
 - DB は `record_photos` を拡張する方向（`kind` / `duration_ms` / `poster_path`）。
   テーブル名が実態と合わなくなるが、リネームは既存 RLS を全部書き直すことになるので別途判断。
 
-## 決まったこと（2026-08-10 実機合意 → [D34](../../docs/explanation/decisions.md)）
+## 決まったこと（2026-08-10 実機合意 → [D35](../../docs/explanation/decisions.md)）
 
 - [x] 動画1本の最長: **30秒**
 - [x] 1記録の動画の本数: **3本**
