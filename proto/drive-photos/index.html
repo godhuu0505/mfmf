@@ -1,0 +1,1593 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>mfmf — 写真の Google ドライブ保存 3 案</title>
+<style>
+/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */
+@layer properties;
+@layer theme, base, components, utilities;
+@layer theme {
+  :root, :host {
+    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    --color-amber-400: oklch(82.8% 0.189 84.429);
+    --color-amber-500: oklch(76.9% 0.188 70.08);
+    --color-amber-700: oklch(55.5% 0.163 48.998);
+    --color-black: #000;
+    --spacing: 0.25rem;
+    --container-md: 28rem;
+    --text-xs: 0.75rem;
+    --text-xs--line-height: calc(1 / 0.75);
+    --text-sm: 0.875rem;
+    --text-sm--line-height: calc(1.25 / 0.875);
+    --text-base: 1rem;
+    --text-base--line-height: calc(1.5 / 1);
+    --text-lg: 1.125rem;
+    --text-lg--line-height: calc(1.75 / 1.125);
+    --text-2xl: 1.5rem;
+    --text-2xl--line-height: calc(2 / 1.5);
+    --text-3xl: 1.875rem;
+    --text-3xl--line-height: calc(2.25 / 1.875);
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --leading-snug: 1.375;
+    --leading-relaxed: 1.625;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --default-transition-duration: 150ms;
+    --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    --default-font-family: var(--font-sans);
+    --default-mono-font-family: var(--font-mono);
+  }
+}
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  html, :host {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    font-family: var(--default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
+    -webkit-tap-highlight-color: transparent;
+  }
+  hr {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+  abbr:where([title]) {
+    -webkit-text-decoration: underline dotted;
+    text-decoration: underline dotted;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  a {
+    color: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit;
+  }
+  b, strong {
+    font-weight: bolder;
+  }
+  code, kbd, samp, pre {
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-feature-settings: var(--default-mono-font-feature-settings, normal);
+    font-variation-settings: var(--default-mono-font-variation-settings, normal);
+    font-size: 1em;
+  }
+  small {
+    font-size: 80%;
+  }
+  sub, sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+  sub {
+    bottom: -0.25em;
+  }
+  sup {
+    top: -0.5em;
+  }
+  table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+  :-moz-focusring {
+    outline: auto;
+  }
+  progress {
+    vertical-align: baseline;
+  }
+  summary {
+    display: list-item;
+  }
+  ol, ul, menu {
+    list-style: none;
+  }
+  img, svg, video, canvas, audio, iframe, embed, object {
+    display: block;
+    vertical-align: middle;
+  }
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+  button, input, select, optgroup, textarea, ::file-selector-button {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  :where(select:is([multiple], [size])) optgroup {
+    font-weight: bolder;
+  }
+  :where(select:is([multiple], [size])) optgroup option {
+    padding-inline-start: 20px;
+  }
+  ::file-selector-button {
+    margin-inline-end: 4px;
+  }
+  ::placeholder {
+    opacity: 1;
+  }
+  @supports (not (-webkit-appearance: -apple-pay-button))  or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: currentcolor;
+      @supports (color: color-mix(in lab, red, red)) {
+        color: color-mix(in oklab, currentcolor 50%, transparent);
+      }
+    }
+  }
+  textarea {
+    resize: vertical;
+  }
+  ::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+  ::-webkit-date-and-time-value {
+    min-height: 1lh;
+    text-align: inherit;
+  }
+  ::-webkit-datetime-edit {
+    display: inline-flex;
+  }
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  ::-webkit-datetime-edit, ::-webkit-datetime-edit-year-field, ::-webkit-datetime-edit-month-field, ::-webkit-datetime-edit-day-field, ::-webkit-datetime-edit-hour-field, ::-webkit-datetime-edit-minute-field, ::-webkit-datetime-edit-second-field, ::-webkit-datetime-edit-millisecond-field, ::-webkit-datetime-edit-meridiem-field {
+    padding-block: 0;
+  }
+  ::-webkit-calendar-picker-indicator {
+    line-height: 1;
+  }
+  :-moz-ui-invalid {
+    box-shadow: none;
+  }
+  button, input:where([type="button"], [type="reset"], [type="submit"]), ::file-selector-button {
+    appearance: button;
+  }
+  ::-webkit-inner-spin-button, ::-webkit-outer-spin-button {
+    height: auto;
+  }
+  [hidden]:where(:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
+@layer utilities {
+  .absolute {
+    position: absolute;
+  }
+  .fixed {
+    position: fixed;
+  }
+  .relative {
+    position: relative;
+  }
+  .sticky {
+    position: sticky;
+  }
+  .inset-0 {
+    inset: 0px;
+  }
+  .inset-x-0 {
+    inset-inline: 0px;
+  }
+  .top-0 {
+    top: 0px;
+  }
+  .top-1 {
+    top: var(--spacing);
+  }
+  .right-1 {
+    right: var(--spacing);
+  }
+  .bottom-0 {
+    bottom: 0px;
+  }
+  .z-20 {
+    z-index: 20;
+  }
+  .z-30 {
+    z-index: 30;
+  }
+  .z-40 {
+    z-index: 40;
+  }
+  .mx-auto {
+    margin-inline: auto;
+  }
+  .mt-0\.5 {
+    margin-top: calc(var(--spacing) * 0.5);
+  }
+  .mt-1 {
+    margin-top: var(--spacing);
+  }
+  .mt-1\.5 {
+    margin-top: calc(var(--spacing) * 1.5);
+  }
+  .mt-2 {
+    margin-top: calc(var(--spacing) * 2);
+  }
+  .mt-3 {
+    margin-top: calc(var(--spacing) * 3);
+  }
+  .mt-4 {
+    margin-top: calc(var(--spacing) * 4);
+  }
+  .mb-0\.5 {
+    margin-bottom: calc(var(--spacing) * 0.5);
+  }
+  .mb-1 {
+    margin-bottom: var(--spacing);
+  }
+  .mb-1\.5 {
+    margin-bottom: calc(var(--spacing) * 1.5);
+  }
+  .mb-2 {
+    margin-bottom: calc(var(--spacing) * 2);
+  }
+  .mb-3 {
+    margin-bottom: calc(var(--spacing) * 3);
+  }
+  .mb-4 {
+    margin-bottom: calc(var(--spacing) * 4);
+  }
+  .ml-1 {
+    margin-left: var(--spacing);
+  }
+  .block {
+    display: block;
+  }
+  .flex {
+    display: flex;
+  }
+  .grid {
+    display: grid;
+  }
+  .hidden {
+    display: none;
+  }
+  .inline-flex {
+    display: inline-flex;
+  }
+  .aspect-square {
+    aspect-ratio: 1 / 1;
+  }
+  .h-1\.5 {
+    height: calc(var(--spacing) * 1.5);
+  }
+  .h-2 {
+    height: calc(var(--spacing) * 2);
+  }
+  .h-4 {
+    height: calc(var(--spacing) * 4);
+  }
+  .h-5 {
+    height: calc(var(--spacing) * 5);
+  }
+  .h-9 {
+    height: calc(var(--spacing) * 9);
+  }
+  .h-12 {
+    height: calc(var(--spacing) * 12);
+  }
+  .h-28 {
+    height: calc(var(--spacing) * 28);
+  }
+  .h-full {
+    height: 100%;
+  }
+  .max-h-\[85dvh\] {
+    max-height: 85dvh;
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+  .w-1\.5 {
+    width: calc(var(--spacing) * 1.5);
+  }
+  .w-4 {
+    width: calc(var(--spacing) * 4);
+  }
+  .w-9 {
+    width: calc(var(--spacing) * 9);
+  }
+  .w-12 {
+    width: calc(var(--spacing) * 12);
+  }
+  .w-\[98\%\] {
+    width: 98%;
+  }
+  .w-full {
+    width: 100%;
+  }
+  .max-w-md {
+    max-width: var(--container-md);
+  }
+  .min-w-0 {
+    min-width: 0px;
+  }
+  .shrink-0 {
+    flex-shrink: 0;
+  }
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .grid-cols-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .flex-col {
+    flex-direction: column;
+  }
+  .flex-wrap {
+    flex-wrap: wrap;
+  }
+  .items-baseline {
+    align-items: baseline;
+  }
+  .items-center {
+    align-items: center;
+  }
+  .items-end {
+    align-items: flex-end;
+  }
+  .justify-between {
+    justify-content: space-between;
+  }
+  .justify-center {
+    justify-content: center;
+  }
+  .gap-0\.5 {
+    gap: calc(var(--spacing) * 0.5);
+  }
+  .gap-1 {
+    gap: var(--spacing);
+  }
+  .gap-2 {
+    gap: calc(var(--spacing) * 2);
+  }
+  .gap-3 {
+    gap: calc(var(--spacing) * 3);
+  }
+  :where(.space-y-1 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(var(--spacing) * var(--tw-space-y-reverse));
+    margin-block-end: calc(var(--spacing) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-1\.5 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 1.5) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 1.5) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-2 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 2) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 2) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-4 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 4) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 4) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .overflow-hidden {
+    overflow: hidden;
+  }
+  .overflow-y-auto {
+    overflow-y: auto;
+  }
+  .rounded {
+    border-radius: 0.25rem;
+  }
+  .rounded-full {
+    border-radius: calc(infinity * 1px);
+  }
+  .rounded-lg {
+    border-radius: var(--radius-lg);
+  }
+  .rounded-md {
+    border-radius: var(--radius-md);
+  }
+  .rounded-xl {
+    border-radius: var(--radius-xl);
+  }
+  .rounded-t-2xl {
+    border-top-left-radius: var(--radius-2xl);
+    border-top-right-radius: var(--radius-2xl);
+  }
+  .border {
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+  }
+  .border-t {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 1px;
+  }
+  .border-b {
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 1px;
+  }
+  .border-dashed {
+    --tw-border-style: dashed;
+    border-style: dashed;
+  }
+  .border-amber-500\/50 {
+    border-color: color-mix(in srgb, oklch(76.9% 0.188 70.08) 50%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-amber-500) 50%, transparent);
+    }
+  }
+  .border-border {
+    border-color: var(--border-color);
+  }
+  .border-primary\/40 {
+    border-color: var(--primary);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--primary) 40%, transparent);
+    }
+  }
+  .bg-amber-500 {
+    background-color: var(--color-amber-500);
+  }
+  .bg-background {
+    background-color: var(--background);
+  }
+  .bg-background\/95 {
+    background-color: var(--background);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--background) 95%, transparent);
+    }
+  }
+  .bg-black\/40 {
+    background-color: color-mix(in srgb, #000 40%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 40%, transparent);
+    }
+  }
+  .bg-primary {
+    background-color: var(--primary);
+  }
+  .bg-surface {
+    background-color: var(--surface);
+  }
+  .bg-surface-muted {
+    background-color: var(--surface-muted);
+  }
+  .bg-surface-muted\/50 {
+    background-color: var(--surface-muted);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--surface-muted) 50%, transparent);
+    }
+  }
+  .bg-surface-muted\/60 {
+    background-color: var(--surface-muted);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--surface-muted) 60%, transparent);
+    }
+  }
+  .bg-surface\/90 {
+    background-color: var(--surface);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--surface) 90%, transparent);
+    }
+  }
+  .bg-surface\/95 {
+    background-color: var(--surface);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--surface) 95%, transparent);
+    }
+  }
+  .p-0\.5 {
+    padding: calc(var(--spacing) * 0.5);
+  }
+  .p-3 {
+    padding: calc(var(--spacing) * 3);
+  }
+  .p-4 {
+    padding: calc(var(--spacing) * 4);
+  }
+  .px-1 {
+    padding-inline: var(--spacing);
+  }
+  .px-2 {
+    padding-inline: calc(var(--spacing) * 2);
+  }
+  .px-3 {
+    padding-inline: calc(var(--spacing) * 3);
+  }
+  .px-4 {
+    padding-inline: calc(var(--spacing) * 4);
+  }
+  .px-5 {
+    padding-inline: calc(var(--spacing) * 5);
+  }
+  .py-0\.5 {
+    padding-block: calc(var(--spacing) * 0.5);
+  }
+  .py-1 {
+    padding-block: var(--spacing);
+  }
+  .py-1\.5 {
+    padding-block: calc(var(--spacing) * 1.5);
+  }
+  .py-2 {
+    padding-block: calc(var(--spacing) * 2);
+  }
+  .py-2\.5 {
+    padding-block: calc(var(--spacing) * 2.5);
+  }
+  .pt-1\.5 {
+    padding-top: calc(var(--spacing) * 1.5);
+  }
+  .pt-4 {
+    padding-top: calc(var(--spacing) * 4);
+  }
+  .pb-32 {
+    padding-bottom: calc(var(--spacing) * 32);
+  }
+  .text-center {
+    text-align: center;
+  }
+  .text-2xl {
+    font-size: var(--text-2xl);
+    line-height: var(--tw-leading, var(--text-2xl--line-height));
+  }
+  .text-3xl {
+    font-size: var(--text-3xl);
+    line-height: var(--tw-leading, var(--text-3xl--line-height));
+  }
+  .text-base {
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
+  }
+  .text-lg {
+    font-size: var(--text-lg);
+    line-height: var(--tw-leading, var(--text-lg--line-height));
+  }
+  .text-sm {
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+  }
+  .text-xs {
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+  }
+  .text-\[9px\] {
+    font-size: 9px;
+  }
+  .text-\[10px\] {
+    font-size: 10px;
+  }
+  .text-\[11px\] {
+    font-size: 11px;
+  }
+  .leading-none {
+    --tw-leading: 1;
+    line-height: 1;
+  }
+  .leading-relaxed {
+    --tw-leading: var(--leading-relaxed);
+    line-height: var(--leading-relaxed);
+  }
+  .leading-snug {
+    --tw-leading: var(--leading-snug);
+    line-height: var(--leading-snug);
+  }
+  .font-medium {
+    --tw-font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-medium);
+  }
+  .font-normal {
+    --tw-font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-normal);
+  }
+  .font-semibold {
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+  }
+  .text-amber-700 {
+    color: var(--color-amber-700);
+  }
+  .text-foreground {
+    color: var(--foreground);
+  }
+  .text-muted-foreground {
+    color: var(--muted-foreground);
+  }
+  .text-primary {
+    color: var(--primary);
+  }
+  .text-primary-foreground {
+    color: var(--primary-foreground);
+  }
+  .shadow-lg {
+    --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 4px 6px -4px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .backdrop-blur {
+    --tw-backdrop-blur: blur(8px);
+    -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+    backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+  }
+  .transition {
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .last\:border-b-0:last-child {
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 0px;
+  }
+  @media (hover: hover) {
+    .hover\:bg-primary-hover:hover {
+      background-color: var(--primary-hover);
+    }
+    .hover\:bg-surface-muted:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+  @media (prefers-color-scheme: dark) {
+    .dark\:text-amber-400 {
+      color: var(--color-amber-400);
+    }
+  }
+}
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1220;
+    --foreground: #e2e8f0;
+    --surface: #111827;
+    --surface-muted: #1f2937;
+    --border-color: #334155;
+    --muted: #475569;
+    --muted-foreground: #94a3b8;
+    --primary: #fb923c;
+    --primary-hover: #fdba74;
+    --primary-foreground: #431407;
+    --skeleton-base: #1f2937;
+    --skeleton-shine: rgba(71, 85, 105, 0.6);
+    --focus-ring: #fb923c;
+  }
+}
+html {
+  color-scheme: light dark;
+}
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+body:has([data-app-tabbar]) main {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+.safe-px {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+.safe-pt {
+  padding-top: env(safe-area-inset-top);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 60;
+}
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.18);
+}
+.skeleton {
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient( 90deg, var(--skeleton-base) 0%, var(--skeleton-shine) 50%, var(--skeleton-base) 100% );
+  @supports (color: color-mix(in lab, red, red)) {
+    background-image: linear-gradient( 90deg, color-mix(in srgb, var(--skeleton-base) 100%, transparent) 0%, var(--skeleton-shine) 50%, color-mix(in srgb, var(--skeleton-base) 100%, transparent) 100% );
+  }
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@property --tw-space-y-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-border-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
+@property --tw-leading {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-font-weight {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-inset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-ring-inset {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-offset-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --tw-ring-offset-color {
+  syntax: "*";
+  inherits: false;
+  initial-value: #fff;
+}
+@property --tw-ring-offset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-backdrop-blur {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-brightness {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-contrast {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-grayscale {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-hue-rotate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-invert {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-opacity {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-saturate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-sepia {
+  syntax: "*";
+  inherits: false;
+}
+@layer properties {
+  @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
+    *, ::before, ::after, ::backdrop {
+      --tw-space-y-reverse: 0;
+      --tw-border-style: solid;
+      --tw-leading: initial;
+      --tw-font-weight: initial;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-color: initial;
+      --tw-shadow-alpha: 100%;
+      --tw-inset-shadow: 0 0 #0000;
+      --tw-inset-shadow-color: initial;
+      --tw-inset-shadow-alpha: 100%;
+      --tw-ring-color: initial;
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-inset-ring-color: initial;
+      --tw-inset-ring-shadow: 0 0 #0000;
+      --tw-ring-inset: initial;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-backdrop-blur: initial;
+      --tw-backdrop-brightness: initial;
+      --tw-backdrop-contrast: initial;
+      --tw-backdrop-grayscale: initial;
+      --tw-backdrop-hue-rotate: initial;
+      --tw-backdrop-invert: initial;
+      --tw-backdrop-opacity: initial;
+      --tw-backdrop-saturate: initial;
+      --tw-backdrop-sepia: initial;
+    }
+  }
+}
+</style>
+
+<div class="min-h-dvh bg-background text-foreground">
+  <!-- ============ 案の切り替え（常時表示） ============ -->
+  <div class="safe-pt sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
+    <div class="mx-auto max-w-md px-4 py-2">
+      <div class="mb-1.5 flex items-baseline justify-between">
+        <span class="text-xs font-medium text-muted-foreground">保存パターン</span>
+        <button
+          type="button"
+          data-open-settings
+          class="rounded-md px-2 py-0.5 text-xs font-medium text-primary transition hover:bg-surface-muted"
+        >
+          プロト設定
+        </button>
+      </div>
+      <div class="grid grid-cols-3 gap-1 rounded-lg border border-border p-0.5" role="tablist">
+        <button type="button" data-plan="A" class="rounded-md px-2 py-1.5 text-xs font-medium transition">
+          A バックアップ
+        </button>
+        <button type="button" data-plan="B" class="rounded-md px-2 py-1.5 text-xs font-medium transition">
+          B 引っ越し
+        </button>
+        <button type="button" data-plan="C" class="rounded-md px-2 py-1.5 text-xs font-medium transition">
+          C 毎回選ぶ
+        </button>
+      </div>
+      <p data-plan-summary class="mt-1.5 text-[11px] leading-snug text-muted-foreground"></p>
+    </div>
+  </div>
+
+  <!-- ============ 画面 ============ -->
+  <main class="mx-auto max-w-md px-4 pt-4 pb-32" data-screen></main>
+
+  <!-- ============ ボトムタブバー（D33 の 5 スロット） ============ -->
+  <nav
+    data-app-tabbar
+    class="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 backdrop-blur"
+  >
+    <div
+      class="mx-auto grid max-w-md grid-cols-5 items-end px-2 pt-1.5"
+      style="padding-bottom: max(0.375rem, env(safe-area-inset-bottom))"
+    >
+      <button type="button" data-screen-to="album" class="flex flex-col items-center gap-0.5 py-1 text-[10px] font-medium transition">
+        <span class="text-lg leading-none">🖼</span><span>アルバム</span>
+      </button>
+      <button type="button" data-screen-to="detail" class="flex flex-col items-center gap-0.5 py-1 text-[10px] font-medium transition">
+        <span class="text-lg leading-none">📄</span><span>記録詳細</span>
+      </button>
+      <button type="button" data-screen-to="form" class="flex flex-col items-center justify-center">
+        <span class="mb-0.5 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-2xl text-primary-foreground shadow-lg">＋</span>
+      </button>
+      <button type="button" data-screen-to="settings" class="flex flex-col items-center gap-0.5 py-1 text-[10px] font-medium transition">
+        <span class="text-lg leading-none">☁️</span><span>ドライブ</span>
+      </button>
+      <button type="button" data-screen-to="matrix" class="flex flex-col items-center gap-0.5 py-1 text-[10px] font-medium transition">
+        <span class="text-lg leading-none">🧭</span><span>4 状態</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============ プロト設定パネル ============ -->
+  <div data-settings-panel class="fixed inset-0 z-40 hidden">
+    <div class="absolute inset-0 bg-black/40" data-close-settings></div>
+    <div
+      class="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4"
+      style="padding-bottom: max(1rem, env(safe-area-inset-bottom))"
+    >
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-base font-semibold text-foreground">プロト設定</h2>
+        <button type="button" data-close-settings class="rounded-md px-2 py-1 text-sm text-muted-foreground transition hover:bg-surface-muted">閉じる</button>
+      </div>
+      <p class="mb-4 text-xs leading-relaxed text-muted-foreground">
+        実データ・実 API は一切使っていません（固定データのみ）。<br />
+        極端な状態に切り替えて、実機で表示が成立するか確かめてください。
+      </p>
+      <div class="space-y-4" data-toggles></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------------------------------------------------------------
+  // プロトの状態（すべて固定データ。fetch は書かない）
+  // ---------------------------------------------------------------
+  const state = {
+    plan: "A", // A: バックアップ / B: 引っ越し / C: 毎回選ぶ
+    photo: "both", // both / appOnly / driveOnly / none
+    link: "linked", // linked / none / expired
+    role: "editor", // editor / viewer
+    owner: "each", // each: 各自の Drive / owner: owner に集約
+    screen: "detail",
+  };
+
+  const PLAN = {
+    A: {
+      name: "案 A: バックアップ型",
+      tagline: "アプリが正・ドライブは控え。表示は常にアプリ側なのでドライブ通信は保存時だけ。",
+    },
+    B: {
+      name: "案 B: 引っ越し型",
+      tagline: "原本はドライブ・サムネだけアプリ。一覧は 0 通信、原本を開いたときだけドライブへ。",
+    },
+    C: {
+      name: "案 C: 毎回選ぶ型",
+      tagline: "保存のたびに保存先を選ぶ。自由だが写真ごとに状態がばらつき、一覧でドライブ通信が要る。",
+    },
+  };
+
+  const TOGGLES = [
+    {
+      key: "photo",
+      label: "写真の在りか",
+      options: [
+        ["both", "両方にある"],
+        ["appOnly", "アプリだけ"],
+        ["driveOnly", "ドライブだけ"],
+        ["none", "どちらにも無い"],
+      ],
+    },
+    {
+      key: "link",
+      label: "ドライブ連携",
+      options: [
+        ["linked", "連携済み"],
+        ["none", "未連携"],
+        ["expired", "失効（要再同意）"],
+      ],
+    },
+    {
+      key: "role",
+      label: "権限",
+      options: [
+        ["editor", "owner / editor"],
+        ["viewer", "viewer"],
+      ],
+    },
+    {
+      key: "owner",
+      label: "原本の持ち主",
+      options: [
+        ["each", "各自のドライブ"],
+        ["owner", "owner に集約"],
+      ],
+    },
+  ];
+
+  // アルバムのモック（24 枚。ばらつきを出すため在りかを散らす）
+  const ALBUM = Array.from({ length: 24 }, (_, i) => ({
+    emoji: ["🐕", "🦴", "🐾", "🍚", "🌳", "🛁"][i % 6],
+    where: i % 7 === 3 ? "appOnly" : i % 5 === 0 ? "driveOnly" : "both",
+  }));
+
+  // ---------------------------------------------------------------
+  // 表示ヘルパー
+  // ---------------------------------------------------------------
+  const on = "bg-primary text-primary-foreground";
+  const off = "text-muted-foreground hover:bg-surface-muted";
+
+  function photoBox(emoji, extra = "") {
+    return `<div class="flex aspect-square items-center justify-center rounded-lg bg-surface-muted text-3xl ${extra}">${emoji}</div>`;
+  }
+
+  function badge(text, tone = "muted") {
+    const cls =
+      tone === "primary"
+        ? "border-primary/40 text-primary"
+        : tone === "warn"
+          ? "border-amber-500/50 text-amber-700 dark:text-amber-400"
+          : "border-border text-muted-foreground";
+    return `<span class="inline-flex items-center gap-1 rounded-full border ${cls} px-2 py-0.5 text-[11px] font-medium">${text}</span>`;
+  }
+
+  function card(inner, extra = "") {
+    return `<section class="rounded-xl border border-border bg-surface p-4 ${extra}">${inner}</section>`;
+  }
+
+  function note(text) {
+    return `<p class="mt-2 text-xs leading-relaxed text-muted-foreground">${text}</p>`;
+  }
+
+  // 「この画面で発生するドライブ通信」の見積り（レートリミット検討用）
+  function driveCalls(screen) {
+    if (state.link !== "linked") return 0;
+    if (screen === "album") {
+      if (state.plan === "A" || state.plan === "B") return 0;
+      return ALBUM.filter((p) => p.where === "driveOnly").length; // 案 C は原本しか無い写真を都度取得
+    }
+    if (screen === "detail") {
+      if (state.plan === "A") return 0;
+      if (state.plan === "B") return 0; // サムネ表示のみ。原本を開くと +1
+      return state.photo === "driveOnly" ? 1 : 0;
+    }
+    return 0;
+  }
+
+  function meter(screen) {
+    const n = driveCalls(screen);
+    const units = n * 200;
+    const tone = n === 0 ? "border-border" : "border-amber-500/50";
+    return `
+      <div class="mt-4 rounded-lg border ${tone} bg-surface-muted/60 px-3 py-2">
+        <p class="text-xs font-medium text-foreground">この画面で発生するドライブ通信: ${n} 回<span class="ml-1 font-normal text-muted-foreground">（${units.toLocaleString()} quota units）</span></p>
+        <p class="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+          上限はユーザーあたり 325,000 units/分・プロジェクト全体で 1,000,000 units/分。
+          ダウンロード 1 回 = 200 units なので、<strong class="font-medium text-foreground">一覧をドライブから描かない限り上限には当たらない</strong>。
+          効くのは Vercel の関数実行と帯域の方。
+        </p>
+      </div>`;
+  }
+
+  // ---------------------------------------------------------------
+  // 画面: 記録詳細（写真 1 枚の状態表示が主役）
+  // ---------------------------------------------------------------
+  function screenDetail() {
+    const driveOwner =
+      state.owner === "owner" ? "はなこさん（世帯 owner）のドライブ" : "たろうさんのドライブ";
+
+    let photoArea = "";
+
+    // --- どちらにも無い（全案共通の異常系） ---
+    if (state.photo === "none") {
+      photoArea = `
+        <div class="flex aspect-square flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-muted/50 p-4 text-center">
+          <span class="text-3xl">🔍</span>
+          <p class="text-sm font-medium text-foreground">この写真を表示できません</p>
+          <p class="text-xs leading-relaxed text-muted-foreground">mfmf が写真を削除することはありません。<br />ドライブのゴミ箱に残っていることが多いです。</p>
+        </div>
+        <div class="mt-3 space-y-2">
+          <button type="button" class="w-full rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">ドライブのゴミ箱を開く</button>
+          ${
+            state.link === "expired"
+              ? `<button type="button" class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover">ドライブに再連携する</button>`
+              : ""
+          }
+          ${
+            state.role === "editor"
+              ? `<button type="button" class="w-full rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">端末の写真から入れ直す</button>`
+              : ""
+          }
+        </div>`;
+    }
+
+    // --- 案 A: アプリが正 ---
+    else if (state.plan === "A") {
+      if (state.photo === "driveOnly") {
+        photoArea = `
+          <div class="flex aspect-square flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-muted/50 p-4 text-center">
+            <span class="text-3xl">🚧</span>
+            <p class="text-sm font-medium text-foreground">案 A ではこの状態は起きません</p>
+            <p class="text-xs leading-relaxed text-muted-foreground">アプリ側の原本を消さない設計だからです。<br />（消す設計にした瞬間、案 A は案 B になります）</p>
+          </div>`;
+      } else {
+        const synced = state.photo === "both";
+        photoArea = `
+          ${photoBox("🐕")}
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            ${
+              state.link !== "linked"
+                ? badge("アプリに保存済み")
+                : synced
+                  ? badge("☁︎ ドライブにバックアップ済み")
+                  : badge("⏳ バックアップ待ち", "warn")
+            }
+            ${synced && state.link === "linked" ? `<span class="text-[11px] text-muted-foreground">${driveOwner}</span>` : ""}
+          </div>
+          ${
+            !synced && state.link === "linked" && state.role === "editor"
+              ? `<button type="button" class="mt-3 w-full rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">今すぐバックアップする</button>`
+              : ""
+          }
+          ${
+            state.link === "none"
+              ? note("ドライブ未連携。写真はアプリ内にだけあります。連携すると自動で控えが作られます。")
+              : ""
+          }`;
+      }
+    }
+
+    // --- 案 B: ドライブが正・サムネだけアプリ ---
+    else if (state.plan === "B") {
+      if (state.photo === "appOnly") {
+        photoArea = `
+          ${photoBox("🐕")}
+          <div class="mt-2 flex flex-wrap items-center gap-2">${badge("原本: アプリ内")}</div>
+          ${note("未連携のメンバーやゲストが入れた写真はアプリに原本が残ります。ここは案 B でも正常な状態です。")}
+          ${
+            state.link === "linked" && state.role === "editor"
+              ? `<button type="button" class="mt-3 w-full rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">原本をドライブへ移す</button>`
+              : ""
+          }`;
+      } else if (state.photo === "driveOnly") {
+        photoArea = `
+          <div class="flex aspect-square items-center justify-center rounded-lg bg-surface-muted text-3xl">🐕</div>
+          <div class="mt-2 flex flex-wrap items-center gap-2">${badge("サムネイル未生成", "warn")}</div>
+          ${note("サムネが作られる前にアプリ側が消えた稀な状態。原本をプロキシ経由で縮小して出すため、この 1 枚だけドライブ通信が起きます。")}`;
+      } else {
+        photoArea = `
+          ${photoBox("🐕")}
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            ${badge("原本: Google ドライブ", "primary")}
+            <span class="text-[11px] text-muted-foreground">${driveOwner}</span>
+          </div>
+          <button type="button" class="mt-3 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover">原本を表示（+1 通信）</button>
+          ${note("一覧・詳細で見えているのはアプリ内のサムネ（長辺 1600px）。ドライブを叩くのは原本を開いたときだけです。")}`;
+      }
+    }
+
+    // --- 案 C: 写真ごとに保存先が違う ---
+    else {
+      const where =
+        state.photo === "both" ? "アプリ＋ドライブ" : state.photo === "appOnly" ? "アプリのみ" : "ドライブのみ";
+      photoArea = `
+        ${photoBox("🐕")}
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          ${badge(`保存先: ${where}`, state.photo === "driveOnly" ? "primary" : "muted")}
+          ${state.photo === "driveOnly" ? `<span class="text-[11px] text-muted-foreground">${driveOwner}</span>` : ""}
+        </div>
+        ${
+          state.photo === "driveOnly"
+            ? note("この写真はアプリ側に実体が無いので、詳細を開くたびにドライブから取得します。連携が切れると即座に見えなくなります。")
+            : note("写真ごとに保存先が違うため、家族の誰がどこに入れたかで見え方が変わります。")
+        }`;
+    }
+
+    return `
+      <h1 class="mb-1 text-lg font-semibold text-foreground">2026年8月4日（火）</h1>
+      <p class="mb-4 text-sm text-muted-foreground">保育園 ・ 記入: たろう</p>
+      ${card(photoArea)}
+      ${card(
+        `<p class="text-sm leading-relaxed text-foreground">今日はお散歩でたくさん歩きました。ごはんは完食。<br />お昼寝もぐっすりでした。</p>`,
+        "mt-3",
+      )}
+      ${meter("detail")}`;
+  }
+
+  // ---------------------------------------------------------------
+  // 画面: アルバム（一覧のコストが案ごとにどう違うか）
+  // ---------------------------------------------------------------
+  function screenAlbum() {
+    const cells = ALBUM.map((p) => {
+      let mark = "";
+      if (state.plan === "C") {
+        mark =
+          p.where === "driveOnly"
+            ? `<span class="absolute right-1 top-1 rounded bg-surface/90 px-1 text-[9px] font-medium text-primary">☁︎</span>`
+            : p.where === "appOnly"
+              ? `<span class="absolute right-1 top-1 rounded bg-surface/90 px-1 text-[9px] font-medium text-muted-foreground">端末</span>`
+              : `<span class="absolute right-1 top-1 rounded bg-surface/90 px-1 text-[9px] font-medium text-muted-foreground">両</span>`;
+      } else if (state.plan === "A" && p.where === "appOnly" && state.link === "linked") {
+        mark = `<span class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-amber-500"></span>`;
+      }
+      return `<div class="relative">${photoBox(p.emoji)}${mark}</div>`;
+    }).join("");
+
+    const legend =
+      state.plan === "C"
+        ? note("案 C は写真ごとにバッジが必要になり、一覧がにぎやかになります。ドライブのみの写真はここでも通信が発生します。")
+        : state.plan === "A"
+          ? note("案 A の一覧はアプリのサムネだけ。未バックアップの写真に小さな点が付くだけで、通信は 0 です。")
+          : note("案 B の一覧もアプリのサムネだけ。原本がドライブでも一覧は 0 通信で、スクロールしても増えません。");
+
+    return `
+      <h1 class="mb-1 text-lg font-semibold text-foreground">アルバム</h1>
+      <p class="mb-4 text-sm text-muted-foreground">もふ ・ 24 枚</p>
+      <div class="grid grid-cols-3 gap-2">${cells}</div>
+      ${legend}
+      ${meter("album")}`;
+  }
+
+  // ---------------------------------------------------------------
+  // 画面: 記録フォーム（保存先を選ばせるか否か）
+  // ---------------------------------------------------------------
+  function screenForm() {
+    let destination = "";
+    if (state.plan === "C") {
+      destination = `
+        <div class="mt-4">
+          <span class="mb-1 block text-sm font-medium text-foreground">写真の保存先</span>
+          <div class="inline-flex rounded-lg border border-border p-0.5">
+            <button type="button" data-dest="app" class="rounded-md px-3 py-1.5 text-sm font-medium transition ${off}">アプリ</button>
+            <button type="button" data-dest="drive" class="rounded-md px-3 py-1.5 text-sm font-medium transition ${on}">ドライブ</button>
+            <button type="button" data-dest="both" class="rounded-md px-3 py-1.5 text-sm font-medium transition ${off}">両方</button>
+          </div>
+          <label class="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <input type="checkbox" checked class="h-4 w-4 rounded border-border" />次回もこの保存先を使う
+          </label>
+          ${note("⚠️ 実機で確かめたいのはここ。保存のたびにこの選択が要るのは、写真を残す手数として重すぎないか。")}
+        </div>`;
+    } else if (state.link === "linked") {
+      destination = note(
+        state.plan === "A"
+          ? "保存後、バックグラウンドで Google ドライブにも控えを作ります（設定でオフにできます）。"
+          : "原本は Google ドライブへ、表示用のサムネイルはアプリに保存します。",
+      );
+    } else {
+      destination = note("写真はアプリに保存します。Google ドライブ連携は「ドライブ」タブから。");
+    }
+
+    return `
+      <div class="mb-4 flex items-center justify-between">
+        <button type="button" class="text-sm text-muted-foreground">キャンセル</button>
+        <button type="button" class="rounded-lg bg-primary px-5 py-2 font-medium text-primary-foreground transition hover:bg-primary-hover">保存</button>
+      </div>
+      <div>
+        <span class="mb-1 block text-sm font-medium text-foreground">記録元</span>
+        <div class="inline-flex rounded-lg border border-border p-0.5">
+          <button type="button" class="rounded-md px-4 py-1.5 text-sm font-medium transition ${on}">保育園</button>
+          <button type="button" class="rounded-md px-4 py-1.5 text-sm font-medium transition ${off}">おうち</button>
+        </div>
+      </div>
+      <div class="mt-4">
+        <span class="mb-1 block text-sm font-medium text-foreground">写真を追加（複数選択可）</span>
+        <div class="mb-2 grid grid-cols-2 gap-2">
+          <button type="button" class="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">端末から選ぶ</button>
+          <button type="button" class="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">Google フォトから選ぶ</button>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          ${photoBox("🐕")}${photoBox("🌳")}
+          <div class="flex aspect-square items-center justify-center rounded-lg border border-dashed border-border text-2xl text-muted-foreground">＋</div>
+        </div>
+        <p class="mt-1.5 text-xs text-muted-foreground">2枚を最適化しました（4.8 MB → 640 KB / -87%）</p>
+        ${note("「Google フォトから選ぶ」= Picker API。端末に無い写真（すでにフォトへバックアップ済みの写真）を記録に付けられる。選んだ瞬間にアプリ側へ取り込むので、以降フォトを叩き続けることはない。")}
+        ${destination}
+      </div>
+      <div class="mt-4">
+        <span class="mb-1 block text-sm font-medium text-foreground">保育園からの記録</span>
+        <div class="h-28 w-full rounded-lg border border-border bg-surface"></div>
+      </div>
+      ${meter("form")}`;
+  }
+
+  // ---------------------------------------------------------------
+  // 画面: ドライブ連携の設定
+  // ---------------------------------------------------------------
+  function screenSettings() {
+    if (state.link === "none") {
+      return `
+        <h1 class="mb-4 text-lg font-semibold text-foreground">Google ドライブ</h1>
+        ${card(`
+          <p class="text-sm leading-relaxed text-foreground">写真を自分の Google ドライブにも残せます。</p>
+          <ul class="mt-3 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+            <li>・アプリが作ったファイルだけにアクセスします（<code class="rounded bg-surface-muted px-1">drive.file</code>）</li>
+            <li>・ドライブの他のファイルは読みません</li>
+            <li>・いつでも解除できます</li>
+          </ul>
+          <button type="button" class="mt-4 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover">Google ドライブと連携する</button>
+        `)}
+        ${meter("settings")}`;
+    }
+
+    const expired =
+      state.link === "expired"
+        ? card(
+            `<p class="text-sm font-medium text-foreground">連携が切れています</p>
+             <p class="mt-1 text-xs leading-relaxed text-muted-foreground">ドライブ側の原本はそのまま残っていますが、mfmf からは開けません。再連携すると元どおり見えるようになります。</p>
+             <button type="button" class="mt-3 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover">再連携する</button>`,
+            "mb-3 border-amber-500/50",
+          )
+        : "";
+
+    const scope =
+      state.owner === "owner"
+        ? `<p class="text-sm text-foreground">この世帯の原本は <strong class="font-medium">はなこさん（owner）のドライブ</strong> にまとめて入ります。</p>
+           ${note("集約案。誰が入れても置き場所が 1 つなので家族から見て分かりやすい。ただし owner の 15GB を全員で使い、owner が抜けると全員が原本を失います。")}`
+        : `<p class="text-sm text-foreground">写真を入れた人の <strong class="font-medium">それぞれのドライブ</strong> に入ります。</p>
+           ${note("分散案。各自の 15GB を使えるが、「たろうさんが連携を切ると、たろうさんが入れた原本だけ見えなくなる」という説明が家族に要る。")}`;
+
+    const progress =
+      state.plan === "A"
+        ? `<div class="mt-4">
+             <div class="mb-1 flex items-baseline justify-between text-xs">
+               <span class="font-medium text-foreground">バックアップの進み具合</span>
+               <span class="text-muted-foreground">1,180 / 1,204 枚</span>
+             </div>
+             <div class="h-2 w-full overflow-hidden rounded-full bg-surface-muted">
+               <div class="h-full w-[98%] rounded-full bg-primary"></div>
+             </div>
+             ${
+               state.role === "editor"
+                 ? `<button type="button" class="mt-3 w-full rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">残り 24 枚をバックアップ</button>`
+                 : ""
+             }
+             ${note("一括バックアップは画面を開いている間だけ少しずつ進みます（Vercel Hobby にジョブ基盤が無いため）。閉じても途中から再開できます。")}
+           </div>`
+        : `<div class="mt-4 grid grid-cols-2 gap-2 text-center">
+             <div class="rounded-lg border border-border p-3">
+               <p class="text-[11px] text-muted-foreground">アプリ（サムネ）</p>
+               <p class="mt-0.5 text-base font-semibold text-foreground">32 MB</p>
+             </div>
+             <div class="rounded-lg border border-border p-3">
+               <p class="text-[11px] text-muted-foreground">ドライブ（原本）</p>
+               <p class="mt-0.5 text-base font-semibold text-foreground">1.8 GB</p>
+             </div>
+           </div>
+           ${note("原本をドライブに逃がすと Supabase Free（1GB）の枠がほぼ減りません。これが案 B の一番の利点です。")}`;
+
+    return `
+      <h1 class="mb-4 text-lg font-semibold text-foreground">Google ドライブ</h1>
+      ${expired}
+      ${card(`
+        <div class="flex items-center gap-3">
+          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-lg">☁️</span>
+          <div class="min-w-0">
+            <p class="truncate text-sm font-medium text-foreground">taro@example.com</p>
+            <p class="text-xs text-muted-foreground">フォルダ: マイドライブ / mfmf</p>
+          </div>
+        </div>
+        ${state.plan === "A" ? `<label class="mt-4 flex items-center justify-between gap-3 text-sm text-foreground">新しい写真を自動でバックアップ<input type="checkbox" checked class="h-5 w-9 rounded-full border-border" /></label>` : ""}
+        ${progress}
+      `)}
+      ${card(scope, "mt-3")}
+      ${card(
+        `<div class="flex items-center justify-between gap-3">
+           <p class="text-sm font-medium text-foreground">Google フォトにも追加する</p>
+           <input type="checkbox" class="h-5 w-9 rounded-full border-border" />
+         </div>
+         <p class="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+           オンにすると、記録に付けた写真がフォトのライブラリにも入ります（思い出・検索に乗る）。
+           <strong class="font-medium text-foreground">表示には使いません</strong> ——
+           フォトの Library API は 10,000 リクエスト/日（プロジェクト全体）で、表示 URL も 60 分で失効するため。
+         </p>
+         ${note("⚠️ このトグルを入れると OAuth 検証（審査）が必要になります。drive.file だけなら不要。第 1 段では出さない案もあります。")}`,
+        "mt-3",
+      )}
+      ${card(
+        `<p class="text-sm font-medium text-foreground">連携を解除すると</p>
+         <ul class="mt-2 space-y-1 text-xs leading-relaxed text-muted-foreground">
+           <li>・ドライブ側のファイルは<strong class="font-medium text-foreground">消えません</strong>（mfmf からは開けなくなります）</li>
+           ${state.plan === "B" ? `<li>・アプリにはサムネイルが残るので、一覧・詳細の見た目は変わりません</li>` : `<li>・アプリ側の原本はそのまま残るので、表示は何も変わりません</li>`}
+         </ul>`,
+        "mt-3",
+      )}
+      ${meter("settings")}`;
+  }
+
+  // ---------------------------------------------------------------
+  // 画面: 4 状態の一覧（案ごとの振る舞いを俯瞰する）
+  // ---------------------------------------------------------------
+  const MATRIX = {
+    A: [
+      ["両方にある", "通常表示 ＋「ドライブにバックアップ済み」", "正常"],
+      ["アプリだけ", "通常表示 ＋「バックアップ待ち」／未連携なら無表示", "正常（同期前）"],
+      ["ドライブだけ", "起きない（アプリ側の原本を消さないため）", "—"],
+      ["どちらにも無い", "原因つきの欠落カード ＋ 復旧導線", "異常"],
+    ],
+    B: [
+      ["両方にある", "サムネ表示。「原本を表示」でドライブから取得", "正常"],
+      ["アプリだけ", "通常表示 ＋「原本: アプリ内」。ゲスト・未連携の写真", "正常（移行前）"],
+      ["ドライブだけ", "原本を縮小して表示（この 1 枚だけ通信）", "稀・要フォールバック"],
+      ["どちらにも無い", "サムネは残るので写真は見える。原本だけ開けない", "劣化はするが致命的でない"],
+    ],
+    C: [
+      ["両方にある", "通常表示 ＋「保存先: 両方」", "正常"],
+      ["アプリだけ", "通常表示 ＋「保存先: アプリ」", "正常"],
+      ["ドライブだけ", "都度ドライブから取得。連携が切れると即見えなくなる", "正常だが脆い"],
+      ["どちらにも無い", "欠落カード。原因が写真ごとに違い説明が難しい", "異常"],
+    ],
+  };
+
+  function screenMatrix() {
+    const rows = MATRIX[state.plan]
+      .map(
+        ([s, view, verdict]) => `
+        <div class="border-b border-border px-3 py-2.5 last:border-b-0">
+          <div class="flex items-baseline justify-between gap-2">
+            <p class="text-sm font-medium text-foreground">${s}</p>
+            <span class="shrink-0 text-[11px] text-muted-foreground">${verdict}</span>
+          </div>
+          <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">${view}</p>
+        </div>`,
+      )
+      .join("");
+
+    return `
+      <h1 class="mb-1 text-lg font-semibold text-foreground">4 つの状態と表示</h1>
+      <p class="mb-4 text-sm text-muted-foreground">${PLAN[state.plan].name}</p>
+      <div class="overflow-hidden rounded-xl border border-border bg-surface">${rows}</div>
+      ${card(
+        `<p class="text-sm font-medium text-foreground">「どちらにも無い」の文言が一番大事</p>
+         <p class="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+           家族から見ると「アプリが写真を消した」に見えます。実際はドライブのゴミ箱・連携切れ・アップロード失敗のどれかで、
+           それぞれ復旧の手が違います。原因を書き分けないと問い合わせがここに集中します。
+         </p>`,
+        "mt-3",
+      )}`;
+  }
+
+  // ---------------------------------------------------------------
+  // 描画
+  // ---------------------------------------------------------------
+  const SCREENS = {
+    album: screenAlbum,
+    detail: screenDetail,
+    form: screenForm,
+    settings: screenSettings,
+    matrix: screenMatrix,
+  };
+
+  function render() {
+    document.querySelectorAll("[data-plan]").forEach((b) => {
+      b.className = `rounded-md px-2 py-1.5 text-xs font-medium transition ${b.dataset.plan === state.plan ? on : off}`;
+    });
+    document.querySelector("[data-plan-summary]").textContent = PLAN[state.plan].tagline;
+
+    document.querySelectorAll("[data-screen-to]").forEach((b) => {
+      const active = b.dataset.screenTo === state.screen;
+      if (b.dataset.screenTo === "form") return;
+      b.className = `flex flex-col items-center gap-0.5 py-1 text-[10px] font-medium transition ${active ? "text-primary" : "text-muted-foreground"}`;
+    });
+
+    document.querySelector("[data-screen]").innerHTML = SCREENS[state.screen]();
+
+    document.querySelector("[data-toggles]").innerHTML = TOGGLES.map(
+      (t) => `
+        <div>
+          <span class="mb-1 block text-xs font-medium text-foreground">${t.label}</span>
+          <div class="flex flex-wrap gap-1">
+            ${t.options
+              .map(
+                ([v, label]) =>
+                  `<button type="button" data-toggle="${t.key}" data-value="${v}" class="rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition ${state[t.key] === v ? on : off}">${label}</button>`,
+              )
+              .join("")}
+          </div>
+        </div>`,
+    ).join("");
+  }
+
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-plan], [data-screen-to], [data-toggle], [data-open-settings], [data-close-settings]");
+    if (!t) return;
+    if (t.dataset.plan) state.plan = t.dataset.plan;
+    else if (t.dataset.screenTo) state.screen = t.dataset.screenTo;
+    else if (t.dataset.toggle) state[t.dataset.toggle] = t.dataset.value;
+    else if (t.hasAttribute("data-open-settings")) {
+      document.querySelector("[data-settings-panel]").classList.remove("hidden");
+      return;
+    } else if (t.hasAttribute("data-close-settings")) {
+      document.querySelector("[data-settings-panel]").classList.add("hidden");
+      return;
+    }
+    render();
+  });
+
+  render();
+</script>
