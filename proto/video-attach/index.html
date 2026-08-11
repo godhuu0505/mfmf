@@ -16,8 +16,14 @@
     --color-amber-100: oklch(96.2% 0.059 95.617);
     --color-amber-400: oklch(82.8% 0.189 84.429);
     --color-amber-900: oklch(41.4% 0.112 45.904);
+    --color-emerald-100: oklch(95% 0.052 163.051);
+    --color-emerald-900: oklch(37.8% 0.077 168.94);
     --color-sky-100: oklch(95.1% 0.026 236.824);
     --color-sky-900: oklch(39.1% 0.09 240.876);
+    --color-violet-100: oklch(94.3% 0.029 294.588);
+    --color-violet-900: oklch(38% 0.189 293.745);
+    --color-slate-100: oklch(96.8% 0.007 247.896);
+    --color-slate-900: oklch(20.8% 0.042 265.755);
     --color-black: #000;
     --color-white: #fff;
     --spacing: 0.25rem;
@@ -603,6 +609,9 @@
       background-color: color-mix(in oklab, var(--color-black) 90%, transparent);
     }
   }
+  .bg-emerald-100 {
+    background-color: var(--color-emerald-100);
+  }
   .bg-muted {
     background-color: var(--muted);
   }
@@ -614,6 +623,9 @@
   }
   .bg-sky-100 {
     background-color: var(--color-sky-100);
+  }
+  .bg-slate-100 {
+    background-color: var(--color-slate-100);
   }
   .bg-surface {
     background-color: var(--surface);
@@ -632,6 +644,9 @@
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--surface) 90%, transparent);
     }
+  }
+  .bg-violet-100 {
+    background-color: var(--color-violet-100);
   }
   .bg-white\/10 {
     background-color: color-mix(in srgb, #fff 10%, transparent);
@@ -791,6 +806,9 @@
   .text-amber-900 {
     color: var(--color-amber-900);
   }
+  .text-emerald-900 {
+    color: var(--color-emerald-900);
+  }
   .text-foreground {
     color: var(--foreground);
   }
@@ -808,6 +826,12 @@
   }
   .text-sky-900 {
     color: var(--color-sky-900);
+  }
+  .text-slate-900 {
+    color: var(--color-slate-900);
+  }
+  .text-violet-900 {
+    color: var(--color-violet-900);
   }
   .text-white {
     color: var(--color-white);
@@ -1044,6 +1068,38 @@ input[type="date"] {
     scroll-behavior: auto !important;
   }
 }
+:root[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --surface: #111827;
+  --surface-muted: #1f2937;
+  --border-color: #334155;
+  --muted: #475569;
+  --muted-foreground: #94a3b8;
+  --primary: #fb923c;
+  --primary-hover: #fdba74;
+  --primary-foreground: #431407;
+  --skeleton-base: #1f2937;
+  --skeleton-shine: rgba(71, 85, 105, 0.6);
+  --focus-ring: #fb923c;
+  color-scheme: dark;
+}
 @property --tw-translate-x {
   syntax: "*";
   inherits: false;
@@ -1231,7 +1287,6 @@ input[type="date"] {
     }
   }
 }
-
 </style>
 
 <!-- ===================================================================
@@ -1307,10 +1362,7 @@ input[type="date"] {
 
     <div>
       <span class="mb-1 block text-sm font-medium text-foreground">記録元</span>
-      <div class="inline-flex rounded-lg border border-border p-0.5">
-        <button type="button" data-source="daycare" class="rounded-md px-4 py-1.5 text-sm font-medium transition">保育園</button>
-        <button type="button" data-source="home" class="rounded-md px-4 py-1.5 text-sm font-medium transition">おうち</button>
-      </div>
+      <div data-source-group class="inline-flex flex-wrap rounded-lg border border-border p-0.5"></div>
     </div>
 
     <div>
@@ -1576,6 +1628,7 @@ input[type="date"] {
     ingesting: new Map(), // 世代 → 進行中の取り込み数（保存のブロックに使う）
     existing: [],      // 編集時の「登録済み」メディア
     source: "daycare",
+    formSource: "home",  // フォームを開いたときの記録元。選択肢の出し分けに使う
     records: [
       { id: "r1", date: "2026-08-09", source: "daycare",
         author: "担当スタッフ", body: "お友だちとよく走り回っていました。おやつも完食です。",
@@ -1584,6 +1637,9 @@ input[type="date"] {
         author: "おかあさん", body: "おうちでお昼寝。よく寝ていました。", tags: [], media: [] },
       { id: "r3", date: "2026-08-07", source: "home",
         author: "", body: "はじめてのシャンプー。がんばりました。", tags: ["おふろ"], media: [] },
+      // 予定（D34）からできた記録。編集すると記録元の選択肢が 5 つに増える
+      { id: "r4", date: "2026-08-05", source: "clinic",
+        author: "おとうさん", body: "ワクチンの2回目。おとなしくできました。", tags: [], media: [] },
     ],
     viewingId: "r1",
   };
@@ -1619,10 +1675,16 @@ input[type="date"] {
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const thumbImg = (src) =>
     src ? `<img src="${src}" alt="" class="absolute inset-0 h-full w-full object-cover" />` : "";
+  // 本番の SOURCE_LABEL / SOURCE_BADGE / BODY_LABEL（src/types/database.ts）と同じ
   const SOURCE = {
-    daycare: { label: "保育園", cls: "bg-sky-100 text-sky-900" },
-    home: { label: "おうち", cls: "bg-amber-100 text-amber-900" },
+    daycare: { label: "保育園", cls: "bg-sky-100 text-sky-900", body: "保育園からの記録" },
+    home: { label: "おうち", cls: "bg-amber-100 text-amber-900", body: "おうちでの記録" },
+    clinic: { label: "病院", cls: "bg-violet-100 text-violet-900", body: "病院での記録" },
+    salon: { label: "サロン", cls: "bg-emerald-100 text-emerald-900", body: "サロンでの記録" },
+    other: { label: "その他", cls: "bg-slate-100 text-slate-900", body: "この日の記録" },
   };
+  const QUICK_SOURCES = ["daycare", "home"];
+  const RECORD_SOURCES = ["daycare", "home", "clinic", "salon", "other"];
   const badge = (src) =>
     `<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${SOURCE[src].cls}">${SOURCE[src].label}</span>`;
   const weightBadge = (w) =>
@@ -1731,6 +1793,9 @@ input[type="date"] {
     state.source = recordId
       ? state.records.find((r) => r.id === recordId).source
       : "home";
+    // 選択肢の出し分けは「開いたときの種類」で決める（本番の defaultSource と同じ）。
+    // いまの選択で決めると、病院 → おうち と選び直した瞬間に病院へ戻せなくなる
+    state.formSource = state.source;
     const rec = recordId ? state.records.find((r) => r.id === recordId) : null;
     $("#date").value = rec?.date ?? "2026-08-10";
     $("#pet").value = rec?.pet ?? "もふ";
@@ -1749,20 +1814,25 @@ input[type="date"] {
       $("[data-form-title]").focus({ preventScroll: true }),
     );
   }
+  // 記録元の選択肢は本番の RecordForm と同じ出し分け: ふだんは「保育園 / おうち」だけ、
+  // 予定からできた記録（病院・サロン・その他）を編集するときは 5 つとも出す。
+  // 2 つに絞ると、いま入っている種類が選べず、一度触ると戻せなくなる（D34 の記録）。
   function renderSource() {
-    $$("[data-source]").forEach((b) => {
-      const on = b.dataset.source === state.source;
-      b.className =
-        "rounded-md px-4 py-1.5 text-sm font-medium transition " +
-        (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface-muted");
-      b.setAttribute("aria-pressed", String(on));
-    });
-    $("[data-body-label]").textContent =
-      state.source === "home" ? "おうちでの記録" : "保育園からの記録";
+    const choices = QUICK_SOURCES.includes(state.formSource) ? QUICK_SOURCES : RECORD_SOURCES;
+    $("[data-source-group]").innerHTML = choices
+      .map((key) => {
+        const on = key === state.source;
+        const cls =
+          "rounded-md px-4 py-1.5 text-sm font-medium transition " +
+          (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface-muted");
+        return `<button type="button" data-source="${key}" aria-pressed="${on}" class="${cls}">${SOURCE[key].label}</button>`;
+      })
+      .join("");
+    $$("[data-source]").forEach((b) =>
+      b.addEventListener("click", () => { state.source = b.dataset.source; renderSource(); }),
+    );
+    $("[data-body-label]").textContent = SOURCE[state.source].body;
   }
-  $$("[data-source]").forEach((b) =>
-    b.addEventListener("click", () => { state.source = b.dataset.source; renderSource(); }),
-  );
 
   // 確認ダイアログ（D33）。キャンセルにも保存にも挟む
   // Artifact は <html> を自前で書けないので、言語はここで宣言する
