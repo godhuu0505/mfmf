@@ -26,6 +26,13 @@ export async function quickRecord(page: Page, note: string): Promise<void> {
     .click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/);
   await page.goto("/");
+  // ここで**落ち着くまで待つ**。このヘルパーはフルロードを 3 回はさむので、
+  // 呼び出し側がすぐ Link を押すと、ハイドレーションと Service Worker の
+  // install/activate の途中に当たり、クライアント遷移が確定しないまま
+  // waitForURL がタイムアウトする（CI で再現。カレンダーの「今日」だけ素の
+  // <a> にしてある既知事象と同じ筋）。
+  await expect(page.getByRole("heading", { name: "記録一覧" })).toBeVisible();
+  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
 }
 
 // /records/new で 3000x2000 の生成画像を選択し、クライアント側の縮小完了まで待つ。
