@@ -24,7 +24,7 @@ export const E2E_USER = {
 
 export default async function globalSetup() {
   // VRT のベースライン生成など、Supabase を使わないテストだけを回すための逃げ道。
-  // CI では設定しないこと（quick-record の UC がログイン段階で落ちて検知される）。
+  // CI では設定しないこと（作成まわりの UC がログイン段階で落ちて検知される）。
   if (process.env.SKIP_E2E_SETUP === "1") return;
   if (!ANON_KEY) {
     throw new Error(

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { resizeImages } from "@/lib/imageResize";
 import { buildStoragePath } from "@/lib/storagePath";
-import { takeQuickDraft } from "@/lib/quickDraft";
 import TagInput from "@/components/TagInput";
 import {
   ConfirmCancelButton,
@@ -112,19 +111,6 @@ export default function RecordForm({
   const confirmedRef = useRef(false);
 
   const busy = processing || uploading || isPending;
-
-  // クイック記録からの下書き（本文・記録元）を取り込む（新規作成のみ。
-  // sessionStorage 経由なので URL・履歴には載らない。世帯が食い違う下書きは
-  // takeQuickDraft 側で破棄される。src/lib/quickDraft.ts）。
-  useEffect(() => {
-    if (existingRecordId) return;
-    const draft = takeQuickDraft(householdId);
-    if (!draft) return;
-    if (draft.body && bodyRef.current && !bodyRef.current.value) {
-      bodyRef.current.value = draft.body;
-    }
-    setSource(draft.source);
-  }, [existingRecordId, householdId]);
 
   // 選択画像をアップロード前に縮小・圧縮し、送信用に保持する。
   async function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {

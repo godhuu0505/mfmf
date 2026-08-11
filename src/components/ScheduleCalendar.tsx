@@ -23,6 +23,7 @@ import {
   savePlan,
   skipPlan,
 } from "@/app/(app)/schedule/actions";
+import { lockModalBackground } from "@/lib/modalBackground";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
@@ -72,6 +73,11 @@ type Props = {
   skippedDates: string[];
   canEdit: boolean;
   householdId: string | null;
+  /**
+   * 開いた直後にこの日の日別シートを開く（?open=YYYY-MM-DD）。
+   * タブバーの「作成」→「予定」から来たとき用（D36）。
+   */
+  initialOpenDate?: string | null;
 };
 
 const COLOR: Record<
@@ -233,6 +239,7 @@ export default function ScheduleCalendar({
   householdId,
   weekNav,
   initialView = "month",
+  initialOpenDate = null,
 }: Props) {
   const [view, setView] = useState<"month" | "week">(initialView);
   // URL が変わったら（月送り・戻る/進む）表示もそれに合わせる。
@@ -278,19 +285,14 @@ export default function ScheduleCalendar({
     if (!openDate) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const bg = document.querySelectorAll<HTMLElement>("[data-quick-record-bg]");
-    bg.forEach((el) => {
-      el.inert = true;
-    });
+    const releaseBg = lockModalBackground();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") requestCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
-      bg.forEach((el) => {
-        el.inert = false;
-      });
+      releaseBg();
       window.removeEventListener("keydown", onKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,6 +332,35 @@ export default function ScheduleCalendar({
       sheetRef.current?.focus({ preventScroll: true }),
     );
   }
+
+  // タブバーの「作成」→「予定」からの入口（D36）。ほかの画面から来たときは
+  // ?open=YYYY-MM-DD、カレンダーを開いたままのときはイベントで開く
+  // （URL が同じ値のままだと押し直しても開かないため）。
+  const openRef = useRef(open);
+  openRef.current = open;
+  const appliedOpenParam = useRef<string | null>(null);
+  useEffect(() => {
+    // ?open= が外れたら「使った」印も落とす —— 残したままだと、戻る/進むで
+    // 同じ ?open= の URL に帰ってきたときに開かない
+    if (!initialOpenDate) {
+      appliedOpenParam.current = null;
+      return;
+    }
+    // 閉じたあとに再描画されても開き直さない（同じ値は 1 度だけ効かせる）
+    if (appliedOpenParam.current === initialOpenDate) return;
+    appliedOpenParam.current = initialOpenDate;
+    openRef.current(initialOpenDate);
+  }, [initialOpenDate]);
+  useEffect(() => {
+    const onOpenPlan = (e: Event) => {
+      const date = (e as CustomEvent<string>).detail;
+      if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        openRef.current(date);
+      }
+    };
+    window.addEventListener("mfmf:open-plan", onOpenPlan);
+    return () => window.removeEventListener("mfmf:open-plan", onOpenPlan);
+  }, []);
 
   /** 開いた時点から中身が変わっているか（本番の記録フォームと同じ判定の考え方）。 */
   function dirty() {
@@ -560,6 +591,11 @@ export default function ScheduleCalendar({
 
   return (
     <>
+      {/* いま出ている表示（月/週）を DOM に出しておく。タブの切替は URL を
+          変えないので、「作成」→「予定」の受け渡し先（CreateSheet）は
+          ここを見て表示を保つ */}
+      <span data-calendar-view={view} hidden />
+
       {/* 月 / 週の切替（タブは増やさない。カレンダーの中で切り替える） */}
       <div
         role="tablist"

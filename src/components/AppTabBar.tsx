@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { CalendarDays, House, Images, Menu, Plus } from "lucide-react";
 
-// ボトムタブバー（D33: 案A・5 スロット・中央に記録ボタン）。
+// ボトムタブバー（D33: 案A・5 スロット・中央に作成ボタン）。
 // AppHeader（サーバー側）から世帯所属が確認できたページにだけ描画される。
 // viewer は中央ボタンを抜いた 4 列になる（作成導線を出さない = UC-A06）。
+// 中央は「作成」（D36）。押すと CreateSheet が開き、予定 / 記録を選ぶ。
 
 type TabDef = {
   href: string;
@@ -90,7 +91,7 @@ export default function AppTabBar({ readOnly }: { readOnly: boolean }) {
     <nav
       aria-label="メインナビゲーション"
       data-app-tabbar
-      data-quick-record-bg
+      data-app-modal-bg
       className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur"
     >
       <div
@@ -106,9 +107,9 @@ export default function AppTabBar({ readOnly }: { readOnly: boolean }) {
           <button
             type="button"
             onClick={() =>
-              window.dispatchEvent(new Event("mfmf:quick-record-open"))
+              window.dispatchEvent(new Event("mfmf:create-open"))
             }
-            aria-label="クイック記録"
+            aria-label="作成"
             aria-haspopup="dialog"
             className="relative"
           >
@@ -116,7 +117,7 @@ export default function AppTabBar({ readOnly }: { readOnly: boolean }) {
               <Plus className="h-7 w-7" aria-hidden="true" />
             </span>
             <span className="block pb-1.5 pt-9 text-center text-[10px] font-medium text-muted-foreground">
-              記録
+              作成
             </span>
           </button>
         )}

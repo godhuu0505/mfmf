@@ -50,9 +50,10 @@ test("スクリーンショット一式（ライト）", async ({ page }) => {
   await page.goto("/schedule/rules");
   await shot(page, "schedule-rules");
 
-  // クイック記録シート（タブバー中央）
-  await page.getByRole("button", { name: "クイック記録" }).click();
-  await shot(page, "quick-record-sheet", false);
+  // 作成シート（タブバー中央）
+  await page.goto("/");
+  await page.getByRole("button", { name: "作成" }).click();
+  await shot(page, "create-sheet", false);
   await page.keyboard.press("Escape");
 
   await page.goto("/menu");

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import {
   buildQueryString,
@@ -27,17 +26,21 @@ export default function RecordFilters({
   /** 選択中のタグ id（検索条件を変えても保持する）。 */
   activeTagId?: string | null;
 }) {
-  const router = useRouter();
-
   // buildQueryString の結果に選択中タグを足してから遷移する。
+  //
+  // 素のフル遷移（location.assign）にしている: 記録元チップ・カレンダーの
+  // 「今日」と同じで、CI では**一覧の「検索パラメータだけが変わる遷移」**の
+  // クライアント遷移が確定しないことがある（E2E がクリック後に URL が変わらない
+  // まま数分待って落ちる）。一覧は毎回サーバー描画なのでフル遷移でも体感差がなく、
+  // 確実に動く方を取る（decisions.md D36-a）。
   function pushWithTag(qs: string) {
     if (!activeTagId) {
-      router.push(`/${qs}`);
+      window.location.assign(`/${qs}`);
       return;
     }
     const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : qs);
     params.set("tag", activeTagId);
-    router.push(`/?${params.toString()}`);
+    window.location.assign(`/?${params.toString()}`);
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {

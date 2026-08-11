@@ -49,6 +49,23 @@ function addDays(iso: string, n: number): string {
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
 }
 
+/**
+ * YYYY-MM-DD が**実在する日**か。?open= は日別シートの見出し（Intl の format）へ
+ * そのまま渡るので、形だけの検査では足りない —— 2026-99-99 のような値を通すと
+ * Invalid Date になり、カレンダーごと RangeError で落ちる。
+ */
+function isRealDate(iso: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const t = new Date(Date.UTC(y, mo - 1, d));
+  return (
+    t.getUTCFullYear() === y &&
+    t.getUTCMonth() === mo - 1 &&
+    t.getUTCDate() === d
+  );
+}
+
 /** iso を含む週（日曜はじまり）の 7 日。 */
 function weekOf(iso: string): string[] {
   const [y, m, d] = iso.split("-").map(Number);
@@ -71,9 +88,14 @@ function memberLabel(row: {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ym?: string; w?: string; view?: string }>;
+  searchParams: Promise<{
+    ym?: string;
+    w?: string;
+    view?: string;
+    open?: string;
+  }>;
 }) {
-  const { ym, w, view } = await searchParams;
+  const { ym, w, view, open } = await searchParams;
   // 月を送っても表示（月／週）は保つ。URL を正にしておかないと、
   // クライアントの状態と出ているものが食い違う
   const viewParam = view === "week" ? "&view=week" : "";
@@ -166,6 +188,13 @@ export default async function CalendarPage({
     if (items.length > 0) itemsByDate[date] = items;
   }
 
+  // ?open= は**取得済みの範囲の日だけ**受け付ける。範囲外（例: 8 月を見ている
+  // URL に 2027-01-15）を通すと、その日にすでに予定やルール由来の予定があっても
+  // itemsByDate に無いので「空の新規」として開き、保存すると二重になる／
+  // その日のルールを打ち消してしまう
+  const openDate =
+    canAdd && open && isRealDate(open) && dates.has(open) ? open : null;
+
   // カレンダーグリッド（前後の空白セルを含む）
   const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay(); // 0=日
   const cells: (number | null)[] = [];
@@ -230,6 +259,9 @@ export default async function CalendarPage({
         canEdit={canAdd}
         householdId={householdId}
         initialView={view === "week" ? "week" : "month"}
+        // タブバーの「作成」→「予定」から来たときだけ、その日の日別シートを
+        // 開いた状態で始める（不正値は無視する）
+        initialOpenDate={openDate}
         weekNav={{
           prevHref: weekHref(addDays(weekDays[0], -7)),
           nextHref: weekHref(addDays(weekDays[0], 7)),
