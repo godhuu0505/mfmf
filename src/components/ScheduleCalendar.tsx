@@ -591,6 +591,11 @@ export default function ScheduleCalendar({
 
   return (
     <>
+      {/* いま出ている表示（月/週）を DOM に出しておく。タブの切替は URL を
+          変えないので、「作成」→「予定」の受け渡し先（CreateSheet）は
+          ここを見て表示を保つ */}
+      <span data-calendar-view={view} hidden />
+
       {/* 月 / 週の切替（タブは増やさない。カレンダーの中で切り替える） */}
       <div
         role="tablist"

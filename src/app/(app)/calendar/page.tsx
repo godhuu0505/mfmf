@@ -188,6 +188,13 @@ export default async function CalendarPage({
     if (items.length > 0) itemsByDate[date] = items;
   }
 
+  // ?open= は**取得済みの範囲の日だけ**受け付ける。範囲外（例: 8 月を見ている
+  // URL に 2027-01-15）を通すと、その日にすでに予定やルール由来の予定があっても
+  // itemsByDate に無いので「空の新規」として開き、保存すると二重になる／
+  // その日のルールを打ち消してしまう
+  const openDate =
+    canAdd && open && isRealDate(open) && dates.has(open) ? open : null;
+
   // カレンダーグリッド（前後の空白セルを含む）
   const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay(); // 0=日
   const cells: (number | null)[] = [];
@@ -254,7 +261,7 @@ export default async function CalendarPage({
         initialView={view === "week" ? "week" : "month"}
         // タブバーの「作成」→「予定」から来たときだけ、その日の日別シートを
         // 開いた状態で始める（不正値は無視する）
-        initialOpenDate={canAdd && open && isRealDate(open) ? open : null}
+        initialOpenDate={openDate}
         weekNav={{
           prevHref: weekHref(addDays(weekDays[0], -7)),
           nextHref: weekHref(addDays(weekDays[0], 7)),

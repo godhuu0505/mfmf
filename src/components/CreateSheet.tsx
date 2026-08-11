@@ -102,7 +102,15 @@ export default function CreateSheet() {
       // 開くと、その月ぶんしか取っていない一覧に今日が無く、すでにある予定が
       // 「空の新規」に見えてしまう（保存すると二重／ルールの上書きになる）。
       const params = new URLSearchParams();
-      if (current.get("view") === "week") params.set("view", "week");
+      // 月/週タブの切替は URL を変えない（ScheduleCalendar のローカル状態）ので、
+      // URL の view を見ると「週で見ていたのに月で開き直る」ことになる。
+      // いま出ている表示を DOM（data-calendar-view）から取り、無ければ URL を使う
+      const liveView = document
+        .querySelector("[data-calendar-view]")
+        ?.getAttribute("data-calendar-view");
+      if ((liveView ?? current.get("view")) === "week") {
+        params.set("view", "week");
+      }
       params.set("ym", ym);
       params.set("w", today);
       params.set("open", today);
