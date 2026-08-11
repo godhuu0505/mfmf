@@ -23,6 +23,7 @@ import {
   savePlan,
   skipPlan,
 } from "@/app/(app)/schedule/actions";
+import { lockModalBackground } from "@/lib/modalBackground";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
@@ -284,19 +285,14 @@ export default function ScheduleCalendar({
     if (!openDate) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const bg = document.querySelectorAll<HTMLElement>("[data-app-modal-bg]");
-    bg.forEach((el) => {
-      el.inert = true;
-    });
+    const releaseBg = lockModalBackground();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") requestCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
-      bg.forEach((el) => {
-        el.inert = false;
-      });
+      releaseBg();
       window.removeEventListener("keydown", onKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -344,7 +340,12 @@ export default function ScheduleCalendar({
   openRef.current = open;
   const appliedOpenParam = useRef<string | null>(null);
   useEffect(() => {
-    if (!initialOpenDate) return;
+    // ?open= が外れたら「使った」印も落とす —— 残したままだと、戻る/進むで
+    // 同じ ?open= の URL に帰ってきたときに開かない
+    if (!initialOpenDate) {
+      appliedOpenParam.current = null;
+      return;
+    }
     // 閉じたあとに再描画されても開き直さない（同じ値は 1 度だけ効かせる）
     if (appliedOpenParam.current === initialOpenDate) return;
     appliedOpenParam.current = initialOpenDate;

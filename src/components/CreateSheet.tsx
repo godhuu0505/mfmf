@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CalendarPlus, NotebookPen, X } from "lucide-react";
 import { jstTodayISO } from "@/lib/dateRange";
+import { lockModalBackground } from "@/lib/modalBackground";
 
 // タブバー中央の「作成」から開くシート（D36）。
 // クイック記録（チップで 1 件残す）はここで廃止し、入口を
@@ -33,16 +34,12 @@ export default function CreateSheet() {
 
   // 表示中は背景（[data-app-modal-bg]）を inert にして、Tab / 支援技術が
   // モーダルの外へ出ないようにする（タブバー自身も対象）。
+  // 直に inert を書き戻さないのが要点 —— 「予定」でカレンダーの日別シートへ
+  // 持ち替えるとき、閉じる側の後始末が開いた側の inert を消してしまう
+  // （数え方は src/lib/modalBackground.ts）。
   useEffect(() => {
-    const els = document.querySelectorAll<HTMLElement>("[data-app-modal-bg]");
-    els.forEach((el) => {
-      el.inert = open;
-    });
-    return () => {
-      els.forEach((el) => {
-        el.inert = false;
-      });
-    };
+    if (!open) return;
+    return lockModalBackground();
   }, [open]);
 
   // タブバーの中央「＋」（AppTabBar）からのイベントで開く。

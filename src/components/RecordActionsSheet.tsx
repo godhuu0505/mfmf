@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { EllipsisVertical, Pencil, Trash2, X } from "lucide-react";
+import { lockModalBackground } from "@/lib/modalBackground";
 
 // 記録詳細の「…」メニュー（UC-D01 / D33）。編集への導線と、確認つきの削除を持つ。
 // 削除の実体は Server Action の form（children で受け取る）に任せる。
@@ -29,19 +30,14 @@ export default function RecordActionsSheet({
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const bg = document.querySelectorAll<HTMLElement>("[data-app-modal-bg]");
-    bg.forEach((el) => {
-      el.inert = true;
-    });
+    const releaseBg = lockModalBackground();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
-      bg.forEach((el) => {
-        el.inert = false;
-      });
+      releaseBg();
       window.removeEventListener("keydown", onKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
