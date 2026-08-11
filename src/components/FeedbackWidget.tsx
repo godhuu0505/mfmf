@@ -84,7 +84,7 @@ export default function FeedbackWidget({
           type="button"
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
-          data-quick-record-bg
+          data-app-modal-bg
           className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg ring-1 ring-black/5 transition hover:bg-primary-hover active:scale-95"
         >
           <MessageCircle className="h-5 w-5" aria-hidden="true" />

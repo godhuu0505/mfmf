@@ -29,7 +29,7 @@ export default function PetEditSheet({
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const bg = document.querySelectorAll<HTMLElement>("[data-quick-record-bg]");
+    const bg = document.querySelectorAll<HTMLElement>("[data-app-modal-bg]");
     bg.forEach((el) => {
       el.inert = true;
     });

@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { login } from "./helpers";
 
 // ボトムタブバーとメニュー画面（proto/app-redesign/spec.md UC-N01 / UC-N02 / UC-M01 / UC-M02）。
-// D33: 主要ナビは 5 スロットのタブバー（中央にクイック記録）。
+// D33: 主要ナビは 5 スロットのタブバー（中央に作成ボタン / D36）。
 // UC-N03（viewer は中央ボタンなし）は viewer ユーザーのフィクスチャ整備後に追加する。
 
 function tabbar(page: Page) {
@@ -34,24 +34,31 @@ test("UC-N01: タブバーで主要画面へ 1 タップ移動でき、アクテ
   ).toHaveAttribute("aria-current", "page");
 });
 
-test("UC-N02: ホーム以外の画面でも中央ボタンからクイック記録できる", async ({
+test("UC-N02: ホーム以外の画面でも中央ボタンから作成を始められる", async ({
   page,
 }) => {
+  const marker = `E2E-tabbar-${Date.now()}`;
   await login(page);
   await tabbar(page).getByRole("link", { name: "カレンダー" }).click();
   await page.waitForURL("**/calendar**");
 
-  await tabbar(page).getByRole("button", { name: "クイック記録" }).click();
-  const sheet = page.getByRole("dialog", { name: "クイック記録" });
+  await tabbar(page).getByRole("button", { name: "作成" }).click();
+  const sheet = page.getByRole("dialog", { name: "作成" });
   await expect(sheet).toBeVisible();
 
-  await sheet.getByRole("button", { name: "ごきげん" }).click();
-  await sheet.getByRole("button", { name: "保存する" }).click();
-  await expect(sheet).not.toBeVisible();
+  await sheet.getByRole("button", { name: /^記録/ }).click();
+  await page.waitForURL("**/records/new**");
+  await page.getByPlaceholder("今日の様子などを記録します").fill(marker);
+  await page.getByRole("button", { name: "保存する" }).click();
+  await page
+    .getByRole("dialog", { name: "この内容で保存しますか？" })
+    .getByRole("button", { name: "保存する" })
+    .click();
+  await page.waitForURL(/\/records\/[0-9a-f-]{36}/);
 
-  // 保存後はホームの先頭に出る（UC-Q06 と同じ契約）
-  await page.waitForURL((url) => url.pathname === "/");
-  await expect(page.locator("main ul > li").first()).toContainText("ごきげん");
+  // 保存したものはホームの先頭に出る
+  await page.goto("/");
+  await expect(page.locator("main ul > li").first()).toContainText(marker);
 });
 
 test("UC-M01: メニューから体重・世帯設定へ 2 タップ以内で届く", async ({

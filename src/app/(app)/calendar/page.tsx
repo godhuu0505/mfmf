@@ -71,9 +71,14 @@ function memberLabel(row: {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ym?: string; w?: string; view?: string }>;
+  searchParams: Promise<{
+    ym?: string;
+    w?: string;
+    view?: string;
+    open?: string;
+  }>;
 }) {
-  const { ym, w, view } = await searchParams;
+  const { ym, w, view, open } = await searchParams;
   // 月を送っても表示（月／週）は保つ。URL を正にしておかないと、
   // クライアントの状態と出ているものが食い違う
   const viewParam = view === "week" ? "&view=week" : "";
@@ -230,6 +235,11 @@ export default async function CalendarPage({
         canEdit={canAdd}
         householdId={householdId}
         initialView={view === "week" ? "week" : "month"}
+        // タブバーの「作成」→「予定」から来たときだけ、その日の日別シートを
+        // 開いた状態で始める（不正値は無視する）
+        initialOpenDate={
+          canAdd && /^\d{4}-\d{2}-\d{2}$/.test(open ?? "") ? open! : null
+        }
         weekNav={{
           prevHref: weekHref(addDays(weekDays[0], -7)),
           nextHref: weekHref(addDays(weekDays[0], 7)),
