@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { E2E_USER } from "./global-setup";
 
 // spec 横断の共通操作。全 spec が同一の E2E ユーザーを共有する
@@ -16,6 +16,10 @@ export async function login(page: Page): Promise<void> {
 // 記録フォームで本文だけの記録を 1 件残す（テキスト経路の最短）。
 // 記録元は「おうち」に揃える（フォームの既定は保育園）。
 export async function quickRecord(page: Page, note: string): Promise<void> {
+  // このフィクスチャはフルロードを 3 回はさむ（/records/new → /records/{id} → /）。
+  // 既定の 30 秒だと、2 件つくるテストは本題に入る前に予算を使い切る
+  // （クイック記録シート時代は 1 回のクリックで済んでいた）。
+  test.slow();
   await page.goto("/records/new");
   await page.getByRole("button", { name: "おうち", exact: true }).click();
   await page.getByPlaceholder("今日の様子などを記録します").fill(note);
@@ -26,13 +30,9 @@ export async function quickRecord(page: Page, note: string): Promise<void> {
     .click();
   await page.waitForURL(/\/records\/[0-9a-f-]{36}/);
   await page.goto("/");
-  // ここで**落ち着くまで待つ**。このヘルパーはフルロードを 3 回はさむので、
-  // 呼び出し側がすぐ Link を押すと、ハイドレーションと Service Worker の
-  // install/activate の途中に当たり、クライアント遷移が確定しないまま
-  // waitForURL がタイムアウトする（CI で再現。カレンダーの「今日」だけ素の
-  // <a> にしてある既知事象と同じ筋）。
+  // 呼び出し側がすぐ Link を押すので、描画とハイドレーションが落ち着くまで待つ
   await expect(page.getByRole("heading", { name: "記録一覧" })).toBeVisible();
-  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => {});
 }
 
 // /records/new で 3000x2000 の生成画像を選択し、クライアント側の縮小完了まで待つ。
