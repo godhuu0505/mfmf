@@ -1303,7 +1303,7 @@ input[type="date"] {
       </button>
     </div>
 
-    <h1 data-form-title class="text-xl font-bold text-foreground">記録を追加</h1>
+    <h1 data-form-title tabindex="-1" class="text-xl font-bold text-foreground">記録を追加</h1>
 
     <div>
       <span class="mb-1 block text-sm font-medium text-foreground">記録元</span>
@@ -1603,6 +1603,11 @@ input[type="date"] {
   const formatFullDate = (iso) => `${iso.split("-")[0]}年${formatLabel(iso)}`;
   // 一覧の見出し。今日だけ「今日」（本番の relativeLabel と同じ考え方）
   const listLabel = (iso) => (iso === "2026-08-10" ? "今日" : formatLabel(iso));
+  // 一覧のカードは抜粋（本番の excerpt と同じ 80 文字・空白正規化）
+  const excerpt = (body, max = 80) => {
+    const oneLine = String(body).replace(/\s+/g, " ").trim();
+    return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
+  };
   const fmtDurJa = (s) => {
     const t = Math.round(s);
     return t >= 60 ? `${Math.floor(t / 60)}分${t % 60}秒` : `${t}秒`;
@@ -1620,6 +1625,10 @@ input[type="date"] {
   };
   const badge = (src) =>
     `<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${SOURCE[src].cls}">${SOURCE[src].label}</span>`;
+  const weightBadge = (w) =>
+    w
+      ? `<span class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">${esc(w)}kg</span>`
+      : "";
 
   const videos = () => state.items.filter((i) => i.kind === "video");
   const photos = () => state.items.filter((i) => i.kind === "photo");
@@ -1728,6 +1737,10 @@ input[type="date"] {
     renderSource();
     renderAll();
     show("form");
+    // 直前の要素は hidden の中に入る。見出しへフォーカスを移して迷子にしない
+    requestAnimationFrame(() =>
+      $("[data-form-title]").focus({ preventScroll: true }),
+    );
   }
   function renderSource() {
     $$("[data-source]").forEach((b) => {
@@ -1866,8 +1879,9 @@ input[type="date"] {
       state.records.unshift(rec);
       state.items = [];
       state.viewingId = rec.id;
-      renderHome(); renderAlbum();
-      show("home");
+      renderHome(); renderAlbum(); renderDetail();
+      // 本番の createRecord は作成した記録の詳細へ redirect する
+      show("detail");
       toast("保存しました");
     }
   }
@@ -2386,9 +2400,9 @@ input[type="date"] {
             ${nVideo > 0 ? '<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶</span>' : ""}
           </div>
           <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-center gap-1.5">${badge(r.source)}</div>
+            <div class="flex flex-wrap items-center gap-1.5">${badge(r.source)}${weightBadge(r.weight)}</div>
             <p class="mt-1 text-sm font-semibold text-foreground">${esc(listLabel(r.date))}</p>
-            <p class="mt-0.5 text-sm text-muted-foreground">${esc(r.body)}</p>
+            <p class="mt-0.5 text-sm text-muted-foreground">${esc(excerpt(r.body))}</p>
             ${r.tags.length ? `<div class="mt-1 flex flex-wrap gap-1">${r.tags.map((t) => `<span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted-foreground">#${esc(t)}</span>`).join("")}</div>` : ""}
             ${meta ? `<p class="mt-1 text-xs text-muted-foreground">${meta}</p>` : ""}
           </div>
@@ -2411,7 +2425,7 @@ input[type="date"] {
   function renderDetail() {
     const r = current();
     if (!r) return;
-    $("[data-detail-badges]").innerHTML = badge(r.source);
+    $("[data-detail-badges]").innerHTML = badge(r.source) + weightBadge(r.weight);
     // 詳細は「今日/昨日」ではなく実日付を出す（本番の formatDate と同じ粒度）
     $("[data-detail-date]").textContent = formatFullDate(r.date);
     $("[data-detail-author]").textContent = r.author ? `記入者: ${r.author}` : "";
