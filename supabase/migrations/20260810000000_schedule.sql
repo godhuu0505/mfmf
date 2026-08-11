@@ -27,6 +27,7 @@
 --     drop column if exists start_time,
 --     drop column if exists end_time,
 --     drop column if exists overrides_rule;
+--   drop function if exists public.delete_record_keeping_skip(uuid);
 --   drop function if exists public.delete_plan(uuid);
 --   drop function if exists public.prune_schedule_assignments() cascade;
 --   drop function if exists public.schedule_rules_for_range(uuid, date, date);
@@ -696,3 +697,44 @@ comment on function public.delete_plan(uuid) is
 
 revoke all on function public.delete_plan(uuid) from public;
 grant execute on function public.delete_plan(uuid) to authenticated;
+
+-- 記録（done / skipped）を消すときも同じ扱いにする。ルールを置き換えていた行を
+-- 消すだけだと、その日の毎週の予定がまた出てくる。こちらは記録詳細の
+-- 「削除」（確認つき）から呼ぶので status は問わない。
+create or replace function public.delete_record_keeping_skip(p_record uuid)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_household uuid;
+  v_date      date;
+  v_overrides boolean;
+begin
+  select household_id, record_date, overrides_rule
+    into v_household, v_date, v_overrides
+    from public.daycare_records
+   where id = p_record;
+  if v_household is null then
+    raise exception '記録が見つかりません（または権限がありません）' using errcode = '42501';
+  end if;
+
+  delete from public.daycare_records where id = p_record;
+  if not found then
+    raise exception '記録を消せませんでした（権限がありません）' using errcode = '42501';
+  end if;
+
+  if v_overrides then
+    insert into public.schedule_rule_skips (household_id, on_date, created_by)
+    values (v_household, v_date, auth.uid())
+    on conflict (household_id, on_date) do nothing;
+  end if;
+end;
+$$;
+
+comment on function public.delete_record_keeping_skip(uuid) is
+  '記録を消す。ルールを置き換えていた行なら、その日の打ち消しも同じトランザクションで入れる';
+
+revoke all on function public.delete_record_keeping_skip(uuid) from public;
+grant execute on function public.delete_record_keeping_skip(uuid) to authenticated;

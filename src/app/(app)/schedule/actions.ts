@@ -262,12 +262,24 @@ async function savePlanRow(
   /** この行がその日の毎週のルールを置き換えるか */
   let overridesRule: boolean;
 
-  if (UUID_RE.test(recordId)) {
-    householdId = await requireEditableRecordHousehold(
-      supabase,
-      userId,
-      recordId,
-    );
+  const isExisting = UUID_RE.test(recordId);
+  householdId = isExisting
+    ? await requireEditableRecordHousehold(supabase, userId, recordId)
+    : await resolveWritableHousehold(supabase, userId, formData);
+
+  // 毎週のルールは行の書き込みより**先**に積む。完了と同じ送信で頼まれたとき、
+  // 先に done にしてしまうと、ルールの失敗をやり直そうにも
+  // status = 'planned' の条件に落ちて二度と保存できない
+  if (repeat) {
+    await applyRepeat(supabase, userId, householdId, {
+      date,
+      source,
+      ...times,
+      who,
+    });
+  }
+
+  if (isExisting) {
     // 保存済みの行は overrides_rule をそのまま保つ。ルール由来を上書きするのは
     // 「実体の無い日を開いて保存した」ときだけで、それは下の insert が担う。
     // ここで立て直すと、「もう 1 件足す」で足した予定を直しただけで
@@ -320,7 +332,6 @@ async function savePlanRow(
     }
     targetId = recordId;
   } else {
-    householdId = await resolveWritableHousehold(supabase, userId, formData);
     const petId = await resolvePetId(supabase, householdId, formData);
     overridesRule = String(formData.get("additional") || "") !== "1";
     // 行の id はクライアントが決める。担当の保存で失敗して押し直したとき、
@@ -371,15 +382,6 @@ async function savePlanRow(
       .delete()
       .eq("household_id", householdId)
       .eq("on_date", date);
-  }
-
-  if (repeat) {
-    await applyRepeat(supabase, userId, householdId, {
-      date,
-      source,
-      ...times,
-      who,
-    });
   }
 
   return { recordId: targetId, householdId };

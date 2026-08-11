@@ -538,16 +538,18 @@ export async function deleteRecord(recordId: string) {
       .remove(photos.map((p) => p.storage_path));
   }
 
-  const { error } = await supabase
-    .from("daycare_records")
-    .delete()
-    .eq("id", recordId);
+  // ルールを置き換えていた記録なら、その日の打ち消しも同じトランザクションで
+  // 入れる（消しただけだと毎週の予定がまた出てくる）
+  const { error } = await supabase.rpc("delete_record_keeping_skip", {
+    p_record: recordId,
+  });
 
   if (error) {
     throw new Error(`記録の削除に失敗しました: ${error.message}`);
   }
 
   revalidatePath("/");
+  revalidatePath("/calendar");
   redirect("/");
 }
 
