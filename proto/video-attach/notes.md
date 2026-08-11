@@ -91,6 +91,9 @@ Android Chrome や PC のブラウザで再生できない。
   （プロトの `resizePhoto()` はこの形にしてある）。
 - 一覧・アルバムでは動画本体を読み込まない（`preload="none"` + poster）。帯域は 5GB/月。
 - Service Worker は署名付き URL をキャッシュしない（CLAUDE.md の不変条件）。
+- **一覧カードのサムネイルは `record_photos` の先頭1件を画像として出している。**
+  動画が先頭に来ると MP4 を `<Image>` に渡すことになるので、`kind` を見て
+  poster を出す分岐が要る（動画だけの記録・動画が先頭の記録が実際に起きる）。
 - **`poster_path` は動画に付属する2つ目のオブジェクト**なので、削除の経路を両方直す。
   いまの `deletePhoto()` / `deleteRecord()` は `storage_path` しか集めておらず、
   そのままだと poster が孤児になって 1GB を食い続ける。アップロード途中で失敗した

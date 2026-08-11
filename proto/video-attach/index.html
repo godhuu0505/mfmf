@@ -248,6 +248,9 @@
   .right-1 {
     right: var(--spacing);
   }
+  .right-2 {
+    right: calc(var(--spacing) * 2);
+  }
   .right-\[max\(1rem\,env\(safe-area-inset-right\)\)\] {
     right: max(1rem, env(safe-area-inset-right));
   }
@@ -268,6 +271,12 @@
   }
   .left-1\/2 {
     left: calc(1 / 2 * 100%);
+  }
+  .left-2 {
+    left: calc(var(--spacing) * 2);
+  }
+  .left-\[max\(1rem\,env\(safe-area-inset-left\)\)\] {
+    left: max(1rem, env(safe-area-inset-left));
   }
   .z-10 {
     z-index: 10;
@@ -928,6 +937,14 @@
     .hover\:bg-surface-muted:hover {
       background-color: var(--surface-muted);
     }
+    .hover\:bg-white\/20:hover {
+      background-color: color-mix(in srgb, #fff 20%, transparent);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-white\/20:hover {
+        background-color: color-mix(in oklab, var(--color-white) 20%, transparent);
+      }
+    }
     .hover\:text-foreground:hover {
       color: var(--foreground);
     }
@@ -1558,9 +1575,13 @@ input[type="date"] {
 <!-- ===== ライトボックス（PhotoGallery 相当） ===== -->
 <div data-lightbox hidden role="dialog" aria-modal="true" aria-label="写真・動画の表示"
   class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+  <!-- 前後送りは既存の PhotoGallery と同じ（ボタン / ← → / 横スワイプ、端で折り返す） -->
+  <span data-lightbox-count class="absolute left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))] z-10 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white/80"></span>
   <button type="button" data-lightbox-close class="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-10 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white">✕ 閉じる</button>
+  <button type="button" data-lightbox-prev aria-label="前の写真・動画" class="absolute left-2 z-10 rounded-full bg-white/10 p-3 text-lg leading-none text-white transition hover:bg-white/20">‹</button>
   <img data-lightbox-img hidden alt="" class="max-h-full max-w-full object-contain" />
   <video data-lightbox-video hidden controls playsinline preload="none" class="max-h-full max-w-full bg-black"></video>
+  <button type="button" data-lightbox-next aria-label="次の写真・動画" class="absolute right-2 z-10 rounded-full bg-white/10 p-3 text-lg leading-none text-white transition hover:bg-white/20">›</button>
   <p data-lightbox-caption class="absolute inset-x-0 bottom-6 text-center text-sm text-white/80"></p>
 </div>
 
@@ -1898,6 +1919,7 @@ input[type="date"] {
         state.checking = 0;
         state.items.forEach(forget);
         state.items = [];
+        // 登録済みの削除は押した時点で確定しているので、ここでは戻さない
         state.existing = [];
         if (state.editingId) { renderDetail(); show("detail", { focusTitle: true }); }
         else show("home", { focusTitle: true });
@@ -1928,10 +1950,8 @@ input[type="date"] {
   function commitForm() {
     if (state.editingId) {
       const rec = state.records.find((r) => r.id === state.editingId);
-      const next = [...state.existing, ...state.items];
-      // 編集で外したものはここで確定。objectURL を残すとブラウザが blob を抱え続ける
-      rec.media.filter((m) => !next.includes(m)).forEach(forget);
-      rec.media = next;
+      // 登録済みの削除は押した時点で確定済み。ここでは追加分を足すだけ
+      rec.media = [...state.existing, ...state.items];
       rec.source = state.source;
       rec.date = $("#date").value || rec.date;
       rec.author = $("#author").value.trim();
@@ -2455,11 +2475,22 @@ input[type="date"] {
     const ex = $("[data-existing-grid]");
     $("[data-existing-section]").hidden = !state.editingId || state.existing.length === 0;
     ex.innerHTML = state.existing.map((i) => tile(i, { existing: true })).join("");
+    // 登録済みの削除は**その場で確定する**（本番の PhotoEditTile は押した時点で
+    // deletePhoto() を呼ぶ）。ここで「更新する」まで保留にすると、キャンセルで
+    // 戻ってしまい本番と挙動が変わる
     $$("[data-remove-existing]").forEach((b) =>
       b.addEventListener("click", () => {
         const id = Number(b.dataset.removeExisting);
+        const gone = state.existing.find((i) => i.id === id);
         state.existing = state.existing.filter((i) => i.id !== id);
+        const rec = state.records.find((r) => r.id === state.editingId);
+        if (rec) rec.media = rec.media.filter((m) => m.id !== id);
+        if (gone) forget(gone);
         renderAll();
+        renderHome();
+        renderAlbum();
+        renderDetail();
+        toast("削除しました");
       }),
     );
 
@@ -2510,7 +2541,8 @@ input[type="date"] {
       b.addEventListener("click", () => {
         state.viewingId = b.dataset.openRecord;
         renderDetail();
-        show("detail");
+        // 押したカードは hidden の中に入る。見出しへフォーカスを移す
+        show("detail", { focusTitle: true });
       }),
     );
   }
@@ -2551,33 +2583,58 @@ input[type="date"] {
       ? "動画はタップするまで読み込みません（開くまで通信しません）。"
       : "";
     $$("[data-open-media]", grid).forEach((b) =>
-      b.addEventListener("click", () => openLightbox(Number(b.dataset.openMedia))),
+      // 詳細は「その記録のメディア」を送る。アルバムはアルバム全体（既存と同じ範囲）
+      b.addEventListener("click", () =>
+        openLightbox(current()?.media ?? [], Number(b.dataset.openMedia)),
+      ),
     );
   }
 
-  $("[data-detail-back]").addEventListener("click", () => show("home"));
+  $("[data-detail-back]").addEventListener("click", () => show("home", { focusTitle: true }));
   $("[data-detail-edit]").addEventListener("click", () => openForm(state.viewingId));
 
   // ---------------- ライトボックス ----------------
   let lightboxPrevFocus = null;
   let lightboxInertTargets = [];
-  function openLightbox(id) {
-    const m = current()?.media.find((x) => x.id === id);
+  // 開いている一覧と、その中の位置。詳細ならその記録のメディア、アルバムなら全体
+  let lightboxList = [];
+  let lightboxIndex = 0;
+  // いま映しているものを差し替える。写真 → 動画 → 写真 とまたいでも同じ場所で見る
+  function renderLightbox() {
+    const m = lightboxList[lightboxIndex];
     if (!m) return;
     const img = $("[data-lightbox-img]"), vid = $("[data-lightbox-video]");
     if (m.kind === "video") {
-      img.hidden = true;
+      img.hidden = true; img.removeAttribute("src");
       vid.hidden = false;
       vid.src = m.url;
       playingLightboxId = m.id;
       vid.play().catch(() => {});
       $("[data-lightbox-caption]").textContent = `${m.name} ・ ${fmtDur(m.duration)} ・ ${fmtBytes(m.after ?? m.size)}`;
     } else {
+      // 動画から写真へ移ったら本体の読み込みを止める（帯域と再生の取り残し）
       vid.hidden = true; vid.pause(); vid.removeAttribute("src");
+      playingLightboxId = null;
       img.hidden = false;
       img.src = m.thumb || "";
       $("[data-lightbox-caption]").textContent = m.name;
     }
+    const many = lightboxList.length > 1;
+    $("[data-lightbox-count]").textContent = many ? `${lightboxIndex + 1} / ${lightboxList.length}` : "";
+    $("[data-lightbox-prev]").hidden = !many;
+    $("[data-lightbox-next]").hidden = !many;
+  }
+  const stepLightbox = (d) => {
+    if (lightboxList.length < 2) return;
+    lightboxIndex = (lightboxIndex + d + lightboxList.length) % lightboxList.length;
+    renderLightbox();
+  };
+  function openLightbox(list, id) {
+    const idx = list.findIndex((x) => x.id === id);
+    if (idx < 0) return;
+    lightboxList = list;
+    lightboxIndex = idx;
+    renderLightbox();
     const box = $("[data-lightbox]");
     box.hidden = false;
     // 確認ダイアログと同じ作法。背景を inert にして閉じるボタンへフォーカスを移す
@@ -2595,17 +2652,46 @@ input[type="date"] {
     $("[data-lightbox-img]").hidden = true;
     $("[data-lightbox]").hidden = true;
     playingLightboxId = null;
+    lightboxList = [];
     lightboxInertTargets.forEach((el) => { el.inert = false; });
     lightboxInertTargets = [];
     lightboxPrevFocus?.focus({ preventScroll: true });
     lightboxPrevFocus = null;
   }
   $("[data-lightbox-close]").addEventListener("click", closeLightbox);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLightbox(); });
+  $("[data-lightbox-prev]").addEventListener("click", () => stepLightbox(-1));
+  $("[data-lightbox-next]").addEventListener("click", () => stepLightbox(1));
+  document.addEventListener("keydown", (e) => {
+    if ($("[data-lightbox]").hidden) return;
+    if (e.key === "Escape") closeLightbox();
+    else if (e.key === "ArrowRight") stepLightbox(1);
+    else if (e.key === "ArrowLeft") stepLightbox(-1);
+  });
+  // 横スワイプでも送る（既存の PhotoGallery と同じ 50px のしきい値）
+  let swipeStartX = null;
+  $("[data-lightbox]").addEventListener("touchstart", (e) => {
+    swipeStartX = e.touches[0]?.clientX ?? null;
+  }, { passive: true });
+  $("[data-lightbox]").addEventListener("touchend", (e) => {
+    const start = swipeStartX;
+    const end = e.changedTouches[0]?.clientX ?? null;
+    swipeStartX = null;
+    if (start === null || end === null) return;
+    const dx = end - start;
+    if (Math.abs(dx) > 50) stepLightbox(dx < 0 ? 1 : -1);
+  }, { passive: true });
 
   // ---------------- 描画: アルバム ----------------
+  // アルバムの並び（新しい順）。ライトボックスの前後送りもこの順で辿るので、
+  // 描画とめくりで同じ 1 本の並びを使う（本番の PhotoGallery も月をまたいで送る）
+  function albumEntries() {
+    return state.records
+      .flatMap((r) => r.media.map((m) => ({ m, r })))
+      .sort((a, b) => b.r.date.localeCompare(a.r.date));
+  }
+  const albumOrder = () => albumEntries().map((e) => e.m);
   function renderAlbum() {
-    const all = state.records.flatMap((r) => r.media.map((m) => ({ m, r })));
+    const all = albumEntries();
     const el = $("[data-album]");
     if (all.length === 0) {
       el.innerHTML = `<div class="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
@@ -2615,16 +2701,13 @@ input[type="date"] {
     }
     // 記録の日付で月ごとにまとめる（日付は編集できるので固定の見出しにしない）
     const groups = [];
-    all
-      .slice()
-      .sort((a, b) => b.r.date.localeCompare(a.r.date))
-      .forEach(({ m, r }) => {
-        const [y, mo] = r.date.split("-");
-        const ym = `${y}-${mo}`;
-        const last = groups[groups.length - 1];
-        if (last && last.ym === ym) last.items.push({ m, r });
-        else groups.push({ ym, label: `${y}年${Number(mo)}月`, items: [{ m, r }] });
-      });
+    all.forEach(({ m, r }) => {
+      const [y, mo] = r.date.split("-");
+      const ym = `${y}-${mo}`;
+      const last = groups[groups.length - 1];
+      if (last && last.ym === ym) last.items.push({ m, r });
+      else groups.push({ ym, label: `${y}年${Number(mo)}月`, items: [{ m, r }] });
+    });
     el.innerHTML = groups
       .map(
         (g) => `
@@ -2644,7 +2727,7 @@ input[type="date"] {
     $$("[data-album-media]", el).forEach((b) =>
       b.addEventListener("click", () => {
         state.viewingId = b.dataset.albumRecord;
-        openLightbox(Number(b.dataset.albumMedia));
+        openLightbox(albumOrder(), Number(b.dataset.albumMedia));
       }),
     );
   }
