@@ -1,0 +1,1144 @@
+// =============================================================
+// survey-facilities.mjs
+//
+// 第一種動物取扱業者登録簿（自治体が公開する CSV）を読み、
+// 事業所名から「業態」を推定して件数を集計する調査用スクリプト。
+//
+//   node scripts/survey-facilities.mjs <csv...> [--json] [--samples N] [--seed N]
+//   node scripts/survey-facilities.mjs data/*.csv --samples 5
+//
+// なぜ必要か:
+//   docs/explanation/market-analysis.md §16-2 の最大の未検証項目
+//   「犬の保育園は何施設あるのか」を数えるため。
+//
+//   登録簿の業種区分は 販売 / 保管 / 貸出し / 訓練 / 展示 / 競りあっせん / 譲受飼養 の7つで、
+//   **「保育園」という区分は存在しない**。犬の保育園は通常「保管」（＋しつけをするなら「訓練」）
+//   で登録されるが、「保管」にはペットホテル・トリミング・シッターも全部入るため、
+//   保管の件数は **上限（天井）** にしかならない。
+//   実数に近づけるには **事業所名のキーワード**で分類するしかない ← 本スクリプトの役目。
+//
+// 前提:
+//   - 外部依存なし（Node 18+ の fetch / TextDecoder のみ）
+//   - 自治体 CSV は Shift_JIS が多いので自動判別する
+//   - 列名は自治体ごとにばらつくため、ヘッダを推定する
+//
+// 出力の読み方:
+//   「推定」であって「正解」ではない。屋号に業態が出ない事業所（例: 「株式会社○○」）は
+//   unknown に落ちる。unknown 比率が高いほど推定の信頼度は下がるので必ず確認すること。
+// =============================================================
+
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+// 「犬の語 ＋（の）＋ 学校系」が**直結**している屋号は、人向けの養成校ではなく
+// 犬向けのスクール（例: ドッグスクール／犬のスクール／犬の学校）。
+// ⚠ 語間を空けないこと。「愛犬美容学園」「愛犬美容専門学校」（＝トリマー養成校）は
+//    犬→美容→学園/学校 と語が挟まるだけなので、距離を許すと養成校の判定が壊れる。
+const DOG_SCHOOL = /(犬|いぬ|イヌ|ドッグ|\bdog|わん|ワン|パピー|\bpupp)の?(スクール|school|学園|学校)/i;
+
+// --- 業態の推定ルール ------------------------------------------------------
+// 上から順に評価し、最初に当たったものを採用する（優先順位が意味を持つ）。
+// 「保育園」系を最優先にするのは、"○○ドッグホテル＆幼稚園" のような複合屋号で
+// 我々が知りたい方（保育園）を取りこぼさないため。
+const RULES = [
+  {
+    key: "daycare",
+    label: "保育園・幼稚園・デイケア",
+    // ひらがな/カタカナ/漢字/英語の揺れを吸収する。
+    // ⚠ 語尾の「園」だけを見るルールは置かない。「ペットサロン花園」「○○楽園」のような
+    //   無関係な屋号を保育園に誤分類し、その比率が全国推定に直接掛かって過大評価になる。
+    //   曖昧な屋号は unknown に落として目視分類へ回す方が安全。
+    patterns: [
+      /保育園/, /ほいくえん/, /ホイクエン/,
+      /幼稚園/, /ようちえん/, /ヨウチエン/,
+      // 「スクール」「学園」は単体で使わない。「トリミングスクール」「東京愛犬美容学園」
+      // （いずれもトリマー養成校）が保育園に化けて分子を膨らませるため、
+      // 犬・パピー・しつけ等の文脈を要求する。
+      /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy|しつけ|obedience)[^、]{0,8}(スクール|school|学園)/i,
+      // 「犬の学校ABC」「ドッグ学校」。上の緩い形に「学校」を足すと「愛犬美容専門学校」
+      // まで拾ってしまうため、**直結している形だけ**を別に見る（isGroomingSchool と同じ判定）。
+      DOG_SCHOOL,
+      /デイケア/, /デイサービス/, /daycare/i, /day\s*care/i,
+      // 「園」は犬・ドッグ等の**直後**に来る場合のみ拾う（「犬の○○園」の形）。
+      // 距離を空けると「ドッグサロン花園」の「ドッグ…花園」まで拾ってしまう。
+      // さらに下の looksGrooming() でサロン系を除外している。
+      /(犬|いぬ|イヌ|ドッグ|dog|ワン|わん|パピー|puppy)の?[^、]{0,3}園/i,
+    ],
+  },
+  {
+    key: "training",
+    label: "しつけ・訓練",
+    patterns: [/しつけ/, /躾/, /訓練/, /トレーニング/, /training/i, /ドッグトレーナー/, /training\s*center/i],
+  },
+  {
+    key: "hotel",
+    label: "ホテル・預かり",
+    patterns: [/ホテル/, /hotel/i, /ペットホテル/, /お預かり/, /預かり/, /シッター/, /sitter/i],
+  },
+  {
+    key: "grooming",
+    label: "トリミング・サロン",
+    patterns: [/トリミング/, /trimming/i, /グルーミング/, /grooming/i, /サロン/, /salon/i, /美容/],
+  },
+  {
+    key: "clinic",
+    label: "動物病院",
+    patterns: [/動物病院/, /獣医/, /クリニック/, /clinic/i, /アニマルホスピタル/, /動物医療/],
+  },
+  {
+    key: "shop",
+    label: "販売・ショップ",
+    // ⚠ /shop/i を語中で当てない。「BISHOP PET CARE」が販売に化けて
+    //    hokanUnknown から抜け、推定の上限（daycareRatioHigh）を不当に狭める。
+    //    語頭で区切りつつ、区切りの無い「PETSHOP」も別パターンで拾う。
+    patterns: [/ペットショップ/, /ブリーダー/, /繁殖/, /販売/, /\bshop/i, /petshop/i, /ペットプラザ/],
+  },
+];
+
+// 「保管」業種を表す表記の揺れ
+const HOKAN_PATTERNS = [/保管/];
+
+// 法定の業種区分。列見出しだけで業種列と決めつけず、**中身がこれらを含むか**で検証する
+// （「事業者種別（法人/個人）」のような無関係な列を業種列と誤認しないため）。
+const STATUTORY_KINDS = [/販売/, /保管/, /貸出/, /訓練/, /展示/, /競り/, /譲受/];
+
+// 業種を1列ずつ並べ、該当する列に○を付ける様式の登録簿がある
+// （見出し「販売」「保管」「訓練」…）。この形は /業種/ 等の見出しに当たらないため、
+// **見出しそのものが法定業種名か**で見分ける。
+const KIND_HEADER = /^(販売|保管|貸出し?|訓練|展示|競りあっせん|競り斡旋|譲受飼養|譲受け?)$/;
+// ○×様式で「登録なし」を表す値。空欄と同じ扱いにする。
+// ⚠ Excel のチェックボックスや数式を書き出すと `TRUE` / `FALSE` になる。
+//    `FALSE` は空でないため、拾わないと**登録していない業種**まで分母に入る
+//    （「販売=TRUE, 保管=FALSE」の行が保管の分母に入り、実数ゼロが非ゼロに化ける）。
+const NEGATIVE_MARK = /^([×✕✖ー－-]|なし|無し?|非|不可|0|false|no|n)$/i;
+// ○×様式の列だと判断するための、肯定・否定を合わせたマーカーの一覧。
+// 「販売」という見出しの**自由記述**列を業種列と誤認しないために使う。
+const MARKER_VALUE = /^([○◯〇●◎✓✔]|有り?|あり|可|登録|1|true|yes|y|[×✕✖ー－-]|なし|無し?|非|不可|0|false|no|n)$/i;
+
+// 犬の保育園の推定分子に寄与するカテゴリ。
+// しつけ・訓練も「保管」を持てば定期通園の預かり業態（market-analysis.md §18-6）。
+const TARGET_CATEGORIES = ["daycare", "training"];
+
+// classify() が返しうるが RULES に無い擬似カテゴリ（集計・表示用）
+const EXTRA_CATEGORIES = [
+  { key: "non_dog", label: "犬以外の動物向け（犬の推定から除外）" },
+  { key: "unknown", label: "不明（屋号から判別不可）" },
+];
+const ALL_CATEGORIES = () => [...RULES, ...EXTRA_CATEGORIES];
+
+// 犬/猫の判別。推定したいのは **犬の**保育園なので、「猫の保育園」を分子に入れない。
+// 犬側はゆるく（誤検知しても「猫のみ」判定を避けるだけなので安全側）、
+// 猫側は厳密に（誤検知すると分子から落ちて過小評価になるため）。
+// 英単語は **語境界**で判定する。EDUCATION / CATCH のような語の内部に cat が入る屋号を
+// 猫扱いしてしまうため（この判定はスペースを残した文字列に対して行う）。
+// ⚠ この判定は isNonDog() の**打ち消し**に使う。誤検知すると
+//    「猫の保育園 犬山店」「うさぎの保育園 ワンダー店」が犬の分子に入るため、
+//    地名・一般語に紛れる形（犬山・犬吠 / ワンダー・ワンルーム）を除いてから当てる。
+//    一方で緩さも必要（「ペット保育園さくら」は種を書かない）ので、
+//    除外は**既知の紛れだけ**に留め、犬の語そのものは広く拾う。
+const DOG_PATTERNS = [
+  /犬(?!山|吠|伏|飼|鳴)/, /いぬ/, /イヌ/, /ドッグ/, /\bdog/i,
+  /わん/, /ワン(?!ダー|ダフル|ピース|タン|ルーム|コイン|オペ|ストップ|タッチ|ポイント|マン)/,
+  /パピー/, /\bpupp/i,
+];
+// 犬以外の動物が明示されている屋号。犬の語が無ければ推定分子から外す。
+// ⚠ 「犬の語が無い＝除外」にはしない。「ペット保育園さくら」のように種を書かない
+//    屋号が多く、そこまで要求すると取りこぼしで過小評価になる。
+//    **別の種が明示されている**ときだけ落とす。
+const OTHER_SPECIES_PATTERNS = [
+  // ⚠ 「猫」も1文字では地名に当たる（浦安市猫実・猫魔・猫塚）。
+  //    「猫実ペット保育園」が犬以外と判定されて分子から消えるため既知の地名を外す。
+  /猫(?!実|魔|塚|又)/, /ねこ/, /ネコ/, /キャット/, /にゃん/, /ニャン/, /\bcats?\b/i,
+  /うさぎ/, /ウサギ/, /兎/, /\brabbits?\b/i,
+  // ⚠ 「馬」「鳥」の1文字で拾わない。地名に頻出するため、「群馬ペット保育園」
+  //    「鳥取ペット保育園」が犬以外と判定されて分子から消える（＝過小評価）。
+  //    **種を指す文脈**を伴う語だけに限定する（馬込・千鳥・飛鳥・白鳥も同様）。
+  /乗馬/, /馬術/, /愛馬/, /厩舎/, /ホース(クラブ|パーク|ランチ)/, /\bhorses?\b/i,
+  /小鳥/, /野鳥/, /愛鳥/, /文鳥/, /九官鳥/, /インコ/, /オウム/, /\bbirds?\b/i,
+  /フェレット/, /ハムスター/, /爬虫/, /リクガメ/, /\breptiles?\b/i,
+];
+
+// トリマー/訓練士の**養成校**。屋号に犬の語が入る（「愛犬」等）ため犬の文脈を
+// 要求しても弾けない。美容・トリミング系の語と学校系の語が同居したら養成校とみなす。
+// 例) 東京愛犬美容学園 / ○○トリミングスクール
+const GROOMING_WORDS = [/美容/, /トリミング/, /グルーミング/, /trimming/i, /grooming/i, /サロン/, /salon/i];
+const SCHOOL_WORDS = [/学園/, /スクール/, /school/i, /専門学校/, /養成/, /学院/];
+// 人材（トリマー・訓練士）の養成校を示す語。犬の語を含むので通常の判定では弾けない。
+const VOCATIONAL_WORDS = [/養成/, /専門学校/, /学院/, /トレーナー(養成|科)/, /訓練士/, /資格/];
+
+// 業態が明示されている語（サロン系の上書き判定と養成校判定の両方で使う）
+const EXPLICIT_DAYCARE = /保育園|幼稚園|ようちえん|ほいくえん|ヨウチエン|ホイクエン|デイケア|デイサービス|daycare/i;
+const EXPLICIT_TRAINING = /しつけ|躾|訓練|トレーニング|training/i;
+
+function isGroomingSchool(name) {
+  // 「養成」「専門学校」「訓練士」等、**人材育成が明示**されていればそれが最優先。
+  const vocational = VOCATIONAL_WORDS.some((re) => re.test(name));
+  // ⚠ 美容系の語と学校系の語が同居しているだけでは養成校と断定できない。
+  //    「ドッグスクール＆トリミングサロン」「犬のしつけスクール＆美容室」のように、
+  //    犬向けのサービスが明示された複合屋号まで grooming に落として分子から消す。
+  //    人材育成の語が無く、犬向けスクール／しつけが明示されていれば養成校ではない。
+  if (!vocational && (DOG_SCHOOL.test(name) || EXPLICIT_TRAINING.test(name))) return false;
+  // 美容・サロン系 × 学校系 → トリマー養成校（例: 東京愛犬美容学園）
+  if (GROOMING_WORDS.some((re) => re.test(name)) && SCHOOL_WORDS.some((re) => re.test(name))) return true;
+  // 「ドッグトレーナー養成スクール」のように、人を育てる語 × 学校系 → 訓練士養成校
+  if (vocational && SCHOOL_WORDS.some((re) => re.test(name))) return true;
+  return false;
+}
+
+/** 屋号にトリミング・サロン系の語があるか（「園」の緩い判定を上書きするために使う）。 */
+function looksGrooming(name) {
+  return GROOMING_WORDS.some((re) => re.test(name));
+}
+
+/** 屋号が「犬以外の動物向け」を示すか（別の種が明示され、犬の語が無い）。 */
+function isNonDog(name) {
+  return OTHER_SPECIES_PATTERNS.some((re) => re.test(name)) && !DOG_PATTERNS.some((re) => re.test(name));
+}
+
+/**
+ * 名寄せ用の正規化。全角/半角スペース・記号の揺れで別店舗に割れるのを防ぐ。
+ * 住所の「1-1」「１−１」「一丁目1番1号」等の完全な正規化までは踏み込まない
+ * （やり過ぎると別店舗を潰す）。
+ */
+function normalize(v) {
+  return String(v ?? "")
+    .normalize("NFKC")
+    // ⚠ 英字は大小を畳む。分類は大小無視なのに鍵だけ区別すると、
+    //    「DOG SCHOOL ABC」と「Dog School ABC」が別施設として二重計上される。
+    .toLowerCase()
+    .replace(/[\s\u3000]+/g, "")
+    .replace(/[（）()「」【】]/g, "")
+    .trim();
+}
+
+/**
+ * 住所の正規化。normalize に加えて**先頭の郵便番号**を落とす。
+ * 「〒277-0005 千葉県柏市…」を落とさないと都道府県から始まらないと判定され、
+ * 相対住所扱いでファイル単位に閉じ込められ、業種ごとに分かれた CSV で二重計上される。
+ */
+function normalizeAddress(v) {
+  return normalize(v).replace(/^〒?\d{3}-?\d{4}/, "");
+}
+
+/**
+ * 住所が「全国で一意」と言える形か（都道府県または市区町村から始まる）。
+ * 「中央1-1」のような相対住所は自治体をまたぐと衝突するため、
+ * ファイルを横断した名寄せに使えない。
+ */
+const PREFECTURES = [
+  "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+  "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+  "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
+  "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
+  "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+  "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
+  "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
+];
+
+// 東京23特別区のうち、**区名だけで全国一意に定まるもの**。
+// 特別区は市名を伴わずに住所の先頭に立てるので、これを認めないと
+// 区ごと/業種ごとに CSV が分かれている登録簿で同じ施設がファイル名前空間に
+// 閉じ込められ、**二重計上**される。
+// ⚠ 政令指定都市の行政区と**同名のもの（中央区・港区・北区）は入れない**。
+//    自治体が自分の管内向けに市名を省いて「中央区1-1」と書く登録簿があり、
+//    千葉市中央区・大阪市港区・札幌市北区…と衝突して無関係な施設が
+//    1件に潰れる（＝過小計上）。この3区はファイル単位のままにする。
+//    中央区: 札幌/千葉/新潟/相模原/静岡/浜松/大阪/神戸/福岡/熊本
+//    港区: 名古屋/大阪 ／ 北区: 札幌/京都/大阪/堺/神戸/岡山/熊本
+const TOKYO_WARDS = [
+  "千代田区", "新宿区", "文京区", "台東区", "墨田区", "江東区",
+  "品川区", "目黒区", "大田区", "世田谷区", "渋谷区", "中野区", "杉並区", "豊島区",
+  "荒川区", "板橋区", "練馬区", "足立区", "葛飾区", "江戸川区",
+];
+
+// 全国に**同じ名前が複数ある市郡**。都道府県名が前に無いと一意に定まらないので、
+// 「府中市…」だけの住所をファイル横断の鍵にすると、東京都府中市と広島県府中市の
+// 無関係な事業所が（屋号と番地まで一致した場合に）1件に潰れる。
+//   市: 府中市（東京/広島）、伊達市（北海道/福島）
+//   郡: 上川郡・中川郡（いずれも北海道内に複数）
+const AMBIGUOUS_MUNICIPALITIES = ["府中市", "伊達市", "上川郡", "中川郡"];
+
+function isQualifiedAddress(v) {
+  const n = normalizeAddress(v);
+  if (!n) return false;
+  // ⚠ 文字が「含まれる」だけでは判定できない。
+  //    「府中町1-1」は府を、「市川1-1」は市を含むが、どちらも全国で一意ではない。
+  //    **先頭が実在の都道府県名**か、**先頭付近で市/郡が閉じている**ことを要求する。
+  if (PREFECTURES.some((pref) => n.startsWith(pref))) return true;
+  // 「柏市…」「市原市…」は可。「市川1-1」（市が先頭）や「府中町…」は不可。
+  // ⚠ 文字数だけで区切らないこと。「かすみがうら市」「つくばみらい市」「いちき串木野市」
+  //    のような長い市名が弾かれ、業種ごとに CSV が分かれた登録簿で同じ施設が
+  //    ファイル名前空間に閉じ込められて**二重計上**される。
+  //    一方で長さだけ緩めると「中央3-1-1市民会館前」まで拾ってしまうので、
+  //    **市名に数字・記号は入らない**ことを使って、仮名/漢字だけの前置に限定する。
+  //    ただし同名の市郡（府中市・伊達市…）は都道府県名が無いと一意に定まらないので、
+  //    ファイル単位のままにする（上の都道府県判定で前置きがある場合は既に true）。
+  if (AMBIGUOUS_MUNICIPALITIES.some((m) => n.startsWith(m))) return false;
+  if (/^[ぁ-んァ-ヶ一-龯々ヵヶー]{1,8}[市郡]/.test(n)) return true;
+  // 「名古屋市港区…」は上の [市] で拾えている。ここで拾うのは市名の無い
+  // 「新宿区…」で、実在する特別区名で始まるものに限る（「区役所前1-1」等を弾く）。
+  return TOKYO_WARDS.some((ward) => n.startsWith(ward));
+}
+
+/**
+ * 分類用の正規化。全角→半角は行うが **スペースは1つに詰めるだけで消さない**。
+ * 消すと "CATCH PET SCHOOL" が "CATCHPETSCHOOL" になり、英単語の語境界判定が壊れる。
+ */
+function normalizeForMatch(v) {
+  return String(v ?? "")
+    .normalize("NFKC")
+    .replace(/[\s\u3000]+/g, " ")
+    .trim();
+}
+
+/**
+ * 事業所名から業態を推定する。当たらなければ unknown。
+ *
+ * 「ＤＯＧ ＳＣＨＯＯＬ」「ﾄﾘﾐﾝｸﾞ」のような全角英数・半角カナは日本の屋号に頻出するので、
+ * **正規化してから**判定する（していないと軒並み unknown に落ちて過小評価になる）。
+ */
+export function classify(name) {
+  const n = normalizeForMatch(name);
+  if (!n) return "unknown";
+  // 養成校（トリマー/訓練士）は「犬」の語を含むので、通常の優先順位だと保育園に化ける。先に落とす。
+  if (isGroomingSchool(n)) return "grooming";
+  // 「ドッグサロン花園」のようにサロン名に「園」が入るケースだけを救済する。
+  // ⚠ サロンの語があるだけで早期 return しない。「ドッグサロンABCしつけ教室」のように
+  //    しつけ（＝対象業態）が明示されている複合屋号まで grooming にしてしまうため。
+  const salonOverridesEn = looksGrooming(n) && !EXPLICIT_DAYCARE.test(n) && !EXPLICIT_TRAINING.test(n);
+  for (const rule of RULES) {
+    // 「園」だけを根拠に daycare にする緩い判定は、サロン系の屋号では採らない
+    const patterns = rule.key === "daycare" && salonOverridesEn
+      ? rule.patterns.filter((re) => !String(re).includes("園/i"))
+      : rule.patterns;
+    if (patterns.some((re) => re.test(n))) {
+      // 犬の推定分子に入るカテゴリ（保育園系・しつけ系）のうち「猫だけ」の施設は外す。
+      // ⚠ 分子に寄与するカテゴリ**すべて**に適用すること。片方だけだと
+      //    「猫のしつけ教室」が犬の分子に入る。
+      if (TARGET_CATEGORIES.includes(rule.key) && isNonDog(n)) return "non_dog";
+      return rule.key;
+    }
+  }
+  return "unknown";
+}
+
+// --- CSV の読み込み --------------------------------------------------------
+
+/**
+ * Shift_JIS / UTF-8 を判別してテキスト化する。
+ * UTF-8 として解釈したときに置換文字(U+FFFD)が出るなら Shift_JIS とみなす。
+ */
+function decode(buf) {
+  // U+FFFD の有無で判定してはいけない。正しい UTF-8 のファイルでも、値の中に
+  // 置換文字が1つ紛れていれば全体を Shift_JIS と誤認し、ヘッダごと文字化けして
+  // 全行スキップになる。**不正なバイト列かどうか**を fatal デコーダで判定する。
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+  } catch {
+    // UTF-8 として不正 → Shift_JIS（自治体 CSV に多い）とみなす
+    try {
+      return new TextDecoder("shift_jis", { fatal: false }).decode(buf);
+    } catch {
+      return new TextDecoder("utf-8", { fatal: false }).decode(buf);
+    }
+  }
+}
+
+/** 引用符・改行込みの CSV を行×セルに分解する最小実装。 */
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  const s = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quoted) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { cell += '"'; i++; }
+        else quoted = false;
+      } else cell += c;
+    } else if (c === '"') {
+      quoted = true;
+    } else if (c === ",") {
+      row.push(cell); cell = "";
+    } else if (c === "\n") {
+      row.push(cell); rows.push(row); row = []; cell = "";
+    } else {
+      cell += c;
+    }
+  }
+  if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter((r) => r.some((v) => v.trim() !== ""));
+}
+
+// 事業所名の列を表す表記の揺れ。ヘッダ判定にも列選択にも同じものを使う。
+// ⚠ 順序に意味がある（pickColumn は最初に当たったものを採る）。
+// 「法人名称」と「屋号」が併存する登録簿で、汎用の /名称/ を先に置くと
+// **法人名を掴んで屋号を取り逃す**（＝その施設が unknown に落ちて分子から消える）。
+// 施設固有の見出しを先に、法人・汎用の見出しを後に置く。
+const NAME_PATTERNS = [
+  /屋号/,
+  /事業所.*名/, /施設.*名/, /店舗.*名/,
+  /名称/, /事業者.*名/, /法人.*名/,
+];
+
+// ⚠ 人名の列を掴まないための除外。「事業所代表者氏名」は /事業所.*名/ に当たるため、
+// 除外しないと代表者名を屋号として分類してしまい（→ unknown）、施設が分子から消える。
+const NAME_EXCLUDE_RAW = [/氏名/, /代表者/, /責任者/, /担当者/, /管理者/];
+// ⚠ ただし法定様式の見出し「氏名又は名称」は**事業者そのもの**を指す列であり、
+//    これを弾くと名前列が1つも無くなって**そのファイルが丸ごとスキップ**される。
+//    屋号としては当てにならないが、事業所を unknown として残し保管を分母に
+//    入れるには十分。人名だけを指す見出し（事業所代表者氏名）は従来どおり弾く。
+const NAME_EXCLUDE = [
+  {
+    test: (h) => NAME_EXCLUDE_RAW.some((re) => re.test(h)) && !/名称|屋号/.test(h),
+  },
+];
+
+/**
+ * 「事業者（法人）の名称」を指す見出し。**施設の実体を表さない**ので、
+ * 名寄せの一致判定には使わない（分類の材料としては引き続き使う）。
+ * これを一致判定に混ぜると、同じ法人が同じ住所で出している別業態の店舗
+ * （「ABCトリミング」と「犬の保育園XYZ」）が法人名だけで1件に潰れる。
+ * ⚠ /事業者/ は「事業所」には当たらない（「者」と「所」は別字）。
+ */
+const OPERATOR_NAME_HEADINGS = [/事業者/, /法人/, /会社/, /申請者/, /設置者/, /団体/, /氏名/];
+const isOperatorName = (heading) => OPERATOR_NAME_HEADINGS.some((re) => re.test(heading));
+
+/** 「事業者（法人）の住所」を指す見出し。施設の所在地ではないので鍵にしない。 */
+// ⚠ 名前側（OPERATOR_NAME_HEADINGS）と揃えること。「申請者住所」「設置者住所」を
+//    取り落とすと事業所の住所と連結され、その列が空・伏字・行ごとに違う登録簿で
+//    同じ施設が別バケツに割れて二重計上される。
+const OPERATOR_ADDR_HEADINGS = [
+  /事業者/, /法人/, /会社/, /申請者/, /設置者/, /団体/, /本社/, /本店/, /代表者/,
+];
+
+/**
+ * ヘッダ行を推定する。自治体ごとに列名も位置もばらつくので、
+ * 「実際に事業所名の列を取り出せる」最初の行をヘッダとして扱う。
+ *
+ * 単に「事業所」を含む行を選ぶと、先頭のタイトル行
+ * （例:「第一種動物取扱業登録事業所一覧」）を掴んでしまい、
+ * 列が見つからずファイルごとスキップしてしまうため、
+ * **候補行に対して実際に列選択を試して**から採用する。
+ */
+function findHeader(rows) {
+  // ヘッダらしさは「名前列があること」だけでは足りない。
+  //   例) 「第一種動物取扱業事業所名簿, 2026年7月」
+  // は2セルあり /事業所.*名/ にも当たるが、これはタイトル行。
+  // **名前列に加えて、他の既知の列（所在地・業種・番号）が最低1つある**ことを要求する。
+  const OTHER_COLUMN_PATTERNS = [
+    [/所在地/, /住所/],
+    [/業種/, /業の種類/, /業.*区分/, /種別/, /種類/],
+    // 法定業種を1列ずつ並べる様式（「販売」「保管」「訓練」…に○を付ける）もあるため、
+    // 業種名そのものの見出しもヘッダらしさの根拠にする。
+    [KIND_HEADER],
+    [/登録番号/, /許可番号/, /番号/],
+    [/登録年月日/, /有効期間/, /責任者/],
+  ];
+  // 日付らしいセルを含む行はタイトル行とみなす（「2026年7月」等）
+  const looksDated = (cells) =>
+    cells.some((c) => /\d{4}\s*年|\d{4}[/-]\d{1,2}|現在/.test(c));
+  // ⚠ 「名前列があり、他の既知列も1つある」だけでは足りない。
+  //    「第一種動物取扱業事業所名簿, 所在地 柏市」のように、表題と管轄を2セルに分けた
+  //    前書きは この条件を満たしてしまう。採用すると本物のヘッダが1件の「事業所」として
+  //    数えられ、業種列も選ばれずファイルが集計不能になる。
+  //    見出しではなく**表題**に見えるセル（名簿・一覧・台帳…、または異様に長い）は弾く。
+  const looksTitleCell = (c) =>
+    /名簿|一覧|台帳|リスト|登録簿|について|現在/.test(c) || c.length > 20;
+
+  let relaxed = -1;
+  // ⚠ 探索を先頭 N 行で打ち切らないこと。Excel を CSV に書き出した登録簿は
+  //    表題・注記・凡例が20行以上続くことがあり、打ち切るとその**ファイル丸ごと**
+  //    集計から消える。見つかるまで走査し、見つけた行番号は警告として報告する
+  //    （深い位置のヘッダは、本物のヘッダではない可能性を人が確認できるように）。
+  for (let i = 0; i < rows.length; i++) {
+    const cells = rows[i].map((c) => c.trim());
+    if (cells.filter((c) => c !== "").length < 2) continue;
+    const ni = pickColumn(cells, NAME_PATTERNS, { exclude: NAME_EXCLUDE });
+    if (ni < 0) continue;
+    // 名前列に当たったセル自体が表題なら、この行はヘッダではない
+    if (looksTitleCell(cells[ni])) continue;
+    const others = OTHER_COLUMN_PATTERNS.filter(
+      (group) => pickColumn(cells, group) >= 0,
+    ).length;
+    if (others >= 1) return i;
+    // 名前列はあるが他の既知列が無い行。タイトル行でなければ次善の候補として控える。
+    if (relaxed < 0 && !looksDated(cells)) relaxed = i;
+  }
+  // ⚠ 見つからないときに 0（＝タイトル行）へ落とさない。
+  //    落とすと本物のヘッダ行が1件の「事業所」として数えられ、総数と不明率が汚れる。
+  return relaxed;
+}
+
+/** マッチする列を優先順位の順に**すべて**返す（重複は除く）。 */
+function pickColumns(header, patterns, { exclude = [] } = {}) {
+  const found = [];
+  for (const re of patterns) {
+    header.forEach((h, i) => {
+      if (re.test(h) && !exclude.some((ex) => ex.test(h)) && !found.includes(i)) found.push(i);
+    });
+  }
+  return found;
+}
+
+function pickColumn(header, patterns, { exclude = [] } = {}) {
+  for (const re of patterns) {
+    const idx = header.findIndex(
+      (h) => re.test(h) && !exclude.some((ex) => ex.test(h)),
+    );
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+
+// --- 抽出 ------------------------------------------------------------------
+
+/**
+ * seed から決まる擬似乱数（mulberry32）。
+ * Math.random を使わないのは、目視分類したサンプルを後から再現・検証するため。
+ */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * 単純無作為抽出（非復元）。全要素の抽出確率が等しい。
+ *
+ * ⚠ 層化（母集団を k 区間に割って各区間から1件）にはしない。
+ *   母集団が k で割り切れないと区間の大きさが揃わず（例: 150件を100区間 →
+ *   1件の区間が50・2件の区間が50）、小さい区間の要素が2倍選ばれやすくなる。
+ *   market-analysis.md §18-4 は抽出した標本の比率を**重みなしで**そのまま
+ *   補正率に使うので、抽出確率が揃っていないとその補正率が偏る。
+ *   等間隔（固定位相）も並びの周期に嵌まるため使わない。
+ *   seed から乱数を作るので、seed を控えれば同じ標本を再現できる。
+ */
+export function sampleRandom(arr, k, seed) {
+  if (k <= 0) return [];
+  if (arr.length <= k) return [...arr];
+  const rand = mulberry32(seed);
+  const idx = arr.map((_, i) => i);
+  // 部分 Fisher-Yates（先頭 k 個だけを確定させる）
+  for (let i = 0; i < k; i++) {
+    const j = i + Math.floor(rand() * (idx.length - i));
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+  }
+  // 出力順は母集団の並び順に戻す（目視で追いやすいように）
+  return idx.slice(0, k).sort((a, b) => a - b).map((i) => arr[i]);
+}
+
+// --- 集計 ------------------------------------------------------------------
+
+export function survey(files, { samples = 3, seed = 1 } = {}) {
+  /** バケツ（住所 or ファイル） -> 施設クラスタの配列。1クラスタ = 1事業所 */
+  const byName = new Map();
+  const perFile = [];
+  // 「業種列が無い」と「業種列はあるが保管が0件」は意味が違うので区別する。
+  // 複数ファイルのうち一部しか業種列を持たない場合、保管0件を「意味のあるゼロ」と
+  // 断定できない（残りは判定されていない）ので、全ファイルが持つかを見る。
+  let filesWithKind = 0;
+  let filesEvaluated = 0;
+  // 事業所名の列を特定できずスキップしたファイル。中身に保管があっても集計されないので、
+  // 「全ファイルを評価した」と言ってはいけない。
+  let filesSkipped = 0;
+
+  for (const file of files) {
+    const rows = parseCsv(decode(readFileSync(file)));
+    // ⚠ 空ファイルを「評価済み」にも「スキップ」にも数えないと、残りのファイルだけで
+    //    allFilesHaveKind が true になり、保管0件を「意味のあるゼロ」と報告してしまう。
+    //    書き出しに失敗した CSV が混じっていても気づけないので、スキップとして数える。
+    if (!rows.length || rows.every((r) => r.every((c) => !String(c ?? "").trim()))) {
+      filesSkipped++;
+      perFile.push({ file, rows: 0, note: "⚠ 空ファイル（スキップ）" });
+      continue;
+    }
+
+    const h = findHeader(rows);
+    if (h < 0) {
+      filesSkipped++;
+      perFile.push({ file, rows: rows.length, note: "⚠ ヘッダ行を特定できず（スキップ）" });
+      continue;
+    }
+    const header = rows[h].map((c) => c.trim());
+    // 名前列は**優先順位つきで複数**保持する。「屋号」を優先しつつ、
+    // その行で空なら「事業所の名称」へ落ちる（屋号は任意入力の登録簿が多く、
+    // 1列に固定すると空の行を丸ごと捨ててしまう）。
+    const nameIdxsAll = pickColumns(header, NAME_PATTERNS, { exclude: NAME_EXCLUDE });
+    // ⚠ 「飼養施設の名称」を施設の別名に混ぜないこと（住所と同じ理由）。
+    //    /施設.*名/ が拾ってしまうため明示的に外す。共同の犬舎を使う2つの事業所が
+    //    その名前を共有して1件に潰れる（「ABCトリミング」と「犬の保育園XYZ」が
+    //    どちらも「共同犬舎」を持つと統合されてしまう）。
+    //    ただし飼養施設名しか列が無い登録簿では手掛かりが消えるので、その場合は使う。
+    const nameIdxsFacility = nameIdxsAll.filter((i) => !/飼養|飼育/.test(header[i]));
+    const nameIdxs = nameIdxsFacility.length ? nameIdxsFacility : nameIdxsAll;
+    const nameIdx = nameIdxs.length ? nameIdxs[0] : -1;
+    // 「業種」の列。法定様式では「業の種類」表記もある。
+    // 一方で「動物種別」「取扱動物の種類」といった**動物の種類**の列が併存するため、
+    // 汎用の /種別|種類/ でそれを掴まないよう除外する。
+    const kindIdxsRaw = pickColumns(
+      header,
+      [/業種/, /業の種類/, /業.*区分/, /登録.*種別/, /種別/, /種類/],
+      // 除外は**動物の種類**を指す見出しに限る。/動物/ で丸ごと弾くと、
+      // 法定の「動物取扱業種別」まで落ちて、そのファイルが集計から消える。
+      // 「動物の種別」のように助詞が入る表記もあるため /動物の?種別/ で拾う
+      // （「動物取扱業種別」は 動物 の直後が「取」なので該当しない）。
+      { exclude: [/動物の?種別/, /動物の?種類/, /取扱動物/, /品種/, /犬種/, /哺乳|鳥類|爬虫/] },
+    );
+    // 「業種1」「業種2」のように登録業種が複数列に分かれる登録簿があるため、
+    // 1列だけ読むと保管を取り逃す。該当する列は**すべて**見る。
+    // さらに、見出しが当たっても**中身が法定業種でない列は捨てる**
+    // （「事業者種別=法人/個人」を業種列と誤認すると、評価済み扱いのまま
+    //   保管ゼロを「意味のあるゼロ」と報告してしまう）。
+    const dataRows = rows.slice(h + 1);
+    const validKindIdxs = kindIdxsRaw.filter((i) =>
+      dataRows.some((r) => STATUTORY_KINDS.some((re) => re.test(normalize(r[i] ?? "")))),
+    );
+    const kindIdxs = validKindIdxs;
+    // 業種を1列ずつ並べて○を付ける様式（見出しが「販売」「保管」「訓練」…）。
+    // この形は上の見出しパターンに1つも当たらないため、拾わないとファイルごと
+    // 「業種列なし」になって、比率（＝推定の本体）が出せなくなる。
+    // ⚠ 2列以上あるときだけ採る。1列だけの一致は偶然（「販売」という名前の
+    //    別の列）の可能性があるため。
+    const kindMatrixIdxsRaw = header
+      .map((c, i) => (KIND_HEADER.test(normalize(c)) ? i : -1))
+      .filter((i) => i >= 0);
+    // ⚠ 「2列以上あること」で判定してはいけない。業種で絞り込んだ抜粋
+    //    （「事業所名,所在地,保管」の1列だけ）が捨てられ、集計不能になる。
+    //    代わりに**中身がマーカー（○×・TRUE/FALSE 等）か**で検証する。
+    //    「販売」という名前の自由記述列を業種列と誤認しないための判定でもある。
+    //    表記ゆれ（「○（H30）」等）を許すため、非空セルの8割以上がマーカーなら採る。
+    const looksMarkerColumn = (i) => {
+      const vals = dataRows
+        .map((r) => normalize(r[i] ?? ""))
+        // ⚠ 繰り返されたヘッダ行の値（見出しと同じ文字列）は母数から外す。
+        //    入れると「保管」という語がマーカー以外として数えられ、
+        //    行数の少ない登録簿では割合が閾値を割って業種列ごと捨ててしまう。
+        .filter((v) => v && v !== normalize(header[i]));
+      if (!vals.length) return false;
+      const hit = vals.filter((v) => MARKER_VALUE.test(v)).length;
+      return hit / vals.length >= 0.8;
+    };
+    const kindMatrixIdxs = kindMatrixIdxsRaw.filter(looksMarkerColumn);
+    /** その行に登録されている業種を、両様式（値型・○×型）から集める。 */
+    const kindsOf = (r) => [
+      ...kindIdxs.map((i) => normalize(r[i] ?? "")).filter(Boolean),
+      ...kindMatrixIdxs
+        .filter((i) => {
+          const v = normalize(r[i] ?? "");
+          return v && !NEGATIVE_MARK.test(v);
+        })
+        .map((i) => normalize(header[i])),
+    ];
+    const hasKindColumn = kindIdxs.length > 0 || kindMatrixIdxs.length > 0;
+    const kindColumnNames = [...kindIdxs, ...kindMatrixIdxs].map((i) => header[i]);
+    // 結合セル由来の「継続行」に埋まっていてよい列。
+    // 継続行は業種そのもの（と、業種ごとに振られる登録番号・登録年月日）だけが埋まり、
+    // 他は空という形をしている。この形を要求しないと、集計行・注記行
+    // （「,保管,10件」等）まで直前の施設の続きとして取り込んでしまう。
+    const contAllowedIdxs = new Set([
+      ...kindIdxs,
+      ...kindMatrixIdxs,
+      ...pickColumns(header, [
+        /登録番号/, /許可番号/, /番号/,
+        /登録.*年月日/, /有効期間/, /登録日/, /更新/, /年月日/,
+      ]),
+    ]);
+    // 名寄せの鍵は「屋号＋所在地」（＝店舗の実体）。登録番号は業種ごとに振られる
+    // 自治体があり、鍵に使うと1店舗が業種の数だけ二重計上されるため使わない。
+    // ⚠ 順序に意味がある。「事業者所在地」と「事業所所在地」が併存する場合、
+    // 汎用の /所在地/ を先に置くと**事業者（本社）の住所**を掴み、
+    // 同じ屋号の別店舗が1件に潰れる。施設固有の見出しを先に。
+    // 「所在地（市区町村）」「所在地（町名番地）」のように住所が複数列に分かれる登録簿が
+    // あるため、**該当する列をすべて連結**する。1列だけ読むと、市区町村だけが鍵になって
+    // その自治体の全事業所が1件に潰れる。
+    // ⚠ 「事業者（本社）所在地」を鍵に混ぜないこと。ある業種の行では埋まっていて
+    //    別の業種の行では空、という登録簿があり、混ぜると同じ施設が別バケツに割れて
+    //    **二重計上**される。施設側の住所列が1つでもあるならそちらだけを使い、
+    //    施設側が存在しない登録簿（1事業者1事業所の様式）でのみ事業者住所に落ちる。
+    // ⚠ 「飼養施設所在地」も混ぜないこと。事業所とは**別の住所**（動物を飼育する
+    //    施設）であり、行によって空だったり事業所と違ったりするため、連結すると
+    //    同じ事業所が別バケツに割れる。/施設.*所在/ が拾ってしまうので明示的に外す。
+    // ⚠ 「所在地」「住所」を含まない見出しで住所を分割する登録簿がある
+    //    （「市区町村」「町名番地」の2列）。拾わないと全行が住所なしバケツに入り、
+    //    同名の別店舗が1件に潰れて業種まで合算される。
+    //    コード列（「市区町村コード」）は住所ではないので除く。
+    const addrIdxsAll = pickColumns(header, [
+      /事業所.*所在/, /施設.*所在/, /店舗.*所在/,
+      /事業所.*住所/, /施設.*住所/, /店舗.*住所/,
+      /所在地/, /住所/,
+      /市区町村/, /町名/, /番地/, /丁目/, /大字/,
+    ], { exclude: [/コード/, /code/i, /番号/] });
+    const isHousingAddr = (i) => /飼養|飼育|保管場所/.test(header[i]);
+    const isOperatorAddr = (i) => OPERATOR_ADDR_HEADINGS.some((re) => re.test(header[i]));
+    // ①事業所の住所 → ②飼養施設の住所 → ③事業者の住所、の順に**先に見つかった層だけ**を使う。
+    // 層を跨いで連結しないのが要点（意味の違う住所を1つの鍵に混ぜない）。
+    const addrIdxsOffice = addrIdxsAll.filter((i) => !isHousingAddr(i) && !isOperatorAddr(i));
+    const addrIdxsHousing = addrIdxsAll.filter((i) => !isOperatorAddr(i));
+    const addrIdxs = addrIdxsOffice.length
+      ? addrIdxsOffice
+      : (addrIdxsHousing.length ? addrIdxsHousing : addrIdxsAll);
+    const addrIdx = addrIdxs.length ? addrIdxs[0] : -1;
+
+    if (nameIdx < 0) {
+      filesSkipped++;
+      perFile.push({ file, rows: rows.length - h - 1, note: "⚠ 事業所名の列を特定できず（スキップ）" });
+      continue;
+    }
+
+    let n = 0;
+    let sitelessRows = 0;
+    let unqualifiedAddrRows = 0;
+    let namelessOtherRows = 0;
+    let repeatedHeaderRows = 0;
+    let lastEntry = null;
+    // 継続行の判定に使う「直前の（名前が入っていた）行」そのもの
+    let lastRow = null;
+    // 見出し行が節・ページごとに繰り返される登録簿がある。
+    // ⚠ ○×様式ではこれが致命的で、業種列に「保管」という**文字**が入っているため
+    //    「保管に○が付いた事業所」として数えられ、名前列の見出し（「事業所の名称」）が
+    //    幽霊の事業所になる。分母 hokan が実数より増えて比率が歪む。
+    const headerKey = header.map(normalize);
+    const isRepeatedHeader = (r) => {
+      let matched = 0;
+      for (let i = 0; i < headerKey.length; i++) {
+        const v = normalize(r[i] ?? "");
+        if (!v) continue;
+        if (v !== headerKey[i]) return false;
+        matched++;
+      }
+      // 1セル一致は偶然（「保管」だけの継続行など）があり得るので2セル以上を要求する
+      return matched >= 2;
+    };
+    for (const r of dataRows) {
+      if (isRepeatedHeader(r)) { repeatedHeaderRows++; continue; }
+      // 候補列の値を**すべて**拾う。行によって埋まっている列が違うため、
+      // 「その行で最初に埋まっていた値」を鍵にすると同じ店舗が割れる。
+      // 列の優先順位（屋号 > 事業所名 > … > 法人名）を**保持したまま**拾う。
+      // 順位を捨てて集約すると、法人名（「犬の保育園株式会社」）が実際の店舗の
+      // 屋号（「ABCトリミング」）を上書きしてしまう。
+      const rowNamed = nameIdxs
+        .map((i, rank) => ({
+          name: (r[i] ?? "").trim(),
+          rank,
+          operator: isOperatorName(header[i]),
+        }))
+        .filter((x) => x.name);
+      const rowNames = rowNamed.map((x) => x.name);
+      // Excel の結合セルを CSV 化すると、業種ごとに「,保管,」のような**継続行**が出る。
+      // 名前が空だからと捨てると、その施設の保管登録が丸ごと失われる。
+      // 直前の施設に業種だけを足す。
+      if (!rowNames.length) {
+        const contKinds = kindsOf(r);
+        // ⚠ 名前が空＝継続行、ではない。小計行・注記行（「,保管,10件」のように
+        //    業種列に文字があり、別の列にも値が入る行）を取り込むと、直前の施設に
+        //    **偽の保管**が付いて分母（hokan）と「意味のあるゼロ」が汚れる。
+        //    継続行の形（業種・登録番号・年月日以外はすべて空）に合う行だけ足す。
+        // ただし**名前セルだけが結合**されている場合、住所・責任者などの識別情報は
+        // 業種ごとの行にそのまま繰り返される（「,柏市中央1-1,山田,保管」）。
+        // **直前の施設行と同じ値**が入っているだけの列は継続行の証拠であって、
+        // 注記行の値ではない（小計の「10件」は直前の行と一致しない）。
+        const repeatsPrev = (i, v) =>
+          lastRow !== null && normalize(lastRow[i] ?? "") === normalize(v);
+        const shapeOk = r.every(
+          (v, i) => !String(v ?? "").trim()
+            || contAllowedIdxs.has(i)
+            || repeatsPrev(i, v),
+        );
+        if (lastEntry && contKinds.length && shapeOk) {
+          n++;
+          for (const k of contKinds) lastEntry.kinds.add(k);
+        } else if (contKinds.length) {
+          namelessOtherRows++;
+        }
+        continue;
+      }
+      n++;
+      // 業種の値は表記ゆれ（「保　管」等）があるので正規化してから保持する
+      const kinds = kindsOf(r);
+      // 数えたいのは「事業所（店舗）」であって「登録（ライセンス）」ではない。
+      //   - 同じ店舗が業種ごとに複数行  → まとめたい
+      //   - 同名の別店舗（チェーン等）  → 分けたい
+      // 登録番号は**業種ごとに別番号**が振られる自治体があり、それを鍵にすると
+      // 1店舗が業種の数だけ二重計上される。したがって鍵は
+      // **正規化した屋号 + 所在地**（＝店舗の実体）とし、登録番号は鍵に使わない。
+      const rawAddr = addrIdxs.map((i) => (r[i] ?? "").trim()).filter(Boolean).join("");
+      const addr = normalizeAddress(rawAddr);
+      if (!addr) sitelessRows++;
+      // 相対住所（「中央1-1」等）は自治体をまたぐと衝突するので、
+      // その行だけファイル名で名前空間を切る。全国で一意な住所ならファイル横断で名寄せする
+      // （自治体が業種ごとに別 CSV を出すケースを潰さないため）。
+      const qualified = addr ? isQualifiedAddress(addr) : false;
+      if (addr && !qualified) unqualifiedAddrRows++;
+      // ⚠ 住所が空のときに `${file}|` のような truthy な鍵を作らないこと。
+      //    作ると住所の無い行が**全部1件に統合**される。
+      const bucket = addr
+        ? (qualified ? `site::${addr}` : `site::${file}|${addr}`)
+        : `noaddr::${file}`;
+
+      // 同じ住所でも**別テナント**（屋号が全く違う）は別施設として数える。
+      // 逆に、行ごとに埋まる列が違って呼称が揺れるケースは**別名を共有していれば**統合する。
+      const norm = rowNames.map(normalize);
+      // 一致判定に使う別名は**施設名（屋号・事業所名）のみ**。法人名まで含めると、
+      // 同じ法人が同じ住所で出している別業態の店舗が1件に潰れる。
+      // ただし施設名が空の行（業種ごとに行が分かれ、屋号列がその行だけ空の登録簿）は
+      // 法人名しか手掛かりが無いので、いったん**法人名だけのクラスタ**に溜め、
+      // 全行を読み終えてから施設へ寄せる（下の reconcile）。
+      // ⚠ ここで「法人名が一致する施設が1つだけならその場で寄せる」としてはいけない。
+      //    法人名だけの行が先に来るか後に来るかで結果が変わる（行順依存）。
+      const facilityNorm = rowNamed.filter((x) => !x.operator).map((x) => normalize(x.name));
+      const operatorNorm = rowNamed.filter((x) => x.operator).map((x) => normalize(x.name));
+      const clusters = byName.get(bucket) ?? [];
+      let hit = [];
+      if (facilityNorm.length) {
+        for (const c of clusters) {
+          if (facilityNorm.some((nm) => c.facilityNames.has(nm))) hit.push(c);
+        }
+      } else {
+        // 施設名が無い行どうしは、同じ住所・同じ法人ならまとめる。
+        hit = clusters.filter(
+          (c) => c.facilityNames.size === 0 && operatorNorm.some((nm) => c.operatorNames.has(nm)),
+        );
+      }
+      let entry;
+      if (!hit.length) {
+        entry = {
+          names: new Set(), normNames: new Set(),
+          facilityNames: new Set(), operatorNames: new Set(),
+          // 目視補正のために、屋号だけでは特定できない事業所を人が調べられるよう
+          // 住所と出典ファイルを保持する（「株式会社XYZ」が複数店ある場合の識別）。
+          sites: new Set(), files: new Set(),
+          kinds: new Set(), ranked: [],
+        };
+        clusters.push(entry);
+        byName.set(bucket, clusters);
+      } else {
+        // 複数クラスタに跨って一致したら1つに畳む（推移的に同一施設とみなす）
+        entry = hit[0];
+        for (const other of hit.slice(1)) {
+          for (const v of other.names) entry.names.add(v);
+          for (const v of other.normNames) entry.normNames.add(v);
+          for (const v of other.facilityNames) entry.facilityNames.add(v);
+          for (const v of other.operatorNames) entry.operatorNames.add(v);
+          for (const v of other.sites) entry.sites.add(v);
+          for (const v of other.files) entry.files.add(v);
+          for (const v of other.kinds) entry.kinds.add(v);
+          entry.ranked.push(...other.ranked);
+          clusters.splice(clusters.indexOf(other), 1);
+        }
+      }
+      rowNamed.forEach((x, i) => {
+        entry.names.add(x.name);
+        entry.normNames.add(norm[i]);
+        (x.operator ? entry.operatorNames : entry.facilityNames).add(norm[i]);
+        entry.ranked.push(x);
+      });
+      for (const k of kinds) entry.kinds.add(k);
+      if (rawAddr) entry.sites.add(rawAddr);
+      entry.files.add(file);
+      lastEntry = entry;
+      lastRow = r;
+    }
+    const idNote = addrIdx >= 0
+      ? "所在地で名寄せ（屋号は別名として集約）"
+      : "⚠ 所在地列が無く屋号のみで名寄せ（同名の別店舗を1件に潰す＝過小計上）";
+    const sitelessNote = sitelessRows
+      ? `⚠ 所在地が空の行 ${sitelessRows} 件（同名なら潰れる＝過小計上）`
+      : "";
+    const unqualifiedNote = unqualifiedAddrRows
+      ? `⚠ 都道府県/市区町村から始まらない住所 ${unqualifiedAddrRows} 件`
+        + `（自治体をまたぐ衝突を避けるためファイル単位で分離。同一自治体を複数 CSV に`
+        + `分けている場合は結合してから渡すこと）`
+      : "";
+    const repeatedHeaderNote = repeatedHeaderRows
+      ? `見出し行の繰り返し ${repeatedHeaderRows} 件を除外`
+      : "";
+    const namelessNote = namelessOtherRows
+      ? `⚠ 事業所名が空で業種だけがある行 ${namelessOtherRows} 件を無視`
+        + `（結合セルの継続行の形に合わない＝小計行・注記行の可能性。継続行なら`
+        + `業種以外の列が埋まっていないはず）`
+      : "";
+    // ヘッダが表の深い位置にあった場合は報告する（本物のヘッダか人が確認できるように）
+    const headerNote = h > 20
+      ? `⚠ ヘッダ行が ${h + 1} 行目（表題・注記が長い可能性。列の並びを確認すること）`
+      : "";
+    filesEvaluated++;
+    if (hasKindColumn) filesWithKind++;
+    perFile.push({
+      file,
+      rows: n,
+      kindColumns: kindColumnNames,
+      note: [!hasKindColumn ? "業種列なし（保管の判定は不可）" : `業種列=「${kindColumnNames.join("」「")}」`
+        + (kindMatrixIdxs.length ? "（業種ごとの○×様式）" : ""), headerNote, idNote, sitelessNote, unqualifiedNote, namelessNote, repeatedHeaderNote]
+        .filter(Boolean).join(" / "),
+    });
+  }
+
+  // --- 法人名だけの行を施設へ寄せる（全ファイルを読み終えてから行う） -----------
+  // 業種ごとに行が分かれる登録簿では、屋号列が空で法人名しか無い行が出る。
+  // これを行の出現順で寄せると「先に法人名だけの行が来るか」で結果が変わるため、
+  // **全行を読み終えてから**、同じ住所・同じ法人の施設が1つに絞れる場合だけ寄せる。
+  // ⚠ 2つ以上あるとき（同じ法人が同じ住所で複数業態を出しているとき）は寄せない。
+  //    どちらの登録か判別できず、寄せ先を選ぶと行順で結果が変わる推測になる。
+  for (const clusters of byName.values()) {
+    for (const anon of clusters.filter((c) => c.facilityNames.size === 0)) {
+      const named = clusters.filter(
+        (c) => c.facilityNames.size > 0
+          && [...anon.operatorNames].some((nm) => c.operatorNames.has(nm)),
+      );
+      if (named.length !== 1) continue;
+      const target = named[0];
+      for (const v of anon.names) target.names.add(v);
+      for (const v of anon.normNames) target.normNames.add(v);
+      for (const v of anon.operatorNames) target.operatorNames.add(v);
+      for (const v of anon.sites) target.sites.add(v);
+      for (const v of anon.files) target.files.add(v);
+      for (const v of anon.kinds) target.kinds.add(v);
+      target.ranked.push(...anon.ranked);
+      clusters.splice(clusters.indexOf(anon), 1);
+    }
+  }
+
+  // 1つの事業所に複数の呼称（法人名・屋号）が集まるので、
+  // **業態が判別できる呼称**を優先して分類する（法人名だけ見て unknown にしない）。
+  const entries = [...byName.values()].flat().map((e) => {
+    const names = [...e.names];
+    // 分類の優先順位は **①列の優先度（屋号＞…＞法人名） → ②RULES の宣言順**。
+    //   ① を先に見るのは、実際の店舗を表すのは屋号であって法人名ではないため
+    //      （「屋号=ABCトリミング / 法人名=犬の保育園株式会社」は grooming）。
+    //   ② を後段に置くのは、同順位で複数の別名が並んだときに CSV の行順で
+    //      結果が変わらないようにするため。
+    const order = [...RULES.map((r) => r.key), "non_dog"];
+    const rank2 = (c) => { const i = order.indexOf(c); return i < 0 ? order.length : i; };
+    const ranked = [...e.ranked]
+      .map((x) => ({ ...x, c: classify(x.name) }))
+      .sort((a, b) => a.rank - b.rank || rank2(a.c) - rank2(b.c));
+    // ⚠ 事業者名（法人名）で業態を決めない。「屋号=ABC / 法人名=犬の保育園株式会社」は、
+    //    法人が別業態の店舗も持ちうる以上、この事業所が保育園である証拠にならない。
+    //    施設名が unknown なら unknown のまま残す（上限側に効くので推定は歪まない）。
+    //    法人名しか無い登録簿でだけ、従来どおり法人名から分類する。
+    const facilityRanked = ranked.filter((x) => !x.operator);
+    const pool = facilityRanked.length ? facilityRanked : ranked;
+    let category = "unknown";
+    let display = pool[0]?.name ?? names[0] ?? "";
+    const first = pool.find((x) => x.c !== "unknown");
+    if (first) { category = first.c; display = first.name; }
+    return {
+      name: display, names, category, kinds: e.kinds,
+      sites: [...e.sites], files: [...e.files],
+    };
+  });
+  const counts = {};
+  const examples = {};
+  for (const rule of ALL_CATEGORIES()) {
+    counts[rule.key] = 0;
+    examples[rule.key] = [];
+  }
+  let hokan = 0;
+  let hokanDaycare = 0;
+  let hokanTraining = 0;
+  let hokanUnknown = 0;
+  // 手作業で目視補正する対象は「不明」全体ではなく **保管を持つ不明**。
+  // examples.unknown は業種を問わず先頭から埋まるため、販売の不明が先に並ぶ
+  // 登録簿では hokanUnknown の中身が1件も入らないことがあり、それを分類しても
+  // daycareRatioLow の補正にならない（market-analysis.md §18-4 の手順が空振りする）。
+  const hokanUnknownAll = [];
+
+  for (const e of entries) {
+    counts[e.category] = (counts[e.category] ?? 0) + 1;
+    if (examples[e.category].length < samples) examples[e.category].push(e.name);
+    const isHokan = [...e.kinds].some((k) => HOKAN_PATTERNS.some((re) => re.test(normalize(k))));
+    if (isHokan) {
+      hokan++;
+      if (e.category === "daycare") hokanDaycare++;
+      // 「保管」を持つしつけ・訓練施設は、預かって面倒を見ている＝保育園業態。
+      // market-analysis.md §18-6 が「定期通園するしつけ教室はターゲットに含む」と
+      // 定めているので、分子から落とすと過小評価になる。
+      if (e.category === "training") hokanTraining++;
+      if (e.category === "unknown") {
+        hokanUnknown++;
+        // ⚠ 名前だけでは足りない。「株式会社XYZ」のような屋号は複数店が同名になり、
+        //    どの事業所を調べればよいか分からず目視分類が成立しない。
+        //    住所・出典ファイル・収集した別名を添えて、人が特定できるようにする。
+        hokanUnknownAll.push({
+          name: e.name, names: e.names, sites: e.sites, files: e.files,
+        });
+      }
+    }
+  }
+
+  // ⚠ 母集団の**先頭から N 件**を取ってはいけない。自治体の登録簿は住所順・
+  //    登録日順・区ごとに並んでいることが多く、先頭 N 件は特定の地域や時期に偏る。
+  //    その偏ったサンプルで求めた補正率を全体に適用すると推定が歪む。
+  // ⚠ 等間隔（固定位相）でも足りない。並びに step と同じ周期があると、
+  //    毎回同じ位置＝同じ地域・同じ登録時期ばかりを引く。
+  //    **全件が等しい確率で選ばれる**単純無作為抽出にする（sampleRandom の注記参照）。
+  //    乱数は seed から作るので、seed を控えれば同じサンプルを再現でき、
+  //    目視分類の結果を後から検証できる（`--seed` で引き直せる）。
+  const hokanUnknownExamples = sampleRandom(hokanUnknownAll, samples, seed);
+
+  // 全国推定に使うのは hokanDaycare / hokan なので、信頼度は
+  // 「全体の不明率」ではなく「保管の中の不明率」で測らないと誤認する。
+  // 例) 保管2件（うち不明1）＋ 販売8件 → 全体の不明率10% だが、分母の半分が不明。
+  const hokanUnknownRatio = hokan ? hokanUnknown / hokan : null;
+  // 分子は「保育園系」＋「保管を持つしつけ・訓練系」（＝定期通園の預かり業態）
+  const hokanTarget = hokanDaycare + hokanTraining;
+  // 不明を全部ターゲットと仮定した場合の上限（＝推定のブレ幅）
+  const daycareRatioLow = hokan ? hokanTarget / hokan : null;
+  const daycareRatioHigh = hokan ? (hokanTarget + hokanUnknown) / hokan : null;
+
+  return {
+    files: perFile,
+    filesWithKind,
+    filesEvaluated,
+    filesSkipped,
+    allFilesHaveKind:
+      filesEvaluated > 0 && filesWithKind === filesEvaluated && filesSkipped === 0,
+    total: entries.length,
+    counts,
+    examples,
+    hokan,
+    hokanDaycare,
+    hokanTraining,
+    hokanTarget,
+    hokanUnknown,
+    hokanUnknownExamples,
+    seed,
+    hokanUnknownRatio,
+    daycareRatioLow,
+    daycareRatioHigh,
+    unknownRatio: entries.length ? counts.unknown / entries.length : 0,
+  };
+}
+
+// --- CLI -------------------------------------------------------------------
+
+function main() {
+  const argv = process.argv.slice(2);
+  const asJson = argv.includes("--json");
+  // ⚠ 数値オプションの値を検証せずに次の引数を消費してはいけない。
+  //    `--samples data/kashiwa.csv` のような打ち間違いで、既定値に落ちたうえ
+  //    **その CSV が入力から静かに消える**（残りのファイルだけで集計が成功し、
+  //    全件読んだように見える）。数値でなければ即座に失敗させる。
+  const numOption = (flag, fallback) => {
+    const idx = argv.indexOf(flag);
+    if (idx < 0) return { idx, value: fallback };
+    const raw = argv[idx + 1];
+    if (raw === undefined || !/^\d+$/.test(raw) || Number(raw) < 1) {
+      console.error(
+        `エラー: ${flag} には1以上の整数を指定してください`
+        + `（受け取った値: ${raw === undefined ? "なし" : raw}）`,
+      );
+      process.exit(1);
+    }
+    return { idx, value: Number(raw) };
+  };
+  const { idx: sIdx, value: samples } = numOption("--samples", 3);
+  const { idx: seedIdx, value: seed } = numOption("--seed", 1);
+  const files = argv.filter(
+    (a, i) => !a.startsWith("--")
+      && !(sIdx >= 0 && i === sIdx + 1)
+      && !(seedIdx >= 0 && i === seedIdx + 1),
+  );
+
+  if (!files.length) {
+    console.error(`使い方: node scripts/survey-facilities.mjs <csv...> [--json] [--samples N] [--seed N]
+
+第一種動物取扱業者登録簿の CSV を渡すと、事業所名から業態を推定して集計します。
+登録簿は各自治体が公開しています（動愛法により知事に公開義務あり）。
+  例) 柏市・埼玉県・さいたま市・福岡県・大阪府 ほか
+      全国リンク集: https://animals-peace.net/companionanimal/link
+
+Excel しか無い自治体は CSV に書き出してから渡してください。`);
+    process.exit(1);
+  }
+
+  const r = survey(files, { samples, seed });
+  if (asJson) { console.log(JSON.stringify(r, null, 2)); return; }
+
+  console.log("=== 読み込み ===");
+  for (const f of r.files) console.log(`  ${f.file}: ${f.rows} 行 ${f.note}`);
+
+  console.log(`\n=== 事業所数（名寄せ後）: ${r.total} ===`);
+  const labelOf = Object.fromEntries(ALL_CATEGORIES().map((x) => [x.key, x.label]));
+  const ordered = Object.entries(r.counts).sort((a, b) => b[1] - a[1]);
+  for (const [key, n] of ordered) {
+    if (!n) continue;
+    const pct = ((n / r.total) * 100).toFixed(1);
+    console.log(`  ${String(labelOf[key]).padEnd(24)} ${String(n).padStart(5)} (${pct}%)`);
+    const ex = r.examples[key];
+    if (ex?.length) console.log(`      例: ${ex.join(" / ")}`);
+  }
+
+  const pct = (x) => `${(x * 100).toFixed(1)}%`;
+
+  if (r.hokan) {
+    console.log(`\n=== 業種「保管」で登録: ${r.hokan} 事業所（全国推定の分母） ===`);
+    console.log(`  うち屋号が保育園・幼稚園系  : ${r.hokanDaycare}`);
+    console.log(`  うちしつけ・訓練系（保管あり）: ${r.hokanTraining}  ← 定期通園の預かり業態として分子に含む`);
+    console.log(`  合計（推定の分子）          : ${r.hokanTarget}`);
+    console.log(`  うち屋号から判別不可        : ${r.hokanUnknown}`);
+    // 目視補正は**この一覧**に対して行う。カテゴリ別の「例」は業種を問わず先頭から
+    // 埋まるので、保管を持たない不明（販売など）が並び、補正の材料にならない。
+    if (r.hokanUnknownExamples.length) {
+      console.log(`      目視補正の抽出（無作為抽出 / seed=${r.seed}。--seed で引き直せる）:`);
+      for (const x of r.hokanUnknownExamples) {
+        // ⚠ 名前だけを並べない。同名の別店舗（「株式会社XYZ」等）が並ぶと
+        //    どれを調べるのか分からず、目視分類が成立しない。
+        const where = x.sites.length ? x.sites.join(" / ") : "住所不明";
+        const alias = x.names.length > 1 ? `［別名: ${x.names.join("・")}］` : "";
+        console.log(`        - ${x.name}${alias} @ ${where}  (${x.files.join(", ")})`);
+      }
+    }
+    console.log(`  ※「保管」にはホテル・トリミング・シッターも含まれるため、これは上限（天井）。`);
+    console.log(`\n  対象業態の比率（全国推定に掛ける値）:`);
+    console.log(`    下限 ${pct(r.daycareRatioLow)}  … 不明を全部「対象業態でない」とみなす`);
+    console.log(`    上限 ${pct(r.daycareRatioHigh)}  … 不明を全部「対象業態」とみなす`);
+    console.log(`    → この幅がそのまま全国推定のブレ幅になる。`);
+    if (!r.allFilesHaveKind) {
+      console.log(`\n  ⚠ この比率は入力の一部だけから計算されている`);
+      console.log(`     （業種列を読めたのは ${r.filesWithKind}/${r.filesEvaluated} ファイル`
+        + `${r.filesSkipped ? `、さらに ${r.filesSkipped} ファイルは列を特定できずスキップ` : ""}）。`);
+      console.log(`     残りのファイルの事業所は分母に入っていないため、そちらの業態構成が`);
+      console.log(`     違えば比率は偏る。全国推定に使う前に、全ファイルで業種列を読める状態にすること。`);
+    }
+  } else if (r.allFilesHaveKind) {
+    console.log(`\n=== 業種「保管」で登録: 0 事業所 ===`);
+    console.log(`  全ファイルで業種列を読めており、保管の登録が1件も無い（＝意味のあるゼロ）。`);
+    console.log(`  該当自治体に保管業態が無いのか、業種の表記が想定と違うのかを確認すること。`);
+  } else if (r.filesWithKind > 0) {
+    console.log(`\n=== 業種「保管」で登録: 0 事業所（⚠ 部分的な結果） ===`);
+    console.log(`  業種列を読めたのは ${r.filesWithKind}/${r.filesEvaluated} ファイルだけ`
+      + `${r.filesSkipped ? `、さらに ${r.filesSkipped} ファイルはスキップ` : ""}。`);
+    console.log(`  残りは保管かどうか判定できていないため、このゼロは「保管が無い」ことを意味しない。`);
+    console.log(`  業種列のあるファイルだけで集計し直すか、列名を確認すること。`);
+  } else {
+    console.log(`\n※ 業種列が無いため「保管」の集計は不可。屋号ベースの推定のみ。`);
+  }
+
+  console.log(`\n=== 信頼度 ===`);
+  console.log(`  全体の不明率: ${pct(r.unknownRatio)}`);
+  if (r.hokanUnknownRatio !== null) {
+    console.log(`  保管内の不明率: ${pct(r.hokanUnknownRatio)}  ← こちらが推定の信頼度`);
+    if (r.hokanUnknownRatio > 0.4) {
+      console.log(`  ⚠ 分母（保管）の4割超が判別不可。この比率で全国推定してはいけない。`);
+      console.log(`     保管の事業所を100件サンプリングして目視分類し、補正率を出すこと。`);
+    }
+  }
+  if (r.unknownRatio > 0.4) {
+    console.log(`  ⚠ 全体の不明率も高い。屋号に業態が出ない事業所が多い。`);
+  }
+  console.log(`\n注: これは推定であって census ではない。docs/explanation/market-analysis.md §2 参照。`);
+}
+
+// ⚠ `file://${process.argv[1]}` と比較しないこと。Windows では argv[1] が
+//    `C:\repo\scripts\...` で import.meta.url は `file:///C:/repo/...` なので
+//    一致せず、main() が呼ばれないまま黙って終了する。
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
