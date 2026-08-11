@@ -49,6 +49,23 @@ function addDays(iso: string, n: number): string {
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
 }
 
+/**
+ * YYYY-MM-DD が**実在する日**か。?open= は日別シートの見出し（Intl の format）へ
+ * そのまま渡るので、形だけの検査では足りない —— 2026-99-99 のような値を通すと
+ * Invalid Date になり、カレンダーごと RangeError で落ちる。
+ */
+function isRealDate(iso: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const t = new Date(Date.UTC(y, mo - 1, d));
+  return (
+    t.getUTCFullYear() === y &&
+    t.getUTCMonth() === mo - 1 &&
+    t.getUTCDate() === d
+  );
+}
+
 /** iso を含む週（日曜はじまり）の 7 日。 */
 function weekOf(iso: string): string[] {
   const [y, m, d] = iso.split("-").map(Number);
@@ -237,9 +254,7 @@ export default async function CalendarPage({
         initialView={view === "week" ? "week" : "month"}
         // タブバーの「作成」→「予定」から来たときだけ、その日の日別シートを
         // 開いた状態で始める（不正値は無視する）
-        initialOpenDate={
-          canAdd && /^\d{4}-\d{2}-\d{2}$/.test(open ?? "") ? open! : null
-        }
+        initialOpenDate={canAdd && open && isRealDate(open) ? open : null}
         weekNav={{
           prevHref: weekHref(addDays(weekDays[0], -7)),
           nextHref: weekHref(addDays(weekDays[0], 7)),
