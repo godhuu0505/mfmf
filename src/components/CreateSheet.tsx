@@ -165,37 +165,43 @@ export default function CreateSheet() {
             </div>
           </div>
 
-          <div className="mb-2 flex flex-col gap-2">
+          {/* 選択肢はアプリの他のシート（RecordActionsSheet）と同じ行グループに
+              揃える —— 角丸のかたまりに行を積み、アイコンは h-5・muted */}
+          <div className="mb-2 overflow-hidden rounded-xl bg-surface-muted">
             <button
               type="button"
               onClick={createPlan}
-              className="flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-left transition hover:bg-surface-muted"
+              className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-muted"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-muted text-foreground">
-                <CalendarPlus className="h-5 w-5" aria-hidden="true" />
-              </span>
+              <CalendarPlus
+                className="h-5 w-5 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
               <span className="min-w-0">
-                <b className="block text-base font-bold text-foreground">
+                <span className="block text-sm font-medium text-foreground">
                   予定
-                </b>
+                </span>
                 <span className="block text-xs text-muted-foreground">
                   これからの予定を入れる（担当・時間も決められます）
                 </span>
               </span>
             </button>
 
+            <div className="border-t border-border" />
+
             <button
               type="button"
               onClick={createRecord}
-              className="flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-left transition hover:bg-surface-muted"
+              className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-muted"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-muted text-foreground">
-                <NotebookPen className="h-5 w-5" aria-hidden="true" />
-              </span>
+              <NotebookPen
+                className="h-5 w-5 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
               <span className="min-w-0">
-                <b className="block text-base font-bold text-foreground">
+                <span className="block text-sm font-medium text-foreground">
                   記録
-                </b>
+                </span>
                 <span className="block text-xs text-muted-foreground">
                   あったことを残す（写真・体重もつけられます）
                 </span>
