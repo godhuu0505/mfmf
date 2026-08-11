@@ -323,6 +323,9 @@
   .mt-6 {
     margin-top: calc(var(--spacing) * 6);
   }
+  .mt-8 {
+    margin-top: calc(var(--spacing) * 8);
+  }
   .mb-1 {
     margin-bottom: var(--spacing);
   }
@@ -738,6 +741,9 @@
   .pt-3 {
     padding-top: calc(var(--spacing) * 3);
   }
+  .pt-4 {
+    padding-top: calc(var(--spacing) * 4);
+  }
   .pt-9 {
     padding-top: calc(var(--spacing) * 9);
   }
@@ -820,6 +826,9 @@
   }
   .text-foreground {
     color: var(--foreground);
+  }
+  .text-muted {
+    color: var(--muted);
   }
   .text-muted-foreground {
     color: var(--muted-foreground);
@@ -1490,6 +1499,9 @@ input[type="date"] {
     <div data-detail-grid class="grid grid-cols-2 gap-2 sm:grid-cols-3"></div>
     <p data-detail-note class="mt-1.5 text-xs text-muted-foreground"></p>
   </section>
+
+  <!-- 前後の記録ナビ（既存の UC-D01。ライトボックスとは別の、記録単位の移動） -->
+  <nav data-detail-nav aria-label="前後の記録" class="mt-8 flex items-center justify-between border-t border-border pt-4 text-sm"></nav>
 </main>
 
 <!-- ===== ボトムタブバー（AppTabBar 相当。フォーム画面では出さない） ===== -->
@@ -1865,6 +1877,7 @@ input[type="date"] {
 
   let confirmAction = null;
   let confirmPrevFocus = null;
+  let confirmPrevOverflow = "";
   let confirmInertTargets = [];
   function askConfirm({ title, message, label, danger, onOk }) {
     $("[data-confirm-title]").textContent = title;
@@ -1886,6 +1899,10 @@ input[type="date"] {
       (el) => el instanceof HTMLElement && el !== dialog,
     );
     confirmInertTargets.forEach((el) => { el.inert = true; });
+    // inert では背景のスクロールは止まらない。長いフォームだと閉じたときに
+    // 別の位置へ動いてしまう（本番の FormConfirm も overflow を固定している）
+    confirmPrevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     requestAnimationFrame(() => ok.focus({ preventScroll: true }));
   }
   // restoreFocus=false は「実行すると画面が入れ替わる」場合。元のボタンへ戻すと
@@ -1895,6 +1912,7 @@ input[type="date"] {
     confirmAction = null;
     confirmInertTargets.forEach((el) => { el.inert = false; });
     confirmInertTargets = [];
+    document.body.style.overflow = confirmPrevOverflow;
     if (restoreFocus) confirmPrevFocus?.focus({ preventScroll: true });
     confirmPrevFocus = null;
   }
@@ -2414,7 +2432,9 @@ input[type="date"] {
       clearTimeout(timer);
       // 複数本を並行して処理することがあるので、打ち切りの判断はアイテム単位で行う
       // （共通のカウンタだと、後から始まった生成が先のものを取り消してしまう）
-      if (!itemExists(item)) return;
+      // 取り消されていても**必ず resolve する**。返さないと processing が
+      // 立ったままになり、次にフォームを開いても保存できなくなる
+      if (!itemExists(item)) { done(); return; }
       try {
         // 4K をそのまま載せると 30MB 超のバッファを確保してしまう
         const MAX = 640;
@@ -2534,11 +2554,13 @@ input[type="date"] {
   }
 
   // ---------------- 描画: ホーム ----------------
+  // 本番の一覧は record_date の降順。日付を編集したら並びも追従する。
+  // 詳細の前後ナビもこの並びで辿るので、1か所にまとめる
+  const sortedRecords = () =>
+    state.records.slice().sort((a, b) => b.date.localeCompare(a.date));
+
   function renderHome() {
-    // 本番の一覧は record_date の降順。日付を編集したら並びも追従する
-    $("[data-home-list]").innerHTML = state.records
-      .slice()
-      .sort((a, b) => b.date.localeCompare(a.date))
+    $("[data-home-list]").innerHTML = sortedRecords()
       .map((r) => {
         const first = r.media[0];
         const nPhoto = r.media.filter((m) => m.kind === "photo").length;
@@ -2614,6 +2636,30 @@ input[type="date"] {
       b.addEventListener("click", () =>
         openLightbox(current()?.media ?? [], Number(b.dataset.openMedia)),
       ),
+    );
+
+    // 前後の記録ナビ（UC-D01）。一覧と同じ並び（記録の日付の新しい順）で辿る。
+    // ライトボックスの送りは「メディア」単位、こちらは「記録」単位で別物
+    const order = sortedRecords();
+    const i = order.findIndex((x) => x.id === r.id);
+    const prev = order[i + 1] ?? null; // 1つ古い記録
+    const next = order[i - 1] ?? null; // 1つ新しい記録
+    const link = (rec, rel, label) =>
+      rec
+        ? `<button type="button" data-detail-go="${rec.id}" rel="${rel}"
+             class="font-medium text-muted-foreground transition hover:text-foreground">${label}</button>`
+        : `<span class="text-muted">${rel === "prev" ? "前の記録なし" : "次の記録なし"}</span>`;
+    const nav = $("[data-detail-nav]");
+    nav.hidden = !prev && !next;
+    nav.innerHTML =
+      link(prev, "prev", `← ${prev ? esc(formatFullDate(prev.date)) : ""}`) +
+      link(next, "next", `${next ? esc(formatFullDate(next.date)) : ""} →`);
+    $$("[data-detail-go]", nav).forEach((b) =>
+      b.addEventListener("click", () => {
+        state.viewingId = b.dataset.detailGo;
+        renderDetail();
+        show("detail", { focusTitle: true });
+      }),
     );
   }
 
