@@ -2744,6 +2744,11 @@ input[type="date"] {
     lightboxPrevFocus?.focus({ preventScroll: true });
     lightboxPrevFocus = null;
   }
+  // 余白（黒いところ）を押したら閉じる。既存の PhotoGallery と同じ逃げ道で、
+  // 片手のときは「✕ 閉じる」より押しやすい。写真・動画・ボタンの上では閉じない
+  $("[data-lightbox]").addEventListener("click", (e) => {
+    if (e.target === $("[data-lightbox]")) closeLightbox();
+  });
   $("[data-lightbox-close]").addEventListener("click", closeLightbox);
   $("[data-lightbox-record]").addEventListener("click", () => {
     const recId = lightboxRecordOf?.(lightboxList[lightboxIndex]);
