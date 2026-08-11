@@ -3,7 +3,7 @@
 記録に**写真と動画をひとつの欄でまとめて添付**できるようにする。
 ユーザーから見える振る舞いだけを書く（画面表・データモデル・RLS は書かない → D16）。
 
-決定は [D35](../../docs/explanation/decisions.md)。プロトは [`index.html`](./index.html)、
+決定は [D36](../../docs/explanation/decisions.md)。プロトは [`index.html`](./index.html)、
 確かめたかったことは [`notes.md`](./notes.md)。
 
 ## 決まった上限

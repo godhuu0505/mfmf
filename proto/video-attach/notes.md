@@ -59,7 +59,7 @@
 
 | 入力 | 判定 | 処理 |
 | --- | --- | --- |
-| `image/*`（`.jpg` `.png` `.heic` ほか） | MIME → 拡張子 | 長辺1600px / JPEG q0.8（`imageResize.ts` と同じ素通し条件: `image/` 以外・GIF・SVG は触らない） |
+| `image/*`（`.jpg` `.png` `.heic` ほか） | MIME → 拡張子 | 長辺1600px / JPEG q0.8。**GIF / SVG 以外はデコードを試し、失敗したときだけ素通し**（`imageResize.ts` は `image/` 以外を即素通しするので、そこは直す。下の「実装の前提」） |
 | `video/*`（`.mov` `.mp4` `.m4v` `.3gp` `.webm`） | 同上 | 長さを検査 → **MP4 (H.264/AAC) へ再エンコード** |
 | どちらでもない | — | 追加せずエラー表示 |
 
@@ -101,7 +101,7 @@ Android Chrome や PC のブラウザで再生できない。
 - DB は `record_photos` を拡張する方向（`kind` / `duration_ms` / `poster_path`）。
   テーブル名が実態と合わなくなるが、リネームは既存 RLS を全部書き直すことになるので別途判断。
 
-## 決まったこと（2026-08-10 実機合意 → [D35](../../docs/explanation/decisions.md)）
+## 決まったこと（2026-08-10 実機合意 → [D36](../../docs/explanation/decisions.md)）
 
 - [x] 動画1本の最長: **30秒**
 - [x] 1記録の動画の本数: **3本**
