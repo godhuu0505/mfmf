@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { login } from "./helpers";
 
-// 作成シート（D36: クイック記録を廃止し、タブバー中央を「作成」にして
+// 作成シート（D37: クイック記録を廃止し、タブバー中央を「作成」にして
 // 予定 / 記録の二択にした）。旧 UC-Q01〜Q07 の置き換え。
 
 /** JST の今日（アプリと同じ基準。CI ランナーは UTC）。 */
@@ -94,5 +94,28 @@ test("UC-N08: Escape で閉じてフォーカスがタブバーの作成ボタ�
 
   await page.keyboard.press("Escape");
   await expect(sheet(page)).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "作成" })).toBeFocused();
+});
+
+test("UC-N09: 同じ日の予定を作成から開き直しても、背景を操作できず閉じると作成へ戻る", async ({
+  page,
+}) => {
+  await login(page);
+  const today = jstToday();
+  await page.goto(`/calendar?ym=${today.slice(0, 7)}&open=${today}`);
+  const daySheet = page.getByRole("dialog", { name: /の予定$/ });
+  await expect(daySheet).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(daySheet).not.toBeVisible();
+
+  // ?open= はそのままなので、二回目はシート間の直接の持ち替えになる。
+  await openSheet(page);
+  await sheet(page).getByRole("button", { name: /^予定/ }).click();
+  await expect(daySheet).toBeVisible();
+  await expect(daySheet).toBeFocused();
+  await expect(page.locator("[data-app-tabbar]")).toHaveAttribute("inert", "");
+
+  await page.keyboard.press("Escape");
+  await expect(daySheet).not.toBeVisible();
   await expect(page.getByRole("button", { name: "作成" })).toBeFocused();
 });

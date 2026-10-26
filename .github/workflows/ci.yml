@@ -42,6 +42,11 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
+      - name: Test backup encryption and failure handling
+        run: |
+          sudo apt-get update && sudo apt-get install -y age
+          bash tests/scripts/backup-db.test.sh
+
       - name: Build
         # NEXT_PUBLIC_* はブラウザ公開前提の値。ビルド通過用のプレースホルダで十分
         # （秘密情報ではない / service_role key は使わない）。

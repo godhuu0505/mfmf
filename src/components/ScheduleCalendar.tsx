@@ -75,7 +75,7 @@ type Props = {
   householdId: string | null;
   /**
    * 開いた直後にこの日の日別シートを開く（?open=YYYY-MM-DD）。
-   * タブバーの「作成」→「予定」から来たとき用（D36）。
+   * タブバーの「作成」→「予定」から来たとき用（D37）。
    */
   initialOpenDate?: string | null;
 };
@@ -333,7 +333,7 @@ export default function ScheduleCalendar({
     );
   }
 
-  // タブバーの「作成」→「予定」からの入口（D36）。ほかの画面から来たときは
+  // タブバーの「作成」→「予定」からの入口（D37）。ほかの画面から来たときは
   // ?open=YYYY-MM-DD、カレンダーを開いたままのときはイベントで開く
   // （URL が同じ値のままだと押し直しても開かないため）。
   const openRef = useRef(open);

@@ -1,0 +1,2849 @@
+<title>mfmf 写真/動画の保存 プロト</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%A5%3C/text%3E%3C/svg%3E" />
+<style id="proto-css">
+/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */
+@layer properties;
+@layer theme, base, components, utilities;
+@layer theme {
+  :root, :host {
+    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    --color-red-600: oklch(57.7% 0.245 27.325);
+    --color-red-700: oklch(50.5% 0.213 27.518);
+    --color-amber-100: oklch(96.2% 0.059 95.617);
+    --color-amber-400: oklch(82.8% 0.189 84.429);
+    --color-amber-900: oklch(41.4% 0.112 45.904);
+    --color-emerald-100: oklch(95% 0.052 163.051);
+    --color-emerald-900: oklch(37.8% 0.077 168.94);
+    --color-sky-100: oklch(95.1% 0.026 236.824);
+    --color-sky-900: oklch(39.1% 0.09 240.876);
+    --color-violet-100: oklch(94.3% 0.029 294.588);
+    --color-violet-900: oklch(38% 0.189 293.745);
+    --color-slate-100: oklch(96.8% 0.007 247.896);
+    --color-slate-900: oklch(20.8% 0.042 265.755);
+    --color-black: #000;
+    --color-white: #fff;
+    --spacing: 0.25rem;
+    --container-sm: 24rem;
+    --container-2xl: 42rem;
+    --text-xs: 0.75rem;
+    --text-xs--line-height: calc(1 / 0.75);
+    --text-sm: 0.875rem;
+    --text-sm--line-height: calc(1.25 / 0.875);
+    --text-base: 1rem;
+    --text-base--line-height: calc(1.5 / 1);
+    --text-lg: 1.125rem;
+    --text-lg--line-height: calc(1.75 / 1.125);
+    --text-xl: 1.25rem;
+    --text-xl--line-height: calc(1.75 / 1.25);
+    --text-2xl: 1.5rem;
+    --text-2xl--line-height: calc(2 / 1.5);
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --default-transition-duration: 150ms;
+    --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    --default-font-family: var(--font-sans);
+    --default-mono-font-family: var(--font-mono);
+  }
+}
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  html, :host {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    font-family: var(--default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
+    -webkit-tap-highlight-color: transparent;
+  }
+  hr {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+  abbr:where([title]) {
+    -webkit-text-decoration: underline dotted;
+    text-decoration: underline dotted;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  a {
+    color: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit;
+  }
+  b, strong {
+    font-weight: bolder;
+  }
+  code, kbd, samp, pre {
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-feature-settings: var(--default-mono-font-feature-settings, normal);
+    font-variation-settings: var(--default-mono-font-variation-settings, normal);
+    font-size: 1em;
+  }
+  small {
+    font-size: 80%;
+  }
+  sub, sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+  sub {
+    bottom: -0.25em;
+  }
+  sup {
+    top: -0.5em;
+  }
+  table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+  :-moz-focusring {
+    outline: auto;
+  }
+  progress {
+    vertical-align: baseline;
+  }
+  summary {
+    display: list-item;
+  }
+  ol, ul, menu {
+    list-style: none;
+  }
+  img, svg, video, canvas, audio, iframe, embed, object {
+    display: block;
+    vertical-align: middle;
+  }
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+  button, input, select, optgroup, textarea, ::file-selector-button {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  :where(select:is([multiple], [size])) optgroup {
+    font-weight: bolder;
+  }
+  :where(select:is([multiple], [size])) optgroup option {
+    padding-inline-start: 20px;
+  }
+  ::file-selector-button {
+    margin-inline-end: 4px;
+  }
+  ::placeholder {
+    opacity: 1;
+  }
+  @supports (not (-webkit-appearance: -apple-pay-button))  or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: currentcolor;
+      @supports (color: color-mix(in lab, red, red)) {
+        color: color-mix(in oklab, currentcolor 50%, transparent);
+      }
+    }
+  }
+  textarea {
+    resize: vertical;
+  }
+  ::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+  ::-webkit-date-and-time-value {
+    min-height: 1lh;
+    text-align: inherit;
+  }
+  ::-webkit-datetime-edit {
+    display: inline-flex;
+  }
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  ::-webkit-datetime-edit, ::-webkit-datetime-edit-year-field, ::-webkit-datetime-edit-month-field, ::-webkit-datetime-edit-day-field, ::-webkit-datetime-edit-hour-field, ::-webkit-datetime-edit-minute-field, ::-webkit-datetime-edit-second-field, ::-webkit-datetime-edit-millisecond-field, ::-webkit-datetime-edit-meridiem-field {
+    padding-block: 0;
+  }
+  ::-webkit-calendar-picker-indicator {
+    line-height: 1;
+  }
+  :-moz-ui-invalid {
+    box-shadow: none;
+  }
+  button, input:where([type="button"], [type="reset"], [type="submit"]), ::file-selector-button {
+    appearance: button;
+  }
+  ::-webkit-inner-spin-button, ::-webkit-outer-spin-button {
+    height: auto;
+  }
+  [hidden]:where(:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
+@layer utilities {
+  .pointer-events-none {
+    pointer-events: none;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+  .absolute {
+    position: absolute;
+  }
+  .fixed {
+    position: fixed;
+  }
+  .relative {
+    position: relative;
+  }
+  .sticky {
+    position: sticky;
+  }
+  .inset-0 {
+    inset: 0px;
+  }
+  .inset-x-0 {
+    inset-inline: 0px;
+  }
+  .top-0 {
+    top: 0px;
+  }
+  .top-1 {
+    top: var(--spacing);
+  }
+  .top-\[max\(1rem\,env\(safe-area-inset-top\)\)\] {
+    top: max(1rem, env(safe-area-inset-top));
+  }
+  .right-1 {
+    right: var(--spacing);
+  }
+  .right-2 {
+    right: calc(var(--spacing) * 2);
+  }
+  .right-\[max\(1rem\,env\(safe-area-inset-right\)\)\] {
+    right: max(1rem, env(safe-area-inset-right));
+  }
+  .bottom-0 {
+    bottom: 0px;
+  }
+  .bottom-1 {
+    bottom: var(--spacing);
+  }
+  .bottom-6 {
+    bottom: calc(var(--spacing) * 6);
+  }
+  .bottom-\[calc\(env\(safe-area-inset-bottom\)\+5\.5rem\)\] {
+    bottom: calc(env(safe-area-inset-bottom) + 5.5rem);
+  }
+  .left-1 {
+    left: var(--spacing);
+  }
+  .left-1\/2 {
+    left: calc(1 / 2 * 100%);
+  }
+  .left-2 {
+    left: calc(var(--spacing) * 2);
+  }
+  .left-\[max\(1rem\,env\(safe-area-inset-left\)\)\] {
+    left: max(1rem, env(safe-area-inset-left));
+  }
+  .z-10 {
+    z-index: 10;
+  }
+  .z-30 {
+    z-index: 30;
+  }
+  .z-40 {
+    z-index: 40;
+  }
+  .z-50 {
+    z-index: 50;
+  }
+  .-mx-4 {
+    margin-inline: calc(var(--spacing) * -4);
+  }
+  .mx-auto {
+    margin-inline: auto;
+  }
+  .-mt-5 {
+    margin-top: calc(var(--spacing) * -5);
+  }
+  .mt-0\.5 {
+    margin-top: calc(var(--spacing) * 0.5);
+  }
+  .mt-1 {
+    margin-top: var(--spacing);
+  }
+  .mt-1\.5 {
+    margin-top: calc(var(--spacing) * 1.5);
+  }
+  .mt-2 {
+    margin-top: calc(var(--spacing) * 2);
+  }
+  .mt-3 {
+    margin-top: calc(var(--spacing) * 3);
+  }
+  .mt-4 {
+    margin-top: calc(var(--spacing) * 4);
+  }
+  .mt-5 {
+    margin-top: calc(var(--spacing) * 5);
+  }
+  .mt-6 {
+    margin-top: calc(var(--spacing) * 6);
+  }
+  .mt-8 {
+    margin-top: calc(var(--spacing) * 8);
+  }
+  .mb-1 {
+    margin-bottom: var(--spacing);
+  }
+  .mb-1\.5 {
+    margin-bottom: calc(var(--spacing) * 1.5);
+  }
+  .mb-2 {
+    margin-bottom: calc(var(--spacing) * 2);
+  }
+  .mb-3 {
+    margin-bottom: calc(var(--spacing) * 3);
+  }
+  .mb-4 {
+    margin-bottom: calc(var(--spacing) * 4);
+  }
+  .mb-6 {
+    margin-bottom: calc(var(--spacing) * 6);
+  }
+  .ml-1 {
+    margin-left: var(--spacing);
+  }
+  .block {
+    display: block;
+  }
+  .flex {
+    display: flex;
+  }
+  .grid {
+    display: grid;
+  }
+  .hidden {
+    display: none;
+  }
+  .inline-flex {
+    display: inline-flex;
+  }
+  .aspect-square {
+    aspect-ratio: 1 / 1;
+  }
+  .h-1 {
+    height: var(--spacing);
+  }
+  .h-6 {
+    height: calc(var(--spacing) * 6);
+  }
+  .h-7 {
+    height: calc(var(--spacing) * 7);
+  }
+  .h-8 {
+    height: calc(var(--spacing) * 8);
+  }
+  .h-9 {
+    height: calc(var(--spacing) * 9);
+  }
+  .h-10 {
+    height: calc(var(--spacing) * 10);
+  }
+  .h-14 {
+    height: calc(var(--spacing) * 14);
+  }
+  .h-20 {
+    height: calc(var(--spacing) * 20);
+  }
+  .h-full {
+    height: 100%;
+  }
+  .max-h-\[85vh\] {
+    max-height: 85vh;
+  }
+  .max-h-full {
+    max-height: 100%;
+  }
+  .min-h-6 {
+    min-height: calc(var(--spacing) * 6);
+  }
+  .w-6 {
+    width: calc(var(--spacing) * 6);
+  }
+  .w-7 {
+    width: calc(var(--spacing) * 7);
+  }
+  .w-8 {
+    width: calc(var(--spacing) * 8);
+  }
+  .w-9 {
+    width: calc(var(--spacing) * 9);
+  }
+  .w-10 {
+    width: calc(var(--spacing) * 10);
+  }
+  .w-14 {
+    width: calc(var(--spacing) * 14);
+  }
+  .w-20 {
+    width: calc(var(--spacing) * 20);
+  }
+  .w-32 {
+    width: calc(var(--spacing) * 32);
+  }
+  .w-full {
+    width: 100%;
+  }
+  .max-w-2xl {
+    max-width: var(--container-2xl);
+  }
+  .max-w-full {
+    max-width: 100%;
+  }
+  .max-w-sm {
+    max-width: var(--container-sm);
+  }
+  .min-w-0 {
+    min-width: 0px;
+  }
+  .min-w-\[10rem\] {
+    min-width: 10rem;
+  }
+  .flex-1 {
+    flex: 1;
+  }
+  .shrink-0 {
+    flex-shrink: 0;
+  }
+  .-translate-x-1\/2 {
+    --tw-translate-x: calc(calc(1 / 2 * 100%) * -1);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
+  .cursor-pointer {
+    cursor: pointer;
+  }
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .grid-cols-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .flex-col {
+    flex-direction: column;
+  }
+  .flex-wrap {
+    flex-wrap: wrap;
+  }
+  .items-baseline {
+    align-items: baseline;
+  }
+  .items-center {
+    align-items: center;
+  }
+  .items-start {
+    align-items: flex-start;
+  }
+  .justify-between {
+    justify-content: space-between;
+  }
+  .justify-center {
+    justify-content: center;
+  }
+  .justify-end {
+    justify-content: flex-end;
+  }
+  .gap-0\.5 {
+    gap: calc(var(--spacing) * 0.5);
+  }
+  .gap-1 {
+    gap: var(--spacing);
+  }
+  .gap-1\.5 {
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .gap-2 {
+    gap: calc(var(--spacing) * 2);
+  }
+  .gap-3 {
+    gap: calc(var(--spacing) * 3);
+  }
+  .gap-4 {
+    gap: calc(var(--spacing) * 4);
+  }
+  :where(.space-y-1 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(var(--spacing) * var(--tw-space-y-reverse));
+    margin-block-end: calc(var(--spacing) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-3 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 3) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 3) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-5 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 5) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 5) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.divide-y > :not(:last-child)) {
+    --tw-divide-y-reverse: 0;
+    border-bottom-style: var(--tw-border-style);
+    border-top-style: var(--tw-border-style);
+    border-top-width: calc(1px * var(--tw-divide-y-reverse));
+    border-bottom-width: calc(1px * calc(1 - var(--tw-divide-y-reverse)));
+  }
+  :where(.divide-border > :not(:last-child)) {
+    border-color: var(--border-color);
+  }
+  .overflow-hidden {
+    overflow: hidden;
+  }
+  .overflow-y-auto {
+    overflow-y: auto;
+  }
+  .rounded {
+    border-radius: 0.25rem;
+  }
+  .rounded-2xl {
+    border-radius: var(--radius-2xl);
+  }
+  .rounded-full {
+    border-radius: calc(infinity * 1px);
+  }
+  .rounded-lg {
+    border-radius: var(--radius-lg);
+  }
+  .rounded-md {
+    border-radius: var(--radius-md);
+  }
+  .rounded-xl {
+    border-radius: var(--radius-xl);
+  }
+  .rounded-t-2xl {
+    border-top-left-radius: var(--radius-2xl);
+    border-top-right-radius: var(--radius-2xl);
+  }
+  .border {
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+  }
+  .border-t {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 1px;
+  }
+  .border-b {
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 1px;
+  }
+  .border-dashed {
+    --tw-border-style: dashed;
+    border-style: dashed;
+  }
+  .border-border {
+    border-color: var(--border-color);
+  }
+  .border-red-600\/40 {
+    border-color: color-mix(in srgb, oklch(57.7% 0.245 27.325) 40%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-red-600) 40%, transparent);
+    }
+  }
+  .bg-amber-100 {
+    background-color: var(--color-amber-100);
+  }
+  .bg-background\/90 {
+    background-color: var(--background);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--background) 90%, transparent);
+    }
+  }
+  .bg-black {
+    background-color: var(--color-black);
+  }
+  .bg-black\/40 {
+    background-color: color-mix(in srgb, #000 40%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 40%, transparent);
+    }
+  }
+  .bg-black\/60 {
+    background-color: color-mix(in srgb, #000 60%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 60%, transparent);
+    }
+  }
+  .bg-black\/70 {
+    background-color: color-mix(in srgb, #000 70%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 70%, transparent);
+    }
+  }
+  .bg-black\/90 {
+    background-color: color-mix(in srgb, #000 90%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 90%, transparent);
+    }
+  }
+  .bg-emerald-100 {
+    background-color: var(--color-emerald-100);
+  }
+  .bg-muted {
+    background-color: var(--muted);
+  }
+  .bg-primary {
+    background-color: var(--primary);
+  }
+  .bg-red-600 {
+    background-color: var(--color-red-600);
+  }
+  .bg-sky-100 {
+    background-color: var(--color-sky-100);
+  }
+  .bg-slate-100 {
+    background-color: var(--color-slate-100);
+  }
+  .bg-surface {
+    background-color: var(--surface);
+  }
+  .bg-surface-muted {
+    background-color: var(--surface-muted);
+  }
+  .bg-surface\/80 {
+    background-color: var(--surface);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--surface) 80%, transparent);
+    }
+  }
+  .bg-surface\/90 {
+    background-color: var(--surface);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--surface) 90%, transparent);
+    }
+  }
+  .bg-violet-100 {
+    background-color: var(--color-violet-100);
+  }
+  .bg-white\/10 {
+    background-color: color-mix(in srgb, #fff 10%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-white) 10%, transparent);
+    }
+  }
+  .object-contain {
+    object-fit: contain;
+  }
+  .object-cover {
+    object-fit: cover;
+  }
+  .p-0\.5 {
+    padding: calc(var(--spacing) * 0.5);
+  }
+  .p-1\.5 {
+    padding: calc(var(--spacing) * 1.5);
+  }
+  .p-3 {
+    padding: calc(var(--spacing) * 3);
+  }
+  .p-4 {
+    padding: calc(var(--spacing) * 4);
+  }
+  .p-5 {
+    padding: calc(var(--spacing) * 5);
+  }
+  .p-10 {
+    padding: calc(var(--spacing) * 10);
+  }
+  .px-1 {
+    padding-inline: var(--spacing);
+  }
+  .px-2 {
+    padding-inline: calc(var(--spacing) * 2);
+  }
+  .px-2\.5 {
+    padding-inline: calc(var(--spacing) * 2.5);
+  }
+  .px-3 {
+    padding-inline: calc(var(--spacing) * 3);
+  }
+  .px-4 {
+    padding-inline: calc(var(--spacing) * 4);
+  }
+  .px-5 {
+    padding-inline: calc(var(--spacing) * 5);
+  }
+  .py-0\.5 {
+    padding-block: calc(var(--spacing) * 0.5);
+  }
+  .py-1 {
+    padding-block: var(--spacing);
+  }
+  .py-1\.5 {
+    padding-block: calc(var(--spacing) * 1.5);
+  }
+  .py-2 {
+    padding-block: calc(var(--spacing) * 2);
+  }
+  .py-2\.5 {
+    padding-block: calc(var(--spacing) * 2.5);
+  }
+  .py-3 {
+    padding-block: calc(var(--spacing) * 3);
+  }
+  .py-3\.5 {
+    padding-block: calc(var(--spacing) * 3.5);
+  }
+  .py-4 {
+    padding-block: calc(var(--spacing) * 4);
+  }
+  .py-6 {
+    padding-block: calc(var(--spacing) * 6);
+  }
+  .pt-2 {
+    padding-top: calc(var(--spacing) * 2);
+  }
+  .pt-3 {
+    padding-top: calc(var(--spacing) * 3);
+  }
+  .pt-4 {
+    padding-top: calc(var(--spacing) * 4);
+  }
+  .pt-9 {
+    padding-top: calc(var(--spacing) * 9);
+  }
+  .pr-\[env\(safe-area-inset-right\)\] {
+    padding-right: env(safe-area-inset-right);
+  }
+  .pb-1\.5 {
+    padding-bottom: calc(var(--spacing) * 1.5);
+  }
+  .pb-\[calc\(1rem\+env\(safe-area-inset-bottom\)\)\] {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+  .pb-\[env\(safe-area-inset-bottom\)\] {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pl-\[env\(safe-area-inset-left\)\] {
+    padding-left: env(safe-area-inset-left);
+  }
+  .text-center {
+    text-align: center;
+  }
+  .text-left {
+    text-align: left;
+  }
+  .text-2xl {
+    font-size: var(--text-2xl);
+    line-height: var(--tw-leading, var(--text-2xl--line-height));
+  }
+  .text-base {
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
+  }
+  .text-lg {
+    font-size: var(--text-lg);
+    line-height: var(--tw-leading, var(--text-lg--line-height));
+  }
+  .text-sm {
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+  }
+  .text-xl {
+    font-size: var(--text-xl);
+    line-height: var(--tw-leading, var(--text-xl--line-height));
+  }
+  .text-xs {
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+  }
+  .text-\[10px\] {
+    font-size: 10px;
+  }
+  .leading-none {
+    --tw-leading: 1;
+    line-height: 1;
+  }
+  .font-bold {
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+  }
+  .font-medium {
+    --tw-font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-medium);
+  }
+  .font-normal {
+    --tw-font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-normal);
+  }
+  .font-semibold {
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+  }
+  .whitespace-pre-wrap {
+    white-space: pre-wrap;
+  }
+  .text-amber-900 {
+    color: var(--color-amber-900);
+  }
+  .text-emerald-900 {
+    color: var(--color-emerald-900);
+  }
+  .text-foreground {
+    color: var(--foreground);
+  }
+  .text-muted {
+    color: var(--muted);
+  }
+  .text-muted-foreground {
+    color: var(--muted-foreground);
+  }
+  .text-primary {
+    color: var(--primary);
+  }
+  .text-primary-foreground {
+    color: var(--primary-foreground);
+  }
+  .text-red-600 {
+    color: var(--color-red-600);
+  }
+  .text-sky-900 {
+    color: var(--color-sky-900);
+  }
+  .text-slate-900 {
+    color: var(--color-slate-900);
+  }
+  .text-violet-900 {
+    color: var(--color-violet-900);
+  }
+  .text-white {
+    color: var(--color-white);
+  }
+  .text-white\/80 {
+    color: color-mix(in srgb, #fff 80%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-white) 80%, transparent);
+    }
+  }
+  .opacity-0 {
+    opacity: 0%;
+  }
+  .opacity-40 {
+    opacity: 40%;
+  }
+  .shadow-lg {
+    --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 4px 6px -4px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .shadow-sm {
+    --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-1 {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-2 {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-amber-400 {
+    --tw-ring-color: var(--color-amber-400);
+  }
+  .ring-border {
+    --tw-ring-color: var(--border-color);
+  }
+  .backdrop-blur {
+    --tw-backdrop-blur: blur(8px);
+    -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+    backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+  }
+  .transition {
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .transition-opacity {
+    transition-property: opacity;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .duration-300 {
+    --tw-duration: 300ms;
+    transition-duration: 300ms;
+  }
+  .outline-none {
+    --tw-outline-style: none;
+    outline-style: none;
+  }
+  .first\:mt-0:first-child {
+    margin-top: 0px;
+  }
+  .focus-within\:outline:focus-within {
+    outline-style: var(--tw-outline-style);
+    outline-width: 1px;
+  }
+  .focus-within\:outline-2:focus-within {
+    outline-style: var(--tw-outline-style);
+    outline-width: 2px;
+  }
+  .focus-within\:outline-offset-2:focus-within {
+    outline-offset: 2px;
+  }
+  .focus-within\:outline-\[var\(--focus-ring\)\]:focus-within {
+    outline-color: var(--focus-ring);
+  }
+  @media (hover: hover) {
+    .hover\:bg-black\/80:hover {
+      background-color: color-mix(in srgb, #000 80%, transparent);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-black\/80:hover {
+        background-color: color-mix(in oklab, var(--color-black) 80%, transparent);
+      }
+    }
+    .hover\:bg-primary-hover:hover {
+      background-color: var(--primary-hover);
+    }
+    .hover\:bg-red-700:hover {
+      background-color: var(--color-red-700);
+    }
+    .hover\:bg-surface-muted:hover {
+      background-color: var(--surface-muted);
+    }
+    .hover\:bg-white\/20:hover {
+      background-color: color-mix(in srgb, #fff 20%, transparent);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-white\/20:hover {
+        background-color: color-mix(in oklab, var(--color-white) 20%, transparent);
+      }
+    }
+    .hover\:text-foreground:hover {
+      color: var(--foreground);
+    }
+    .hover\:text-primary-hover:hover {
+      color: var(--primary-hover);
+    }
+  }
+  .focus\:border-muted-foreground:focus {
+    border-color: var(--muted-foreground);
+  }
+  .focus\:ring-1:focus {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .focus\:ring-muted-foreground:focus {
+    --tw-ring-color: var(--muted-foreground);
+  }
+  @media (width >= 40rem) {
+    .sm\:grid-cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .sm\:grid-cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+}
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1220;
+    --foreground: #e2e8f0;
+    --surface: #111827;
+    --surface-muted: #1f2937;
+    --border-color: #334155;
+    --muted: #475569;
+    --muted-foreground: #94a3b8;
+    --primary: #fb923c;
+    --primary-hover: #fdba74;
+    --primary-foreground: #431407;
+    --skeleton-base: #1f2937;
+    --skeleton-shine: rgba(71, 85, 105, 0.6);
+    --focus-ring: #fb923c;
+  }
+}
+html {
+  color-scheme: light dark;
+}
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+body:has([data-app-tabbar]) main {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+.safe-px {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+.safe-pt {
+  padding-top: env(safe-area-inset-top);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 60;
+}
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.18);
+}
+.skeleton {
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient( 90deg, var(--skeleton-base) 0%, var(--skeleton-shine) 50%, var(--skeleton-base) 100% );
+  @supports (color: color-mix(in lab, red, red)) {
+    background-image: linear-gradient( 90deg, color-mix(in srgb, var(--skeleton-base) 100%, transparent) 0%, var(--skeleton-shine) 50%, color-mix(in srgb, var(--skeleton-base) 100%, transparent) 100% );
+  }
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+:root[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --surface: #111827;
+  --surface-muted: #1f2937;
+  --border-color: #334155;
+  --muted: #475569;
+  --muted-foreground: #94a3b8;
+  --primary: #fb923c;
+  --primary-hover: #fdba74;
+  --primary-foreground: #431407;
+  --skeleton-base: #1f2937;
+  --skeleton-shine: rgba(71, 85, 105, 0.6);
+  --focus-ring: #fb923c;
+  color-scheme: dark;
+}
+@property --tw-translate-x {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-translate-y {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-translate-z {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-space-y-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-divide-y-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-border-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
+@property --tw-leading {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-font-weight {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-inset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-ring-inset {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-offset-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --tw-ring-offset-color {
+  syntax: "*";
+  inherits: false;
+  initial-value: #fff;
+}
+@property --tw-ring-offset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-backdrop-blur {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-brightness {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-contrast {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-grayscale {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-hue-rotate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-invert {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-opacity {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-saturate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-sepia {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-duration {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-outline-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
+@layer properties {
+  @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
+    *, ::before, ::after, ::backdrop {
+      --tw-translate-x: 0;
+      --tw-translate-y: 0;
+      --tw-translate-z: 0;
+      --tw-space-y-reverse: 0;
+      --tw-divide-y-reverse: 0;
+      --tw-border-style: solid;
+      --tw-leading: initial;
+      --tw-font-weight: initial;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-color: initial;
+      --tw-shadow-alpha: 100%;
+      --tw-inset-shadow: 0 0 #0000;
+      --tw-inset-shadow-color: initial;
+      --tw-inset-shadow-alpha: 100%;
+      --tw-ring-color: initial;
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-inset-ring-color: initial;
+      --tw-inset-ring-shadow: 0 0 #0000;
+      --tw-ring-inset: initial;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-backdrop-blur: initial;
+      --tw-backdrop-brightness: initial;
+      --tw-backdrop-contrast: initial;
+      --tw-backdrop-grayscale: initial;
+      --tw-backdrop-hue-rotate: initial;
+      --tw-backdrop-invert: initial;
+      --tw-backdrop-opacity: initial;
+      --tw-backdrop-saturate: initial;
+      --tw-backdrop-sepia: initial;
+      --tw-duration: initial;
+      --tw-outline-style: solid;
+    }
+  }
+}
+</style>
+
+<!-- ===================================================================
+     既存アプリの動線に合わせたプロト。
+       ホーム(/) → タブバー中央の＋ → クイック記録シート
+         → 「写真つきでくわしく記録する →」 → /records/new（全画面モーダル）
+       ホーム → カードをタップ → /records/[id] → 編集(?edit=1)
+       アルバム(/gallery) は月見出し + グリッド
+     フォーム画面ではヘッダーもタブバーも出さない（AppTabBar / HideOnFormRoute）。
+     =================================================================== -->
+
+<!-- ===== 共通ヘッダー（AppHeader 相当。フォーム画面では隠す） ===== -->
+<header data-chrome-header class="safe-pt sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+  <div class="safe-px mx-auto flex h-14 max-w-2xl items-center justify-between">
+    <span class="flex items-center gap-2 text-lg font-bold text-foreground">
+      <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-sm text-primary-foreground">m</span>
+      mfmf
+    </span>
+    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-surface-muted text-sm font-medium text-muted-foreground">ご</span>
+  </div>
+</header>
+
+<!-- =========================== ホーム =========================== -->
+<main data-screen="home" class="mx-auto max-w-2xl px-4 py-6">
+  <div class="mb-4 flex items-center justify-between">
+    <h1 data-screen-title tabindex="-1" class="text-xl font-bold text-foreground">記録一覧</h1>
+  </div>
+  <ul data-home-list class="space-y-3"></ul>
+</main>
+
+<!-- =========================== アルバム =========================== -->
+<main data-screen="album" hidden class="mx-auto max-w-2xl px-4 py-6">
+  <h1 data-screen-title tabindex="-1" class="mb-1 text-xl font-bold text-foreground">アルバム</h1>
+  <p class="mb-6 text-sm text-muted-foreground">
+    すべての写真・動画を月ごとに新しい順で表示します。タップすると拡大できます。
+  </p>
+  <div data-album></div>
+</main>
+
+<!-- =========================== メニュー =========================== -->
+<main data-screen="menu" hidden class="mx-auto max-w-2xl px-4 py-6">
+  <h1 data-screen-title tabindex="-1" class="mb-4 text-xl font-bold text-foreground">メニュー</h1>
+  <ul class="divide-y divide-border overflow-hidden rounded-2xl bg-surface ring-1 ring-border">
+    <li class="px-4 py-3.5 text-sm text-muted-foreground">ペット</li>
+    <li class="px-4 py-3.5 text-sm text-muted-foreground">体重</li>
+    <li class="px-4 py-3.5 text-sm text-muted-foreground">設定</li>
+    <li>
+      <button type="button" data-open-settings
+        class="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm font-medium text-foreground transition hover:bg-surface-muted">
+        上限を試す（プロト専用）
+        <span class="text-xs text-muted-foreground">動画の長さ・本数</span>
+      </button>
+    </li>
+  </ul>
+  <p class="mt-3 text-xs text-muted-foreground">
+    「上限を試す」はこのプロトだけの画面です。本番のメニューには出しません。
+  </p>
+</main>
+
+<!-- ===== 記録フォーム（/records/new と ?edit=1 が同じ RecordForm） ===== -->
+<main data-screen="form" hidden class="mx-auto max-w-2xl px-4 py-6">
+  <form class="space-y-5" onsubmit="return false">
+    <!-- 全画面モーダルなのでヘッダーが無く、ここがセーフエリア直下に貼り付く -->
+    <div class="safe-pt sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-2.5 backdrop-blur">
+      <button type="button" data-form-cancel class="text-sm text-muted-foreground transition hover:text-foreground">キャンセル</button>
+      <button type="button" data-form-save
+        class="rounded-lg bg-primary px-5 py-2 font-medium text-primary-foreground transition hover:bg-primary-hover">
+        <span data-form-submit-label>保存する</span>
+      </button>
+    </div>
+
+    <h1 data-form-title tabindex="-1" class="text-xl font-bold text-foreground">記録を追加</h1>
+
+    <div>
+      <span class="mb-1 block text-sm font-medium text-foreground">記録元</span>
+      <div data-source-group class="inline-flex flex-wrap rounded-lg border border-border p-0.5"></div>
+    </div>
+
+    <div>
+      <label for="pet" class="mb-1 block text-sm font-medium text-foreground">ペット</label>
+      <select id="pet" class="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground">
+        <option>（未設定）</option>
+        <option selected>もふ</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="date" class="mb-1 block text-sm font-medium text-foreground">記録の日付</label>
+      <input id="date" type="date" value="2026-08-10" required
+        class="rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground" />
+    </div>
+
+    <div class="flex flex-wrap gap-4">
+      <div class="min-w-[10rem] flex-1">
+        <label for="author" class="mb-1 block text-sm font-medium text-foreground">
+          記入者 <span class="ml-1 text-xs font-normal text-muted-foreground">（任意）</span>
+        </label>
+        <input id="author" type="text" placeholder="おかあさん など"
+          class="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground" />
+      </div>
+      <div class="w-32">
+        <label for="weight" class="mb-1 block text-sm font-medium text-foreground">
+          体重(kg) <span class="ml-1 text-xs font-normal text-muted-foreground">（任意）</span>
+        </label>
+        <input id="weight" type="number" step="0.01" min="0" placeholder="2.25"
+          class="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground" />
+      </div>
+    </div>
+
+    <!-- ▼ ここが今回の変更点。既存は「写真を追加（複数選択可）」だけだった -->
+    <div>
+      <div class="mb-1.5 flex items-baseline justify-between gap-2">
+        <span class="text-sm font-medium text-foreground">写真 / 動画を追加</span>
+        <span class="text-xs text-muted-foreground" data-counter>0 / 10</span>
+      </div>
+
+      <div data-media-grid class="grid grid-cols-3 gap-2"></div>
+
+      <p class="mt-2 text-xs text-muted-foreground" aria-live="polite" data-media-summary></p>
+
+      <div data-media-errors hidden role="alert" aria-live="assertive"
+        class="mt-2 rounded-lg border border-red-600/40 bg-surface px-3 py-2.5">
+        <div class="flex items-start justify-between gap-2">
+          <p class="text-sm font-medium text-red-600">追加できなかったファイル</p>
+          <button type="button" data-clear-errors
+            class="shrink-0 text-xs text-muted-foreground transition hover:text-foreground">閉じる</button>
+        </div>
+        <ul data-error-list class="mt-1 space-y-1 text-sm text-foreground"></ul>
+        <p data-trim-hint hidden class="mt-2 text-xs text-muted-foreground">
+          長すぎる動画は、写真アプリで前後を切ってから選び直せます
+          （iPhone: 編集 → 黄色い枠をドラッグ / Android: フォト → 編集 → トリミング）。
+        </p>
+      </div>
+    </div>
+
+    <div>
+      <label for="body" class="mb-1 block text-sm font-medium text-foreground" data-body-label>保育園からの記録</label>
+      <textarea id="body" rows="8" placeholder="今日の様子などを記録します"
+        class="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"></textarea>
+    </div>
+
+    <div>
+      <span class="mb-1 block text-sm font-medium text-foreground">タグ<span class="ml-1 text-xs font-normal text-muted-foreground">（任意）</span></span>
+      <div class="flex flex-wrap gap-1.5">
+        <span class="rounded-full bg-surface-muted px-2.5 py-1 text-xs text-muted-foreground">＋ タグを追加</span>
+      </div>
+      <p class="mt-1 text-xs text-muted-foreground">
+        既存の TagInput をそのまま使うため、このプロトでは動かしていません。
+      </p>
+    </div>
+
+    <!-- 編集のときだけ出る。既存の写真・動画はここから消す（PhotoEditTile 相当） -->
+    <section data-existing-section hidden class="pt-2">
+      <h2 class="mb-3 text-sm font-medium text-foreground">登録済みの写真・動画</h2>
+      <div data-existing-grid class="grid grid-cols-3 gap-2"></div>
+    </section>
+  </form>
+</main>
+
+<!-- =========================== 記録詳細 =========================== -->
+<main data-screen="detail" hidden class="mx-auto max-w-2xl px-4 py-6">
+  <div class="mb-4">
+    <button type="button" data-detail-back class="text-sm text-muted-foreground transition hover:text-foreground">← 一覧へ戻る</button>
+  </div>
+
+  <div class="mb-4 flex items-start justify-between gap-3">
+    <div class="min-w-0">
+      <div class="mb-1 flex flex-wrap items-center gap-2" data-detail-badges></div>
+      <h1 data-screen-title tabindex="-1" class="text-xl font-bold text-foreground" data-detail-date></h1>
+      <p class="mt-0.5 text-sm text-muted-foreground" data-detail-author></p>
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      <button type="button" data-detail-edit
+        class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">編集</button>
+      <span class="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground">⋮</span>
+    </div>
+  </div>
+
+  <article class="whitespace-pre-wrap rounded-2xl bg-surface p-5 text-foreground shadow-sm ring-1 ring-border" data-detail-body></article>
+
+  <div class="mt-3 flex flex-wrap gap-1.5" data-detail-tags></div>
+
+  <section class="mt-6">
+    <div data-detail-grid class="grid grid-cols-2 gap-2 sm:grid-cols-3"></div>
+    <p data-detail-note class="mt-1.5 text-xs text-muted-foreground"></p>
+  </section>
+
+  <!-- 前後の記録ナビ（既存の UC-D01。ライトボックスとは別の、記録単位の移動） -->
+  <nav data-detail-nav aria-label="前後の記録" class="mt-8 flex items-center justify-between border-t border-border pt-4 text-sm"></nav>
+</main>
+
+<!-- ===== ボトムタブバー（AppTabBar 相当。フォーム画面では出さない） ===== -->
+<nav data-chrome-tabbar data-app-tabbar aria-label="メインナビゲーション"
+  class="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur">
+  <div class="mx-auto grid max-w-2xl grid-cols-5">
+    <button type="button" data-tab="home" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium transition">
+      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      ホーム
+    </button>
+    <button type="button" data-tab="calendar" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium transition">
+      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+      カレンダー
+    </button>
+    <button type="button" data-open-quick aria-label="クイック記録" aria-haspopup="dialog" class="relative">
+      <span class="absolute left-1/2 top-0 -mt-5 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:bg-primary-hover">
+        <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      </span>
+      <span class="block pb-1.5 pt-9 text-center text-[10px] font-medium text-muted-foreground">記録</span>
+    </button>
+    <button type="button" data-tab="album" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium transition">
+      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M7 21h12a2 2 0 0 0 2-2V8"/><circle cx="8" cy="8" r="1.5"/><path d="m4 15 4-4 5 5"/></svg>
+      アルバム
+    </button>
+    <button type="button" data-tab="menu" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium transition">
+      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      メニュー
+    </button>
+  </div>
+</nav>
+
+<!-- ===== クイック記録シート（QuickRecordSheet 相当） ===== -->
+<div data-quick-backdrop hidden class="fixed inset-0 z-40 bg-black/40"></div>
+<div data-quick-sheet hidden role="dialog" aria-modal="true" aria-label="クイック記録"
+  class="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-surface shadow-lg ring-1 ring-border">
+  <div class="mx-auto max-w-2xl px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="text-base font-bold text-foreground">クイック記録</h2>
+      <div class="flex items-center gap-2">
+        <p class="text-sm text-muted-foreground">2026年8月10日(月)</p>
+        <button type="button" data-quick-close aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted">✕</button>
+      </div>
+    </div>
+    <div class="mb-3 flex items-center gap-1.5">
+      <span class="rounded-full bg-amber-100 px-4 py-2 text-sm font-medium text-amber-900 ring-2 ring-amber-400">おうち</span>
+      <span class="rounded-full bg-sky-100 px-4 py-2 text-sm font-medium text-sky-900">保育園</span>
+    </div>
+    <button type="button" class="mb-3 inline-flex items-center gap-1 rounded-full bg-surface-muted px-3 py-1.5 text-sm font-medium text-muted-foreground">＋ ひとことを足す</button>
+    <div class="mb-4 flex flex-wrap gap-2">
+      <span class="rounded-full bg-surface-muted px-4 py-2 text-sm font-medium text-muted-foreground">ごはん完食</span>
+      <span class="rounded-full bg-surface-muted px-4 py-2 text-sm font-medium text-muted-foreground">おやつ</span>
+      <span class="rounded-full bg-surface-muted px-4 py-2 text-sm font-medium text-muted-foreground">さんぽ</span>
+      <span class="rounded-full bg-surface-muted px-4 py-2 text-sm font-medium text-muted-foreground">トイレOK</span>
+      <span class="rounded-full bg-surface-muted px-4 py-2 text-sm font-medium text-muted-foreground">ねんね</span>
+      <span class="rounded-full bg-surface-muted px-4 py-2 text-sm font-medium text-muted-foreground">ごきげん</span>
+    </div>
+    <p class="mb-3 min-h-6 text-sm text-muted-foreground">チップを選ぶか、ひとことを書いてください</p>
+    <button type="button" disabled class="w-full rounded-lg bg-primary px-4 py-3 text-base font-medium text-primary-foreground opacity-40">保存する</button>
+    <!-- ここが写真・動画を付けるときの入口（既存のまま） -->
+    <button type="button" data-quick-detailed
+      class="mt-2 w-full py-2 text-center text-sm font-medium text-primary transition hover:text-primary-hover">
+      写真つきでくわしく記録する →
+    </button>
+  </div>
+</div>
+
+<!-- ===== 確認ダイアログ（FormConfirm 相当。D33） ===== -->
+<div data-confirm hidden role="dialog" aria-modal="true" aria-labelledby="confirm-title"
+  class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/40" data-confirm-cancel></div>
+  <div class="relative w-full max-w-sm rounded-2xl bg-surface p-5 shadow-lg ring-1 ring-border">
+    <h2 id="confirm-title" data-confirm-title class="text-base font-bold text-foreground"></h2>
+    <p data-confirm-message class="mt-1.5 text-sm text-muted-foreground"></p>
+    <div class="mt-5 flex justify-end gap-2">
+      <button type="button" data-confirm-cancel
+        class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">やめる</button>
+      <button type="button" data-confirm-ok class="rounded-lg px-4 py-2 text-sm font-medium transition"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ライトボックス（PhotoGallery 相当） ===== -->
+<div data-lightbox hidden role="dialog" aria-modal="true" aria-label="写真・動画の表示"
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+  <!-- 前後送りは既存の PhotoGallery と同じ（ボタン / ← → / 横スワイプ、端で折り返す） -->
+  <span data-lightbox-count class="absolute left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))] z-10 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white/80"></span>
+  <button type="button" data-lightbox-close class="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-10 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white">✕ 閉じる</button>
+  <button type="button" data-lightbox-prev aria-label="前の写真・動画" class="absolute left-2 z-10 rounded-full bg-white/10 p-3 text-lg leading-none text-white transition hover:bg-white/20">‹</button>
+  <img data-lightbox-img hidden alt="" class="max-h-full max-w-full object-contain" />
+  <video data-lightbox-video hidden controls playsinline preload="none" class="max-h-full max-w-full bg-black"></video>
+  <button type="button" data-lightbox-next aria-label="次の写真・動画" class="absolute right-2 z-10 rounded-full bg-white/10 p-3 text-lg leading-none text-white transition hover:bg-white/20">›</button>
+  <div class="absolute inset-x-0 bottom-6 flex flex-wrap items-center justify-center gap-4 px-4 text-sm text-white/80">
+    <span data-lightbox-caption></span>
+    <!-- アルバムから開いたときの戻り口（PhotoGallery の recordId 付きと同じ） -->
+    <button type="button" data-lightbox-record hidden class="rounded-lg bg-white/10 px-3 py-1 transition hover:bg-white/20">記録を見る →</button>
+  </div>
+</div>
+
+<!-- ===== プロト専用: 上限の設定シート ===== -->
+<div data-settings hidden role="dialog" aria-modal="true" aria-label="上限を試す" class="fixed inset-0 z-50">
+  <div class="absolute inset-0 bg-black/40" data-close-settings></div>
+  <div class="safe-px absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-border bg-surface py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+    <p class="text-sm font-semibold text-foreground">上限を試す（プロト専用）</p>
+    <div class="mt-4">
+      <span class="mb-1.5 block text-sm font-medium text-foreground">動画1本の最長</span>
+      <div class="inline-flex w-full rounded-lg border border-border p-0.5">
+        <button type="button" data-cap="15" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">15秒</button>
+        <button type="button" data-cap="30" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">30秒</button>
+        <button type="button" data-cap="60" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">60秒</button>
+      </div>
+    </div>
+    <div class="mt-4">
+      <span class="mb-1.5 block text-sm font-medium text-foreground">1記録の動画の本数</span>
+      <div class="inline-flex w-full rounded-lg border border-border p-0.5">
+        <button type="button" data-maxvideos="1" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">1本</button>
+        <button type="button" data-maxvideos="3" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">3本</button>
+        <button type="button" data-maxvideos="10" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">10本</button>
+      </div>
+    </div>
+    <div class="mt-4">
+      <span class="mb-1.5 block text-sm font-medium text-foreground">保存する画質</span>
+      <div class="inline-flex w-full rounded-lg border border-border p-0.5">
+        <button type="button" data-quality="720" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">720p</button>
+        <button type="button" data-quality="1080" class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition">1080p</button>
+      </div>
+    </div>
+    <div class="mt-4 rounded-lg bg-surface-muted p-3">
+      <p class="text-sm text-foreground" data-budget></p>
+      <p class="mt-1 text-xs text-muted-foreground">無料枠 1GB のうち写真・動画に 800MB を充てた場合の概算です。</p>
+    </div>
+    <button type="button" data-close-settings
+      class="mt-4 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover">閉じる</button>
+  </div>
+</div>
+
+<!-- トースト -->
+<div data-toast role="status" aria-live="polite" class="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-1/2 z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-0 shadow-lg transition-opacity duration-300"></div>
+
+<script>
+(() => {
+  // ---- 上限（プロトで動かして決める） ----
+  const MAX_ITEMS = 10;
+  const MAX_OBJECT_MB = 50;
+  const MAX_OBJECT_BYTES = MAX_OBJECT_MB * 1024 * 1024;
+  const BITRATE = { 720: 2.0, 1080: 4.5 };
+  const PHOTO_BYTES = 300 * 1024;
+  const MEDIA_BUDGET = 800 * 1024 * 1024;
+  const CONVERT_SPEED = 0.5;
+  const MIN_CONVERT_MS = 2000;
+  const PHOTO_PROCESS_MS = 350;
+
+  const state = {
+    cap: 30, maxVideos: 3, quality: 720,
+    screen: "home",
+    editingId: null,   // 編集中の記録 id（null なら新規）
+    items: [],         // フォームで追加中のメディア
+    checking: 0,       // 取り込みの検査待ち件数（確認中タイルの数）
+    formGen: 0,        // フォームを開くたびに増える。取り込みの帰属先を見分ける
+    ingesting: new Map(), // 世代 → 進行中の取り込み数（保存のブロックに使う）
+    existing: [],      // 編集時の「登録済み」メディア
+    source: "daycare",
+    formSource: "home",  // フォームを開いたときの記録元。選択肢の出し分けに使う
+    records: [
+      { id: "r1", date: "2026-08-09", source: "daycare",
+        author: "担当スタッフ", body: "お友だちとよく走り回っていました。おやつも完食です。",
+        tags: ["おさんぽ"], media: [] },
+      { id: "r2", date: "2026-08-08", source: "home",
+        author: "おかあさん", body: "おうちでお昼寝。よく寝ていました。", tags: [], media: [] },
+      { id: "r3", date: "2026-08-07", source: "home",
+        author: "", body: "はじめてのシャンプー。がんばりました。", tags: ["おふろ"], media: [] },
+      // 予定（D34）からできた記録。編集すると記録元の選択肢が 5 つに増える
+      { id: "r4", date: "2026-08-05", source: "clinic",
+        author: "おとうさん", body: "ワクチンの2回目。おとなしくできました。", tags: [], media: [] },
+    ],
+    viewingId: "r1",
+  };
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const fmtBytes = (b) =>
+    b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`;
+  const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const WD = ["日", "月", "火", "水", "木", "金", "土"];
+  const formatLabel = (iso) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    const wd = WD[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+    return `${m}月${d}日(${wd})`;
+  };
+  // 詳細は年も出す。年を固定にすると 2027 年の記録が 2026 年と表示される
+  const formatFullDate = (iso) => `${iso.split("-")[0]}年${formatLabel(iso)}`;
+  // 一覧の見出し。今日だけ「今日」（本番の relativeLabel と同じ考え方）
+  const listLabel = (iso) => (iso === "2026-08-10" ? "今日" : formatLabel(iso));
+  // 一覧のカードは抜粋（本番の excerpt と同じ 80 文字・空白正規化）
+  const excerpt = (body, max = 80) => {
+    const oneLine = String(body).replace(/\s+/g, " ").trim();
+    return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
+  };
+  const fmtDurJa = (s) => {
+    const t = Math.round(s);
+    return t >= 60 ? `${Math.floor(t / 60)}分${t % 60}秒` : `${t}秒`;
+  };
+  const estVideoBytes = (sec) => (sec * BITRATE[state.quality] * 1e6) / 8;
+  // ファイル名は入力由来。innerHTML に混ぜる前に必ず通す
+  const esc = (s) =>
+    String(s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const thumbImg = (src) =>
+    src ? `<img src="${src}" alt="" class="absolute inset-0 h-full w-full object-cover" />` : "";
+  // 本番の SOURCE_LABEL / SOURCE_BADGE / BODY_LABEL（src/types/database.ts）と同じ
+  const SOURCE = {
+    daycare: { label: "保育園", cls: "bg-sky-100 text-sky-900", body: "保育園からの記録" },
+    home: { label: "おうち", cls: "bg-amber-100 text-amber-900", body: "おうちでの記録" },
+    clinic: { label: "病院", cls: "bg-violet-100 text-violet-900", body: "病院での記録" },
+    salon: { label: "サロン", cls: "bg-emerald-100 text-emerald-900", body: "サロンでの記録" },
+    other: { label: "その他", cls: "bg-slate-100 text-slate-900", body: "この日の記録" },
+  };
+  const QUICK_SOURCES = ["daycare", "home"];
+  const RECORD_SOURCES = ["daycare", "home", "clinic", "salon", "other"];
+  const badge = (src) =>
+    `<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${SOURCE[src].cls}">${SOURCE[src].label}</span>`;
+  const weightBadge = (w) =>
+    w
+      ? `<span class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">${esc(w)}kg</span>`
+      : "";
+
+  const videos = () => state.items.filter((i) => i.kind === "video");
+  const photos = () => state.items.filter((i) => i.kind === "photo");
+  // 編集中は「登録済み + 追加中」の合計で上限を数える（本番も同じ記録に載る）
+  const allCount = () => state.items.length + state.existing.length;
+  const allVideos = () =>
+    videos().length + state.existing.filter((i) => i.kind === "video").length;
+
+  // ---------------- 画面遷移 ----------------
+  function show(screen, { focusTitle = false } = {}) {
+    state.screen = screen;
+    $$("[data-screen]").forEach((el) => (el.hidden = el.dataset.screen !== screen));
+    // フォームは全画面モーダル。ヘッダーもタブバーも出さない（AppTabBar / HideOnFormRoute）
+    const isForm = screen === "form";
+    $("[data-chrome-header]").hidden = isForm;
+    const tabbar = $("[data-chrome-tabbar]");
+    tabbar.hidden = isForm;
+    // 本番は下端余白を `body:has([data-app-tabbar]) main` で確保している。
+    // フォームはタブバーごと消える画面なので、マーカーも外す。
+    tabbar.toggleAttribute("data-app-tabbar", !isForm);
+    $$("[data-tab]").forEach((b) => {
+      const on = b.dataset.tab === screen || (screen === "detail" && b.dataset.tab === "home");
+      b.className =
+        "flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium transition " +
+        (on ? "text-primary" : "text-muted-foreground hover:text-foreground");
+      // 現在地を色だけで伝えない（本番の AppTabBar と同じ）
+      if (on) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
+    window.scrollTo({ top: 0 });
+    // 画面が入れ替わる操作（確認ダイアログの実行など）では、直前のボタンへフォーカスを
+    // 戻すと hidden になった側に取り残される。行き先の見出しへ移す。
+    if (focusTitle) {
+      requestAnimationFrame(() =>
+        $(`[data-screen="${screen}"] [data-screen-title]`)?.focus({ preventScroll: true }),
+      );
+    }
+  }
+  $$("[data-tab]").forEach((b) =>
+    b.addEventListener("click", () => {
+      if (b.dataset.tab === "calendar") { toast("カレンダーはこのプロトの対象外です"); return; }
+      show(b.dataset.tab);
+    }),
+  );
+
+  let toastTimer = null;
+  function toast(msg) {
+    const el = $("[data-toast]");
+    el.textContent = msg;
+    el.style.opacity = "1";
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (el.style.opacity = "0"), 1800);
+  }
+
+  // ---------------- クイック記録シート ----------------
+  let quickPrevFocus = null;
+  let quickInertTargets = [];
+  const quickOpen = (open) => {
+    const sheet = $("[data-quick-sheet]");
+    const backdrop = $("[data-quick-backdrop]");
+    backdrop.hidden = !open;
+    sheet.hidden = !open;
+    if (open) {
+      quickPrevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      quickInertTargets = Array.from(document.body.children).filter(
+        (el) => el instanceof HTMLElement && el !== sheet && el !== backdrop,
+      );
+      quickInertTargets.forEach((el) => { el.inert = true; });
+      requestAnimationFrame(() =>
+        $("[data-quick-detailed]").focus({ preventScroll: true }),
+      );
+    } else {
+      quickInertTargets.forEach((el) => { el.inert = false; });
+      quickInertTargets = [];
+      quickPrevFocus?.focus({ preventScroll: true });
+      quickPrevFocus = null;
+    }
+  };
+  $("[data-open-quick]").addEventListener("click", () => quickOpen(true));
+  $("[data-quick-close]").addEventListener("click", () => quickOpen(false));
+  $("[data-quick-backdrop]").addEventListener("click", () => quickOpen(false));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("[data-quick-sheet]").hidden) quickOpen(false);
+  });
+  $("[data-quick-detailed]").addEventListener("click", () => {
+    quickOpen(false);
+    openForm(null);
+  });
+
+  // ---------------- フォーム ----------------
+  function openForm(recordId) {
+    state.formGen += 1; // 前のフォーム宛ての取り込みを無効化する
+    state.checking = 0;
+    state.editingId = recordId;
+    state.items.forEach(release);
+    state.items = [];
+    state.existing = recordId
+      ? (state.records.find((r) => r.id === recordId)?.media ?? []).slice()
+      : [];
+    state.source = recordId
+      ? state.records.find((r) => r.id === recordId).source
+      : "home";
+    // 選択肢の出し分けは「開いたときの種類」で決める（本番の defaultSource と同じ）。
+    // いまの選択で決めると、病院 → おうち と選び直した瞬間に病院へ戻せなくなる
+    state.formSource = state.source;
+    const rec = recordId ? state.records.find((r) => r.id === recordId) : null;
+    $("#date").value = rec?.date ?? "2026-08-10";
+    $("#pet").value = rec?.pet ?? "もふ";
+    $("#weight").value = rec?.weight ?? "";
+    $("#author").value = rec?.author ?? "";
+    $("#body").value = rec && rec.body !== "（本文なし）" ? rec.body : "";
+    $("[data-form-title]").textContent = recordId ? "記録を編集" : "記録を追加";
+    $("[data-form-submit-label]").textContent = recordId ? "更新する" : "保存する";
+    $("[data-existing-section]").hidden = !recordId || state.existing.length === 0;
+    clearErrors();
+    renderSource();
+    renderAll();
+    show("form");
+    // 直前の要素は hidden の中に入る。見出しへフォーカスを移して迷子にしない
+    requestAnimationFrame(() =>
+      $("[data-form-title]").focus({ preventScroll: true }),
+    );
+  }
+  // 記録元の選択肢は本番の RecordForm と同じ出し分け: ふだんは「保育園 / おうち」だけ、
+  // 予定からできた記録（病院・サロン・その他）を編集するときは 5 つとも出す。
+  // 2 つに絞ると、いま入っている種類が選べず、一度触ると戻せなくなる（D34 の記録）。
+  function renderSource() {
+    const choices = QUICK_SOURCES.includes(state.formSource) ? QUICK_SOURCES : RECORD_SOURCES;
+    $("[data-source-group]").innerHTML = choices
+      .map((key) => {
+        const on = key === state.source;
+        const cls =
+          "rounded-md px-4 py-1.5 text-sm font-medium transition " +
+          (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface-muted");
+        return `<button type="button" data-source="${key}" aria-pressed="${on}" class="${cls}">${SOURCE[key].label}</button>`;
+      })
+      .join("");
+    $$("[data-source]").forEach((b) =>
+      b.addEventListener("click", () => { state.source = b.dataset.source; renderSource(); }),
+    );
+    $("[data-body-label]").textContent = SOURCE[state.source].body;
+  }
+
+  // 確認ダイアログ（D33）。キャンセルにも保存にも挟む
+  // Artifact は <html> を自前で書けないので、言語はここで宣言する
+  document.documentElement.lang = "ja";
+
+  let confirmAction = null;
+  let confirmPrevFocus = null;
+  let confirmPrevOverflow = "";
+  let confirmInertTargets = [];
+  function askConfirm({ title, message, label, danger, onOk }) {
+    $("[data-confirm-title]").textContent = title;
+    $("[data-confirm-message]").textContent = message;
+    const ok = $("[data-confirm-ok]");
+    ok.textContent = label;
+    ok.className =
+      "rounded-lg px-4 py-2 text-sm font-medium transition " +
+      (danger
+        ? "bg-red-600 text-white hover:bg-red-700"
+        : "bg-primary text-primary-foreground hover:bg-primary-hover");
+    confirmAction = onOk;
+    const dialog = $("[data-confirm]");
+    dialog.hidden = false;
+    // 本番の ConfirmDialog と同じ作法: 背景を inert にしてダイアログへフォーカスを移し、
+    // 閉じたら元の場所へ戻す（role=dialog だけではフォーカスは閉じ込められない）。
+    confirmPrevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    confirmInertTargets = Array.from(document.body.children).filter(
+      (el) => el instanceof HTMLElement && el !== dialog,
+    );
+    confirmInertTargets.forEach((el) => { el.inert = true; });
+    // inert では背景のスクロールは止まらない。長いフォームだと閉じたときに
+    // 別の位置へ動いてしまう（本番の FormConfirm も overflow を固定している）
+    confirmPrevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    requestAnimationFrame(() => ok.focus({ preventScroll: true }));
+  }
+  // restoreFocus=false は「実行すると画面が入れ替わる」場合。元のボタンへ戻すと
+  // 直後に hidden になる側へフォーカスが取り残されるので、行き先の見出しへ任せる。
+  function closeConfirm(restoreFocus = true) {
+    $("[data-confirm]").hidden = true;
+    confirmAction = null;
+    confirmInertTargets.forEach((el) => { el.inert = false; });
+    confirmInertTargets = [];
+    document.body.style.overflow = confirmPrevOverflow;
+    if (restoreFocus) confirmPrevFocus?.focus({ preventScroll: true });
+    confirmPrevFocus = null;
+  }
+  // Esc で閉じる（キーボード / スイッチ利用者の脱出路）
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("[data-confirm]").hidden) closeConfirm();
+  });
+  $$("[data-confirm-cancel]").forEach((b) => b.addEventListener("click", () => closeConfirm()));
+  $("[data-confirm-ok]").addEventListener("click", () => {
+    const fn = confirmAction;
+    // 保存 / 更新 / 破棄はいずれも別画面へ移る。フォーカスは移動先で取り直す。
+    closeConfirm(false);
+    fn?.();
+  });
+
+  $("[data-form-cancel]").addEventListener("click", () => {
+    askConfirm({
+      title: "編集をやめますか？",
+      message: "入力した内容は保存されません。",
+      label: "破棄してもどる",
+      danger: true,
+      onOk: () => {
+        // 世代を進めて、走っている検査・変換をこの下書きのものではなくする。
+        // 進めないと破棄後も CPU と blob を抱えたままになる。
+        state.formGen += 1;
+        state.checking = 0;
+        state.items.forEach(forget);
+        state.items = [];
+        // 登録済みの削除は押した時点で確定しているので、ここでは戻さない
+        state.existing = [];
+        if (state.editingId) { renderDetail(); show("detail", { focusTitle: true }); }
+        else show("home", { focusTitle: true });
+      },
+    });
+  });
+
+  $("[data-form-save]").addEventListener("click", () => {
+    // 本番はフォーム送信なので、日付などの必須チェックがブラウザ側で先に走る。
+    // ここは click ハンドラなので、自分で検証してから確認ダイアログを出す
+    const form = $("[data-screen='form'] form");
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+    // 検査中・取り込み中のファイルは state.items にまだ入っていない。
+    // ここでブロックしないと、選んだメディアが保存から抜け落ちる。
+    // 前のフォーム宛ての取り込みがまだ動いていても、いまのフォームの保存は止めない
+    if (
+      state.checking > 0 ||
+      (state.ingesting.get(state.formGen) ?? 0) > 0 ||
+      state.items.some((i) => i.status !== "ready")
+    ) {
+      toast("処理が終わるまでお待ちください");
+      return;
+    }
+    askConfirm({
+      title: "この内容で保存しますか？",
+      message: "保存したあともいつでも編集できます。",
+      label: state.editingId ? "更新する" : "保存する",
+      onOk: commitForm,
+    });
+  });
+
+  function commitForm() {
+    if (state.editingId) {
+      const rec = state.records.find((r) => r.id === state.editingId);
+      // 登録済みの削除は押した時点で確定済み。ここでは追加分を足すだけ
+      rec.media = [...state.existing, ...state.items];
+      rec.source = state.source;
+      rec.date = $("#date").value;
+      rec.author = $("#author").value.trim();
+      rec.pet = $("#pet").value;
+      rec.weight = $("#weight").value;
+      rec.body = $("#body").value.trim() || "（本文なし）";
+      state.items = [];
+      state.viewingId = rec.id;
+      renderHome(); renderAlbum(); renderDetail();
+      show("detail", { focusTitle: true });
+      toast("更新しました");
+    } else {
+      // 画面に入れた値をそのまま使う（固定値だと保存後の見え方が確かめられない）
+      const dateValue = $("#date").value;
+      const rec = {
+        id: "n" + Date.now(),
+        date: dateValue,
+        source: state.source,
+        pet: $("#pet").value,
+        weight: $("#weight").value,
+        author: $("#author").value.trim(),
+        body: $("#body").value.trim() || "（本文なし）",
+        tags: [], media: state.items,
+      };
+      state.records.unshift(rec);
+      state.items = [];
+      state.viewingId = rec.id;
+      renderHome(); renderAlbum(); renderDetail();
+      // 本番の createRecord は作成した記録の詳細へ redirect する
+      show("detail", { focusTitle: true });
+      toast("保存しました");
+    }
+  }
+
+  // ---------------- 上限の設定（プロト専用） ----------------
+  function segment(attr, value) {
+    $$(`[${attr}]`).forEach((b) => {
+      const on = b.getAttribute(attr) === String(value);
+      b.className =
+        "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition " +
+        (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface-muted");
+      // 選択状態を色だけで伝えない
+      b.setAttribute("aria-pressed", String(on));
+    });
+  }
+  function renderSettings() {
+    segment("data-cap", state.cap);
+    segment("data-maxvideos", state.maxVideos);
+    segment("data-quality", state.quality);
+    const perRecord =
+      state.maxVideos * estVideoBytes(state.cap) +
+      Math.max(0, MAX_ITEMS - state.maxVideos) * PHOTO_BYTES;
+    $("[data-budget]").textContent =
+      `上限まで入れた記録 1件 ≒ ${fmtBytes(perRecord)}` +
+      `（動画${state.maxVideos}本 × ${state.cap}秒 + 写真${MAX_ITEMS - state.maxVideos}枚）。` +
+      `800MB で約 ${Math.floor(MEDIA_BUDGET / perRecord)} 記録。`;
+  }
+  $$("[data-cap]").forEach((b) =>
+    b.addEventListener("click", () => { state.cap = Number(b.dataset.cap); onLimitsChanged(); }));
+  $$("[data-maxvideos]").forEach((b) =>
+    b.addEventListener("click", () => { state.maxVideos = Number(b.dataset.maxvideos); onLimitsChanged(); }));
+  $$("[data-quality]").forEach((b) =>
+    b.addEventListener("click", () => { state.quality = Number(b.dataset.quality); onLimitsChanged(); }));
+  let settingsPrevFocus = null;
+  let settingsInertTargets = [];
+  $("[data-open-settings]").addEventListener("click", () => {
+    const sheet = $("[data-settings]");
+    sheet.hidden = false;
+    settingsPrevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    settingsInertTargets = Array.from(document.body.children).filter(
+      (el) => el instanceof HTMLElement && el !== sheet,
+    );
+    settingsInertTargets.forEach((el) => { el.inert = true; });
+    requestAnimationFrame(() => $("[data-cap='30']").focus({ preventScroll: true }));
+  });
+  function closeSettings() {
+    if ($("[data-settings]").hidden) return;
+    $("[data-settings]").hidden = true;
+    settingsInertTargets.forEach((el) => { el.inert = false; });
+    settingsInertTargets = [];
+    settingsPrevFocus?.focus({ preventScroll: true });
+    settingsPrevFocus = null;
+  }
+  $$("[data-close-settings]").forEach((b) => b.addEventListener("click", closeSettings));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeSettings();
+  });
+
+  function onLimitsChanged() {
+    renderSettings();
+    const dropped = [];
+    let kept = 0;
+    state.items = state.items.filter((it) => {
+      if (it.kind !== "video") return true;
+      if (Math.floor(it.duration) > state.cap) {
+        dropped.push({ msg: `${it.name} — ${fmtDurJa(it.duration)}（上限 ${state.cap}秒 を超えました）`, duration: true });
+        forget(it); return false;
+      }
+      kept += 1;
+      if (kept > state.maxVideos) {
+        dropped.push({ msg: `${it.name} — 動画は${state.maxVideos}本までになりました` });
+        forget(it); return false;
+      }
+      it.after = estVideoBytes(it.duration);
+      return true;
+    });
+    if (dropped.length) {
+      addErrors(dropped);
+      // 上限シートはフォーム以外の画面からも開ける。理由はフォームのエラー欄に
+      // 書かれるので、その場で見えるようトーストでも知らせる。
+      if (state.screen !== "form") {
+        toast(`上限を超えた動画を${dropped.length}件外しました`);
+      }
+    }
+    renderAll();
+  }
+
+  // ---------------- エラー表示 ----------------
+  function addErrors(errors) {
+    const ul = $("[data-error-list]");
+    errors.forEach((e) => {
+      const li = document.createElement("li");
+      li.textContent = e.msg;
+      ul.appendChild(li);
+      if (e.duration) $("[data-trim-hint]").hidden = false;
+    });
+    $("[data-media-errors]").hidden = false;
+  }
+  function clearErrors() {
+    $("[data-error-list]").innerHTML = "";
+    $("[data-trim-hint]").hidden = true;
+    $("[data-media-errors]").hidden = true;
+  }
+  $("[data-clear-errors]").addEventListener("click", clearErrors);
+
+  // ---------------- メディアの取り込み ----------------
+  let seq = 0;
+  let playingLightboxId = null;
+
+  const release = (item) => { if (item.url) URL.revokeObjectURL(item.url); item.url = null; };
+  function forget(item) {
+    if (playingLightboxId === item.id) closeLightbox();
+    release(item);
+  }
+
+  function classify(file) {
+    if (file.type.startsWith("image/")) return "photo";
+    if (file.type.startsWith("video/")) return "video";
+    // iOS から来る .mov などで type が空になることがあるので拡張子でも見る
+    if (/\.(mov|mp4|m4v|3gp|webm|avi|mkv)$/i.test(file.name)) return "video";
+    if (/\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file.name)) return "photo";
+    return null;
+  }
+
+  // 直列化は**世代ごと**に行う。ひとつのチェーンにすると、前のフォームで
+  // 止まっている検査（最大15秒）の後ろに今のフォームの取り込みが並んでしまう。
+  const ingestChains = new Map();
+  function handleFiles(fileList) {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+    const gen = state.formGen;
+    state.ingesting.set(gen, (state.ingesting.get(gen) ?? 0) + 1);
+    // 「確認中」の枠は**チェーンに並べる前に**確保する。前の選択の検査
+    //（動画1本あたり最大15秒）が終わるまで何も出ないと、選んだぶんが
+    // 消えたように見えて＋タイルから重ねて選ばれてしまう。
+    state.checking += files.length;
+    renderAll();
+    const chain = (ingestChains.get(gen) ?? Promise.resolve())
+      .then(() => ingest(files, gen))
+      .catch(() => {})
+      .finally(() => {
+        const n = (state.ingesting.get(gen) ?? 1) - 1;
+        if (n > 0) {
+          state.ingesting.set(gen, n);
+        } else {
+          state.ingesting.delete(gen);
+          ingestChains.delete(gen);
+        }
+      });
+    ingestChains.set(gen, chain);
+  }
+
+  async function ingest(files, gen) {
+    const errors = [];
+    const queue = [];
+    // 「確認中」の枠は handleFiles() が確保済み。ここでは1つ片づくごとに戻す
+    //（代入で数え直すと、並行して選ばれた別のぶんまで消してしまう）。
+    let held = files.length;
+    const releaseHold = (n = 1) => {
+      held -= n;
+      // 世代が変わったときは破棄側で 0 に戻っているので、ここでは触らない
+      if (gen === state.formGen) { state.checking = Math.max(0, state.checking - n); renderAll(); }
+    };
+
+    // 動画は枠を取る前に長さを検査する。ダメな動画が先に枠を取ると、
+    // 後ろの正しい動画まで本数上限で弾かれて結局どちらも残らない。
+    for (let idx = 0; idx < files.length; idx++) {
+      if (gen !== state.formGen) break; // フォームが切り替わった
+      const file = files[idx];
+      try {
+        const kind = classify(file);
+        if (!kind) { errors.push({ msg: `${file.name} — 写真でも動画でもないようです` }); continue; }
+        if (allCount() + queue.length >= MAX_ITEMS) {
+          errors.push({ msg: `${file.name} — 合計${MAX_ITEMS}件までです` }); continue;
+        }
+        if (file.size === 0) { errors.push({ msg: `${file.name} — 中身が空のようです` }); continue; }
+        const item = {
+          id: ++seq, kind, name: file.name || (kind === "video" ? "動画" : "写真"),
+          file, size: file.size, after: null, url: null, thumb: null,
+          duration: null, status: "pending", progress: 0,
+        };
+        if (kind === "video") {
+          const meta = await readVideoMeta(file);
+          if (meta.duration == null) {
+            URL.revokeObjectURL(meta.url);
+            errors.push({ msg: `${file.name} — 読み込めませんでした（対応していない形式かもしれません）` });
+            continue;
+          }
+          if (Math.floor(meta.duration) > state.cap) {
+            URL.revokeObjectURL(meta.url);
+            errors.push({ msg: `${file.name} — ${fmtDurJa(meta.duration)}。${state.cap}秒までにしてください`, duration: true });
+            continue;
+          }
+          const queued = queue.filter((q) => q.kind === "video").length;
+          if (allVideos() + queued >= state.maxVideos) {
+            URL.revokeObjectURL(meta.url);
+            errors.push({ msg: `${file.name} — 動画は${state.maxVideos}本までです` });
+            continue;
+          }
+          item.url = meta.url;
+          item.duration = meta.duration;
+        }
+        queue.push(item);
+      } finally {
+        releaseHold();
+      }
+    }
+    // break で抜けたぶんの予約を戻す
+    if (held > 0) releaseHold(held);
+
+    // 別のフォームに移っていたら、このぶんは捨てる（違う記録に混ざらないように）
+    if (gen !== state.formGen) {
+      queue.forEach(release);
+      renderAll();
+      return;
+    }
+
+    // await の間に上限を下げられている可能性があるので、確定の直前に照らし直す
+    const accepted = [];
+    for (const item of queue) {
+      if (allCount() + accepted.length >= MAX_ITEMS) {
+        release(item); errors.push({ msg: `${item.name} — 合計${MAX_ITEMS}件までです` }); continue;
+      }
+      if (item.kind === "video") {
+        if (Math.floor(item.duration) > state.cap) {
+          release(item);
+          errors.push({ msg: `${item.name} — ${fmtDurJa(item.duration)}。${state.cap}秒までにしてください`, duration: true });
+          continue;
+        }
+        const q = accepted.filter((a) => a.kind === "video").length;
+        if (allVideos() + q >= state.maxVideos) {
+          release(item); errors.push({ msg: `${item.name} — 動画は${state.maxVideos}本までです` }); continue;
+        }
+      }
+      accepted.push(item);
+    }
+
+    state.items.push(...accepted);
+    renderAll();
+    if (errors.length) addErrors(errors.splice(0));
+
+    // 変換・縮小はこのチェーンの外へ出す。ここで待つと、同じフォームで
+    // 2回目に選んだファイルの「確認中」タイルが変換の後ろに並んで出てこない。
+    accepted.forEach((item) => processQueue.push({ item, gen }));
+    pumpProcessing();
+  }
+
+  // 重い処理（変換・縮小）は 1 件ずつ。端末側の再エンコードは並列にしても速くならない。
+  const processQueue = [];
+  let processing = false;
+  async function pumpProcessing() {
+    if (processing) return;
+    processing = true;
+    try {
+      while (processQueue.length > 0) {
+        const { item, gen } = processQueue.shift();
+        if (!alive(item) || gen !== state.formGen) continue; // 消された / 別のフォームへ移った
+        const errors = [];
+        await processItem(item, errors);
+        if (errors.length) addErrors(errors);
+      }
+    } finally {
+      processing = false;
+      renderAll();
+    }
+  }
+
+  const alive = (item) => state.items.includes(item);
+
+  async function processItem(item, errors) {
+    item.status = "processing";
+    renderAll();
+
+    if (item.kind === "photo") {
+      const out = await resizePhoto(item.file);
+      if (!alive(item)) { if (out.url) URL.revokeObjectURL(out.url); return; }
+      // 縮小できなかった経路（デコード不可・GIF/SVG）は元のまま。ここで上限に当てる
+      if (out.size > MAX_OBJECT_BYTES) {
+        URL.revokeObjectURL(out.url);
+        errors.push({ msg: `${item.name} — 保存サイズが ${fmtBytes(out.size)} で、上限の ${MAX_OBJECT_MB}MB を超えます` });
+        drop(item); return;
+      }
+      item.after = out.size; item.url = out.url; item.thumb = out.url;
+      await wait(PHOTO_PROCESS_MS);
+      if (!alive(item)) return;
+      item.status = "ready";
+      item.file = null; // 縮小後は元ファイルを使わない。参照を残さない
+      renderAll();
+      return;
+    }
+
+    await convert(item);
+    if (!alive(item)) return;
+    // 必ず H.264 へ再エンコードするので出力はビットレートで決まる
+    item.after = estVideoBytes(item.duration);
+    if (item.after > MAX_OBJECT_BYTES) {
+      errors.push({ msg: `${item.name} — 保存サイズが ${fmtBytes(item.after)} で、上限の ${MAX_OBJECT_MB}MB を超えます` });
+      drop(item); return;
+    }
+    // poster を先に作る。作れなかった動画は**追加しない**。
+    // poster 無しで保存できてしまうと、一覧のタイルが空になるか、
+    // 一覧が動画本体を取りに行くことになる（UC-M08b / 非機能）
+    await grabVideoThumb(item);
+    if (!alive(item)) return;
+    if (!item.thumb) {
+      errors.push({ msg: `${item.name} — サムネイルを作れませんでした。選び直してください` });
+      drop(item); return;
+    }
+    item.status = "ready";
+    item.file = null; // 変換後は元ファイルを使わない
+    renderAll();
+  }
+
+  function drop(item) {
+    forget(item);
+    const i = state.items.indexOf(item);
+    if (i >= 0) state.items.splice(i, 1);
+    renderAll();
+  }
+
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // 実装では WebCodecs で MP4(H.264/AAC) へ再エンコードする。ここは擬似だが、
+  // 待ち時間は長さに比例させて実機で体感できるようにしてある。
+  function convert(item) {
+    return new Promise((resolve) => {
+      const totalMs = Math.max(MIN_CONVERT_MS, item.duration * CONVERT_SPEED * 1000);
+      const tick = 100;
+      let elapsed = 0;
+      item.progress = 0;
+      const timer = setInterval(() => {
+        if (!alive(item)) { clearInterval(timer); resolve(); return; }
+        elapsed += tick;
+        item.progress = Math.min(100, (elapsed / totalMs) * 100);
+        const el = $(`[data-prog="${item.id}"]`);
+        if (el) {
+          const left = Math.ceil((totalMs - elapsed) / 1000);
+          el.textContent = item.progress >= 100 ? "100%" : `${Math.round(item.progress)}% ・ 残り約${left}秒`;
+        }
+        if (item.progress >= 100) { clearInterval(timer); resolve(); }
+      }, tick);
+    });
+  }
+
+  // 写真は本番と同じ方針（長辺1600px / JPEG q0.8）で実際に縮小する
+  async function resizePhoto(file) {
+    const asIs = () => ({ size: file.size, url: URL.createObjectURL(file) });
+    // GIF / SVG は触らない（本番の resizeImage() と同じ）
+    if (file.type === "image/gif" || file.type === "image/svg+xml") return asIs();
+    if (/\.(gif|svg)$/i.test(file.name)) return asIs();
+    // MIME が空でも拡張子で写真と判定したものは**デコードを試す**。
+    // ここで素通しすると 50MB の判定が元ファイルのサイズにかかってしまい、
+    // 「縮小後で判定する」（UC-M08b）が破れる。デコードできなければ従来どおり素通し。
+    // ※本番の imageResize.ts は `image/` 以外を即素通しするので、実装時はここを直す。
+    if (typeof createImageBitmap !== "function") return asIs();
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => null);
+    if (!bmp) return asIs();
+    try {
+      const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(bmp.width * scale));
+      c.height = Math.max(1, Math.round(bmp.height * scale));
+      const ctx = c.getContext("2d");
+      if (!ctx) return asIs();
+      ctx.drawImage(bmp, 0, 0, c.width, c.height);
+      const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.8));
+      if (!blob) return asIs();
+      // 縮小していないのに圧縮後が大きいなら元を使う（本番と同じ）
+      if (scale === 1 && blob.size >= file.size) return asIs();
+      return { size: blob.size, url: URL.createObjectURL(blob) };
+    } finally {
+      bmp.close?.();
+    }
+  }
+
+  function readVideoMeta(file) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.muted = true;
+      let settled = false;
+      let timer = null;
+      const done = (dur) => {
+        if (settled) return;
+        settled = true;
+        // タイマーと一時 video を残すとデコーダのバッファごと居座る。
+        // objectURL は採用したアイテムが使うのでここでは revoke しない。
+        if (timer) clearTimeout(timer);
+        v.onloadedmetadata = v.ondurationchange = v.onerror = null;
+        v.removeAttribute("src");
+        v.load();
+        resolve({ url, duration: dur });
+      };
+      // loadedmetadata の時点で duration が Infinity / NaN のことがある
+      // （ブラウザで録画した WebM など）。確定させず durationchange を待つ。
+      const settleIfKnown = () => { if (isFinite(v.duration) && v.duration > 0) done(v.duration); };
+      v.onloadedmetadata = settleIfKnown;
+      v.ondurationchange = settleIfKnown;
+      v.onerror = () => done(null);
+      timer = setTimeout(
+        () => done(isFinite(v.duration) && v.duration > 0 ? v.duration : null),
+        15000,
+      );
+      v.src = url;
+    });
+  }
+
+  // 1フレーム目をサムネにする（実装では poster として別途 Storage に保存する想定）
+  // poster が出来るまで ready にしない。ここを待たずに保存できてしまうと、
+  // 一覧・詳細・アルバムのタイルが空のまま確定する（実装では poster オブジェクトが
+  // 無いまま保存され、「動画本体を読まない」を満たせなくなる）
+  function grabVideoThumb(item) {
+    return new Promise((resolve) => {
+    const done = () => resolve();
+    // 取れないまま待ち続けない。コマ抽出に失敗しても保存経路は止めない
+    const timer = setTimeout(done, 8000);
+    const v = document.createElement("video");
+    v.preload = "metadata"; v.muted = true; v.playsInline = true; v.src = item.url;
+    v.onerror = () => { clearTimeout(timer); done(); };
+    v.onloadeddata = () => {
+      clearTimeout(timer);
+      // 複数本を並行して処理することがあるので、打ち切りの判断はアイテム単位で行う
+      // （共通のカウンタだと、後から始まった生成が先のものを取り消してしまう）
+      // 取り消されていても**必ず resolve する**。返さないと processing が
+      // 立ったままになり、次にフォームを開いても保存できなくなる
+      if (!itemExists(item)) { done(); return; }
+      try {
+        // 4K をそのまま載せると 30MB 超のバッファを確保してしまう
+        const MAX = 640;
+        const vw = v.videoWidth || 640, vh = v.videoHeight || 360;
+        const scale = Math.min(1, MAX / Math.max(vw, vh));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(vw * scale));
+        c.height = Math.max(1, Math.round(vh * scale));
+        c.getContext("2d")?.drawImage(v, 0, 0, c.width, c.height);
+        item.thumb = c.toDataURL("image/jpeg", 0.7);
+        // 保存直後にコマ抽出が終わることがある。フォームだけでなく
+        // 一覧・詳細・アルバムも描き直さないとサムネが空のままになる。
+        renderAll();
+        renderHome();
+        renderDetail();
+        renderAlbum();
+      } catch (_) { /* プロトなので失敗は無視 */ }
+      done();
+    };
+    v.currentTime = 0.1;
+    });
+  }
+  const itemExists = (item) =>
+    state.items.includes(item) || state.records.some((r) => r.media.includes(item));
+
+  // ---------------- 描画: フォームのメディア欄 ----------------
+  function tile(item, { existing = false } = {}) {
+    const busy = !existing && item.status !== "ready";
+    return `
+      <div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted">
+        ${thumbImg(item.thumb)}
+        ${busy ? '<div class="skeleton absolute inset-0"></div>' : ""}
+        ${busy ? `<div class="absolute inset-0 flex flex-col items-center justify-center gap-1 px-1 text-center">
+             <span class="text-xs font-medium text-foreground">${item.kind === "video" ? "変換中" : "最適化中"}</span>
+             ${item.kind === "video" ? `<span class="text-[10px] text-muted-foreground" data-prog="${item.id}">${Math.round(item.progress)}%</span>` : ""}
+           </div>` : ""}
+        ${item.kind === "video" && !busy
+          ? `<span class="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ ${fmtDur(item.duration)}</span>`
+          : ""}
+        <button type="button" ${existing ? `data-remove-existing="${item.id}"` : `data-remove="${item.id}"`}
+          aria-label="${esc(item.name)} を削除"
+          class="absolute right-1 top-1 ${existing
+            ? "rounded-full bg-black/60 px-2 py-1 text-xs text-white transition hover:bg-black/80"
+            : "flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white transition hover:bg-black/80"}">${existing ? "削除" : "✕"}</button>
+      </div>`;
+  }
+
+  function addTile() {
+    if (allCount() >= MAX_ITEMS) {
+      return `<div class="flex aspect-square items-center justify-center rounded-lg border border-dashed border-border px-1 text-center text-[10px] text-muted-foreground">${MAX_ITEMS}件まで</div>`;
+    }
+    return `
+      <label class="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border transition hover:bg-surface-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus-ring)]">
+        <span class="text-2xl leading-none text-muted-foreground" aria-hidden="true">＋</span>
+        <span class="px-1 text-center text-[10px] text-muted-foreground">写真 / 動画</span>
+        <input type="file" accept="image/*,video/*" multiple data-media-input class="sr-only" />
+      </label>`;
+  }
+
+  function renderAll() {
+    const checkingTiles = Array.from({ length: state.checking }, () =>
+      `<div class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted">
+         <div class="skeleton absolute inset-0"></div>
+         <div class="absolute inset-0 flex items-center justify-center">
+           <span class="text-xs font-medium text-foreground">確認中</span>
+         </div>
+       </div>`).join("");
+    $("[data-media-grid]").innerHTML =
+      state.items.map((i) => tile(i)).join("") + checkingTiles + addTile();
+    $$("[data-media-input]").forEach((input) =>
+      input.addEventListener("change", (e) => {
+        const files = Array.from(e.target.files ?? []); // value を戻すと FileList が空になる
+        e.target.value = "";
+        handleFiles(files);
+      }),
+    );
+    $$("[data-remove]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const item = state.items.find((i) => i.id === Number(b.dataset.remove));
+        if (item) drop(item);
+      }),
+    );
+
+    // 編集時の「登録済みの写真・動画」
+    const ex = $("[data-existing-grid]");
+    $("[data-existing-section]").hidden = !state.editingId || state.existing.length === 0;
+    ex.innerHTML = state.existing.map((i) => tile(i, { existing: true })).join("");
+    // 登録済みの削除は**その場で確定する**（本番の PhotoEditTile は押した時点で
+    // deletePhoto() を呼ぶ）。ここで「更新する」まで保留にすると、キャンセルで
+    // 戻ってしまい本番と挙動が変わる
+    $$("[data-remove-existing]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const id = Number(b.dataset.removeExisting);
+        const gone = state.existing.find((i) => i.id === id);
+        state.existing = state.existing.filter((i) => i.id !== id);
+        const rec = state.records.find((r) => r.id === state.editingId);
+        if (rec) rec.media = rec.media.filter((m) => m.id !== id);
+        if (gone) forget(gone);
+        renderAll();
+        renderHome();
+        renderAlbum();
+        renderDetail();
+        toast("削除しました");
+      }),
+    );
+
+    const ready = state.items.filter((i) => i.status === "ready");
+    const pending = state.items.length - ready.length;
+    $("[data-counter]").textContent = `${allCount()} / ${MAX_ITEMS}`;
+    const before = state.items.reduce((s, i) => s + i.size, 0);
+    const total = ready.reduce((s, i) => s + (i.after ?? i.size), 0);
+    $("[data-media-summary]").textContent =
+      state.items.length === 0
+        ? `写真も動画もまとめて選べます（動画は1本 ${state.cap}秒 / ${state.maxVideos}本まで）。`
+        : `写真${photos().length}枚・動画${videos().length}本 ・ ${fmtBytes(before)} → ${fmtBytes(total)}` +
+          (pending > 0 ? `（ほか${pending}件を処理中）` : "");
+  }
+
+  // ---------------- 描画: ホーム ----------------
+  // 本番の一覧は record_date の降順。日付を編集したら並びも追従する。
+  // 詳細の前後ナビもこの並びで辿るので、1か所にまとめる
+  const sortedRecords = () =>
+    state.records.slice().sort((a, b) => b.date.localeCompare(a.date));
+
+  function renderHome() {
+    $("[data-home-list]").innerHTML = sortedRecords()
+      .map((r) => {
+        const first = r.media[0];
+        const nPhoto = r.media.filter((m) => m.kind === "photo").length;
+        const nVideo = r.media.filter((m) => m.kind === "video").length;
+        const meta = [nPhoto > 0 ? `写真 ${nPhoto} 枚` : null, nVideo > 0 ? `動画 ${nVideo} 本` : null]
+          .filter(Boolean).join(" ・ ");
+        return `
+      <li>
+        <button type="button" data-open-record="${r.id}"
+          class="flex w-full gap-3 rounded-2xl bg-surface p-3 text-left shadow-sm ring-1 ring-border transition">
+          <div class="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-muted">
+            ${first ? thumbImg(first.thumb) : '<div class="flex h-full w-full items-center justify-center text-muted-foreground">🐾</div>'}
+            ${nVideo > 0 ? '<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶</span>' : ""}
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-1.5">${badge(r.source)}${weightBadge(r.weight)}</div>
+            <p class="mt-1 text-sm font-semibold text-foreground">${esc(listLabel(r.date))}</p>
+            <p class="mt-0.5 text-sm text-muted-foreground">${esc(excerpt(r.body))}</p>
+            ${r.tags.length ? `<div class="mt-1 flex flex-wrap gap-1">${r.tags.map((t) => `<span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted-foreground">#${esc(t)}</span>`).join("")}</div>` : ""}
+            ${meta ? `<p class="mt-1 text-xs text-muted-foreground">${meta}</p>` : ""}
+          </div>
+        </button>
+      </li>`;
+      })
+      .join("");
+    $$("[data-open-record]").forEach((b) =>
+      b.addEventListener("click", () => {
+        state.viewingId = b.dataset.openRecord;
+        renderDetail();
+        // 押したカードは hidden の中に入る。見出しへフォーカスを移す
+        show("detail", { focusTitle: true });
+      }),
+    );
+  }
+
+  // ---------------- 描画: 詳細 ----------------
+  const current = () => state.records.find((r) => r.id === state.viewingId);
+
+  function renderDetail() {
+    const r = current();
+    if (!r) return;
+    $("[data-detail-badges]").innerHTML = badge(r.source) + weightBadge(r.weight);
+    // 詳細は「今日/昨日」ではなく実日付を出す（本番の formatDate と同じ粒度）
+    $("[data-detail-date]").textContent = formatFullDate(r.date);
+    $("[data-detail-author]").textContent = r.author ? `記入者: ${r.author}` : "";
+    $("[data-detail-body]").textContent = r.body || "（本文なし）";
+    $("[data-detail-tags]").innerHTML = r.tags
+      .map((t) => `<span class="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">#${esc(t)}</span>`)
+      .join("");
+
+    const grid = $("[data-detail-grid]");
+    grid.innerHTML = r.media
+      .map(
+        (m) => `
+        <button type="button" data-open-media="${m.id}"
+          aria-label="${m.kind === "video" ? `動画を再生（${fmtDur(m.duration)}）` : "写真を拡大表示"}"
+          class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted">
+          ${thumbImg(m.thumb)}
+          ${m.kind === "video"
+            ? `<span class="absolute inset-0 flex items-center justify-center">
+                 <span class="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-sm text-white">▶</span>
+               </span>
+               <span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">${fmtDur(m.duration)}</span>`
+            : ""}
+        </button>`,
+      )
+      .join("");
+    $("[data-detail-note]").textContent = r.media.some((m) => m.kind === "video")
+      ? "動画はタップするまで読み込みません（開くまで通信しません）。"
+      : "";
+    $$("[data-open-media]", grid).forEach((b) =>
+      // 詳細は「その記録のメディア」を送る。アルバムはアルバム全体（既存と同じ範囲）
+      b.addEventListener("click", () =>
+        openLightbox(current()?.media ?? [], Number(b.dataset.openMedia)),
+      ),
+    );
+
+    // 前後の記録ナビ（UC-D01）。一覧と同じ並び（記録の日付の新しい順）で辿る。
+    // ライトボックスの送りは「メディア」単位、こちらは「記録」単位で別物
+    const order = sortedRecords();
+    const i = order.findIndex((x) => x.id === r.id);
+    const prev = order[i + 1] ?? null; // 1つ古い記録
+    const next = order[i - 1] ?? null; // 1つ新しい記録
+    const link = (rec, rel, label) =>
+      rec
+        ? `<button type="button" data-detail-go="${rec.id}" rel="${rel}"
+             class="font-medium text-muted-foreground transition hover:text-foreground">${label}</button>`
+        : `<span class="text-muted">${rel === "prev" ? "前の記録なし" : "次の記録なし"}</span>`;
+    const nav = $("[data-detail-nav]");
+    nav.hidden = !prev && !next;
+    nav.innerHTML =
+      link(prev, "prev", `← ${prev ? esc(formatFullDate(prev.date)) : ""}`) +
+      link(next, "next", `${next ? esc(formatFullDate(next.date)) : ""} →`);
+    $$("[data-detail-go]", nav).forEach((b) =>
+      b.addEventListener("click", () => {
+        state.viewingId = b.dataset.detailGo;
+        renderDetail();
+        show("detail", { focusTitle: true });
+      }),
+    );
+  }
+
+  $("[data-detail-back]").addEventListener("click", () => show("home", { focusTitle: true }));
+  $("[data-detail-edit]").addEventListener("click", () => openForm(state.viewingId));
+
+  // ---------------- ライトボックス ----------------
+  let lightboxPrevFocus = null;
+  let lightboxInertTargets = [];
+  let prevBodyOverflow = "";
+  // 開いている一覧と、その中の位置。詳細ならその記録のメディア、アルバムなら全体
+  let lightboxList = [];
+  let lightboxIndex = 0;
+  // アルバムから開いたときだけ、そのメディアの記録へ戻れるようにする
+  let lightboxRecordOf = null;
+  // いま映しているものを差し替える。写真 → 動画 → 写真 とまたいでも同じ場所で見る
+  function renderLightbox() {
+    const m = lightboxList[lightboxIndex];
+    if (!m) return;
+    const img = $("[data-lightbox-img]"), vid = $("[data-lightbox-video]");
+    if (m.kind === "video") {
+      img.hidden = true; img.removeAttribute("src");
+      vid.hidden = false;
+      vid.src = m.url;
+      playingLightboxId = m.id;
+      vid.play().catch(() => {});
+      $("[data-lightbox-caption]").textContent = `${m.name} ・ ${fmtDur(m.duration)} ・ ${fmtBytes(m.after ?? m.size)}`;
+    } else {
+      // 動画から写真へ移ったら本体の読み込みを止める（帯域と再生の取り残し）。
+      // src を外すだけでは進行中のリクエストは切れないので load() まで呼ぶ
+      vid.hidden = true; vid.pause(); vid.removeAttribute("src"); vid.load();
+      playingLightboxId = null;
+      img.hidden = false;
+      img.src = m.thumb || "";
+      $("[data-lightbox-caption]").textContent = m.name;
+    }
+    const recId = lightboxRecordOf?.(m) ?? null;
+    $("[data-lightbox-record]").hidden = !recId;
+    const many = lightboxList.length > 1;
+    $("[data-lightbox-count]").textContent = many ? `${lightboxIndex + 1} / ${lightboxList.length}` : "";
+    $("[data-lightbox-prev]").hidden = !many;
+    $("[data-lightbox-next]").hidden = !many;
+  }
+  const stepLightbox = (d) => {
+    if (lightboxList.length < 2) return;
+    lightboxIndex = (lightboxIndex + d + lightboxList.length) % lightboxList.length;
+    renderLightbox();
+  };
+  function openLightbox(list, id, recordOf = null) {
+    const idx = list.findIndex((x) => x.id === id);
+    if (idx < 0) return;
+    lightboxList = list;
+    lightboxIndex = idx;
+    lightboxRecordOf = recordOf;
+    renderLightbox();
+    const box = $("[data-lightbox]");
+    box.hidden = false;
+    // 確認ダイアログと同じ作法。背景を inert にして閉じるボタンへフォーカスを移す
+    lightboxPrevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    lightboxInertTargets = Array.from(document.body.children).filter(
+      (el) => el instanceof HTMLElement && el !== box,
+    );
+    lightboxInertTargets.forEach((el) => { el.inert = true; });
+    // inert では背景のスクロールは止まらない。閉じたときに別のカード・別の月に
+    // 戻ってしまうので、本番と同じく body のスクロールを固定する
+    prevBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    requestAnimationFrame(() => $("[data-lightbox-close]").focus({ preventScroll: true }));
+  }
+  function closeLightbox() {
+    if ($("[data-lightbox]").hidden) return;
+    const vid = $("[data-lightbox-video]");
+    vid.pause(); vid.removeAttribute("src"); vid.load(); vid.hidden = true;
+    $("[data-lightbox-img]").hidden = true;
+    $("[data-lightbox]").hidden = true;
+    playingLightboxId = null;
+    lightboxList = [];
+    lightboxRecordOf = null;
+    lightboxInertTargets.forEach((el) => { el.inert = false; });
+    lightboxInertTargets = [];
+    document.body.style.overflow = prevBodyOverflow;
+    lightboxPrevFocus?.focus({ preventScroll: true });
+    lightboxPrevFocus = null;
+  }
+  // 余白（黒いところ）を押したら閉じる。既存の PhotoGallery と同じ逃げ道で、
+  // 片手のときは「✕ 閉じる」より押しやすい。写真・動画・ボタンの上では閉じない
+  $("[data-lightbox]").addEventListener("click", (e) => {
+    if (e.target === $("[data-lightbox]")) closeLightbox();
+  });
+  $("[data-lightbox-close]").addEventListener("click", closeLightbox);
+  $("[data-lightbox-record]").addEventListener("click", () => {
+    const recId = lightboxRecordOf?.(lightboxList[lightboxIndex]);
+    if (!recId) return;
+    closeLightbox();
+    state.viewingId = recId;
+    renderDetail();
+    show("detail", { focusTitle: true });
+  });
+  $("[data-lightbox-prev]").addEventListener("click", () => stepLightbox(-1));
+  $("[data-lightbox-next]").addEventListener("click", () => stepLightbox(1));
+  document.addEventListener("keydown", (e) => {
+    if ($("[data-lightbox]").hidden) return;
+    if (e.key === "Escape") { closeLightbox(); return; }
+    // 動画にフォーカスがあるときの ← → は「シーク」。奪うと再生位置を動かせない
+    if (e.target === $("[data-lightbox-video]")) return;
+    if (e.key === "ArrowRight") stepLightbox(1);
+    else if (e.key === "ArrowLeft") stepLightbox(-1);
+  });
+  // 横スワイプでも送る（既存の PhotoGallery と同じ 50px のしきい値）
+  let swipeStartX = null;
+  // 動画のシークバーを掴んだドラッグは送りにしない（キー操作と同じ理由）
+  const onVideo = (e) => e.target === $("[data-lightbox-video]");
+  $("[data-lightbox]").addEventListener("touchstart", (e) => {
+    swipeStartX = onVideo(e) ? null : (e.touches[0]?.clientX ?? null);
+  }, { passive: true });
+  $("[data-lightbox]").addEventListener("touchend", (e) => {
+    if (onVideo(e)) { swipeStartX = null; return; }
+    const start = swipeStartX;
+    const end = e.changedTouches[0]?.clientX ?? null;
+    swipeStartX = null;
+    if (start === null || end === null) return;
+    const dx = end - start;
+    if (Math.abs(dx) > 50) stepLightbox(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
+  // ---------------- 描画: アルバム ----------------
+  // アルバムの並び（新しい順）。ライトボックスの前後送りもこの順で辿るので、
+  // 描画とめくりで同じ 1 本の並びを使う（本番の PhotoGallery も月をまたいで送る）
+  function albumEntries() {
+    return state.records
+      .flatMap((r) => r.media.map((m) => ({ m, r })))
+      .sort((a, b) => b.r.date.localeCompare(a.r.date));
+  }
+  const albumOrder = () => albumEntries().map((e) => e.m);
+  function renderAlbum() {
+    const all = albumEntries();
+    const el = $("[data-album]");
+    if (all.length === 0) {
+      el.innerHTML = `<div class="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
+        まだ写真・動画がありません。<br />記録に追加すると、ここにまとまって表示されます。
+      </div>`;
+      return;
+    }
+    // 記録の日付で月ごとにまとめる（日付は編集できるので固定の見出しにしない）
+    const groups = [];
+    all.forEach(({ m, r }) => {
+      const [y, mo] = r.date.split("-");
+      const ym = `${y}-${mo}`;
+      const last = groups[groups.length - 1];
+      if (last && last.ym === ym) last.items.push({ m, r });
+      else groups.push({ ym, label: `${y}年${Number(mo)}月`, items: [{ m, r }] });
+    });
+    el.innerHTML = groups
+      .map(
+        (g) => `
+      <h2 class="mb-2 mt-4 text-sm font-semibold text-muted-foreground first:mt-0">${g.label}</h2>
+      <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+        ${g.items.map(({ m, r }) => `
+          <button type="button" data-album-record="${r.id}" data-album-media="${m.id}"
+            aria-label="${m.kind === "video" ? `動画を再生（${fmtDur(m.duration)}）` : "写真を拡大表示"}"
+            class="relative aspect-square overflow-hidden rounded-lg bg-surface-muted">
+            ${thumbImg(m.thumb)}
+            ${m.kind === "video" ? `<span class="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-medium text-white">▶ ${fmtDur(m.duration)}</span>` : ""}
+          </button>`).join("")}
+      </div>`,
+      )
+      .join("");
+    // 「タップすると拡大できます」と書いてあるので、ここからも開けるようにする
+    $$("[data-album-media]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        // 送りでほかの記録のメディアへ移るので、記録の対応は都度引き直す
+        const owner = new Map(albumEntries().map((e) => [e.m, e.r.id]));
+        openLightbox(albumOrder(), Number(b.dataset.albumMedia), (m) => owner.get(m) ?? null);
+      }),
+    );
+  }
+
+  // ---------------- 起動 ----------------
+  show("home");
+  renderSettings();
+  renderSource();
+  renderAll();
+  renderHome();
+  renderAlbum();
+  renderDetail();
+})();
+</script>

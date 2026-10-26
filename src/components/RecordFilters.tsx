@@ -32,7 +32,7 @@ export default function RecordFilters({
   // 「今日」と同じで、CI では**一覧の「検索パラメータだけが変わる遷移」**の
   // クライアント遷移が確定しないことがある（E2E がクリック後に URL が変わらない
   // まま数分待って落ちる）。一覧は毎回サーバー描画なのでフル遷移でも体感差がなく、
-  // 確実に動く方を取る（decisions.md D36-a）。
+  // 確実に動く方を取る（decisions.md D37-a）。
   function pushWithTag(qs: string) {
     if (!activeTagId) {
       window.location.assign(`/${qs}`);

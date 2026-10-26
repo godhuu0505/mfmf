@@ -6,7 +6,7 @@ import { CalendarPlus, NotebookPen, X } from "lucide-react";
 import { jstTodayISO } from "@/lib/dateRange";
 import { lockModalBackground } from "@/lib/modalBackground";
 
-// タブバー中央の「作成」から開くシート（D36）。
+// タブバー中央の「作成」から開くシート（D37）。
 // クイック記録（チップで 1 件残す）はここで廃止し、入口を
 // 「予定を入れる」「記録を残す」の二択にした —— どちらも既存の画面
 // （カレンダーの日別シート / 記録フォーム）へ渡すだけで、ここでは保存しない。
@@ -93,8 +93,12 @@ export default function CreateSheet() {
       // すでに今日の月・同じ ?open= を見ている（開いて閉じた直後）ときだけ、
       // URL が変わらず開き直せないのでイベントで直接開く。
       if (current.get("open") === today && (current.get("ym") ?? ym) === ym) {
-        window.dispatchEvent(
-          new CustomEvent("mfmf:open-plan", { detail: today }),
+        // close() が作成ボタンへフォーカスを戻してから開く。先に開くと、
+        // 日別シートが閉じた作成シート内の「予定」を復帰先として覚えてしまう。
+        requestAnimationFrame(() =>
+          window.dispatchEvent(
+            new CustomEvent("mfmf:open-plan", { detail: today }),
+          ),
         );
         return;
       }

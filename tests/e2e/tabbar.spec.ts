@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { login } from "./helpers";
 
 // ボトムタブバーとメニュー画面（proto/app-redesign/spec.md UC-N01 / UC-N02 / UC-M01 / UC-M02）。
-// D33: 主要ナビは 5 スロットのタブバー（中央に作成ボタン / D36）。
+// D33: 主要ナビは 5 スロットのタブバー（中央に作成ボタン / D37）。
 // UC-N03（viewer は中央ボタンなし）は viewer ユーザーのフィクスチャ整備後に追加する。
 
 function tabbar(page: Page) {

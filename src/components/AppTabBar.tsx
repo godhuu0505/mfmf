@@ -7,7 +7,7 @@ import { CalendarDays, House, Images, Menu, Plus } from "lucide-react";
 // ボトムタブバー（D33: 案A・5 スロット・中央に作成ボタン）。
 // AppHeader（サーバー側）から世帯所属が確認できたページにだけ描画される。
 // viewer は中央ボタンを抜いた 4 列になる（作成導線を出さない = UC-A06）。
-// 中央は「作成」（D36）。押すと CreateSheet が開き、予定 / 記録を選ぶ。
+// 中央は「作成」（D37）。押すと CreateSheet が開き、予定 / 記録を選ぶ。
 
 type TabDef = {
   href: string;
