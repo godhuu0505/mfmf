@@ -1,0 +1,20 @@
+# Allowlist: real env files, local auth state, backups and .git never reach Docker.
+**
+!package.json
+!package-lock.json
+!next.config.mjs
+!postcss.config.mjs
+!tsconfig.json
+!next-env.d.ts
+!.eslintrc.json
+!src/
+!src/**
+!public/
+!public/**
+# Keep secrets excluded even if accidentally placed below an allowed directory.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.age
