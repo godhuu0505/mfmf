@@ -18,11 +18,11 @@ const OPTIONAL_CONFIG = ["SIGNUP_ENABLED", "SENTRY_ENVIRONMENT", "SENTRY_TRACES_
 const ALLOWED = new Set([...PUBLIC_KEYS, ...Object.keys(SECRET_NAMES), ...OPTIONAL_CONFIG]);
 class CandidateError extends Error {}
 
-export function selectProductionConfig(response) {
+function productionEntries(response) {
   if (!Array.isArray(response?.envs) || response.pagination?.next != null || response.hiddenProductionEnvCount > 0) {
     throw new CandidateError("Vercel did not return a complete visible environment list.");
   }
-  const values = new Map();
+  const entries = new Map();
   for (const item of response.envs) {
     if (!item || !ALLOWED.has(item.key)) continue;
     if (typeof item.target !== "string" && !Array.isArray(item.target)) {
@@ -30,10 +30,19 @@ export function selectProductionConfig(response) {
     }
     const targets = Array.isArray(item.target) ? item.target : [item.target];
     if (!targets.includes("production") || item.gitBranch) continue;
-    if (values.has(item.key)) throw new CandidateError(`Duplicate production setting: ${item.key}.`);
-    // Sensitive / legacy secret の参照文字列や未復号値を誤って移送しない。
-    if (!["plain", "encrypted"].includes(item.type) ||
-        (item.type === "encrypted" && item.decrypted !== true) || typeof item.value !== "string") {
+    if (entries.has(item.key)) throw new CandidateError(`Duplicate production setting: ${item.key}.`);
+    if (!["plain", "encrypted"].includes(item.type)) {
+      throw new CandidateError(`Production setting is not readable plaintext: ${item.key}.`);
+    }
+    entries.set(item.key, item);
+  }
+  return [...entries.values()];
+}
+
+export function selectProductionConfig(response) {
+  const values = new Map();
+  for (const item of productionEntries(response)) {
+    if ((item.type === "encrypted" && item.decrypted !== true) || typeof item.value !== "string") {
       throw new CandidateError(`Production setting is not readable plaintext: ${item.key}.`);
     }
     values.set(item.key, item.value);
@@ -102,6 +111,67 @@ async function requestJson(fetchImpl, url, token, body) {
   try { return await response.json(); } catch { throw new CandidateError("Cloud API returned invalid JSON."); }
 }
 
+function safeEnvironmentMetadata(item, key) {
+  let publicKeyClass = "not_applicable";
+  if (key === "NEXT_PUBLIC_SUPABASE_ANON_KEY") {
+    publicKeyClass = "unrecognized";
+    if (typeof item?.value === "string" && item.value.length <= 65_536) {
+      if (/^sb_publishable_[A-Za-z0-9_-]+$/.test(item.value)) publicKeyClass = "publishable";
+      else if (item.value.startsWith("sb_secret_")) publicKeyClass = "privileged";
+      else {
+        try {
+          const role = JSON.parse(Buffer.from(item.value.split(".")[1], "base64url").toString("utf8"))?.role;
+          if (role === "anon") publicKeyClass = "anon_jwt";
+          if (role === "service_role") publicKeyClass = "privileged";
+        } catch { /* classify only; never print the input */ }
+      }
+    }
+  }
+  return JSON.stringify({
+    key,
+    type: ["plain", "encrypted", "secret", "sensitive", "system"].includes(item?.type) ? item.type : "unknown",
+    decryptedPresent: Object.hasOwn(item ?? {}, "decrypted"),
+    decryptedType: typeof item?.decrypted,
+    decrypted: typeof item?.decrypted === "boolean" ? item.decrypted : null,
+    valueType: typeof item?.value,
+    publicKeyClass,
+  });
+}
+
+async function readProductionConfig(env, fetchImpl) {
+  const project = encodeURIComponent(env.VERCEL_PROJECT_ID);
+  const listUrl = new URL(`https://api.vercel.com/v10/projects/${project}/env`);
+  listUrl.searchParams.set("teamId", env.VERCEL_ORG_ID);
+  // v10 list の decrypted は optional。deprecated な decrypt query と list.value に依存しない。
+  const entries = productionEntries(await requestJson(fetchImpl, listUrl.href, env.VERCEL_TOKEN));
+  for (const key of [...PUBLIC_KEYS, "TOKEN_ENC_KEY"]) {
+    if (!entries.some((item) => item.key === key)) throw new CandidateError(`Required production setting is missing or invalid: ${key}.`);
+  }
+  const decrypted = [];
+  for (const entry of entries) {
+    if (typeof entry.id !== "string" || !/^[A-Za-z0-9_-]{1,256}$/.test(entry.id)) {
+      throw new CandidateError(`Environment ID is missing or invalid: ${entry.key}.`);
+    }
+    const detailUrl = new URL(`https://api.vercel.com/v1/projects/${project}/env/${encodeURIComponent(entry.id)}`);
+    detailUrl.searchParams.set("teamId", env.VERCEL_ORG_ID);
+    // 公式の「decrypted value」endpoint からだけ値を受け取る。value を持たない variant は拒否。
+    // https://vercel.com/docs/rest-api/projects/retrieve-the-decrypted-value-of-an-environment-variable-of-a-project-by-id
+    const detail = await requestJson(fetchImpl, detailUrl.href, env.VERCEL_TOKEN);
+    const targets = Array.isArray(detail?.target) ? detail.target : [detail?.target];
+    if (detail?.key !== entry.key || detail?.type !== entry.type ||
+        (detail.id !== undefined && detail.id !== entry.id) || detail.gitBranch ||
+        (detail.target !== undefined && !targets.includes("production")) ||
+        (detail.decrypted !== undefined && typeof detail.decrypted !== "boolean") ||
+        (detail.type === "encrypted" && detail.decrypted === false) || typeof detail.value !== "string") {
+      throw new CandidateError(`Decrypted environment response rejected: ${safeEnvironmentMetadata(detail, entry.key)}`);
+    }
+    // 専用 endpoint の公式 schema は decrypted が省略される value:string variant も持つ。
+    // list の ciphertext をここへフォールバックさせず、取得した平文だけを既存の値検証へ渡す。
+    decrypted.push({ ...entry, value: detail.value, decrypted: true });
+  }
+  return selectProductionConfig({ envs: decrypted });
+}
+
 export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, log = console.log }) {
   if (env.GITHUB_ACTIONS !== "true" || env.GITHUB_REF !== "refs/heads/main" || env.GITHUB_EVENT_NAME !== "workflow_dispatch") {
     throw new CandidateError("Candidate preparation requires a manual main workflow run.");
@@ -114,10 +184,7 @@ export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, l
       !/^\d+$/.test(env.GITHUB_RUN_ID ?? "") || !/^\d+$/.test(env.GITHUB_RUN_ATTEMPT ?? "")) {
     throw new CandidateError("Deployment project or workflow identity is invalid.");
   }
-  const vercelUrl = new URL(`https://api.vercel.com/v10/projects/${encodeURIComponent(env.VERCEL_PROJECT_ID)}/env`);
-  vercelUrl.searchParams.set("decrypt", "true");
-  vercelUrl.searchParams.set("teamId", env.VERCEL_ORG_ID);
-  const { publicEnv, secrets, features } = selectProductionConfig(await requestJson(fetchImpl, vercelUrl.href, env.VERCEL_TOKEN));
+  const { publicEnv, secrets, features } = await readProductionConfig(env, fetchImpl);
   const imageBase = `${REGISTRY}/${env.GCP_PROJECT_ID}/mfmf/mfmf-candidate`;
   const image = `${imageBase}:${env.GITHUB_SHA}-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
   log("Production settings validated. Building candidate with public Supabase settings and signup flag only.");

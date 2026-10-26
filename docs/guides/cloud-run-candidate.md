@@ -26,11 +26,18 @@ Supabase migration は実行しません。初回の private サービス作成�
 
 ## 実行結果と失敗時
 
-Vercel の公式 `GET /v10/projects/{project}/env?decrypt=true&teamId=...` から
-production の明示的な allowlist だけを選びます。preview / ブランチ固有設定は使いません。
+Vercel の公式 `GET /v10/projects/{project}/env?teamId=...` から production の明示的な
+allowlist だけを選び、各 ID の `GET /v1/projects/{project}/env/{id}?teamId=...`
+（decrypted value endpoint）で平文を取得します。list の `value` や deprecated な
+`decrypt` query には依存しません。preview / ブランチ固有設定は使いません。
 必須設定不足、重複、非平文・未復号値、非表示または途中までの一覧は変更前に失敗させます。
 Sensitive 型など API から読めない値は管理者が安全な保管元から別途移す必要があり、
 この処理で新しい暗号鍵を生成したり、実 env ファイルへフォールバックすることはありません。
+個別応答の key / type / ID / production scope を照合し、value 欠落や encrypted かつ
+`decrypted:false` は拒否します。専用 endpoint の公式 schema は `decrypted` 省略の
+`value:string` variant も持つため、この場合は endpoint の平文取得契約に従います。
+拒否時の診断は allowlist の変数名・固定 type 分類・decrypted の有無/型・value の型と
+公開キーの分類だけであり、応答本文や値は出力しません。
 
 Docker build args は `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` と
 公開の正規 boolean `SIGNUP_ENABLED` だけ。login / signup の静的生成時にも同じ flag を渡し、
@@ -59,6 +66,7 @@ Docker 認証は固定 registry だけに答える credential helper の pipe �
 
 公式仕様:
 [Vercel project env API](https://vercel.com/docs/rest-api/projects/retrieve-the-environment-variables-of-a-project-by-id-or-name)、
+[Vercel decrypted value API](https://vercel.com/docs/rest-api/projects/retrieve-the-decrypted-value-of-an-environment-variable-of-a-project-by-id)、
 [Secret Manager addVersion](https://cloud.google.com/secret-manager/docs/reference/rest/v1/projects.secrets/addVersion)、
 [GitHub Actions WIF](https://github.com/google-github-actions/auth)、
 [Artifact Registry の認証](https://cloud.google.com/artifact-registry/docs/docker/authentication)。
