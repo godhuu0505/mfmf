@@ -1,9 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { siteRedirect } from "@/lib/siteRedirect";
 import {
   POST_LOGIN_NEXT_COOKIE,
   POST_LOGIN_NEXT_MAX_AGE,
   sanitizeNextPath,
+  withNext,
 } from "@/lib/nextPath";
 
 export async function POST(request: NextRequest) {
@@ -15,9 +17,7 @@ export async function POST(request: NextRequest) {
   const form = await request.formData().catch(() => null);
   const next = sanitizeNextPath(form?.get("next")?.toString());
 
-  const url = new URL("/login", request.url);
-  if (next !== "/") url.searchParams.set("next", next);
-  const response = NextResponse.redirect(url, { status: 303 });
+  const response = siteRedirect(withNext("/login", next), 303);
   if (next !== "/") {
     response.cookies.set(POST_LOGIN_NEXT_COOKIE, next, {
       path: "/",

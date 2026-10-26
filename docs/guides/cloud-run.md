@@ -22,6 +22,16 @@ node tests/scripts/cloudrun-smoke.mjs
 `NEXT_PUBLIC_*` はブラウザコードに埋め込まれるため、Cloud Run の実行時変数だけを変更しても
 接続先は変わらない。`service_role` や Google の秘密鍵を build arg に渡してはいけない。
 CI は本番資格情報を使わず、実際の Linux コンテナを非 root で起動して検証する。
+smoke では外部 Host / HTTPS 転送ヘッダーと内部 bind address が違う条件でも、
+OAuth の取消・ログアウト・招待誘導が同一サイトへ戻り、招待 Cookie の更新が
+同一 origin に限られることを確認する。
+
+認証 Route Handler の Location は相対パスを使い、Host / Forwarded から公開 origin を推測しない。
+middleware は Next.js adapter が要求する絶対URLを内部で保ち、配信時の同origin相対化を使う。
+`/auth/next` の POST はブラウザが生成する `Sec-Fetch-Site: same-origin` のみを許可する。
+このヘッダーがない場合は、Origin が存在して request URL の origin と完全一致するときだけ許可する。
+Fetch Metadata がないクライアントから内部URLの standalone へ送る POST は安全側に拒否される。
+この判定を外部 OAuth から到達する callback GET へ適用しない。
 
 Docker に送るファイルは `Dockerfile.cloudrun.dockerignore` の許可リストで限定する。
 実 env、ローカルログイン状態、バックアップ、Git 履歴は送らない。

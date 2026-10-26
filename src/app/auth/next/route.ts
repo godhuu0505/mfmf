@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isSameOriginPost } from "@/lib/sameOriginPost";
 import {
   POST_LOGIN_NEXT_COOKIE,
   POST_LOGIN_NEXT_MAX_AGE,
@@ -24,8 +25,7 @@ import {
 // 書き込むのはサニタイズ済みのサイト内パスだけ。念のため同一オリジンからの
 // POST に限定する（他サイトから戻り先を仕込まれないように）。
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (!isSameOriginPost(request)) {
     return new NextResponse(null, { status: 403 });
   }
 

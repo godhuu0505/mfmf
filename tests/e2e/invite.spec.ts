@@ -44,6 +44,11 @@ test("戻り先 Cookie の更新は同一 Origin からだけ許可する", asyn
 }) => {
   await page.goto("/login");
   const next = "/invite/same-origin-only";
+  // ブラウザ自身が Sec-Fetch-Site を付ける経路（JSからこのヘッダーを設定しない）。
+  const browserStatus = await page.evaluate(async (value) => (await fetch("/auth/next", {
+    method: "POST", body: new URLSearchParams({ next: value }),
+  })).status, next);
+  expect(browserStatus).toBe(204);
   const allowed = await page.request.post("/auth/next", {
     form: { next },
     headers: { origin: new URL(page.url()).origin },
