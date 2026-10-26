@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, CircleHelp, PawPrint, Scale, Users,
+import { ChevronRight, CircleHelp, ClipboardList, PawPrint, Scale, Users,
   Repeat,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -103,6 +103,12 @@ export default async function MenuPage() {
           <Link href="/weight" className={rowClass}>
             <Scale className={iconClass} aria-hidden="true" />
             体重の推移
+            {chevron}
+          </Link>
+          <div className="border-t border-border" />
+          <Link href="/care-summary" className={rowClass}>
+            <ClipboardList className={iconClass} aria-hidden="true" />
+            お世話の引き継ぎ
             {chevron}
           </Link>
         </div>

@@ -1,0 +1,29 @@
+@media print {
+  :global(body):has(.page) {
+    --background: #fff;
+    --foreground: #111;
+    --surface: #fff;
+    --surface-muted: #f4f4f4;
+    --border-color: #bbb;
+    --muted-foreground: #444;
+    color-scheme: light;
+    background: #fff;
+  }
+
+  :global(body):has(.page) :global(header),
+  :global(body):has(.page) :global([data-app-tabbar]),
+  :global(body):has(.page) :global([role="dialog"]),
+  :global(body):has(.page) :global(.skip-link) {
+    display: none !important;
+  }
+
+  :global(body):has(.page) .page {
+    max-width: none;
+    padding: 0;
+    color: #111;
+    font-size: 10pt;
+  }
+
+  .page h2 { break-after: avoid; }
+  .page p { overflow-wrap: anywhere; }
+}
