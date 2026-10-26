@@ -40,7 +40,7 @@ test("記録元チップ: ワンタップで絞り込めて、選択が URL に�
 }) => {
   const marker = `E2E-chip-${Date.now()}`;
   await login(page);
-  await quickRecord(page, marker); // クイック記録の既定は「おうち」
+  await quickRecord(page, marker); // ヘルパーは「おうち」で残す
 
   // 保育園チップ → おうちの記録は一覧から消える
   await page.getByRole("link", { name: "保育園", exact: true }).click();

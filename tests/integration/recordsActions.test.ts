@@ -53,7 +53,6 @@ vi.mock("@/lib/supabase/server", async () => {
 });
 
 import {
-  createQuickRecord,
   createRecord,
   deletePhoto,
   deleteRecord,
@@ -140,7 +139,7 @@ async function recordById(id: string) {
   return rows[0] ?? null;
 }
 
-// 世帯 A に記録を 1 件つくる（fixture。作成経路自体は別テストで検証済みの createQuickRecord ではなく
+// 世帯 A に記録を 1 件つくる（fixture。作成経路自体は別テストで検証済みの createRecord ではなく
 // DB 直挿入にして、更新/削除テストの前提を作成系の成否と独立させる）
 async function insertRecordInA(body: string): Promise<string> {
   const { rows } = await db.query(
@@ -185,9 +184,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("不変条件1: 全 Server Action が未ログインを /login へ redirect する", () => {
-  it("6 アクションすべて", async () => {
-    asAnonymous();
-    await expectLoginRedirect(createQuickRecord(recordForm(seed.householdA, "x")));
+  it("5 アクションすべて", async () => {
     asAnonymous();
     await expectLoginRedirect(
       createRecord(fullRecordForm(seed.householdA, crypto.randomUUID(), "x")),
@@ -210,14 +207,8 @@ describe("不変条件1: 全 Server Action が未ログインを /login へ redi
 });
 
 describe("不変条件3: viewer は書き込み系を呼べない", () => {
-  it("createQuickRecord / createRecord は viewer を分かりやすく拒否し、行を作らない", async () => {
+  it("createRecord は viewer を分かりやすく拒否し、行を作らない", async () => {
     await loginAs(PERSONAS.aViewer);
-    const body1 = marker("viewer-quick");
-    await expect(
-      createQuickRecord(recordForm(seed.householdA, body1)),
-    ).rejects.toThrow(/閲覧のみ/);
-    expect(await findRecordByBody(body1)).toHaveLength(0);
-
     const body2 = marker("viewer-full");
     await expect(
       createRecord(fullRecordForm(seed.householdA, crypto.randomUUID(), body2)),
@@ -249,42 +240,15 @@ describe("不変条件3: viewer は書き込み系を呼べない", () => {
   });
 });
 
-describe("作成系: 認可の基準は「シート/フォームを描画した世帯」（hidden household_id）", () => {
-  it("editor はその世帯に作成できる（household_id がフォームの世帯になる）", async () => {
-    await loginAs(PERSONAS.aEditor);
-    const body = marker("editor-quick");
-    await createQuickRecord(recordForm(seed.householdA, body));
-    const rows = await findRecordByBody(body);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].household_id).toBe(seed.householdA);
-  });
-
-  it("メンバーでない世帯の hidden を送りつけても作成できない", async () => {
-    await loginAs(PERSONAS.aEditor); // B のメンバーではない
-    const body = marker("cross-tenant");
-    await expect(
-      createQuickRecord(recordForm(seed.householdB, body)),
-    ).rejects.toThrow(/この世帯のメンバーではありません/);
-    expect(await findRecordByBody(body)).toHaveLength(0);
-  });
-
+describe("作成系: 認可の基準は「フォームを描画した世帯」（hidden household_id）", () => {
   it("ゲスト grant はメンバーシップではない（期間内でも作成不可）", async () => {
     await loginAs(PERSONAS.guestActive);
+    const recordId = crypto.randomUUID();
     const body = marker("guest-active");
     await expect(
-      createQuickRecord(recordForm(seed.householdA, body)),
+      createRecord(fullRecordForm(seed.householdA, recordId, body)),
     ).rejects.toThrow(/この世帯のメンバーではありません/);
     expect(await findRecordByBody(body)).toHaveLength(0);
-  });
-
-  it("両世帯に属するユーザー: Cookie の現在世帯が A でも、フォームの世帯 B に作成される", async () => {
-    await loginAs(PERSONAS.abEditor);
-    setHouseholdCookie(seed.householdA); // 別タブでは A を開いている状況
-    const body = marker("ab-form-wins");
-    await createQuickRecord(recordForm(seed.householdB, body));
-    const rows = await findRecordByBody(body);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].household_id).toBe(seed.householdB); // Cookie ではなくフォーム基準
   });
 
   it("createRecord も editor はフォームの世帯に作成でき、クライアント生成 id が行の id になる", async () => {
@@ -321,13 +285,6 @@ describe("作成系: 認可の基準は「シート/フォームを描画した�
       createRecord(fullRecordForm(seed.householdB, recordId, marker("full-cross"))),
     ).rejects.toThrow(/この世帯のメンバーではありません/);
     expect(await recordById(recordId)).toBeNull();
-  });
-
-  it("createQuickRecord は本文が空なら保存しない", async () => {
-    await loginAs(PERSONAS.aEditor);
-    await expect(
-      createQuickRecord(recordForm(seed.householdA, "   ")),
-    ).rejects.toThrow(/本文が空/);
   });
 });
 
