@@ -31,8 +31,10 @@ runtime="mfmf-runtime@$project.iam.gserviceaccount.com"
 deployer="mfmf-deploy@$project.iam.gserviceaccount.com"
 budget_name="mfmf-$project-monthly"
 # Numeric IDs prevent repository/owner name reuse from acquiring this trust.
-condition="assertion.repository_id == '1271210275' && assertion.repository_owner_id == '19723431' && assertion.ref == 'refs/heads/main' && assertion.workflow_ref == 'godhuu0505/mfmf/.github/workflows/deploy-cloud-run.yml@refs/heads/main' && assertion.event_name in ['push', 'workflow_dispatch']"
-mapping='google.subject=assertion.sub,attribute.repository_id=assertion.repository_id'
+script_dir=$(cd "$(dirname "$0")" && pwd)
+source "$script_dir/wif-policy.sh"
+condition=$MFMF_WIF_LEGACY_CONDITION
+mapping=$MFMF_WIF_MAPPING
 principal="principalSet://iam.googleapis.com/projects/$project_number/locations/global/workloadIdentityPools/$pool/attribute.repository_id/1271210275"
 cat <<PLAN
 Project: $project ($project_number); region: $region
@@ -133,13 +135,10 @@ if [[ $(jq length <<< "$providers") == 0 ]]; then
     --workload-identity-pool="$pool" --issuer-uri=https://token.actions.githubusercontent.com \
     --attribute-mapping="$mapping" --attribute-condition="$condition" >/dev/null
 else
-  jq -e --arg condition "$condition" '
-    length == 1 and .[0].state == "ACTIVE" and (.[0].disabled // false) == false and
-    .[0].oidc.issuerUri == "https://token.actions.githubusercontent.com" and
-    ((.[0].oidc.allowedAudiences // []) | length) == 0 and
-    .[0].attributeMapping == {"google.subject":"assertion.sub", "attribute.repository_id":"assertion.repository_id"} and
-    .[0].attributeCondition == $condition
-  ' <<< "$providers" >/dev/null || fail 'Existing WIF provider differs; no trust policy was overwritten.'
+  # An operator may already have enabled the separately reviewed production-push
+  # condition. Recognize it without changing it; new bootstraps still use legacy trust.
+  mfmf_validate_wif_providers "projects/$project_number/locations/global/workloadIdentityPools/$pool/providers/$provider" \
+    <<< "$providers" || fail 'Existing WIF provider differs; no trust policy was overwritten.'
 fi
 
 # Do not silently coexist with a previously broad impersonation policy.

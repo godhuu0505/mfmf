@@ -59,6 +59,25 @@ function harness(data = response(), failureAt?: number, details = data) {
 }
 
 describe("candidate preparation", () => {
+  it("reuses strict source validation for enabled production main push while manual entry stays manual", async () => {
+    const production = {
+      ...env, GCP_PROJECT_ID: "mfmf-499612", GCP_PROJECT_NUMBER: "92772745697", GITHUB_EVENT_NAME: "push",
+      GCP_DEPLOY_ENABLED: "true", GITHUB_WORKFLOW_REF: "godhuu0505/mfmf/.github/workflows/deploy-production.yml@refs/heads/main",
+      PRESEEDED_SECRET_VERSIONS: JSON.stringify(Object.fromEntries(Object.keys(pinned).map((key) =>
+        [key, `projects/92772745697/secrets/${SECRET_NAMES[key as keyof typeof SECRET_NAMES]}/versions/1`]))),
+    };
+    const h = harness(sensitiveResponse());
+    const docker = vi.fn(async (args: string[]) => args[0] === "image"
+      ? JSON.stringify([`asia-northeast1-docker.pkg.dev/mfmf-499612/mfmf/mfmf-candidate@sha256:${"c".repeat(64)}`]) : "");
+    await prepareCandidate({ env: production, mode: "production", fetchImpl: h.fetchImpl, docker, save: h.save, log: h.log });
+    expect(h.fetchImpl.mock.calls.every(([, options]) => options?.method === "GET")).toBe(true);
+    expect(h.save).toHaveBeenCalledOnce();
+    const blocked = harness(sensitiveResponse());
+    await expect(prepareCandidate({ env: production, fetchImpl: blocked.fetchImpl, docker, save: blocked.save })).rejects.toThrow("manual main");
+    await expect(prepareCandidate({ env: { ...production, GCP_DEPLOY_ENABLED: "false" }, mode: "production", fetchImpl: blocked.fetchImpl, docker, save: blocked.save })).rejects.toThrow("enabled production main push");
+    expect(blocked.fetchImpl).not.toHaveBeenCalled();
+  });
+
   it.each(["invalid-pin", "invalid-json", "missing-event", "oversized-event"])("CLI wrapper withholds %s from stdout/stderr before side effects", async (failure) => {
     const scratch = await mkdtemp(join(tmpdir(), "mfmf-candidate-cli-test-"));
     try {

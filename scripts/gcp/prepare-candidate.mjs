@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { requireContinuousContext } from "./production-config.mjs";
+
 const execFileAsync = promisify(execFile);
 const REGISTRY = "asia-northeast1-docker.pkg.dev";
 const PUBLIC_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
@@ -222,8 +224,9 @@ async function readProductionConfig(env, fetchImpl, preseeded) {
   return selectProductionConfig({ envs: decrypted }, preseeded);
 }
 
-export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, log = console.log }) {
-  if (env.GITHUB_ACTIONS !== "true" || env.GITHUB_REF !== "refs/heads/main" || env.GITHUB_EVENT_NAME !== "workflow_dispatch") {
+export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, log = console.log, mode = "manual" }) {
+  if (mode === "production") requireContinuousContext(env);
+  else if (mode !== "manual" || env.GITHUB_ACTIONS !== "true" || env.GITHUB_REF !== "refs/heads/main" || env.GITHUB_EVENT_NAME !== "workflow_dispatch") {
     throw new CandidateError("Candidate preparation requires a manual main workflow run.");
   }
   for (const key of ["VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID", "GCP_ACCESS_TOKEN"]) {
@@ -288,6 +291,11 @@ async function main() {
   }
   const workflowEnv = { ...process.env, PRESEEDED_SECRET_VERSIONS: input };
   parsePreseededSecretVersions(workflowEnv);
+  await prepareWithDocker(workflowEnv);
+}
+
+export async function prepareWithDocker(workflowEnv, { save, mode = "manual" } = {}) {
+  parsePreseededSecretVersions(workflowEnv);
   const scratch = await mkdtemp(join(tmpdir(), "mfmf-candidate-"));
   try {
     const bin = join(scratch, "bin");
@@ -297,13 +305,14 @@ async function main() {
     await chmod(helper, 0o700);
     // 公開設定のみ。docker login は token をファイル保存するため使わない。
     await writeFile(join(scratch, "config.json"), JSON.stringify({ credHelpers: { [REGISTRY]: "mfmf-wif" } }), { mode: 0o600 });
-    const dockerEnv = { PATH: `${bin}:${process.env.PATH}`, HOME: process.env.HOME, DOCKER_CONFIG: scratch };
+    const dockerEnv = { PATH: `${bin}:${workflowEnv.PATH}`, HOME: workflowEnv.HOME, DOCKER_CONFIG: scratch };
     await prepareCandidate({
       env: workflowEnv,
+      mode,
       docker: async (args, authenticate) => {
         try {
           const result = await execFileAsync("docker", args, {
-            env: { ...dockerEnv, ...(authenticate ? { GCP_ACCESS_TOKEN: process.env.GCP_ACCESS_TOKEN } : {}) },
+            env: { ...dockerEnv, ...(authenticate ? { GCP_ACCESS_TOKEN: workflowEnv.GCP_ACCESS_TOKEN } : {}) },
             timeout: 20 * 60 * 1000, maxBuffer: 16 * 1024 * 1024,
           });
           return result.stdout;
@@ -312,7 +321,7 @@ async function main() {
           throw new CandidateError("Docker operation failed; output withheld. No Cloud Run deployment was attempted.");
         }
       },
-      save: (manifest) => writeFile(process.env.CANDIDATE_PUBLIC_CONFIG, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 }),
+      save: save ?? ((manifest) => writeFile(workflowEnv.CANDIDATE_PUBLIC_CONFIG, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 })),
     });
   } finally {
     await rm(scratch, { recursive: true, force: true });
