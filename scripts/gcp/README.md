@@ -66,6 +66,30 @@ bash scripts/gcp/grant-deploy-access.sh --project PROJECT_ID --service SERVICE_N
 このロールにはサービスの IAM 公開設定変更権限がない。
 サービスの新規作成/再作成や一般公開は管理者の作業として残る。
 
+## イメージの保存期間
+
+`configure-artifact-cleanup.sh` は東京の専用 `mfmf` リポジトリにだけ対応する。
+プロジェクト数値 ID、名前、形式、bootstrap の説明文を照合し、別の保存ルールがあれば停止する。
+既定は外部呼出を行わない計画表示。
+
+```bash
+bash scripts/gcp/configure-artifact-cleanup.sh --project PROJECT_ID --project-number PROJECT_NUMBER
+# --dry-run を追加: クラウドへシミュレーション設定だけを保存（削除しない）
+# 結果を管理者が確認してから --apply: 非dry-runへ切り替える
+```
+
+保持ルールは `artifact-cleanup.json`。14 日より古いバージョンを整理し、
+**各 package の直近 5 バージョンは日付にかかわらず保護**する。タグ付きも対象になる。
+既存の異なる cleanup policy は置き換えない。まず同じポリシーの dry-run 設定が必要。
+整理は定期処理で反映され、即時削除コマンドは呼ばない。
+古いイメージを再デプロイするための無期限保存にはならないため、ロールバック対象の digest を
+確認してから有効化する。14 日以内に大量のイメージを push すれば保存量は増えるので、
+**5 バージョンという個数上限や料金上限ではない**。
+
+[dry-run の一次資料](https://docs.cloud.google.com/artifact-registry/docs/repositories/cleanup-policy)に従い、
+必要に応じ Artifact Registry の Data Access `DATA_WRITE` 監査ログを確認する。
+監査ログの有効化やログ設定の変更はこのスクリプトでは行わない。
+
 ## 秘密値の移送前
 
 P1 の配信準備が実行される前に、管理者が対象コンテナと権限だけを用意する。

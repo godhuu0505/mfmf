@@ -38,7 +38,14 @@ if starts('artifacts', 'repositories', 'list'):
     if s.get('deny_repo_list'): sys.exit(1)
     save(s.get('repos', []))
 if starts('artifacts', 'repositories', 'create'):
-    s['repos'] = [{'name': 'projects/test-project/locations/asia-northeast1/repositories/mfmf', 'format': 'DOCKER', 'mode': 'STANDARD_REPOSITORY'}]; save({})
+    s['repos'] = [{'name': 'projects/test-project/locations/asia-northeast1/repositories/mfmf', 'format': 'DOCKER', 'mode': 'STANDARD_REPOSITORY', 'description': opt('--description')}]; save({})
+if starts('artifacts', 'repositories', 'describe'): save(s.get('repo_describe', s.get('repos', [{}])[0]))
+if starts('artifacts', 'repositories', 'set-cleanup-policies'):
+    policies = json.loads(Path(opt('--policy')).read_text())
+    s['repos'][0]['cleanupPolicies'] = {p['name']: {'id': p['name'], 'action': p['action']['type'].upper(),
+        **({'condition': {'tagState': 'ANY', 'olderThan': '1209600s'}} if 'condition' in p else {'mostRecentVersions': p['mostRecentVersions']})} for p in policies}
+    s['repos'][0]['cleanupPolicyDryRun'] = '--dry-run' in args
+    save({})
 if starts('artifacts', 'repositories', 'get-iam-policy'): save(s.get('repo_policy', {}))
 if starts('iam', 'service-accounts', 'list'): save(s.get('accounts', []))
 if starts('iam', 'service-accounts', 'create'):
@@ -85,6 +92,8 @@ class BootstrapTests(unittest.TestCase):
         args = ['bash', str(ROOT / 'scripts/gcp' / script), '--project', 'test-project']
         if script == 'bootstrap.sh':
             args += ['--project-number', '123456789', '--billing-account', 'ABCDEF-123456-ABCDEF']
+        elif script == 'configure-artifact-cleanup.sh':
+            args += ['--project-number', '123456789']
         elif script == 'grant-deploy-access.sh':
             args += ['--service', 'mfmf-candidate']
         if apply:
@@ -155,6 +164,41 @@ class BootstrapTests(unittest.TestCase):
         self.state.write_text(json.dumps(state)); self.log.unlink()
         self.assertNotEqual(self.invoke().returncode, 0)
         self.assertFalse(any('add-iam-policy-binding' in c or 'update-oidc' in c for c in self.calls()))
+
+    def test_cleanup_plan_simulation_and_apply(self):
+        script = 'configure-artifact-cleanup.sh'
+        self.assertEqual(self.invoke(apply=False, script=script).returncode, 0)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.invoke().returncode, 0)
+        self.log.unlink()
+        self.assertNotEqual(self.invoke(script=script).returncode, 0)
+        self.assertFalse(any('set-cleanup-policies' in c for c in self.calls()))
+        dry = self.invoke(apply=False, script=script, extra=['--dry-run'])
+        self.assertEqual(dry.returncode, 0, dry.stderr)
+        live = self.invoke(script=script)
+        self.assertEqual(live.returncode, 0, live.stderr)
+        changes = [c for c in self.calls() if 'set-cleanup-policies' in c]
+        self.assertEqual(len(changes), 2)
+        self.assertTrue(all(c[3] == 'mfmf' and '--location=asia-northeast1' in c for c in changes))
+        self.assertIn('--dry-run', changes[0])
+        self.assertIn('--no-dry-run', changes[1])
+        policies = json.loads(self.state.read_text())['repos'][0]['cleanupPolicies']
+        self.assertEqual(policies['mfmf-keep-last-5']['mostRecentVersions']['keepCount'], 5)
+        self.assertEqual(policies['mfmf-delete-after-14d']['condition']['olderThan'], '1209600s')
+        self.assertFalse(any('delete' in c or 'delete-cleanup-policies' in c for c in self.calls()))
+
+    def test_cleanup_refuses_other_repositories_and_existing_policies(self):
+        self.assertEqual(self.invoke().returncode, 0)
+        base = json.loads(self.state.read_text())
+        cases = []
+        for field, value in [('description', 'Other app'), ('name', 'projects/test-project/locations/asia-northeast1/repositories/other'), ('cleanupPolicies', {'keep-everything': {'action': 'KEEP'}})]:
+            state = json.loads(json.dumps(base)); state['repos'][0][field] = value; cases.append(state)
+        state = json.loads(json.dumps(base)); state['number'] = '999'; cases.append(state)
+        for state in cases:
+            with self.subTest(state=state):
+                self.state.write_text(json.dumps(state)); self.log.unlink(missing_ok=True)
+                self.assertNotEqual(self.invoke(apply=False, script='configure-artifact-cleanup.sh', extra=['--dry-run']).returncode, 0)
+                self.assertFalse(any('set-cleanup-policies' in c for c in self.calls()))
 
     def test_secret_preparation_never_reads_or_writes_values(self):
         self.assertEqual(self.invoke(apply=False, script='prepare-runtime-secrets.sh').returncode, 0)
