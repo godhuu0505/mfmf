@@ -12,6 +12,7 @@ import {
   type RecordSourceFilter,
   type SortKey,
 } from "@/lib/recordQuery";
+import { RECORD_SOURCES, type RecordSource } from "@/types/database";
 
 // 記録一覧の検索・絞り込み・並び替えフォーム。
 // 記録元はホーム常設のチップ（page.tsx / proto 合意）が受け持ち、
@@ -43,8 +44,11 @@ export default function RecordFilters({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const sourceRaw = String(fd.get("source") || "all");
-    const source: RecordSourceFilter =
-      sourceRaw === "daycare" || sourceRaw === "home" ? sourceRaw : "all";
+    const source: RecordSourceFilter = RECORD_SOURCES.includes(
+      sourceRaw as RecordSource,
+    )
+      ? (sourceRaw as RecordSource)
+      : "all";
     const sortRaw = String(fd.get("sort") || "date_desc");
     const sort: SortKey = (SORT_KEYS as string[]).includes(sortRaw)
       ? (sortRaw as SortKey)

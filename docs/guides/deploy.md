@@ -15,7 +15,7 @@ mfmf は **GitHub Actions から Vercel CLI で明示的にデプロイ**しま�
 - **merge = 本番リリース**。main にマージした時点で migration 適用 → Vercel Production デプロイまで一気に走ります。
 - CI（`ci.yml` を `workflow_call` で再利用）が緑のときだけデプロイされます。
 - **DB スキーマも main マージ時点で本番 Supabase に進む**。`supabase db push` は冪等です。
-- 各ジョブ順は `verify → check-secrets → migrate → deploy`。`migrate` が失敗したら `deploy` は走りません。
+- `verify` と `check-secrets` の後に `migrate → deploy` が続きます。`migrate` の失敗・skip 時は `deploy` も停止します。
 
 ## 本番（Production）へ出す手順
 
@@ -58,9 +58,27 @@ Secrets をその Environment スコープに置く（`production` に承認ル�
 | `SUPABASE_PROJECT_ID` | Supabase migrate | Project URL の subdomain（例: `abcdefghijklmnopqrst.supabase.co` の左側 20 文字） |
 
 Supabase 系 3 つを **`production` Environment** に登録する。
-未設定の場合は `migrate` ジョブが自動 skip され、Vercel deploy は続行される（DB に触れない状態で動作確認したいときの抜け道）。
+未設定の場合は `migrate` と Vercel deploy が停止します。古い DB に新しいコードだけを出すことは許可しません。
 
-### 4. Vercel 側の環境変数
+### 4. バックアップの公開鍵を登録
+
+公開リポジトリの Actions Artifact はリポジトリ閲覧者も取得できます。**平文の本番 DB を保存しないでください。**
+管理者の端末に `age` を導入し、リポジトリ外の保護された場所で鍵を作ります。
+
+```bash
+umask 077
+mkdir -p "$HOME/.local/share/mfmf-backups"
+age-keygen -o "$HOME/.local/share/mfmf-backups/identity.txt"
+age-keygen -y "$HOME/.local/share/mfmf-backups/identity.txt" > "$HOME/.local/share/mfmf-backups/recipient.txt"
+gh variable set SUPABASE_BACKUP_AGE_RECIPIENT --repo godhuu0505/mfmf < "$HOME/.local/share/mfmf-backups/recipient.txt"
+```
+
+GitHub に登録するのは **公開鍵だけ**です。`identity.txt` は復号に必須の秘密鍵なので、
+コミット・Artifact・ログ・GitHub Secrets へ入れず、別の安全な保管先にも控えを置いてください。
+鍵を紛失すると過去のバックアップは復元できません。鍵を替えた後も、旧バックアップの保持期間中は旧鍵が必要です。
+公開鍵未設定・不正値・dump失敗・暗号化失敗は、migration より前に処理を停止します。
+
+### 5. Vercel 側の環境変数
 
 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を Vercel の
 **Settings > Environment Variables** の **Production** に設定する。
@@ -97,10 +115,13 @@ main マージ = 本番反映のため、destructive 変更は **main マージ�
 
 **Free プランには自動バックアップも PITR も無い。** ロールバック手段は以下のいずれか：
 
-#### 1. GitHub Actions Artifact からの復元（推奨・標準手段）
+#### 1. 暗号化済み GitHub Actions Artifact からの復元
 
-`migrate` ジョブは `supabase db push` の**前に** `supabase db dump` で本番 DB の schema と data を取り、Artifact として 90 日間保持する。
-名前は `supabase-backup-production-<commit-sha>`（main マージの commit SHA）。
+`migrate` ジョブは `supabase db push` の**前に**本番 DB の schema と data を取り、
+`scripts/backup-db.sh` で age 暗号化した `.sql.age` だけを Artifact として90日間保持します。
+名前は `supabase-backup-production-encrypted-<commit-sha>`（main マージの commit SHA）。
+平文は権限を絞った一時ディレクトリにのみ作り、正常時・異常時とも削除します。
+これはマージ直前の退避であり、定期バックアップや写真のバックアップではありません。
 
 > ⚠️ **dump 対象は `public` スキーマのみ**。`auth.users`（Supabase Auth 管理）/ `storage.*`（Storage メタデータ）/ Storage バケット本体（`record_photos` の画像ファイル）は含まれない。
 > - `auth.users` は通常 Supabase Auth 側に残るが、Auth まで壊した場合は別途 `supabase auth export` で個別退避が必要。
@@ -110,8 +131,13 @@ main マージ = 本番反映のため、destructive 変更は **main マージ�
 
 ```bash
 # 1. GitHub の該当 Actions run（Actions タブ → 対象 workflow → 該当 run）から
-#    Artifact "supabase-backup-production-<sha>" をダウンロードして展開する。
-#    pre-migrate-schema.sql / pre-migrate-data.sql が得られる。
+#    Artifact "supabase-backup-production-encrypted-<sha>" をダウンロードして展開する。
+#    リポジトリ外の保護されたディレクトリで復号する。SQL を画面へ出力しない。
+umask 077
+age --decrypt --identity "$HOME/.local/share/mfmf-backups/identity.txt" \
+  --output pre-migrate-schema.sql pre-migrate-schema.sql.age
+age --decrypt --identity "$HOME/.local/share/mfmf-backups/identity.txt" \
+  --output pre-migrate-data.sql pre-migrate-data.sql.age
 
 # 2. Supabase Dashboard → Project Settings → Database → Connection string
 #    から direct connection の URL（postgres://postgres:<PW>@db.<ref>.supabase.co:5432/postgres）を取得。
@@ -128,11 +154,15 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f pre-migrate-data.sql
 
 > ⚠️ 復元中はアプリが整合しない状態になる。Vercel Dashboard で過去デプロイに一時的にロールバックしておくか、メンテモードを掲示する。
 
-#### 2. 緊急時の Pro プラン一時アップグレード（裏技）
+旧形式の平文 Artifact が残っている場合は、内容を出力せず暗号化して保護された場所へ退避し、
+復号後のハッシュ一致を確認してから公開 Artifact を削除します。保持期限まで放置しないでください。
 
-- Supabase Dashboard → Settings → Subscription Plan → Pro へアップグレード（$25/月）。
-- アップグレード直後から **過去 7 日分の日次バックアップが Dashboard から復元可能**になる（コミュニティ確認済み挙動）。
-- 復元完了後にダウングレードして Free に戻せる。
+#### 2. Supabase が保持しているバックアップからの復元
+
+有料プランの日次バックアップや PITR を利用している場合は、Dashboard で復元可能な時点を確認します。
+**事故後のアップグレードで、Free 利用中の過去データが復元できるとは保証されません。**
+事前に確保したバックアップを基準にしてください。対象・保持期間は
+[Supabase 公式のバックアップ手順](https://supabase.com/docs/guides/platform/backups)を参照します。
 
 `supabase_migrations.schema_migrations` の履歴を直接いじる場合は `supabase migration repair --status applied|reverted <version>` を使う。
 

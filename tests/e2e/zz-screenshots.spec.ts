@@ -30,13 +30,25 @@ test("スクリーンショット一式（ライト）", async ({ page }) => {
 
   await page.goto("/calendar");
   await shot(page, "calendar");
-  // 記録のある日のシート
-  const dayWithRecords = page.getByRole("button", { name: /記録\d+件/ });
-  if ((await dayWithRecords.count()) > 0) {
-    await dayWithRecords.last().click();
+  // 週表示（時間割）
+  await page.getByRole("tab", { name: "週" }).click();
+  await shot(page, "calendar-week");
+  await page.getByRole("tab", { name: "月" }).click();
+
+  // 日別シート（予定の編集）
+  const jstToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+  }).format(new Date());
+  const todayCell = page.locator(`[data-day="${jstToday}"]`);
+  if ((await todayCell.count()) > 0) {
+    await todayCell.click();
     await shot(page, "calendar-day-sheet", false);
     await page.keyboard.press("Escape");
   }
+
+  // 毎週の予定ルール
+  await page.goto("/schedule/rules");
+  await shot(page, "schedule-rules");
 
   // クイック記録シート（タブバー中央）
   await page.getByRole("button", { name: "クイック記録" }).click();

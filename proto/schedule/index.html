@@ -1,0 +1,3444 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>mfmf — 予定と担当（プロト）</title>
+<!-- proto.css:start -->
+<style>
+/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */
+@layer properties;
+@layer theme, base, components, utilities;
+@layer theme {
+  :root, :host {
+    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    --color-amber-50: oklch(98.7% 0.022 95.277);
+    --color-amber-500: oklch(76.9% 0.188 70.08);
+    --color-amber-700: oklch(55.5% 0.163 48.998);
+    --color-amber-900: oklch(41.4% 0.112 45.904);
+    --color-emerald-50: oklch(97.9% 0.021 166.113);
+    --color-emerald-100: oklch(95% 0.052 163.051);
+    --color-emerald-300: oklch(84.5% 0.143 164.978);
+    --color-emerald-400: oklch(76.5% 0.177 163.223);
+    --color-emerald-500: oklch(69.6% 0.17 162.48);
+    --color-emerald-600: oklch(59.6% 0.145 163.225);
+    --color-emerald-700: oklch(50.8% 0.118 165.612);
+    --color-emerald-800: oklch(43.2% 0.095 166.913);
+    --color-emerald-900: oklch(37.8% 0.077 168.94);
+    --color-emerald-950: oklch(26.2% 0.051 172.552);
+    --color-sky-50: oklch(97.7% 0.013 236.62);
+    --color-sky-100: oklch(95.1% 0.026 236.824);
+    --color-sky-400: oklch(74.6% 0.16 232.661);
+    --color-sky-500: oklch(68.5% 0.169 237.323);
+    --color-sky-700: oklch(50% 0.134 242.749);
+    --color-sky-900: oklch(39.1% 0.09 240.876);
+    --color-violet-50: oklch(96.9% 0.016 293.756);
+    --color-violet-500: oklch(60.6% 0.25 292.717);
+    --color-violet-700: oklch(49.1% 0.27 292.581);
+    --color-violet-900: oklch(38% 0.189 293.745);
+    --color-rose-50: oklch(96.9% 0.015 12.422);
+    --color-rose-100: oklch(94.1% 0.03 12.58);
+    --color-rose-300: oklch(81% 0.117 11.638);
+    --color-rose-400: oklch(71.2% 0.194 13.428);
+    --color-rose-500: oklch(64.5% 0.246 16.439);
+    --color-rose-600: oklch(58.6% 0.253 17.585);
+    --color-rose-700: oklch(51.4% 0.222 16.935);
+    --color-rose-800: oklch(45.5% 0.188 13.697);
+    --color-rose-900: oklch(41% 0.159 10.272);
+    --color-slate-50: oklch(98.4% 0.003 247.858);
+    --color-slate-400: oklch(70.4% 0.04 256.788);
+    --color-slate-700: oklch(37.2% 0.044 257.287);
+    --color-slate-900: oklch(20.8% 0.042 265.755);
+    --color-black: #000;
+    --color-white: #fff;
+    --spacing: 0.25rem;
+    --container-3xl: 48rem;
+    --text-xs: 0.75rem;
+    --text-xs--line-height: calc(1 / 0.75);
+    --text-sm: 0.875rem;
+    --text-sm--line-height: calc(1.25 / 0.875);
+    --text-base: 1rem;
+    --text-base--line-height: calc(1.5 / 1);
+    --text-lg: 1.125rem;
+    --text-lg--line-height: calc(1.75 / 1.125);
+    --text-xl: 1.25rem;
+    --text-xl--line-height: calc(1.75 / 1.25);
+    --text-3xl: 1.875rem;
+    --text-3xl--line-height: calc(2.25 / 1.875);
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --leading-tight: 1.25;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --default-transition-duration: 150ms;
+    --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    --default-font-family: var(--font-sans);
+    --default-mono-font-family: var(--font-mono);
+  }
+}
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  html, :host {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    font-family: var(--default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
+    -webkit-tap-highlight-color: transparent;
+  }
+  hr {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+  abbr:where([title]) {
+    -webkit-text-decoration: underline dotted;
+    text-decoration: underline dotted;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  a {
+    color: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit;
+  }
+  b, strong {
+    font-weight: bolder;
+  }
+  code, kbd, samp, pre {
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-feature-settings: var(--default-mono-font-feature-settings, normal);
+    font-variation-settings: var(--default-mono-font-variation-settings, normal);
+    font-size: 1em;
+  }
+  small {
+    font-size: 80%;
+  }
+  sub, sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+  sub {
+    bottom: -0.25em;
+  }
+  sup {
+    top: -0.5em;
+  }
+  table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+  :-moz-focusring {
+    outline: auto;
+  }
+  progress {
+    vertical-align: baseline;
+  }
+  summary {
+    display: list-item;
+  }
+  ol, ul, menu {
+    list-style: none;
+  }
+  img, svg, video, canvas, audio, iframe, embed, object {
+    display: block;
+    vertical-align: middle;
+  }
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+  button, input, select, optgroup, textarea, ::file-selector-button {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  :where(select:is([multiple], [size])) optgroup {
+    font-weight: bolder;
+  }
+  :where(select:is([multiple], [size])) optgroup option {
+    padding-inline-start: 20px;
+  }
+  ::file-selector-button {
+    margin-inline-end: 4px;
+  }
+  ::placeholder {
+    opacity: 1;
+  }
+  @supports (not (-webkit-appearance: -apple-pay-button))  or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: currentcolor;
+      @supports (color: color-mix(in lab, red, red)) {
+        color: color-mix(in oklab, currentcolor 50%, transparent);
+      }
+    }
+  }
+  textarea {
+    resize: vertical;
+  }
+  ::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+  ::-webkit-date-and-time-value {
+    min-height: 1lh;
+    text-align: inherit;
+  }
+  ::-webkit-datetime-edit {
+    display: inline-flex;
+  }
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  ::-webkit-datetime-edit, ::-webkit-datetime-edit-year-field, ::-webkit-datetime-edit-month-field, ::-webkit-datetime-edit-day-field, ::-webkit-datetime-edit-hour-field, ::-webkit-datetime-edit-minute-field, ::-webkit-datetime-edit-second-field, ::-webkit-datetime-edit-millisecond-field, ::-webkit-datetime-edit-meridiem-field {
+    padding-block: 0;
+  }
+  ::-webkit-calendar-picker-indicator {
+    line-height: 1;
+  }
+  :-moz-ui-invalid {
+    box-shadow: none;
+  }
+  button, input:where([type="button"], [type="reset"], [type="submit"]), ::file-selector-button {
+    appearance: button;
+  }
+  ::-webkit-inner-spin-button, ::-webkit-outer-spin-button {
+    height: auto;
+  }
+  [hidden]:where(:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
+@layer utilities {
+  .pointer-events-none {
+    pointer-events: none;
+  }
+  .invisible {
+    visibility: hidden;
+  }
+  .absolute {
+    position: absolute;
+  }
+  .fixed {
+    position: fixed;
+  }
+  .relative {
+    position: relative;
+  }
+  .sticky {
+    position: sticky;
+  }
+  .inset-0 {
+    inset: 0px;
+  }
+  .inset-x-0 {
+    inset-inline: 0px;
+  }
+  .top-0 {
+    top: 0px;
+  }
+  .right-1 {
+    right: var(--spacing);
+  }
+  .bottom-0 {
+    bottom: 0px;
+  }
+  .bottom-24 {
+    bottom: calc(var(--spacing) * 24);
+  }
+  .bottom-28 {
+    bottom: calc(var(--spacing) * 28);
+  }
+  .bottom-36 {
+    bottom: calc(var(--spacing) * 36);
+  }
+  .left-1\/2 {
+    left: calc(1 / 2 * 100%);
+  }
+  .left-3 {
+    left: calc(var(--spacing) * 3);
+  }
+  .z-30 {
+    z-index: 30;
+  }
+  .z-40 {
+    z-index: 40;
+  }
+  .z-50 {
+    z-index: 50;
+  }
+  .z-\[60\] {
+    z-index: 60;
+  }
+  .z-\[70\] {
+    z-index: 70;
+  }
+  .z-\[80\] {
+    z-index: 80;
+  }
+  .mx-auto {
+    margin-inline: auto;
+  }
+  .-mt-5 {
+    margin-top: calc(var(--spacing) * -5);
+  }
+  .mt-0\.5 {
+    margin-top: calc(var(--spacing) * 0.5);
+  }
+  .mt-1 {
+    margin-top: var(--spacing);
+  }
+  .mt-2 {
+    margin-top: calc(var(--spacing) * 2);
+  }
+  .mt-3 {
+    margin-top: calc(var(--spacing) * 3);
+  }
+  .mr-1 {
+    margin-right: var(--spacing);
+  }
+  .mb-0\.5 {
+    margin-bottom: calc(var(--spacing) * 0.5);
+  }
+  .mb-1 {
+    margin-bottom: var(--spacing);
+  }
+  .mb-2 {
+    margin-bottom: calc(var(--spacing) * 2);
+  }
+  .mb-3 {
+    margin-bottom: calc(var(--spacing) * 3);
+  }
+  .-ml-1 {
+    margin-left: calc(var(--spacing) * -1);
+  }
+  .ml-auto {
+    margin-left: auto;
+  }
+  .block {
+    display: block;
+  }
+  .flex {
+    display: flex;
+  }
+  .grid {
+    display: grid;
+  }
+  .hidden {
+    display: none;
+  }
+  .inline {
+    display: inline;
+  }
+  .inline-flex {
+    display: inline-flex;
+  }
+  .aspect-square {
+    aspect-ratio: 1 / 1;
+  }
+  .h-1 {
+    height: var(--spacing);
+  }
+  .h-2 {
+    height: calc(var(--spacing) * 2);
+  }
+  .h-2\.5 {
+    height: calc(var(--spacing) * 2.5);
+  }
+  .h-3 {
+    height: calc(var(--spacing) * 3);
+  }
+  .h-3\.5 {
+    height: calc(var(--spacing) * 3.5);
+  }
+  .h-4 {
+    height: calc(var(--spacing) * 4);
+  }
+  .h-5 {
+    height: calc(var(--spacing) * 5);
+  }
+  .h-6 {
+    height: calc(var(--spacing) * 6);
+  }
+  .h-7 {
+    height: calc(var(--spacing) * 7);
+  }
+  .h-8 {
+    height: calc(var(--spacing) * 8);
+  }
+  .h-9 {
+    height: calc(var(--spacing) * 9);
+  }
+  .h-10 {
+    height: calc(var(--spacing) * 10);
+  }
+  .h-12 {
+    height: calc(var(--spacing) * 12);
+  }
+  .h-14 {
+    height: calc(var(--spacing) * 14);
+  }
+  .h-24 {
+    height: calc(var(--spacing) * 24);
+  }
+  .max-h-\[58dvh\] {
+    max-height: 58dvh;
+  }
+  .max-h-\[88dvh\] {
+    max-height: 88dvh;
+  }
+  .min-h-6 {
+    min-height: calc(var(--spacing) * 6);
+  }
+  .min-h-24 {
+    min-height: calc(var(--spacing) * 24);
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+  .w-2 {
+    width: calc(var(--spacing) * 2);
+  }
+  .w-2\.5 {
+    width: calc(var(--spacing) * 2.5);
+  }
+  .w-3 {
+    width: calc(var(--spacing) * 3);
+  }
+  .w-3\.5 {
+    width: calc(var(--spacing) * 3.5);
+  }
+  .w-4 {
+    width: calc(var(--spacing) * 4);
+  }
+  .w-5 {
+    width: calc(var(--spacing) * 5);
+  }
+  .w-6 {
+    width: calc(var(--spacing) * 6);
+  }
+  .w-7 {
+    width: calc(var(--spacing) * 7);
+  }
+  .w-8 {
+    width: calc(var(--spacing) * 8);
+  }
+  .w-9 {
+    width: calc(var(--spacing) * 9);
+  }
+  .w-10 {
+    width: calc(var(--spacing) * 10);
+  }
+  .w-12 {
+    width: calc(var(--spacing) * 12);
+  }
+  .w-14 {
+    width: calc(var(--spacing) * 14);
+  }
+  .w-16 {
+    width: calc(var(--spacing) * 16);
+  }
+  .w-20 {
+    width: calc(var(--spacing) * 20);
+  }
+  .w-64 {
+    width: calc(var(--spacing) * 64);
+  }
+  .w-full {
+    width: 100%;
+  }
+  .max-w-3xl {
+    max-width: var(--container-3xl);
+  }
+  .min-w-0 {
+    min-width: 0px;
+  }
+  .min-w-\[24rem\] {
+    min-width: 24rem;
+  }
+  .min-w-\[46rem\] {
+    min-width: 46rem;
+  }
+  .flex-1 {
+    flex: 1;
+  }
+  .shrink-0 {
+    flex-shrink: 0;
+  }
+  .-translate-x-1\/2 {
+    --tw-translate-x: calc(calc(1 / 2 * 100%) * -1);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
+  .-translate-y-1\/2 {
+    --tw-translate-y: calc(calc(1 / 2 * 100%) * -1);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
+  .translate-y-full {
+    --tw-translate-y: 100%;
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
+  .cursor-default {
+    cursor: default;
+  }
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .grid-cols-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .grid-cols-7 {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .grid-cols-\[3rem_repeat\(7\,1fr\)\] {
+    grid-template-columns: 3rem repeat(7,1fr);
+  }
+  .flex-col {
+    flex-direction: column;
+  }
+  .flex-wrap {
+    flex-wrap: wrap;
+  }
+  .items-center {
+    align-items: center;
+  }
+  .items-start {
+    align-items: flex-start;
+  }
+  .items-stretch {
+    align-items: stretch;
+  }
+  .justify-between {
+    justify-content: space-between;
+  }
+  .justify-center {
+    justify-content: center;
+  }
+  .justify-start {
+    justify-content: flex-start;
+  }
+  .gap-0\.5 {
+    gap: calc(var(--spacing) * 0.5);
+  }
+  .gap-1 {
+    gap: var(--spacing);
+  }
+  .gap-1\.5 {
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .gap-2 {
+    gap: calc(var(--spacing) * 2);
+  }
+  .gap-3 {
+    gap: calc(var(--spacing) * 3);
+  }
+  :where(.space-y-1 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(var(--spacing) * var(--tw-space-y-reverse));
+    margin-block-end: calc(var(--spacing) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-2 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 2) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 2) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-3 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 3) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 3) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-4 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 4) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 4) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  .gap-x-3 {
+    column-gap: calc(var(--spacing) * 3);
+  }
+  :where(.-space-x-1 > :not(:last-child)) {
+    --tw-space-x-reverse: 0;
+    margin-inline-start: calc(calc(var(--spacing) * -1) * var(--tw-space-x-reverse));
+    margin-inline-end: calc(calc(var(--spacing) * -1) * calc(1 - var(--tw-space-x-reverse)));
+  }
+  .gap-y-1 {
+    row-gap: var(--spacing);
+  }
+  .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .overflow-hidden {
+    overflow: hidden;
+  }
+  .overflow-x-auto {
+    overflow-x: auto;
+  }
+  .overflow-y-auto {
+    overflow-y: auto;
+  }
+  .rounded {
+    border-radius: 0.25rem;
+  }
+  .rounded-2xl {
+    border-radius: var(--radius-2xl);
+  }
+  .rounded-full {
+    border-radius: calc(infinity * 1px);
+  }
+  .rounded-lg {
+    border-radius: var(--radius-lg);
+  }
+  .rounded-xl {
+    border-radius: var(--radius-xl);
+  }
+  .rounded-t-2xl {
+    border-top-left-radius: var(--radius-2xl);
+    border-top-right-radius: var(--radius-2xl);
+  }
+  .border {
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+  }
+  .border-2 {
+    border-style: var(--tw-border-style);
+    border-width: 2px;
+  }
+  .border-\[1\.5px\] {
+    border-style: var(--tw-border-style);
+    border-width: 1.5px;
+  }
+  .border-t {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 1px;
+  }
+  .border-r {
+    border-right-style: var(--tw-border-style);
+    border-right-width: 1px;
+  }
+  .border-b {
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 1px;
+  }
+  .border-l {
+    border-left-style: var(--tw-border-style);
+    border-left-width: 1px;
+  }
+  .border-l-4 {
+    border-left-style: var(--tw-border-style);
+    border-left-width: 4px;
+  }
+  .border-dashed {
+    --tw-border-style: dashed;
+    border-style: dashed;
+  }
+  .border-amber-500 {
+    border-color: var(--color-amber-500);
+  }
+  .border-border {
+    border-color: var(--border-color);
+  }
+  .border-emerald-500 {
+    border-color: var(--color-emerald-500);
+  }
+  .border-emerald-600 {
+    border-color: var(--color-emerald-600);
+  }
+  .border-muted-foreground\/50 {
+    border-color: var(--muted-foreground);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
+    }
+  }
+  .border-primary {
+    border-color: var(--primary);
+  }
+  .border-rose-300 {
+    border-color: var(--color-rose-300);
+  }
+  .border-rose-500 {
+    border-color: var(--color-rose-500);
+  }
+  .border-sky-500 {
+    border-color: var(--color-sky-500);
+  }
+  .border-slate-400 {
+    border-color: var(--color-slate-400);
+  }
+  .border-violet-500 {
+    border-color: var(--color-violet-500);
+  }
+  .border-l-black\/20 {
+    border-left-color: color-mix(in srgb, #000 20%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-left-color: color-mix(in oklab, var(--color-black) 20%, transparent);
+    }
+  }
+  .bg-amber-50 {
+    background-color: var(--color-amber-50);
+  }
+  .bg-amber-500 {
+    background-color: var(--color-amber-500);
+  }
+  .bg-amber-700 {
+    background-color: var(--color-amber-700);
+  }
+  .bg-background {
+    background-color: var(--background);
+  }
+  .bg-black\/40 {
+    background-color: color-mix(in srgb, #000 40%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 40%, transparent);
+    }
+  }
+  .bg-emerald-50 {
+    background-color: var(--color-emerald-50);
+  }
+  .bg-emerald-100 {
+    background-color: var(--color-emerald-100);
+  }
+  .bg-emerald-500 {
+    background-color: var(--color-emerald-500);
+  }
+  .bg-emerald-600 {
+    background-color: var(--color-emerald-600);
+  }
+  .bg-emerald-700 {
+    background-color: var(--color-emerald-700);
+  }
+  .bg-foreground {
+    background-color: var(--foreground);
+  }
+  .bg-muted {
+    background-color: var(--muted);
+  }
+  .bg-primary {
+    background-color: var(--primary);
+  }
+  .bg-primary\/10 {
+    background-color: var(--primary);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--primary) 10%, transparent);
+    }
+  }
+  .bg-rose-50 {
+    background-color: var(--color-rose-50);
+  }
+  .bg-rose-100 {
+    background-color: var(--color-rose-100);
+  }
+  .bg-rose-500 {
+    background-color: var(--color-rose-500);
+  }
+  .bg-rose-600 {
+    background-color: var(--color-rose-600);
+  }
+  .bg-rose-700 {
+    background-color: var(--color-rose-700);
+  }
+  .bg-sky-50 {
+    background-color: var(--color-sky-50);
+  }
+  .bg-sky-100 {
+    background-color: var(--color-sky-100);
+  }
+  .bg-sky-500 {
+    background-color: var(--color-sky-500);
+  }
+  .bg-sky-700 {
+    background-color: var(--color-sky-700);
+  }
+  .bg-slate-50 {
+    background-color: var(--color-slate-50);
+  }
+  .bg-slate-400 {
+    background-color: var(--color-slate-400);
+  }
+  .bg-slate-700 {
+    background-color: var(--color-slate-700);
+  }
+  .bg-surface {
+    background-color: var(--surface);
+  }
+  .bg-surface-muted {
+    background-color: var(--surface-muted);
+  }
+  .bg-surface-muted\/40 {
+    background-color: var(--surface-muted);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--surface-muted) 40%, transparent);
+    }
+  }
+  .bg-surface\/90 {
+    background-color: var(--surface);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--surface) 90%, transparent);
+    }
+  }
+  .bg-violet-50 {
+    background-color: var(--color-violet-50);
+  }
+  .bg-violet-500 {
+    background-color: var(--color-violet-500);
+  }
+  .bg-violet-700 {
+    background-color: var(--color-violet-700);
+  }
+  .p-0\.5 {
+    padding: calc(var(--spacing) * 0.5);
+  }
+  .p-1 {
+    padding: var(--spacing);
+  }
+  .p-1\.5 {
+    padding: calc(var(--spacing) * 1.5);
+  }
+  .p-3 {
+    padding: calc(var(--spacing) * 3);
+  }
+  .p-4 {
+    padding: calc(var(--spacing) * 4);
+  }
+  .px-0\.5 {
+    padding-inline: calc(var(--spacing) * 0.5);
+  }
+  .px-1 {
+    padding-inline: var(--spacing);
+  }
+  .px-2 {
+    padding-inline: calc(var(--spacing) * 2);
+  }
+  .px-2\.5 {
+    padding-inline: calc(var(--spacing) * 2.5);
+  }
+  .px-3 {
+    padding-inline: calc(var(--spacing) * 3);
+  }
+  .px-4 {
+    padding-inline: calc(var(--spacing) * 4);
+  }
+  .py-0\.5 {
+    padding-block: calc(var(--spacing) * 0.5);
+  }
+  .py-1 {
+    padding-block: var(--spacing);
+  }
+  .py-1\.5 {
+    padding-block: calc(var(--spacing) * 1.5);
+  }
+  .py-2 {
+    padding-block: calc(var(--spacing) * 2);
+  }
+  .py-2\.5 {
+    padding-block: calc(var(--spacing) * 2.5);
+  }
+  .py-3 {
+    padding-block: calc(var(--spacing) * 3);
+  }
+  .py-3\.5 {
+    padding-block: calc(var(--spacing) * 3.5);
+  }
+  .pt-2 {
+    padding-top: calc(var(--spacing) * 2);
+  }
+  .pt-3 {
+    padding-top: calc(var(--spacing) * 3);
+  }
+  .pt-4 {
+    padding-top: calc(var(--spacing) * 4);
+  }
+  .pt-9 {
+    padding-top: calc(var(--spacing) * 9);
+  }
+  .pr-1 {
+    padding-right: var(--spacing);
+  }
+  .pr-3 {
+    padding-right: calc(var(--spacing) * 3);
+  }
+  .pr-\[env\(safe-area-inset-right\)\] {
+    padding-right: env(safe-area-inset-right);
+  }
+  .pb-1 {
+    padding-bottom: var(--spacing);
+  }
+  .pb-1\.5 {
+    padding-bottom: calc(var(--spacing) * 1.5);
+  }
+  .pb-\[calc\(1\.5rem\+env\(safe-area-inset-bottom\)\)\] {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+  .pb-\[env\(safe-area-inset-bottom\)\] {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pl-1 {
+    padding-left: var(--spacing);
+  }
+  .pl-20 {
+    padding-left: calc(var(--spacing) * 20);
+  }
+  .pl-\[env\(safe-area-inset-left\)\] {
+    padding-left: env(safe-area-inset-left);
+  }
+  .text-center {
+    text-align: center;
+  }
+  .text-left {
+    text-align: left;
+  }
+  .text-right {
+    text-align: right;
+  }
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+  .text-3xl {
+    font-size: var(--text-3xl);
+    line-height: var(--tw-leading, var(--text-3xl--line-height));
+  }
+  .text-base {
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
+  }
+  .text-lg {
+    font-size: var(--text-lg);
+    line-height: var(--tw-leading, var(--text-lg--line-height));
+  }
+  .text-sm {
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+  }
+  .text-xl {
+    font-size: var(--text-xl);
+    line-height: var(--tw-leading, var(--text-xl--line-height));
+  }
+  .text-xs {
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+  }
+  .text-\[9px\] {
+    font-size: 9px;
+  }
+  .text-\[10px\] {
+    font-size: 10px;
+  }
+  .leading-none {
+    --tw-leading: 1;
+    line-height: 1;
+  }
+  .leading-tight {
+    --tw-leading: var(--leading-tight);
+    line-height: var(--leading-tight);
+  }
+  .font-bold {
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+  }
+  .font-medium {
+    --tw-font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-medium);
+  }
+  .font-normal {
+    --tw-font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-normal);
+  }
+  .font-semibold {
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+  }
+  .break-all {
+    word-break: break-all;
+  }
+  .text-amber-900 {
+    color: var(--color-amber-900);
+  }
+  .text-background {
+    color: var(--background);
+  }
+  .text-emerald-800 {
+    color: var(--color-emerald-800);
+  }
+  .text-emerald-900 {
+    color: var(--color-emerald-900);
+  }
+  .text-foreground {
+    color: var(--foreground);
+  }
+  .text-muted-foreground {
+    color: var(--muted-foreground);
+  }
+  .text-muted-foreground\/40 {
+    color: var(--muted-foreground);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--muted-foreground) 40%, transparent);
+    }
+  }
+  .text-primary {
+    color: var(--primary);
+  }
+  .text-primary-foreground {
+    color: var(--primary-foreground);
+  }
+  .text-rose-500 {
+    color: var(--color-rose-500);
+  }
+  .text-rose-600 {
+    color: var(--color-rose-600);
+  }
+  .text-rose-800 {
+    color: var(--color-rose-800);
+  }
+  .text-rose-900 {
+    color: var(--color-rose-900);
+  }
+  .text-sky-500 {
+    color: var(--color-sky-500);
+  }
+  .text-sky-900 {
+    color: var(--color-sky-900);
+  }
+  .text-slate-900 {
+    color: var(--color-slate-900);
+  }
+  .text-violet-900 {
+    color: var(--color-violet-900);
+  }
+  .text-white {
+    color: var(--color-white);
+  }
+  .tabular-nums {
+    --tw-numeric-spacing: tabular-nums;
+    font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,) var(--tw-numeric-figure,) var(--tw-numeric-spacing,) var(--tw-numeric-fraction,);
+  }
+  .line-through {
+    text-decoration-line: line-through;
+  }
+  .opacity-0 {
+    opacity: 0%;
+  }
+  .opacity-40 {
+    opacity: 40%;
+  }
+  .opacity-50 {
+    opacity: 50%;
+  }
+  .opacity-70 {
+    opacity: 70%;
+  }
+  .shadow-lg {
+    --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 4px 6px -4px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .shadow-sm {
+    --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-1 {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-2 {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-border {
+    --tw-ring-color: var(--border-color);
+  }
+  .ring-emerald-400 {
+    --tw-ring-color: var(--color-emerald-400);
+  }
+  .ring-muted {
+    --tw-ring-color: var(--muted);
+  }
+  .ring-rose-400 {
+    --tw-ring-color: var(--color-rose-400);
+  }
+  .ring-sky-400 {
+    --tw-ring-color: var(--color-sky-400);
+  }
+  .backdrop-blur {
+    --tw-backdrop-blur: blur(8px);
+    -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+    backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+  }
+  .transition {
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .transition-\[transform\,visibility\] {
+    transition-property: transform,visibility;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .transition-opacity {
+    transition-property: opacity;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .duration-300 {
+    --tw-duration: 300ms;
+    transition-duration: 300ms;
+  }
+  .outline-none {
+    --tw-outline-style: none;
+    outline-style: none;
+  }
+  .select-all {
+    -webkit-user-select: all;
+    user-select: all;
+  }
+  .last\:border-0:last-child {
+    border-style: var(--tw-border-style);
+    border-width: 0px;
+  }
+  @media (hover: hover) {
+    .hover\:bg-emerald-50:hover {
+      background-color: var(--color-emerald-50);
+    }
+    .hover\:bg-emerald-700:hover {
+      background-color: var(--color-emerald-700);
+    }
+    .hover\:bg-muted:hover {
+      background-color: var(--muted);
+    }
+    .hover\:bg-primary-hover:hover {
+      background-color: var(--primary-hover);
+    }
+    .hover\:bg-surface:hover {
+      background-color: var(--surface);
+    }
+    .hover\:bg-surface-muted:hover {
+      background-color: var(--surface-muted);
+    }
+    .hover\:text-foreground:hover {
+      color: var(--foreground);
+    }
+  }
+  @media (width >= 40rem) {
+    .sm\:inline {
+      display: inline;
+    }
+  }
+  @media (prefers-color-scheme: dark) {
+    .dark\:border-emerald-400:where(:not([data-theme="light"] *)) {
+      border-color: var(--color-emerald-400);
+    }
+  }
+  .dark\:border-emerald-400:where([data-theme="dark"] *) {
+    border-color: var(--color-emerald-400);
+  }
+  @media (prefers-color-scheme: dark) {
+    .dark\:text-emerald-300:where(:not([data-theme="light"] *)) {
+      color: var(--color-emerald-300);
+    }
+  }
+  .dark\:text-emerald-300:where([data-theme="dark"] *) {
+    color: var(--color-emerald-300);
+  }
+  @media (prefers-color-scheme: dark) {
+    @media (hover: hover) {
+      .dark\:hover\:bg-emerald-950:where(:not([data-theme="light"] *)):hover {
+        background-color: var(--color-emerald-950);
+      }
+    }
+  }
+  @media (hover: hover) {
+    .dark\:hover\:bg-emerald-950:where([data-theme="dark"] *):hover {
+      background-color: var(--color-emerald-950);
+    }
+  }
+}
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1220;
+    --foreground: #e2e8f0;
+    --surface: #111827;
+    --surface-muted: #1f2937;
+    --border-color: #334155;
+    --muted: #475569;
+    --muted-foreground: #94a3b8;
+    --primary: #fb923c;
+    --primary-hover: #fdba74;
+    --primary-foreground: #431407;
+    --skeleton-base: #1f2937;
+    --skeleton-shine: rgba(71, 85, 105, 0.6);
+    --focus-ring: #fb923c;
+  }
+}
+html {
+  color-scheme: light dark;
+}
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+body:has([data-app-tabbar]) main {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+.safe-px {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+.safe-pt {
+  padding-top: env(safe-area-inset-top);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 60;
+}
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.18);
+}
+.skeleton {
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient( 90deg, var(--skeleton-base) 0%, var(--skeleton-shine) 50%, var(--skeleton-base) 100% );
+  @supports (color: color-mix(in lab, red, red)) {
+    background-image: linear-gradient( 90deg, color-mix(in srgb, var(--skeleton-base) 100%, transparent) 0%, var(--skeleton-shine) 50%, color-mix(in srgb, var(--skeleton-base) 100%, transparent) 100% );
+  }
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+:root[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --surface: #111827;
+  --surface-muted: #1f2937;
+  --border-color: #334155;
+  --muted: #475569;
+  --muted-foreground: #94a3b8;
+  --primary: #fb923c;
+  --primary-hover: #fdba74;
+  --primary-foreground: #431407;
+  --skeleton-base: #1f2937;
+  --skeleton-shine: rgba(71, 85, 105, 0.6);
+  --focus-ring: #fb923c;
+  color-scheme: dark;
+}
+@property --tw-translate-x {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-translate-y {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-translate-z {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-space-y-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-space-x-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-border-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
+@property --tw-leading {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-font-weight {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ordinal {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-slashed-zero {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-numeric-figure {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-numeric-spacing {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-numeric-fraction {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-inset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-ring-inset {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-offset-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --tw-ring-offset-color {
+  syntax: "*";
+  inherits: false;
+  initial-value: #fff;
+}
+@property --tw-ring-offset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-backdrop-blur {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-brightness {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-contrast {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-grayscale {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-hue-rotate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-invert {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-opacity {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-saturate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-sepia {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-duration {
+  syntax: "*";
+  inherits: false;
+}
+@layer properties {
+  @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
+    *, ::before, ::after, ::backdrop {
+      --tw-translate-x: 0;
+      --tw-translate-y: 0;
+      --tw-translate-z: 0;
+      --tw-space-y-reverse: 0;
+      --tw-space-x-reverse: 0;
+      --tw-border-style: solid;
+      --tw-leading: initial;
+      --tw-font-weight: initial;
+      --tw-ordinal: initial;
+      --tw-slashed-zero: initial;
+      --tw-numeric-figure: initial;
+      --tw-numeric-spacing: initial;
+      --tw-numeric-fraction: initial;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-color: initial;
+      --tw-shadow-alpha: 100%;
+      --tw-inset-shadow: 0 0 #0000;
+      --tw-inset-shadow-color: initial;
+      --tw-inset-shadow-alpha: 100%;
+      --tw-ring-color: initial;
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-inset-ring-color: initial;
+      --tw-inset-ring-shadow: 0 0 #0000;
+      --tw-ring-inset: initial;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-backdrop-blur: initial;
+      --tw-backdrop-brightness: initial;
+      --tw-backdrop-contrast: initial;
+      --tw-backdrop-grayscale: initial;
+      --tw-backdrop-hue-rotate: initial;
+      --tw-backdrop-invert: initial;
+      --tw-backdrop-opacity: initial;
+      --tw-backdrop-saturate: initial;
+      --tw-backdrop-sepia: initial;
+      --tw-duration: initial;
+    }
+  }
+}
+</style>
+<!-- proto.css:end -->
+
+<div class="min-h-dvh bg-background text-foreground">
+  <header data-proto-bg class="sticky top-0 z-30 safe-pt border-b border-border bg-surface/90 backdrop-blur">
+    <div class="safe-px mx-auto flex h-14 max-w-3xl items-center justify-between">
+      <span class="text-lg font-bold text-primary">mfmf</span>
+      <span class="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">マ</span>
+    </div>
+  </header>
+
+  <main data-proto-bg class="mx-auto max-w-3xl pt-4">
+
+    <!-- ═══════════ ホーム ═══════════ -->
+    <section id="screen-home" tabindex="-1" class="hidden outline-none safe-px space-y-4">
+      <div id="todayCard"></div>
+      <div>
+        <h2 class="mb-2 text-sm font-bold text-muted-foreground">さいきんの記録</h2>
+        <ul id="recentList" class="space-y-2"></ul>
+      </div>
+    </section>
+
+    <!-- ═══════════ カレンダー ═══════════ -->
+    <section id="screen-calendar" tabindex="-1" class="hidden outline-none">
+      <div class="safe-px">
+        <div class="mb-3 flex items-center justify-between">
+          <span class="px-2 py-1 text-sm text-muted-foreground/40" aria-hidden="true">‹ 7月</span>
+          <h1 class="text-base font-bold">2026年8月</h1>
+          <span class="px-2 py-1 text-sm text-muted-foreground/40" aria-hidden="true">9月 ›</span>
+        </div>
+        <div role="tablist" aria-label="カレンダーの表示" class="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1 text-sm">
+          <button type="button" id="tabMonth" role="tab" aria-controls="calMonth" onclick="setCalView('month')" class="rounded-lg py-1.5 font-medium transition">月</button>
+          <button type="button" id="tabWeek" role="tab" aria-controls="calWeek" onclick="setCalView('week')" class="rounded-lg py-1.5 font-medium transition">週</button>
+        </div>
+      </div>
+
+      <!-- 月表示（Google カレンダー風のチップ） -->
+      <div id="calMonth" role="tabpanel" aria-labelledby="tabMonth" class="safe-px">
+        <div class="grid grid-cols-7 text-center" id="monthHead"></div>
+        <div class="grid grid-cols-7 overflow-hidden rounded-xl border border-border" id="monthGrid"></div>
+        <p id="legend" class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"></p>
+      </div>
+
+      <!-- 週表示（時間割） -->
+      <div id="calWeek" role="tabpanel" aria-labelledby="tabWeek" class="hidden">
+        <div class="safe-px mb-2 flex items-center justify-between text-xs text-muted-foreground">
+          <span>8/9（日）〜 8/15（土）</span>
+          <button type="button" onclick="toggleAssignBoard()" id="assignToggle" class="rounded-lg border border-border px-2.5 py-1.5 font-medium text-foreground transition hover:bg-surface-muted">担当をまとめて決める</button>
+        </div>
+        <div id="assignBoard" class="hidden safe-px mb-3 space-y-2"></div>
+        <div class="overflow-x-auto">
+          <div class="min-w-[46rem] px-1">
+            <div id="weekHead" class="grid grid-cols-[3rem_repeat(7,1fr)] border-b border-border bg-background"></div>
+            <div id="allDayBand" class="grid grid-cols-[3rem_repeat(7,1fr)] border-b border-border"></div>
+            <!-- 見出しを残したまま時間軸だけ縦に送る（sticky は overflow-x-auto の
+                 中では効かず、スクロールすると曜日が消えてしまう） -->
+            <div class="max-h-[58dvh] overflow-y-auto pt-2">
+              <div id="timeGrid" class="relative grid grid-cols-[3rem_repeat(7,1fr)]"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ アルバム（既存タブ。スタブ） ═══════════ -->
+    <section id="screen-gallery" tabindex="-1" class="hidden outline-none safe-px">
+      <div class="grid grid-cols-3 gap-1">
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+        <div class="aspect-square rounded-lg bg-surface-muted"></div>
+      </div>
+      <p class="mt-3 text-center text-xs text-muted-foreground">（既存のアルバム。今回は変更なし）</p>
+    </section>
+
+    <!-- ═══════════ メニュー ═══════════ -->
+    <section id="screen-menu" tabindex="-1" class="hidden outline-none safe-px space-y-4">
+      <div class="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+        <span class="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">マ</span>
+        <span class="min-w-0 flex-1">
+          <span class="block truncate font-semibold">ママ</span>
+          <span id="meRole" class="block truncate text-xs text-muted-foreground"></span>
+        </span>
+      </div>
+      <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+        <div class="flex w-full items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted-foreground">ペット<span class="ml-auto" data-lucide="chevron-right"></span></div>
+        <div class="border-t border-border"></div>
+        <div class="flex w-full items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted-foreground">体重の推移<span class="ml-auto" data-lucide="chevron-right"></span></div>
+      </div>
+      <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+        <button type="button" onclick="go('rules')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium transition hover:bg-surface-muted">
+          <span class="text-muted-foreground" data-lucide="repeat"></span>
+          <span class="min-w-0 flex-1">毎週の予定ルール
+            <span id="ruleSummary" class="block truncate text-xs font-normal text-muted-foreground"></span>
+          </span>
+          <span class="text-muted-foreground" data-lucide="chevron-right"></span>
+        </button>
+        <div class="border-t border-border"></div>
+        <button type="button" onclick="go('family')" class="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium transition hover:bg-surface-muted">
+          <span class="text-muted-foreground" data-lucide="users"></span>
+          <span class="min-w-0 flex-1">世帯の設定
+            <span id="familySummary" class="block truncate text-xs font-normal text-muted-foreground"></span>
+          </span>
+          <span class="text-muted-foreground" data-lucide="chevron-right"></span>
+        </button>
+      </div>
+      <div class="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+        <div class="flex w-full items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted-foreground">ガイド<span class="ml-auto" data-lucide="chevron-right"></span></div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 毎週の予定ルール ═══════════ -->
+    <section id="screen-rules" tabindex="-1" class="hidden outline-none safe-px space-y-4">
+      <button type="button" onclick="go('menu')" class="-ml-1 flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground">‹ メニュー</button>
+      <div>
+        <h1 class="text-base font-bold">毎週の予定ルール</h1>
+        <p class="mt-1 text-sm text-muted-foreground">
+          いつもの週をここで一度だけ決めます。カレンダーには<b class="font-semibold text-foreground">薄く</b>自動で入り、違う日だけ上書きすれば大丈夫です。
+        </p>
+      </div>
+      <p id="ruleReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、ルールは変更できません。</p>
+      <div class="overflow-x-auto rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+        <table class="w-full min-w-[24rem] text-center text-sm">
+          <thead>
+            <tr class="border-b border-border">
+              <th class="w-14 py-2"></th>
+              <th class="py-2 text-xs font-medium text-rose-500">日</th>
+              <th class="py-2 text-xs font-medium text-muted-foreground">月</th>
+              <th class="py-2 text-xs font-medium text-muted-foreground">火</th>
+              <th class="py-2 text-xs font-medium text-muted-foreground">水</th>
+              <th class="py-2 text-xs font-medium text-muted-foreground">木</th>
+              <th class="py-2 text-xs font-medium text-muted-foreground">金</th>
+              <th class="py-2 text-xs font-medium text-sky-500">土</th>
+            </tr>
+          </thead>
+          <tbody id="ruleTable"></tbody>
+        </table>
+      </div>
+      <div id="ruleUnlinked" class="hidden space-y-2"></div>
+      <p class="text-xs text-muted-foreground">
+        予定の行はタップで種類が順に切り替わります（最後まで行くと「なし」）。担当の行はタップでメンバーが入れ替わります。
+        <b class="font-semibold text-foreground">時間</b>は、日の予定を編集して「これから毎週◯曜も同じにする」で保存すると、その時間がルールに入ります。
+      </p>
+    </section>
+
+    <!-- ═══════════ 世帯の設定 ═══════════ -->
+    <section id="screen-family" tabindex="-1" class="hidden outline-none safe-px space-y-4">
+      <button type="button" onclick="go('menu')" class="-ml-1 flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground">‹ メニュー</button>
+      <div>
+        <h1 class="text-base font-bold">世帯の設定</h1>
+        <p class="mt-1 text-sm text-muted-foreground">
+          担当に選べるのはこの一覧の人です。<b class="font-semibold text-foreground">アカウントを連携すると</b>、その人のスマホにも予定が出ます。
+        </p>
+      </div>
+      <p id="familyReadonly" class="hidden rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">招待できるのはオーナーだけです。</p>
+      <ul id="familyList" class="space-y-2"></ul>
+      <button id="familyInvite" type="button" onclick="openInvite()" class="flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-medium transition hover:bg-surface-muted">
+        <span data-lucide="user-plus"></span>家族を招待する
+      </button>
+    </section>
+
+  </main>
+
+  <div class="h-24"></div>
+
+  <!-- ═══════════ ボトムタブバー（AppTabBar と同じ 5 スロット） ═══════════ -->
+  <nav aria-label="メインナビゲーション" data-app-tabbar data-proto-bg
+    class="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur">
+    <div id="tabRow" class="mx-auto grid max-w-3xl grid-cols-5"></div>
+  </nav>
+
+  <!-- ═══════════ 予定シート ═══════════ -->
+  <div id="backdrop" onclick="requestCloseSheet()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
+  <div id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+    <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+      <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+      <div class="mb-3 flex items-center justify-between gap-2">
+        <h2 id="sheetTitle" class="min-w-0 flex-1 truncate text-base font-bold"></h2>
+        <span id="sheetStatus"></span>
+        <button id="sheetClose" type="button" onclick="requestCloseSheet()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
+      </div>
+      <div id="sheetBody" class="space-y-4"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ 完了（記録にする）シート ═══════════ -->
+  <div id="doneBackdrop" onclick="requestCloseDone()" class="pointer-events-none fixed inset-0 z-[60] bg-black/40 opacity-0 transition-opacity duration-300"></div>
+  <div id="doneSheet" role="dialog" aria-modal="true" aria-labelledby="doneTitle" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-[70] max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+    <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+      <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+      <div class="mb-1 flex items-center justify-between">
+        <h2 id="doneTitle" class="text-base font-bold">記録にする</h2>
+        <button id="doneClose" type="button" onclick="requestCloseDone()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
+      </div>
+      <p id="doneSummary" class="mb-3 text-xs text-muted-foreground"></p>
+      <div id="doneBody" class="space-y-4"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ クイック記録シート ═══════════ -->
+  <div id="qrBackdrop" onclick="closeQuick()" class="pointer-events-none fixed inset-0 z-40 bg-black/40 opacity-0 transition-opacity duration-300"></div>
+  <div id="qrSheet" role="dialog" aria-modal="true" aria-labelledby="qrTitle" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] translate-y-full overflow-y-auto rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+    <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+      <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+      <div class="mb-3 flex items-center justify-between">
+        <h2 id="qrTitle" class="text-base font-bold">クイック記録</h2>
+        <button type="button" onclick="closeQuick()" aria-label="閉じる" class="rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-muted" data-lucide="x"></button>
+      </div>
+      <div id="qrTodayPlan" class="mb-3"></div>
+      <p class="mb-2 text-xs text-muted-foreground">2026年8月9日(日)</p>
+      <div id="qrBody" class="space-y-3"></div>
+      <button id="qrSave" type="button" onclick="quickSave()" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">保存する</button>
+      <!-- 本番の導線（写真つき）は残したまま、予定への受け皿を下に足す -->
+      <button type="button" onclick="closeQuick(); toast('（プロトでは記録フォームは省略）')"
+        class="mt-2 w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
+        写真つきでくわしく記録する →
+      </button>
+      <button type="button" onclick="closeQuick(); openNextFreeDay()"
+        class="mt-1 w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
+        これからの予定を入れる →
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════ 招待シート ═══════════ -->
+  <div id="invBackdrop" onclick="closeInvite()" class="pointer-events-none fixed inset-0 z-[60] bg-black/40 opacity-0 transition-opacity duration-300"></div>
+  <div id="invSheet" role="dialog" aria-modal="true" aria-labelledby="invTitle" tabindex="-1" class="invisible fixed inset-x-0 bottom-0 z-[70] translate-y-full rounded-t-2xl bg-surface shadow-lg ring-1 ring-border transition-[transform,visibility] duration-300">
+    <div class="mx-auto max-w-3xl px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+      <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted"></div>
+      <h2 id="invTitle" class="mb-1 text-base font-bold">家族を招待する</h2>
+      <p id="invBody" class="mb-3 text-sm text-muted-foreground"></p>
+      <div class="flex items-start gap-2 rounded-xl bg-surface-muted px-3 py-2.5 text-xs">
+        <!-- コピーが弾かれても手で選べるよう、URL は省略せず全部出す -->
+        <span id="inviteUrl" class="min-w-0 flex-1 select-all break-all font-mono"></span>
+        <button type="button" onclick="copyInvite()" class="shrink-0 rounded-lg bg-surface px-3 py-1.5 font-medium ring-1 ring-border">コピー</button>
+      </div>
+      <button type="button" onclick="closeInvite()" class="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground">閉じる</button>
+    </div>
+  </div>
+
+  <!-- ═══════════ プロト設定 ═══════════ -->
+  <button type="button" data-proto-bg onclick="document.getElementById('cfg').classList.toggle('hidden')" class="fixed bottom-24 left-3 z-30 rounded-full bg-surface px-3 py-1.5 text-xs shadow-lg ring-1 ring-border">⚙︎ プロト設定</button>
+  <div id="cfg" data-proto-bg class="hidden fixed bottom-36 left-3 z-30 w-64 space-y-3 rounded-xl bg-surface p-3 text-xs shadow-lg ring-1 ring-border">
+    <div>
+      <p class="mb-1 font-bold">担当の入れかた</p>
+      <div class="space-y-1">
+        <label class="flex items-center gap-2"><input type="radio" name="mode" value="avatar" checked onchange="setMode(this.value)">顔をタップ</label>
+        <label class="flex items-center gap-2"><input type="radio" name="mode" value="preset" onchange="setMode(this.value)">いつものパターン</label>
+      </div>
+      <p class="mt-1 text-[10px] text-muted-foreground">毎週のルールは下地として常に効いています。</p>
+    </div>
+    <label class="flex items-center gap-2"><input type="checkbox" id="cfgEmpty" onchange="toggleEmpty()">予定が 0 件の状態</label>
+    <label class="flex items-center gap-2"><input type="checkbox" id="cfgDense" onchange="toggleDense()">記録が多い状態（200 件）</label>
+    <label class="flex items-center gap-2"><input type="checkbox" id="cfgViewer" onchange="render()">viewer（編集不可）</label>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite" class="pointer-events-none fixed bottom-28 left-1/2 z-[80] -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background opacity-0 transition-opacity duration-300"></div>
+</div>
+
+<script>
+// ───────── lucide のアイコン（本番と同じ形。実装時は lucide-react に戻す） ─────────
+const ICONS = {
+  "house": `<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>`,
+  "calendar-days": `<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>`,
+  "images": `<path d="m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"/><path d="M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"/><circle cx="13" cy="7" r="1" fill="currentColor"/><rect x="8" y="2" width="14" height="14" rx="2"/>`,
+  "menu": `<path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/>`,
+  "plus": `<path d="M5 12h14"/><path d="M12 5v14"/>`,
+  "repeat": `<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>`,
+  "users": `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/>`,
+  "chevron-right": `<path d="m9 18 6-6-6-6"/>`,
+  "camera": `<path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/>`,
+  "x": `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`,
+  "user-plus": `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>`,
+  "check": `<path d="M20 6 9 17l-5-5"/>`,
+};
+function svg(name, cls) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${cls || "h-5 w-5"}" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+}
+
+// ───────── モックデータ ─────────
+const TODAY = "2026-08-09";
+const MEMBERS = [
+  { id: "m1", name: "ママ",   initial: "マ", link: "linked", role: "owner",  bg: "bg-rose-100 text-rose-900",       solid: "bg-rose-500",    ring: "ring-rose-400" },
+  { id: "m2", name: "パパ",   initial: "パ", link: "linked", role: "editor", bg: "bg-sky-100 text-sky-900",         solid: "bg-sky-500",     ring: "ring-sky-400" },
+  { id: "m3", name: "ばあば", initial: "バ", link: "none",                   bg: "bg-surface-muted text-muted-foreground", solid: "bg-muted", ring: "ring-muted" },
+  { id: "m4", name: "じいじ", initial: "ジ", link: "invited",                bg: "bg-emerald-100 text-emerald-900", solid: "bg-emerald-500", ring: "ring-emerald-400" },
+];
+const LINK_LABEL = { linked: "連携済み", invited: "招待中", none: "未連携" };
+const ROLE_LABEL = { owner: "オーナー", editor: "編集者", viewer: "閲覧者" };
+
+const TYPES = [
+  { id: "daycare", emoji: "🏫", label: "保育園",     color: "sky",     start: "09:00", end: "18:00", roles: [["drop", "送り"], ["pick", "お迎え"]] },
+  { id: "home",    emoji: "🏡", label: "おうち",     color: "amber",   start: "09:00", end: "18:00", roles: [["care", "みる人"]] },
+  { id: "family",  emoji: "👵", label: "家族が来る", color: "emerald", start: "10:00", end: "17:00", roles: [["care", "みる人"]] },
+  { id: "clinic",  emoji: "🏥", label: "通院",       color: "violet",  start: "09:30", end: "11:00", roles: [["care", "連れて行く"]] },
+  { id: "outing",  emoji: "✈️", label: "おでかけ",   color: "rose",    start: "10:00", end: "16:00", roles: [] },
+  { id: "other",   emoji: "📌", label: "その他",     color: "slate",   start: "10:00", end: "11:00", roles: [] },
+];
+// Tailwind に拾わせるため、クラス名はすべて素の文字列で書く。
+// solid（記録ずみ）は白文字を載せるので 700 まで濃くする（500 だと 10px の
+// ラベルが読めない）
+const C = {
+  sky:     { solid: "bg-sky-700 text-white",     soft: "bg-sky-50 text-sky-900 border-sky-500",         dot: "bg-sky-500",     ring: "border-sky-500" },
+  amber:   { solid: "bg-amber-700 text-white",   soft: "bg-amber-50 text-amber-900 border-amber-500",   dot: "bg-amber-500",   ring: "border-amber-500" },
+  emerald: { solid: "bg-emerald-700 text-white", soft: "bg-emerald-50 text-emerald-900 border-emerald-500", dot: "bg-emerald-500", ring: "border-emerald-500" },
+  violet:  { solid: "bg-violet-700 text-white",  soft: "bg-violet-50 text-violet-900 border-violet-500", dot: "bg-violet-500",  ring: "border-violet-500" },
+  rose:    { solid: "bg-rose-700 text-white",    soft: "bg-rose-50 text-rose-900 border-rose-500",       dot: "bg-rose-500",    ring: "border-rose-500" },
+  slate:   { solid: "bg-slate-700 text-white",   soft: "bg-slate-50 text-slate-900 border-slate-400",    dot: "bg-slate-400",   ring: "border-slate-400" },
+};
+
+// 出来事は 1 本の配列。status で「予定」「記録（完了）」「見送り」を表す。
+// 予定として作られ、完了すると記録になる。予定を経ずに記録だけ作ることもできる。
+let ITEMS = [
+  { id: "i1", date: "2026-08-03", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" }, note: "", status: "done", body: "おやつをぜんぶ食べました", photos: 2, overridesRule: true },
+  { id: "i2", date: "2026-08-05", type: "family",  start: "10:00", end: "17:00", who: { care: "m3" }, note: "ばあばが泊まりに来る", status: "done", body: "ばあばと公園へ", photos: 3, overridesRule: true },
+  { id: "i3", date: "2026-08-06", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" }, note: "", status: "done", body: "お昼寝が長かった", photos: 0, overridesRule: true },
+  { id: "i4", date: "2026-08-07", type: "home",    start: "09:00", end: "18:00", who: { care: "m1" }, note: "", status: "done", body: "ごきげん", photos: 1, overridesRule: true },
+  { id: "i5", date: "2026-08-08", type: "outing",  start: "10:00", end: "16:00", who: {}, note: "", status: "skipped", body: "", photos: 0, overridesRule: true },
+  { id: "i6", date: "2026-08-11", type: "clinic",  start: "09:30", end: "11:00", who: { care: "m1" }, note: "ワクチン2回目", status: "planned", body: "", photos: 0, overridesRule: true },
+  // 既定（10:00〜16:00）から手で変えた想定なので timeDirty を立てる。
+  // 立てないと、種類を変えたときに「触っていない」と見なされて上書きされる
+  { id: "i7", date: "2026-08-14", type: "outing",  start: "08:00", end: "17:00", who: {}, note: "海！", status: "planned", body: "", photos: 0, timeDirty: true, overridesRule: true },
+  { id: "i8", date: "2026-08-20", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m1", pick: "m3" }, note: "パパ出張のため、迎えはばあば", status: "planned", body: "", photos: 0, overridesRule: true },
+];
+// 曜日ルールは「版」の配列で持つ（since の昇順）。
+// ひとつの枠を上書きすると、since より前の日まで巻き添えで消えてしまうため。
+let RULES = {
+  1: [{ type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } }],
+  2: [{ type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } }],
+  3: [{ type: "home",    start: "09:00", end: "18:00", who: { care: "m1" } }],
+  4: [{ type: "daycare", start: "09:00", end: "18:00", who: { drop: "m1", pick: "m2" } }],
+  5: [{ type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } }],
+};
+const PRESETS = [
+  { label: "いつもの保育園", type: "daycare", start: "09:00", end: "18:00", who: { drop: "m2", pick: "m1" } },
+  { label: "ママ在宅の日",   type: "home",    start: "09:00", end: "18:00", who: { care: "m1" } },
+  { label: "ばあばが来る日", type: "family",  start: "10:00", end: "17:00", who: { care: "m3" } },
+];
+// 本番の QuickRecordSheet.tsx と同じ語彙（D32 で合意した 8 つ）
+const CHIPS = ["ごはん完食", "ごはん少なめ", "おやつ", "さんぽ", "トイレOK", "おくすり", "ねんね", "ごきげん"];
+
+let seqCreated = 0;
+ITEMS.forEach((x) => { x.created = seqCreated++; }); // 一覧の並び替え用の作成順
+const FIXTURE_ITEMS = JSON.parse(JSON.stringify(ITEMS));
+const FIXTURE_RULES = JSON.parse(JSON.stringify(RULES));
+let CANCELLED = new Set();
+let MODE = "avatar";
+let screen = "calendar";
+let calView = "month";
+let openDate = null;
+let DRAFT = null;
+let DRAFT_BASE = null;
+let DONE_DRAFT = null;
+let CONFIRM_DELETE = false; // 記録削除の確認state
+let CONFIRM_CLOSE = false;  // 編集を捨てるときの確認state
+let OPEN_SIG = null;        // 開いた時点の内容（変更の有無を見る）
+let PENDING_SWITCH = null;  // 確認後に開く行（同じ日のほかの記録・予定）
+let CONFIRM_CLOSE_DONE = false;
+let DONE_OPEN_SIG = null;
+let ASSIGN_DRAFT = null;
+let assignOpen = false;
+let seq = 100;
+
+// ───────── ヘルパ ─────────
+const $ = (id) => document.getElementById(id);
+const member = (id) => MEMBERS.find((m) => m.id === id);
+const type = (id) => TYPES.find((t) => t.id === id) || TYPES[0];
+const dow = (d) => new Date(d + "T00:00:00").getDay();
+const isEmpty = () => $("cfgEmpty").checked;
+const isDense = () => $("cfgDense").checked;
+const isViewer = () => $("cfgViewer").checked;
+const min = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+const dayNum = (d) => Number(d.slice(8, 10));
+
+function versionsOf(w) { return RULES[w] || []; }
+// 直近の版。type が null のものは「ここから先はルールなし」の墓標
+function latestVersion(w) {
+  const v = versionsOf(w);
+  return v.length ? v[v.length - 1] : null;
+}
+function latestRule(w) {
+  const r = latestVersion(w);
+  return r && r.type ? r : null;
+}
+// その日に効く版 = since がその日以前で、いちばん新しいもの
+function ruleFor(d) {
+  let best = null;
+  for (const r of versionsOf(dow(d))) {
+    if (r.since && d < r.since) continue;
+    if (!best || (r.since || "") >= (best.since || "")) best = r;
+  }
+  return best && best.type ? best : null;
+}
+// ルール表の編集は「今日から」の版に対して行う。直近の版が今日より前から
+// 効いている場合は、その複製を今日の版として積んでから編集する
+// （直接いじると 8/4 のような過去の日まで書き換わる）
+function editableRule(w) {
+  const lv = latestVersion(w);
+  if (!lv || !lv.type) return null;
+  if ((lv.since || "") === TODAY) return lv;
+  // 未来から始まる版は畳んでから、今日の版として編集する
+  RULES[w] = versionsOf(w).filter((r) => !r.since || r.since <= TODAY);
+  const copy = { ...lv, who: { ...(lv.who || {}) }, since: TODAY };
+  putRuleVersion(w, copy);
+  return copy;
+}
+function putRuleVersion(w, r) {
+  const list = RULES[w] || (RULES[w] = []);
+  const i = list.findIndex((x) => (x.since || "") === (r.since || ""));
+  if (i >= 0) list[i] = r; else list.push(r);
+  list.sort((a, b) => (a.since || "").localeCompare(b.since || ""));
+}
+// その日の出来事。保存済みの行に、曜日ルール由来の予定を足して返す。
+// ルールを隠すのは「その日の予定として保存し直した（overridesRule）」ときだけ。
+// 保存済みが 1 件でもあれば隠す作りだと、無関係なクイック記録を 1 件足しただけで
+// その日の保育園の予定と担当が消えてしまう。
+function itemsOn(d) {
+  const saved = ITEMS.filter((x) => x.date === d);
+  const overridden = CANCELLED.has(d) || saved.some((x) => x.overridesRule);
+  const r = overridden ? null : ruleFor(d);
+  const list = r
+    ? [...saved, { id: "rule:" + d, date: d, type: r.type, start: r.start, end: r.end, who: { ...r.who }, note: "", status: "planned", body: "", photos: 0, fromRule: true, timeDirty: !!r.timeDirty }]
+    : [...saved];
+  // 時刻なしの記録は先頭にまとめる
+  return list.sort((a, b) => (a.untimed ? 0 : 1) - (b.untimed ? 0 : 1) || (a.start || "").localeCompare(b.start || ""));
+}
+// その日の「予定」。編集シートや担当ボードが扱う 1 件。
+// 予定を経ない記録（overridesRule === false）はここに出さない。
+// 出すと、日曜に記録を 1 件足しただけで「その日は予定ずみ」扱いになり、
+// 新しい予定を入れられなくなる
+function planOn(d) {
+  const list = itemsOn(d).filter((x) => x.overridesRule !== false);
+  return list.find((x) => x.status === "planned") || list[0] || null;
+}
+function fmt(d) {
+  return new Intl.DateTimeFormat("ja-JP", { month: "long", day: "numeric", weekday: "short" }).format(new Date(d + "T00:00:00"));
+}
+function avatar(id, size) {
+  const m = member(id);
+  const s = size === "sm" ? "h-5 w-5 text-[9px]" : "h-9 w-9 text-xs";
+  if (!m) return `<span class="inline-flex ${s} items-center justify-center rounded-full border border-dashed border-border text-muted-foreground">?</span>`;
+  const unlinked = m.link !== "linked";
+  return `<span class="inline-flex ${s} items-center justify-center rounded-full ${m.bg} font-bold ${unlinked ? "border border-dashed border-muted-foreground/50" : ""}">${m.initial}</span>`;
+}
+// 自由入力（メモ・記録本文）は innerHTML のテンプレートに入るのでエスケープする。
+// 素で入れると <img onerror> が publish 済みの Artifact 上で実行できてしまう
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+// 開いているシートが 1 つでもあれば背面を固定する
+// シートを開いた要素を覚えておき、閉じたらそこへフォーカスを戻す（UC-Q05）
+const TRIGGERS = {};
+const TRIGGER_SEL = {}; // 描き直しでノードが差し替わるので、選び直すための目印
+function rememberTrigger(id) {
+  const el = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  setTrigger(id, el, el && openSelectors(el));
+}
+// 覚えた要素を選び直すための候補（前から順に試す）。
+// 予定を保存すると id が変わることがある（ルール由来 → 実体）ので、
+// data-open は「その行」で見つからなければ「その日」まで緩める
+function openSelectors(el) {
+  if (el.id) return [`#${CSS.escape(el.id)}`];
+  const key = el.dataset.open;
+  if (key) {
+    const day = key.split("|")[0];
+    return [`[data-open="${key}"]`, `[data-open^="${day}|"]`, `[data-open="${day}"]`];
+  }
+  for (const attr of ["data-tab", "data-who", "data-type", "data-preset", "data-qr-source", "data-assign", "data-chip", "data-done-photo", "data-done-open"]) {
+    const v = el.getAttribute(attr);
+    if (v != null) return [`[${attr}="${v}"]`];
+  }
+  return [];
+}
+function setTrigger(id, el, sel) {
+  TRIGGERS[id] = el || null;
+  TRIGGER_SEL[id] = sel && sel.length ? sel : null;
+}
+// 確認を出したら、そこへフォーカスを移す。描き直しで押したボタンが消えるので、
+// そのままだとフォーカスが body に落ちて「確認が出たこと」に気づけない
+// 「編集に戻る」で帰ってくる先。描き直すと押していた要素は消えるので、
+// 確認を出す前（renderSheet の前）に呼ぶこと
+function rememberConfirmReturn(back) {
+  const el = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  setTrigger("confirm", el, [...(el ? openSelectors(el) : []), back].filter(Boolean));
+}
+function focusConfirm(id) {
+  requestAnimationFrame(() => $(id)?.focus({ preventScroll: true }));
+}
+// 確認から戻る。描き直しで確認の枠ごと消えるので、元いた場所へフォーカスを返す
+function backFromConfirm(render0) {
+  render0();
+  restoreTrigger("confirm");
+}
+function askDelete() {
+  rememberConfirmReturn("#sheetClose");
+  CONFIRM_DELETE = true;
+  renderSheet();
+  focusConfirm("confirmDelete");
+}
+function restoreTrigger(id) {
+  const el = TRIGGERS[id];
+  const sel = TRIGGER_SEL[id];
+  TRIGGERS[id] = null;
+  TRIGGER_SEL[id] = null;
+  if (!el && !sel) return;
+  requestAnimationFrame(() => {
+    // 保存すると render() でカレンダーが作り直され、覚えていたノードは外れている。
+    // 同じ意味の要素を選び直してからフォーカスする（見えているものだけ）
+    let fresh = null;
+    for (const q of sel || []) {
+      fresh = [...document.querySelectorAll(q)].find((x) => x.offsetParent);
+      if (fresh) break;
+    }
+    const back = el && document.contains(el) && el.offsetParent ? el : null;
+    // どれも見つからないとき（描き直しでボタンごと消えたときなど）は、
+    // せめて今いる画面へ。フォーカスが body に落ちると読み上げが先頭へ戻る
+    (fresh || back || $("screen-" + screen))?.focus({ preventScroll: true });
+  });
+}
+// Esc は一番上に開いているシートを閉じる
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const open = (id) => !$(id).classList.contains("invisible");
+  if (open("invSheet")) return closeInvite();
+  if (open("doneSheet")) return requestCloseDone();
+  if (open("qrSheet")) return closeQuick();
+  if (open("sheet")) return requestCloseSheet();
+});
+const SHEET_IDS = ["sheet", "doneSheet", "qrSheet", "invSheet"];
+// 上に開いているシートの順（z-index の高い順）
+const SHEET_STACK = ["invSheet", "doneSheet", "qrSheet", "sheet"];
+function topSheet() {
+  return SHEET_STACK.find((id) => !$(id).classList.contains("invisible")) || null;
+}
+function syncScrollLock() {
+  const top = topSheet();
+  document.body.style.overflow = top ? "hidden" : "";
+  // 背面を inert にして、Tab が隠れたナビや本文へ抜けないようにする
+  document.querySelectorAll("[data-proto-bg]").forEach((el) => { el.inert = !!top; });
+  // 重ねて開いているときは、下のシートも inert にする（最前面だけが操作対象）
+  SHEET_IDS.forEach((id) => { $(id).inert = !!top && id !== top; });
+}
+// シートを開いたら、その中へフォーカスを移す。
+// visibility はトランジション対象なので、開いた直後はまだ hidden のことがある
+// （focus() が無視される）。一度試して駄目なら遷移後にもう一度試す
+function focusSheet(id) {
+  const el = $(id);
+  const tryFocus = () => {
+    el.focus({ preventScroll: true });
+    return document.activeElement === el;
+  };
+  requestAnimationFrame(() => {
+    if (tryFocus()) return;
+    el.addEventListener("transitionend", tryFocus, { once: true });
+    setTimeout(tryFocus, 350);
+  });
+}
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.remove("opacity-0");
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.add("opacity-0"), 1900);
+}
+// 未連携の担当への案内。1 人目だけでなく全員ぶん出す
+function unlinkedNotice(members) {
+  if (!members.length) return "";
+  return members.map((u) => `<div class="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-xs ring-1 ring-border">
+    <span class="min-w-0 flex-1 text-muted-foreground">
+      <b class="font-semibold text-foreground">${u.name}</b> は${u.link === "invited" ? "招待に応じていません" : "アカウント未連携です"}。連携すると本人のスマホにも予定が出ます。
+    </span>
+    <button type="button" onclick="openInvite('${u.id}')" class="shrink-0 rounded-lg border border-border px-2.5 py-1.5 font-medium transition hover:bg-surface-muted">招待</button>
+  </div>`).join("");
+}
+function statusBadge(st) {
+  if (st === "done") return `<span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900">${svg("check", "h-3 w-3")}記録ずみ</span>`;
+  if (st === "skipped") return `<span class="inline-flex shrink-0 items-center rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">見送り</span>`;
+  return `<span class="inline-flex shrink-0 items-center rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground">予定</span>`;
+}
+function sig(p) {
+  if (!p) return "none";
+  const keys = type(p.type).roles.map(([k]) => k);
+  // timeDirty も含める。含めないと「時刻を触って元に戻した」draft が
+  // 無変更と見なされて実体化せず、触った事実が失われる
+  return JSON.stringify([p.type, p.start, p.end, !!p.timeDirty, keys.map((k) => (p.who || {})[k] || null), p.note || ""]);
+}
+
+// ───────── タブバー ─────────
+const TABS = [
+  { key: "home", label: "ホーム", icon: "house" },
+  { key: "calendar", label: "カレンダー", icon: "calendar-days" },
+  { key: "__plus", label: "記録", icon: "plus" },
+  { key: "gallery", label: "アルバム", icon: "images" },
+  { key: "menu", label: "メニュー", icon: "menu" },
+];
+const MENU_SCREENS = ["menu", "rules", "family"];
+function renderTabs() {
+  const ro = isViewer();
+  const row = $("tabRow");
+  row.className = "mx-auto grid max-w-3xl " + (ro ? "grid-cols-4" : "grid-cols-5");
+  row.innerHTML = TABS.filter((t) => !(ro && t.key === "__plus")).map((t) => {
+    if (t.key === "__plus") {
+      return `<button type="button" data-tab="__plus" onclick="openQuick()" aria-label="クイック記録" aria-haspopup="dialog" class="relative">
+        <span class="absolute left-1/2 top-0 -mt-5 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:bg-primary-hover">${svg("plus", "h-7 w-7")}</span>
+        <span class="block pb-1.5 pt-9 text-center text-[10px] font-medium text-muted-foreground">記録</span></button>`;
+    }
+    const active = t.key === screen || (t.key === "menu" && MENU_SCREENS.includes(screen));
+    return `<button type="button" data-tab="${t.key}" onclick="go('${t.key}')" ${active ? 'aria-current="page"' : ""}
+      class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium transition ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}">
+      ${svg(t.icon, "h-6 w-6")}${t.label}</button>`;
+  }).join("");
+}
+
+function go(s) {
+  // 未保存の一括編集は保持する（誤タップ 1 回で週ぶんの入力が消えないように）。
+  // 捨てるのは「変更を捨てる」を押したときだけ
+  screen = s;
+  ["home", "calendar", "gallery", "menu", "rules", "family"].forEach((k) => {
+    $("screen-" + k).classList.toggle("hidden", k !== s);
+  });
+  window.scrollTo(0, 0);
+  const wasTab = document.activeElement?.dataset?.tab || null;
+  render();
+  // タブバーは innerHTML を作り直すので、押したタブへフォーカスを戻す
+  // 行き先のタブを優先する（セレクタを並べると DOM 順で拾ってしまう）
+  if (wasTab) (document.querySelector(`[data-tab="${s}"]`) || document.querySelector(`[data-tab="${wasTab}"]`))?.focus({ preventScroll: true });
+  // 画面内のリンク（メニュー › 毎週の予定ルール、‹ メニュー など）から移ったときは
+  // 押した要素が hidden の中に取り残される。移った先の画面へフォーカスを送る
+  else $("screen-" + s).focus({ preventScroll: true });
+}
+function setMode(m) { MODE = m; render(); }
+function setCalView(v) {
+  calView = v;
+  render();
+}
+function assignDiscard() {
+  ASSIGN_DRAFT = null;
+  render();
+  toast("未保存の変更を捨てました");
+}
+// 記録が 200 件ある状態。月の「他 N 件」・日別シートの一覧・さいきんの記録が
+// 詰まったときに読めるかを実機で確かめるため（prototype skill の「200 件」）
+function denseItems() {
+  const out = JSON.parse(JSON.stringify(FIXTURE_ITEMS));
+  const kinds = ["daycare", "home", "family", "clinic", "outing", "other"];
+  const last = Number(TODAY.slice(-2)); // 記録は起きたこと。今日より後には作らない
+  const perDay = Math.ceil(200 / last);
+  let n = 0;
+  for (let d = 1; d <= last && n < 200; d++) {
+    const date = `2026-08-${String(d).padStart(2, "0")}`;
+    for (let i = 0; i < perDay && n < 200; i++) {
+      const t = type(kinds[(d + i) % kinds.length]);
+      const h = 7 + i * 2;
+      out.push({
+        id: "big" + n, date, type: t.id,
+        // 記録なので時刻は持たせない（クイック記録と同じ扱い）
+        untimed: true, start: "", end: "",
+        who: {}, note: "", status: "done",
+        body: `${t.label}のきろく ${i + 1}`, chips: [], freeNote: "",
+        photos: n % 3 === 0 ? 1 : 0,
+        // 記録は曜日ルールの予定を消さない（詰まった日を作りたいので残す）
+        overridesRule: false,
+      });
+      n++;
+    }
+  }
+  out.forEach((x, i) => { x.created = i; });
+  return out;
+}
+// 差し替えたデータに合わせて採番を進める。戻し忘れると、この後のクイック記録が
+// 「いちばん古い」扱いになって「さいきんの記録」に出てこない
+function resyncCreated() {
+  // 元データの分は、いま外していても採番済みとして扱う（0 件の状態で作った記録が
+  // 戻したときの予定と同じ番号になり、並びが入れ替わるのを防ぐ）
+  seqCreated = ITEMS.reduce((m, x) => Math.max(m, (x.created || 0) + 1), FIXTURE_ITEMS.length);
+}
+function toggleDense() {
+  if (isDense()) { $("cfgEmpty").checked = false; ITEMS = denseItems(); RULES = JSON.parse(JSON.stringify(FIXTURE_RULES)); }
+  else { ITEMS = JSON.parse(JSON.stringify(FIXTURE_ITEMS)); RULES = JSON.parse(JSON.stringify(FIXTURE_RULES)); }
+  resyncCreated();
+  CANCELLED = new Set();
+  ASSIGN_DRAFT = null;
+  render();
+}
+function toggleEmpty() {
+  if (isEmpty()) $("cfgDense").checked = false; // 0 件と 200 件は同時に選べない
+  // 「予定が 0 件」＝これからの予定が無い状態。すでにある履歴（記録ずみ・見送り）は
+  // 残す（消すと新規アカウントの状態になってしまい、確かめたい状態と違う）
+  if (isEmpty()) {
+    ITEMS = JSON.parse(JSON.stringify(FIXTURE_ITEMS)).filter((x) => x.status !== "planned");
+    RULES = {};
+  }
+  else {
+    ITEMS = JSON.parse(JSON.stringify(FIXTURE_ITEMS));
+    RULES = JSON.parse(JSON.stringify(FIXTURE_RULES));
+  }
+  resyncCreated();
+  CANCELLED = new Set();
+  ASSIGN_DRAFT = null;
+  render();
+}
+
+// ───────── 月表示（Google カレンダー風） ─────────
+function renderMonth() {
+  const WD = ["日", "月", "火", "水", "木", "金", "土"];
+  $("monthHead").innerHTML = WD.map((w, i) =>
+    `<div class="pb-1 text-xs font-medium ${i === 0 ? "text-rose-500" : i === 6 ? "text-sky-500" : "text-muted-foreground"}">${w}</div>`
+  ).join("");
+
+  let h = "";
+  for (let i = 0; i < 6; i++) h += `<div class="min-h-24 border-b border-r border-border bg-surface-muted/40"></div>`;
+  for (let d = 1; d <= 31; d++) {
+    const ds = `2026-08-${String(d).padStart(2, "0")}`;
+    const list = itemsOn(ds);
+    const isToday = ds === TODAY;
+    const shown = list.slice(0, 2);
+    const rest = list.length - shown.length;
+    h += `<button type="button" data-open="${ds}" onclick="openDay('${ds}')" aria-haspopup="dialog"
+      aria-label="${8}月${d}日 ${list.length ? list.map((x) => type(x.type).label + (x.status === "done" ? " 記録ずみ" : x.status === "skipped" ? " 見送り" : " 予定")).join("、") : "予定なし"}"
+      class="flex min-h-24 flex-col items-stretch gap-0.5 border-b border-r border-border p-1 text-left transition hover:bg-surface-muted">
+      <span class="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-full text-xs ${isToday ? "bg-primary font-bold text-primary-foreground" : "text-muted-foreground"}">${d}</span>
+      ${shown.map((x) => monthChip(x)).join("")}
+      ${rest > 0 ? `<span class="px-0.5 text-[10px] text-muted-foreground">他 ${rest} 件</span>` : ""}
+    </button>`;
+  }
+  // 末尾の空セル（6 週ぶんの枠を埋める）
+  const used = 6 + 31;
+  for (let i = used; i < 42; i++) h += `<div class="min-h-24 border-b border-r border-border bg-surface-muted/40"></div>`;
+  $("monthGrid").innerHTML = h;
+
+  $("legend").innerHTML =
+    `<span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full border-[1.5px] border-sky-500"></span>予定（これから）</span>` +
+    `<span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-sky-500"></span>記録ずみ（完了）</span>` +
+    `<span class="flex items-center gap-1"><span class="opacity-40">薄い</span>= 毎週のルール</span>` +
+    `<span class="ml-auto">日付をタップ</span>`;
+}
+function monthChip(x) {
+  const t = type(x.type);
+  const c = C[t.color];
+  // 薄くするのは「しるし」だけ。文字ごと薄くすると 10px の見出しが
+  // 3.4:1（開始時刻は 2.3:1）まで落ちて、カレンダーの大半が読みにくくなる
+  const faint = x.fromRule ? "opacity-50" : "";
+  if (x.status === "skipped") {
+    return `<span class="flex items-center gap-1 rounded px-0.5 text-[10px] text-muted-foreground line-through"><span class="h-2 w-2 shrink-0 rounded-full bg-muted"></span><span class="truncate">${t.label}</span></span>`;
+  }
+  const dot = x.status === "done"
+    ? `<span class="h-2 w-2 shrink-0 rounded-full ${c.dot} ${faint}"></span>`
+    : `<span class="h-2 w-2 shrink-0 rounded-full border-[1.5px] ${c.ring} ${faint}"></span>`;
+  return `<span class="flex items-center gap-1 rounded px-0.5 text-[10px]">
+    ${dot}${x.untimed ? "" : `<span class="hidden shrink-0 tabular-nums text-muted-foreground sm:inline">${x.start}</span>`}<span class="truncate">${t.label}</span>
+    ${x.photos ? `<span class="shrink-0 text-muted-foreground">${svg("camera", "inline h-2.5 w-2.5")}</span>` : ""}
+  </span>`;
+}
+
+// ───────── 週表示（時間割） ─────────
+const ROW = 48;
+// 時間軸の範囲。既定は 07:00〜21:00 だが、その外の予定があれば広げる
+// （固定だと 22:00 の予定が枠の下に消え、06:00 の予定は位置がずれる）
+function weekBounds() {
+  let s = 7 * 60, e = 21 * 60;
+  for (const ds of weekDays()) {
+    for (const x of itemsOn(ds)) {
+      if (x.status === "skipped" || x.untimed) continue;
+      s = Math.min(s, Math.floor(min(x.start) / 60) * 60);
+      e = Math.max(e, Math.ceil(min(x.end) / 60) * 60);
+    }
+  }
+  return [Math.max(0, s / 60), Math.min(24, Math.max(e / 60, s / 60 + 1))];
+}
+function weekDays() {
+  return ["2026-08-09", "2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14", "2026-08-15"];
+}
+// 時間が重なるブロックを横に並べる。同じ列に全幅で重ねると、
+// 後から描いたものが前のものを完全に隠してしまう
+const MIN_BLOCK_PX = 22; // ブロックの最小高さ
+// 画面上でブロックが占める位置。実時間ではなくこちらで重なりを見る:
+// 12:00〜12:05 のような短い予定は最小高さで膨らみ、23:55〜23:59 は枠の下端で
+// 止まるため、実時間では重ならない 2 件が画面では重なることがある
+function geomOf(x, H_START, H_END) {
+  const gridH = (H_END - H_START) * ROW;
+  const s0 = Math.max(min(x.start), H_START * 60);
+  const e0 = Math.min(min(x.end), H_END * 60);
+  const hgt = Math.min(gridH, Math.max(MIN_BLOCK_PX, (e0 - s0) / 60 * ROW));
+  const top = Math.max(0, Math.min((s0 - H_START * 60) / 60 * ROW, gridH - hgt));
+  return { top, hgt, bottom: top + hgt };
+}
+function layoutDay(list, H_START, H_END) {
+  const sorted = list
+    .map((x) => ({ x, g: geomOf(x, H_START, H_END) }))
+    .sort((a, b) => a.g.top - b.g.top || a.g.bottom - b.g.bottom);
+  const out = [];
+  let cluster = [];
+  let clusterEnd = -1;
+  const flush = () => {
+    if (!cluster.length) return;
+    const colEnds = [];
+    const placed = [];
+    for (const q of cluster) {
+      let c = colEnds.findIndex((end) => q.g.top >= end);
+      if (c === -1) { c = colEnds.length; colEnds.push(0); }
+      colEnds[c] = q.g.bottom;
+      placed.push({ x: q.x, g: q.g, col: c });
+    }
+    for (const q of placed) out.push({ ...q, total: colEnds.length });
+    cluster = [];
+    clusterEnd = -1;
+  };
+  for (const q of sorted) {
+    if (cluster.length && q.g.top >= clusterEnd) flush();
+    cluster.push(q);
+    clusterEnd = Math.max(clusterEnd, q.g.bottom);
+  }
+  flush();
+  return out;
+}
+function renderWeek() {
+  const days = weekDays();
+  const WD = ["日", "月", "火", "水", "木", "金", "土"];
+  $("weekHead").innerHTML = `<div></div>` + days.map((ds, i) => {
+    const isToday = ds === TODAY;
+    return `<div class="border-l border-border py-1 text-center">
+      <div class="text-[10px] ${i === 0 ? "text-rose-500" : i === 6 ? "text-sky-500" : "text-muted-foreground"}">${WD[i]}</div>
+      <div class="mx-auto flex h-7 w-7 items-center justify-center rounded-full text-sm ${isToday ? "bg-primary font-bold text-primary-foreground" : "font-medium"}">${dayNum(ds)}</div>
+    </div>`;
+  }).join("");
+
+  // 終日（このプロトでは「見送り」だけ上のバンドに出す）
+  $("allDayBand").innerHTML = `<div class="py-1 pr-1 text-right text-[10px] text-muted-foreground">終日</div>` +
+    days.map((ds) => {
+      // 時刻を持たないもの（見送り・クイック記録）は上のバンドに出す
+      const sk = itemsOn(ds).filter((x) => x.status === "skipped" || x.untimed);
+      return `<div class="min-h-6 border-l border-border p-0.5">
+        ${sk.map((x) => `<button type="button" data-open="${ds}|${x.id}" onclick="openDay('${ds}','${x.id}')"
+          aria-label="${fmt(ds)} ${x.status === "skipped" ? "見送り" : "時刻なしの記録"} ${esc(x.body) || type(x.type).label}"
+          class="block w-full truncate rounded bg-surface-muted px-1 text-left text-[10px] ${x.status === "skipped" ? "text-muted-foreground line-through" : "text-foreground"}">${type(x.type).emoji}${esc(x.body) || type(x.type).label}</button>`).join("")}
+      </div>`;
+    }).join("");
+
+  // 時間軸 + 予定ブロック
+  const [H_START, H_END] = weekBounds();
+  let gutter = `<div class="relative" style="height:${(H_END - H_START) * ROW}px">`;
+  for (let hgt = H_START; hgt < H_END; hgt++) {
+    gutter += `<div class="absolute right-1 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground" style="top:${(hgt - H_START) * ROW}px">${String(hgt).padStart(2, "0")}:00</div>`;
+  }
+  gutter += `</div>`;
+
+  const cols = days.map((ds) => {
+    const list = itemsOn(ds).filter((x) => x.status !== "skipped" && !x.untimed);
+    let lines = "";
+    for (let hgt = H_START; hgt < H_END; hgt++) {
+      lines += `<div class="absolute inset-x-0 border-t border-border" style="top:${(hgt - H_START) * ROW}px"></div>`;
+    }
+    const blocks = layoutDay(list, H_START, H_END).map(({ x, g, col, total }) => {
+      const t = type(x.type);
+      const c = C[t.color];
+      const { top, hgt: hgt2 } = g; // 枠内に収めた位置。列の割り当てもこの位置で決めている
+      const done = x.status === "done";
+      const who = t.roles.map(([k]) => (x.who || {})[k]).filter(Boolean);
+      return `<button type="button" data-open="${ds}|${x.id}" onclick="openDay('${ds}','${x.id}')"
+        aria-label="${fmt(ds)} ${x.start}から${x.end} ${t.label}${done ? " 記録ずみ" : ""}"
+        class="absolute flex flex-col items-stretch justify-start overflow-hidden rounded border-l-4 px-1 py-0.5 text-left text-[10px] leading-tight ${done ? c.solid + " border-l-black/20" : c.soft} ${x.fromRule ? "border-dashed" : ""}"
+        style="top:${top}px;height:${hgt2}px;left:calc(${(col / total) * 100}% + 2px);width:calc(${100 / total}% - 4px)">
+        <span class="block truncate font-medium">${t.emoji} ${t.label}</span>
+        <span class="block truncate tabular-nums">${x.start}〜${x.end}</span>
+        ${who.length ? `<span class="mt-0.5 flex gap-0.5">${who.map((id) => avatar(id, "sm")).join("")}</span>` : ""}
+      </button>`;
+    }).join("");
+    return `<div class="relative border-l border-border" style="height:${(H_END - H_START) * ROW}px">${lines}${blocks}</div>`;
+  }).join("");
+
+  $("timeGrid").innerHTML = gutter + cols;
+
+  // 担当のまとめ入力
+  const hasDraft = ASSIGN_DRAFT && Object.keys(ASSIGN_DRAFT).length > 0;
+  $("assignToggle").textContent = assignOpen
+    ? "閉じる"
+    : hasDraft ? "担当をまとめて決める（未保存あり）" : "担当をまとめて決める";
+  $("assignBoard").classList.toggle("hidden", !assignOpen);
+  if (assignOpen) renderAssignBoard();
+}
+function toggleAssignBoard() { assignOpen = !assignOpen; render(); }
+function renderAssignBoard() {
+  const ro = isViewer();
+  const days = weekDays();
+  const dirty = ASSIGN_DRAFT && Object.keys(ASSIGN_DRAFT).length > 0;
+  const rows = days.map((ds) => {
+    // 下書きは担当だけを持つ。予定そのもの（種類・時刻）は常に今の値を見るので、
+    // ルールを変えたあとに保存しても古い種類で上書きされない
+    const base = planOn(ds);
+    const x = base ? { ...base, who: { ...(base.who || {}), ...((ASSIGN_DRAFT || {})[ds] || {}) } } : null;
+    const label = fmt(ds);
+    if (!x) {
+      if (ro) return `<div class="flex items-center gap-3 rounded-xl border border-dashed border-border px-3 py-2.5 text-sm"><span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span><span class="text-muted-foreground">予定なし</span></div>`;
+      return `<button type="button" data-open="${ds}|assign" onclick="openDay('${ds}')" class="flex w-full items-center gap-3 rounded-xl border border-dashed border-border px-3 py-2.5 text-left text-sm transition hover:bg-surface-muted">
+        <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
+        <span class="min-w-0 flex-1 text-muted-foreground">予定なし</span>
+        <span class="shrink-0 text-xs text-primary">予定を入れる</span></button>`;
+    }
+    const t = type(x.type);
+    if (x.status === "skipped") {
+      return `<div class="flex items-center gap-3 rounded-xl bg-surface-muted px-3 py-2.5 text-sm">
+        <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
+        <span class="opacity-50">${t.emoji}</span>
+        <span class="text-muted-foreground line-through">${t.label}</span>
+        <span class="ml-auto shrink-0 text-xs text-muted-foreground">見送り</span></div>`;
+    }
+    if (!t.roles.length) {
+      return `<div class="flex items-center gap-3 rounded-xl bg-surface-muted px-3 py-2.5 text-sm">
+        <span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
+        <span>${t.emoji}</span><span class="text-muted-foreground">${t.label}（担当なし）</span></div>`;
+    }
+    // 記録ずみは「これからの担当を決める」道具の対象外。ここで押せると、
+    // 済んだ日の送り迎えを黙って書き換えてしまう（見送りと同じく読むだけにする）
+    if (x.status === "done") {
+      return `<div class="rounded-xl bg-surface-muted p-3 text-sm">
+        <div class="mb-1 flex items-center gap-2"><span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span>
+          <span class="opacity-70">${t.emoji}</span><span class="text-muted-foreground">${t.label}</span>
+          <span class="ml-auto shrink-0">${statusBadge("done")}</span></div>
+        <p class="pl-20 text-xs text-muted-foreground">
+          ${t.roles.map(([k, l]) => `${l}: ${member((x.who || {})[k])?.name || "未定"}`).join(" / ")}
+          <span class="block">記録ずみのため変えられません。変えるにはその日をタップ。</span>
+        </p></div>`;
+    }
+    return `<div class="rounded-xl bg-surface p-3 shadow-sm ring-1 ring-border">
+      <div class="mb-2 flex items-center gap-2 text-sm"><span class="w-20 shrink-0 text-xs text-muted-foreground">${label}</span><span>${t.emoji}</span><span class="font-medium">${t.label}</span>${x.status === "done" ? statusBadge("done") : ""}</div>
+      ${t.roles.map(([k, l]) => `<div class="mt-1 flex items-center gap-2">
+        <span class="w-16 shrink-0 text-xs text-muted-foreground">${l}</span>
+        <div class="flex gap-1.5">${MEMBERS.map((m) => {
+          const on = (x.who || {})[k] === m.id;
+          return `<button type="button" data-assign="${ds}|${k}|${m.id}" ${ro ? "disabled" : ""} onclick="assignSet('${ds}','${k}','${m.id}')" aria-label="${label} ${l} ${m.name}" aria-pressed="${on}"
+            class="flex h-9 w-9 items-center justify-center rounded-full transition ${on ? `ring-2 ${m.ring} ` + m.bg : "bg-surface-muted text-muted-foreground"} ${ro ? "opacity-50" : on ? "" : "hover:bg-muted"}">
+            <span class="text-xs font-bold">${m.initial}</span></button>`;
+        }).join("")}</div></div>`).join("")}
+    </div>`;
+  }).join("");
+
+  // 行の描画と同じ「下書きを載せた今の予定」から集める。
+  // 下書き（担当だけの delta）をそのまま予定として扱うと type が無く、
+  // 保育園の送り迎えしか見ないため care の未連携を取りこぼす
+  const unlinked = [...new Set(days.flatMap((ds) => {
+    const base = planOn(ds);
+    if (!base || base.status !== "planned") return [];
+    const who = { ...(base.who || {}), ...((ASSIGN_DRAFT || {})[ds] || {}) };
+    return type(base.type).roles.map(([k]) => who[k]).filter(Boolean);
+  }))].map(member).filter((m) => m && m.link !== "linked");
+
+  $("assignBoard").innerHTML = rows +
+    (ro ? `<p class="rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、担当は変更できません。</p>` : "") +
+    (!ro && unlinked.length ? `<div class="space-y-2">${unlinkedNotice(unlinked)}</div>` : "") +
+    (ro ? "" : `<div class="flex gap-2">
+      ${dirty ? `<button type="button" onclick="assignDiscard()" class="shrink-0 rounded-xl border border-border px-4 py-3 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">変更を捨てる</button>` : ""}
+      <button type="button" ${dirty ? "" : "disabled"} onclick="assignSave()"
+        class="flex-1 rounded-xl py-3 text-sm font-bold transition ${dirty ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "bg-surface-muted text-muted-foreground"}">
+        ${dirty ? "保存する（未保存の変更あり）" : "保存する"}</button>
+    </div>`);
+}
+// 下書きは「触った担当だけ」を持つ。base.who ごと写し取ると、
+// 触っていない担当（例: お迎え）を後からルールで変えても、保存時に古い値で
+// 巻き戻してしまう
+function assignSet(ds, k, mid) {
+  if (isViewer()) return;
+  const base = planOn(ds);
+  // 見送り・記録ずみは対象外（記録ずみを通すと済んだ日の担当が書き換わる）
+  if (!base || base.status !== "planned") return;
+  if (!ASSIGN_DRAFT) ASSIGN_DRAFT = {};
+  const delta = ASSIGN_DRAFT[ds] || (ASSIGN_DRAFT[ds] = {});
+  const current = k in delta ? delta[k] : (base.who || {})[k] || null;
+  const next = current === mid ? null : mid;
+  // 元の値に戻したらその項目を下書きから外す
+  if (next === ((base.who || {})[k] || null)) delete delta[k];
+  else delta[k] = next;
+  if (Object.keys(delta).length === 0) delete ASSIGN_DRAFT[ds];
+  if (ASSIGN_DRAFT && Object.keys(ASSIGN_DRAFT).length === 0) ASSIGN_DRAFT = null;
+  // 週ぶんの担当を続けて選ぶので、押したボタンへフォーカスを戻す
+  const key = document.activeElement?.dataset?.assign || null;
+  renderAssignBoard();
+  if (key) document.querySelector(`[data-assign="${key}"]`)?.focus({ preventScroll: true });
+}
+function assignSave() {
+  if (!ASSIGN_DRAFT) return;
+  let saved = 0;
+  for (const [ds, who] of Object.entries(ASSIGN_DRAFT)) {
+    const base = planOn(ds); // 保存の瞬間の予定に、触った担当だけを載せる
+    // 開いている間に完了した日は、下書きが残っていても書き戻さない
+    if (!base || base.status !== "planned") continue;
+    const merged = { ...(base.who || {}), ...who };
+    const next = {};
+    for (const [k] of type(base.type).roles) if (merged[k]) next[k] = merged[k];
+    // 保存するころにはルール側が同じ内容になっていることがある。
+    // そのまま実体化すると、以降のルール変更に追従しない例外が無駄に生まれる
+    const sameAsRule = type(base.type).roles
+      .every(([k]) => (next[k] || null) === ((base.who || {})[k] || null));
+    if (sameAsRule && base.fromRule) continue;
+    const existing = ITEMS.find((y) => y.id === base.id);
+    if (existing) existing.who = next;
+    else ITEMS.push({ ...base, who: next, id: "n" + seq++, fromRule: undefined, overridesRule: true, created: seqCreated++ });
+    CANCELLED.delete(ds);
+    saved++;
+  }
+  ASSIGN_DRAFT = null;
+  render();
+  toast(saved ? "今週の担当を保存しました" : "保存できる予定がありませんでした");
+}
+
+// ───────── 予定シート ─────────
+// ホームなど別の画面からカレンダーへ移ってその日を開く。go() が画面を描き直すので、
+// 押したボタンはこの時点で消えている。閉じたときの戻り先はカレンダーのその日にする
+// （そのままだと rememberTrigger が body を覚えてフォーカスが迷子になる）
+function goOpenDay(d, id) {
+  go("calendar");
+  openDay(d, id);
+  // 月表示の日セルへ。週表示のときはセルが隠れていて focus() が効かないので、
+  // カレンダータブへ落とす
+  const cell = document.querySelector(`[data-open="${d}"]`);
+  const sel = cell && cell.offsetParent ? `[data-open="${d}"]` : '[data-tab="calendar"]';
+  setTrigger("sheet", document.querySelector(sel), [sel]);
+}
+function openDay(d, id) {
+  openDate = d;
+  CONFIRM_DELETE = false;
+  PENDING_SWITCH = null;
+  // id を渡されたらその行を開く（さいきんの記録から、予定ではなく記録を開くため）
+  const cur = (id && itemsOn(d).find((x) => x.id === id)) || planOn(d);
+  DRAFT = cur ? JSON.parse(JSON.stringify(cur)) : null;
+  if (DRAFT) DRAFT.repeat = false;
+  DRAFT_BASE = cur ? { fromRule: !!cur.fromRule, sig: sig(cur) } : null;
+  OPEN_SIG = cur ? sig(cur) : "none";
+  CONFIRM_CLOSE = false;
+  $("sheetTitle").textContent = fmt(d);
+  // シートを開いたまま別の行へ切り替える場合、押した行は renderSheet() で消えている。
+  // 覚え直すと最初にシートを開いた要素（カレンダーの日）を見失う
+  const switching = !$("sheet").classList.contains("invisible");
+  renderSheet();
+  if (!switching) rememberTrigger("sheet");
+  $("sheet").scrollTop = 0; // 前に開いた日の位置が残らないように
+  $("sheet").classList.remove("invisible", "translate-y-full");
+  $("backdrop").classList.remove("pointer-events-none", "opacity-0");
+  syncScrollLock();
+  focusSheet("sheet");
+}
+// 編集が入っているか（本番の記録フォームと同じく、捨てる前に確認する）
+function sheetDirty() {
+  if (isViewer()) return false;
+  if (!DRAFT) return OPEN_SIG !== "none";
+  return sig(DRAFT) !== OPEN_SIG || !!DRAFT.repeat;
+}
+// ✕ / 背景 / Esc から呼ぶ。変更があれば確認をはさむ
+// 同じ日のほかの行へ切り替える。未保存の編集があれば確認をはさむ
+function requestSwitchItem(d, id) {
+  if (sheetDirty()) {
+    rememberConfirmReturn("#sheetClose");
+    PENDING_SWITCH = { d, id };
+    CONFIRM_CLOSE = true;
+    renderSheet();
+    $("sheet").scrollTop = 0;
+    focusConfirm("confirmClose");
+    return;
+  }
+  openDay(d, id);
+}
+function requestCloseSheet() {
+  PENDING_SWITCH = null;
+  if (sheetDirty()) {
+    rememberConfirmReturn("#sheetClose");
+    CONFIRM_CLOSE = true;
+    renderSheet();
+    $("sheet").scrollTop = 0;
+    focusConfirm("confirmClose");
+    return;
+  }
+  closeSheet();
+}
+function discardSheet() {
+  CONFIRM_CLOSE = false;
+  const go2 = PENDING_SWITCH;
+  PENDING_SWITCH = null;
+  if (go2 && go2.restore) doRestoreRule(go2.d);
+  else if (go2) openDay(go2.d, go2.id); // 切り替え先があればそのまま開く
+  else closeSheet();
+}
+function closeSheet() {
+  $("sheet").classList.add("invisible", "translate-y-full");
+  $("backdrop").classList.add("pointer-events-none", "opacity-0");
+  syncScrollLock();
+  restoreTrigger("sheet");
+  openDate = null;
+  DRAFT = null;
+  DRAFT_BASE = null;
+}
+function renderSheet() {
+  const d = openDate;
+  if (!d) return;
+  const p = DRAFT;
+  const t = p ? type(p.type) : null;
+  const ro = isViewer();
+  $("sheetStatus").innerHTML = p ? statusBadge(p.status) : "";
+  let h = "";
+
+  if (CONFIRM_CLOSE) {
+    h += `<div id="confirmClose" role="alert" tabindex="-1" class="space-y-2 rounded-xl border border-border bg-surface-muted p-3 outline-none">
+      <p class="text-sm font-medium">${!PENDING_SWITCH ? "編集をやめますか？" : PENDING_SWITCH.restore ? "編集をやめて、毎週のルールに戻しますか？" : "編集をやめて、そちらを開きますか？"}</p>
+      <p class="text-xs text-muted-foreground">保存していない変更は失われます。</p>
+      <div class="flex gap-2">
+        <button type="button" onclick="CONFIRM_CLOSE = false; PENDING_SWITCH = null; backFromConfirm(renderSheet)" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">編集に戻る</button>
+        <button type="button" onclick="discardSheet()" class="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background">${!PENDING_SWITCH ? "やめる" : PENDING_SWITCH.restore ? "戻す" : "開く"}</button>
+      </div>
+    </div>`;
+  }
+  if (ro) h += `<p class="rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">閲覧のみの権限のため、変更できません。</p>`;
+
+  // 判定は「その日の予定として保存された行があるか」。無関係な記録の有無で隠さない
+  if (!ro && CANCELLED.has(d) && ruleFor(d) && !ITEMS.some((x) => x.date === d && x.overridesRule !== false)) {
+    h += `<div class="flex items-center gap-2 rounded-xl border border-dashed border-border p-3 text-sm">
+      <span class="min-w-0 flex-1 text-muted-foreground">毎週のルール（${type(ruleFor(d).type).label}）を打ち消しています。</span>
+      <button type="button" onclick="restoreRule()" class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">戻す</button>
+    </div>`;
+  }
+
+  // ── 記録ずみのときは、まず記録の中身を見せる ──
+  if (p && p.status === "done") {
+    h += `<div class="rounded-xl bg-surface-muted p-3">
+      <p class="mb-1 text-xs font-bold text-muted-foreground">記録</p>
+      <p class="text-sm">${esc(p.body) || "（本文なし）"}</p>
+      ${p.photos ? `<p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">${svg("camera", "h-3.5 w-3.5")}写真 ${p.photos} 枚</p>` : ""}
+      ${!ro ? `<button type="button" onclick="openDone()" class="mt-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">記録を編集</button>` : ""}
+    </div>`;
+  }
+
+  if (MODE === "preset" && !ro && (!p || p.status === "planned")) {
+    h += `<div>
+      <p class="mb-2 text-xs font-bold text-muted-foreground">いつものパターン</p>
+      <div class="flex flex-wrap gap-2">
+        ${PRESETS.map((ps, i) => `
+          <button type="button" data-preset="${i}" onclick="applyPreset(${i})"
+            class="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-sm transition hover:bg-surface-muted">
+            <span>${type(ps.type).emoji}</span><span class="font-medium">${ps.label}</span>
+            <span class="flex -space-x-1">${Object.values(ps.who).map((id) => avatar(id, "sm")).join("")}</span>
+          </button>`).join("")}
+      </div>
+    </div>`;
+  }
+
+  // ── 種類 ──
+  h += `<div>
+    <p id="typeLabel" class="mb-2 text-xs font-bold text-muted-foreground">どう過ごす？</p>
+    <div role="radiogroup" aria-labelledby="typeLabel" class="grid grid-cols-3 gap-2">
+      ${TYPES.map((x) => `
+        <button type="button" role="radio" data-type="${x.id}" aria-checked="${!!(p && p.type === x.id)}" ${ro ? "disabled" : ""} onclick="setType('${x.id}')"
+          class="flex flex-col items-center gap-1 rounded-xl border py-2.5 text-xs transition
+          ${p && p.type === x.id ? "border-primary bg-primary/10 font-bold text-primary" : "border-border bg-surface hover:bg-surface-muted"}
+          ${ro ? "opacity-50" : ""}">
+          <span class="text-xl leading-none">${x.emoji}</span>${x.label}
+        </button>`).join("")}
+    </div>
+  </div>`;
+
+  // ── 時間 ──
+  if (p && p.untimed) {
+    h += `<p class="rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted-foreground">この記録は時刻を持ちません（クイック記録）。</p>`;
+  } else if (p) {
+    h += `<div>
+      <p class="mb-2 text-xs font-bold text-muted-foreground">時間</p>
+      <div class="flex items-center gap-2">
+        <input type="time" id="start" ${ro ? "disabled" : ""} value="${p.start}" onchange="setTime('start', this.value)"
+          aria-label="開始時刻" aria-describedby="timeError" aria-invalid="${!!timeProblem(p)}"
+          class="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm tabular-nums" />
+        <span class="shrink-0 text-sm text-muted-foreground">〜</span>
+        <input type="time" id="end" ${ro ? "disabled" : ""} value="${p.end}" onchange="setTime('end', this.value)"
+          aria-label="終了時刻" aria-describedby="timeError" aria-invalid="${!!timeProblem(p)}"
+          class="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm tabular-nums" />
+      </div>
+      <p id="timeError" role="alert" class="mt-1 text-xs text-rose-600 ${timeProblem(p) ? "" : "hidden"}">${esc(timeProblem(p) || "終了は開始より後にしてください")}</p>
+    </div>`;
+  }
+
+  // ── 担当（種類に応じて出る） ──
+  if (t && t.roles.length && p) {
+    h += `<div class="space-y-3 rounded-xl bg-surface-muted p-3">`;
+    for (const [key, label] of t.roles) {
+      h += `<div class="flex flex-wrap items-center gap-2">
+        <span class="w-20 shrink-0 text-sm font-medium">${label}</span>
+        ${MEMBERS.map((m) => {
+          const on = (p.who || {})[key] === m.id;
+          return `<button type="button" ${ro ? "disabled" : ""} onclick="setWho('${key}','${m.id}')"
+            data-who="${key}:${m.id}" aria-pressed="${on}" aria-label="${label}は${m.name}"
+            class="flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs transition
+            ${on ? `bg-surface font-bold shadow-sm ring-2 ${m.ring}` : "text-muted-foreground hover:bg-surface"} ${ro ? "opacity-50" : ""}">
+            ${avatar(m.id, "sm")}${m.name}</button>`;
+        }).join("")}
+      </div>`;
+    }
+    const un = [...new Set(t.roles.map(([k]) => (p.who || {})[k]).filter(Boolean))]
+      .map(member).filter((m) => m && m.link !== "linked");
+    if (un.length && !ro) h += `<div class="space-y-2">${unlinkedNotice(un)}</div>`;
+    h += `</div>`;
+  }
+
+  if (p) {
+    h += `<div>
+      <label class="mb-1 block text-xs font-medium text-muted-foreground" for="note">ひとことメモ（任意）</label>
+      <input id="note" ${ro ? "disabled" : ""} value="${esc(p.note)}"
+        oninput="if (DRAFT) DRAFT.note = this.value" placeholder="例: パパ出張のため、迎えはばあば"
+        class="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm" />
+    </div>`;
+    if (!ro && p.status === "planned") {
+      const wd = ["日", "月", "火", "水", "木", "金", "土"][dow(d)];
+      h += `<label class="flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
+        <input type="checkbox" id="rep" class="mt-0.5" ${p.repeat ? "checked" : ""} onchange="if (DRAFT) DRAFT.repeat = this.checked" />
+        <span>これから毎週${wd}曜も同じにする<span class="mt-0.5 block text-xs text-muted-foreground">種類・時間・担当がルールに保存され、以降の${wd}曜に薄く自動で入ります</span></span>
+      </label>`;
+    }
+  }
+
+  if (!ro) {
+    h += `<div class="space-y-2">
+      <button type="button" ${p ? "" : "disabled"} onclick="savePlan()"
+        class="w-full rounded-xl py-3 text-sm font-bold transition ${p ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "bg-surface-muted text-muted-foreground"}">
+        ${p ? (p.status === "done" ? "変更を保存する" : "予定を保存する") : "どう過ごすか選んでください"}</button>`;
+    if (p && p.status === "planned") {
+      h += `<div class="flex gap-2">
+        <button type="button" data-done-open onclick="openDone()" class="flex-1 rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950">
+          ${svg("check", "mr-1 inline h-4 w-4")}完了して記録にする</button>
+        <button type="button" onclick="skipPlan()" class="rounded-xl border border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">見送り</button>
+      </div>`;
+    }
+    if (p && p.status === "skipped") {
+      h += `<button type="button" onclick="unskip()" class="w-full rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">予定に戻す</button>`;
+    }
+    if (p) {
+      if (p.status === "done" && CONFIRM_DELETE) {
+        // 記録と写真は元に戻せない。本番の RecordActionsSheet と同じく確認をはさむ
+        h += `<div id="confirmDelete" role="alert" tabindex="-1" class="space-y-2 rounded-xl border border-rose-300 bg-rose-50 p-3 outline-none">
+          <p class="text-sm font-medium text-rose-900">この記録を削除しますか？</p>
+          <p class="text-xs text-rose-800">本文と写真 ${p.photos || 0} 枚も一緒に消えます。元に戻せません。</p>
+          <div class="flex gap-2">
+            <button type="button" onclick="CONFIRM_DELETE = false; backFromConfirm(renderSheet)" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">やめる</button>
+            <button type="button" onclick="clearPlan()" class="flex-1 rounded-lg bg-rose-600 py-2.5 text-sm font-bold text-white">削除する</button>
+          </div>
+        </div>`;
+      } else {
+        h += `<button id="planDelete" type="button" onclick="${p.status === "done" ? "askDelete()" : "clearPlan()"}"
+          class="w-full rounded-xl py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-muted">
+          ${p.status === "done" ? "この記録を削除する（写真ごと）" : "この日の予定を消す"}</button>`;
+      }
+    }
+    h += `</div>`;
+  }
+
+  // その日のほかの行。月セルが記録だけの日でも、タップした記録へ辿り着けるように
+  // （予定エディタは planOn の 1 件しか扱わないので、ここが唯一の入口になる）
+  const others = itemsOn(d).filter((x) => x.id !== (p && p.id));
+  if (others.length) {
+    h += `<section class="space-y-2 border-t border-border pt-4">
+      <h3 class="text-xs font-bold text-muted-foreground">この日のほかの記録・予定</h3>
+      ${others.map((x) => {
+        const t2 = type(x.type);
+        return `<button type="button" onclick="requestSwitchItem('${d}','${x.id}')"
+          class="flex w-full items-center gap-2 rounded-xl bg-surface-muted px-3 py-2.5 text-left text-sm transition hover:bg-muted">
+          <span class="shrink-0">${t2.emoji}</span>
+          <span class="w-20 shrink-0 text-xs tabular-nums text-muted-foreground">${x.untimed ? "時刻なし" : `${x.start}〜${x.end}`}</span>
+          <span class="min-w-0 flex-1 truncate">${esc(x.body) || t2.label}</span>
+          ${statusBadge(x.status)}
+        </button>`;
+      }).join("")}
+    </section>`;
+  }
+
+  $("sheetBody").innerHTML = h;
+}
+function draft() {
+  if (!DRAFT) {
+    const t = TYPES[0];
+    DRAFT = { id: "n" + seq++, date: openDate, type: t.id, start: t.start, end: t.end, who: {}, note: "", status: "planned", body: "", photos: 0, created: seqCreated++, repeat: false };
+  }
+  if (!DRAFT.who) DRAFT.who = {};
+  return DRAFT;
+}
+function setType(id) {
+  const p = draft();
+  p.type = id;
+  const keep = {};
+  for (const [k] of type(id).roles) if (p.who[k]) keep[k] = p.who[k];
+  p.who = keep;
+  // 時間を触っていなければ、その種類の既定時間に合わせる。
+  // 既定値との一致で推測すると、たまたま別の種類の既定と同じ時刻にしたときに
+  // 勝手に上書きされてしまうので、触ったかどうかは旗で持つ
+  if (!p.timeDirty) { p.start = type(id).start; p.end = type(id).end; }
+  renderSheet();
+  // 描き直すとフォーカスが外れる。選んだ種類のまま時間・担当へ進めるように戻す
+  document.querySelector(`[data-type="${id}"]`)?.focus({ preventScroll: true });
+}
+function setTime(which, v) {
+  const p = draft();
+  p[which] = v;
+  p.timeDirty = true;
+  // 保存・完了と同じ判定を使う（別々に書くと文言や条件がずれる）
+  showTimeProblem(p);
+}
+// 時刻の不備をその場に出す。renderSheet() でも同じ形を組み立てるので、
+// 担当や種類を触って描き直しても、直っていないエラーは出たままになる
+function showTimeProblem(p) {
+  const bad = timeProblem(p);
+  const el = $("timeError");
+  if (bad) el.textContent = bad;
+  el.classList.toggle("hidden", !bad);
+  // どの欄が不正なのかを読み上げに伝える（描き直しでも同じ値になる）
+  for (const id of ["start", "end"]) $(id)?.setAttribute("aria-invalid", String(!!bad));
+}
+function setWho(key, mid) {
+  const p = draft();
+  p.who[key] = p.who[key] === mid ? null : mid;
+  renderSheet();
+  // 描き直すとフォーカスが外れる。送り → お迎えと続けて選べるように戻す
+  document.querySelector(`[data-who="${key}:${mid}"]`)?.focus({ preventScroll: true });
+}
+function applyPreset(i) {
+  const ps = PRESETS[i];
+  const p = draft();
+  p.type = ps.type; p.start = ps.start; p.end = ps.end; p.who = { ...ps.who };
+  // パターンは種類も時刻も置き換える。旗を残すと、この後で種類を変えたときに
+  // パターンの時刻が「手で触った時刻」として居座る
+  p.timeDirty = false;
+  renderSheet();
+  // 描き直すとフォーカスが外れる。押したパターンのまま保存へ進めるように戻す
+  document.querySelector(`[data-preset="${i}"]`)?.focus({ preventScroll: true });
+  toast(`「${ps.label}」を入れました`);
+}
+function commit(x) {
+  // 素性は作ったときに決まる。保存のたびに立て直すと、クイック記録を編集した
+  // だけでその日の曜日ルールの予定が消える
+  const row = { ...x, overridesRule: x.overridesRule === undefined ? true : x.overridesRule };
+  // ルール由来の行には created が無い。付けないと、さいきんの記録の並びで
+  // 常に最古扱いになり、完了した直後の記録が 4 件の枠から漏れる
+  if (row.created === undefined) row.created = seqCreated++;
+  delete row.repeat;
+  delete row.fromRule;
+  const i = ITEMS.findIndex((y) => y.id === row.id);
+  if (i >= 0) ITEMS[i] = row; else ITEMS.push(row);
+  // 打ち消しを解くのは「その日の予定」を保存したときだけ。
+  // 併存しているだけの記録を編集して、消したルールが戻ってきては困る
+  if (row.overridesRule !== false) CANCELLED.delete(x.date);
+}
+function savePlan() {
+  const p = DRAFT;
+  if (!p) return;
+  const bad = timeProblem(p);
+  if (bad) { toast(bad); return; }
+  const repeat = !!p.repeat;
+  // ルール由来のまま何も変えていないなら、例外として実体化させない
+  if (!repeat && DRAFT_BASE && DRAFT_BASE.fromRule && sig(p) === DRAFT_BASE.sig) {
+    closeSheet(); render(); toast("変更なし（毎週のルールのままです）"); return;
+  }
+  commit(p);
+  if (repeat) {
+    applyRepeat(p);
+    toast("予定と毎週のルールを保存しました");
+  } else {
+    toast(p.status === "done" ? "記録を保存しました" : "予定を保存しました");
+  }
+  closeSheet();
+  render();
+}
+// 「これから毎週◯曜も同じにする」の適用。commit() は repeat を捨てるので、
+// 保存・完了・見送りのどの経路からでもここを通す
+function applyRepeat(p) {
+  const w = dow(p.date);
+  // 「これから毎週」と言った以上、その日より後から効く古い版は畳む。
+  // 残すと 8/13 で作り直したルールが 8/20 で前の版に戻ってしまう
+  RULES[w] = versionsOf(w).filter((r) => !r.since || r.since < p.date);
+  putRuleVersion(w, {
+    type: p.type, start: p.start, end: p.end, who: { ...p.who },
+    since: p.date, timeDirty: !!p.timeDirty,
+  });
+}
+function skipPlan() {
+  const p = draft();
+  const bad = timeProblem(p);
+  if (bad) { toast(bad); return; }
+  const repeat = !!p.repeat;
+  p.status = "skipped";
+  commit(p);
+  if (repeat) applyRepeat(p); // この日は見送りでも、以降のルールは設定どおりにする
+  closeSheet();
+  render();
+  toast(repeat ? "見送りにして、毎週のルールを保存しました" : "見送りにしました");
+}
+function unskip() {
+  const p = draft();
+  const bad = timeProblem(p);
+  if (bad) { toast(bad); return; }
+  p.status = "planned";
+  commit(p);
+  renderSheet();
+  render();
+  toast("予定に戻しました");
+}
+function clearPlan() {
+  const d = openDate;
+  const wasDone = DRAFT && DRAFT.status === "done";
+  const wasPlan = !DRAFT || DRAFT.overridesRule !== false;
+  if (DRAFT) ITEMS = ITEMS.filter((x) => x.id !== DRAFT.id);
+  // その日の「予定」を消したときだけルールを打ち消す。
+  // 併存しているだけの記録を消してもルールは残す
+  if (wasPlan && ruleFor(d)) CANCELLED.add(d);
+  closeSheet();
+  render();
+  toast(wasDone ? "記録を削除しました" : "この日の予定を消しました");
+}
+function restoreRule() {
+  const d = openDate;
+  // 打ち消しを戻すと、いま書きかけの内容は捨てられる（ルール由来の予定に戻る）
+  if (sheetDirty()) {
+    rememberConfirmReturn("#sheetClose");
+    PENDING_SWITCH = { d, id: null, restore: true };
+    CONFIRM_CLOSE = true;
+    renderSheet();
+    $("sheet").scrollTop = 0;
+    focusConfirm("confirmClose");
+    return;
+  }
+  doRestoreRule(d);
+}
+function doRestoreRule(d) {
+  CANCELLED.delete(d);
+  openDay(d);
+  toast("毎週のルールに戻しました");
+}
+
+// ───────── 完了 → 記録にする ─────────
+function timeProblem(p) {
+  if (p.untimed) return null; // 時刻を持たない記録は検証しない
+  if (!p.start || !p.end) return "開始と終了の時刻を入れてください";
+  if (min(p.end) <= min(p.start)) return "終了は開始より後にしてください";
+  return null;
+}
+function openDone() {
+  const p = draft();
+  // 保存と同じ検証を通す（ここを素通りすると不正な時刻のまま記録になる）
+  const bad = timeProblem(p);
+  if (bad) { toast(bad); return; }
+  // 本文を「、」で割って復元すると、ひとことが並べ替わる（「あとで、おやつ」→
+  // チップ「おやつ」＋ひとこと「あとで」→ 保存すると「おやつ、あとで」）。
+  // チップとひとことは構造のまま持っておく
+  DONE_DRAFT = {
+    chips: p.chips ? [...p.chips] : [],
+    note: p.freeNote !== undefined ? p.freeNote : (p.body || ""),
+    photos: p.photos || 0,
+  };
+  const t = type(p.type);
+  DONE_OPEN_SIG = JSON.stringify([DONE_DRAFT.chips, DONE_DRAFT.note, DONE_DRAFT.photos]);
+  CONFIRM_CLOSE_DONE = false;
+  $("doneSummary").textContent = `${fmt(p.date)}・${t.emoji} ${t.label}` + (p.untimed ? "" : `・${p.start}〜${p.end}`);
+  renderDone();
+  // ホームや ＋ シートからは openDay() → openDone() と続けて呼ぶので、そのまま覚えると
+  // 「日別シートの下に隠れて押せなくなったボタン」が戻り先になる。
+  // 日別シートの中から開いたときだけその要素を覚え、それ以外はシート側の要素を戻り先にする
+  if (document.activeElement instanceof HTMLElement && $("sheet").contains(document.activeElement)) {
+    rememberTrigger("doneSheet");
+  } else {
+    const sel = ["#sheet [data-done-open]", "#sheetClose"];
+    setTrigger("doneSheet", document.querySelector(sel[0]) || $("sheetClose"), sel);
+  }
+  $("doneSheet").scrollTop = 0; // 前に開いた分の位置が残らないように
+  $("doneSheet").classList.remove("invisible", "translate-y-full");
+  $("doneBackdrop").classList.remove("pointer-events-none", "opacity-0");
+  syncScrollLock();
+  focusSheet("doneSheet");
+}
+function doneDirty() {
+  if (!DONE_DRAFT) return false;
+  return JSON.stringify([DONE_DRAFT.chips, DONE_DRAFT.note, DONE_DRAFT.photos]) !== DONE_OPEN_SIG;
+}
+// ✕ / 背景 / Esc から呼ぶ。入力があれば確認をはさむ
+function requestCloseDone() {
+  if (doneDirty()) {
+    rememberConfirmReturn("#doneClose");
+    CONFIRM_CLOSE_DONE = true;
+    renderDone();
+    $("doneSheet").scrollTop = 0;
+    focusConfirm("confirmDone");
+    return;
+  }
+  closeDone();
+}
+function discardDone() {
+  CONFIRM_CLOSE_DONE = false;
+  closeDone();
+}
+function closeDone() {
+  $("doneSheet").classList.add("invisible", "translate-y-full");
+  $("doneBackdrop").classList.add("pointer-events-none", "opacity-0");
+  syncScrollLock();
+  restoreTrigger("doneSheet");
+  DONE_DRAFT = null;
+}
+function renderDone() {
+  const dd = DONE_DRAFT;
+  if (!dd) return;
+  const body = [...dd.chips, dd.note.trim()].filter(Boolean).join("、");
+  $("doneBody").innerHTML = `
+    ${CONFIRM_CLOSE_DONE ? `<div id="confirmDone" role="alert" tabindex="-1" class="space-y-2 rounded-xl border border-border bg-surface-muted p-3 outline-none">
+      <p class="text-sm font-medium">入力をやめますか？</p>
+      <p class="text-xs text-muted-foreground">選んだ内容と写真は保存されません。</p>
+      <div class="flex gap-2">
+        <button type="button" onclick="CONFIRM_CLOSE_DONE = false; backFromConfirm(renderDone)" class="flex-1 rounded-lg border border-border bg-surface py-2.5 text-sm font-medium">入力に戻る</button>
+        <button type="button" onclick="discardDone()" class="flex-1 rounded-lg bg-foreground py-2.5 text-sm font-bold text-background">やめる</button>
+      </div>
+    </div>` : ""}
+    <div>
+      <p class="mb-2 text-xs font-bold text-muted-foreground">あったこと（タップで選ぶ）</p>
+      <div class="flex flex-wrap gap-2">
+        ${CHIPS.map((c) => {
+          const on = dd.chips.includes(c);
+          return `<button type="button" data-chip="${c}" onclick="doneChip('${c}')" aria-pressed="${on}"
+            class="rounded-full border px-3 py-1.5 text-sm transition ${on ? "border-primary bg-primary/10 font-bold text-primary" : "border-border hover:bg-surface-muted"}">${c}</button>`;
+        }).join("")}
+      </div>
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-muted-foreground" for="doneNote">ひとこと（任意）</label>
+      <input id="doneNote" value="${esc(dd.note)}" oninput="DONE_DRAFT.note = this.value; renderDonePreview()"
+        placeholder="例: おやつをぜんぶ食べました" class="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm" />
+    </div>
+    <button type="button" data-done-photo onclick="donePhoto()" class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">
+      ${svg("camera", "h-4 w-4")}写真を追加${dd.photos ? `（${dd.photos} 枚）` : ""}</button>
+    <p id="donePreview" class="rounded-xl bg-surface-muted px-3 py-2.5 text-sm ${body ? "" : "text-muted-foreground"}">${esc(body) || "まだ何も選んでいません"}</p>
+    <button type="button" onclick="confirmDone()" class="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700">
+      ${svg("check", "mr-1 inline h-4 w-4")}記録として保存する</button>
+    <p class="text-center text-xs text-muted-foreground">保存すると、この予定は<b class="font-semibold text-foreground">記録ずみ</b>になります。</p>`;
+}
+function renderDonePreview() {
+  const dd = DONE_DRAFT;
+  const body = [...dd.chips, dd.note.trim()].filter(Boolean).join("、");
+  const el = $("donePreview");
+  el.textContent = body || "まだ何も選んでいません";
+  el.className = "rounded-xl bg-surface-muted px-3 py-2.5 text-sm " + (body ? "" : "text-muted-foreground");
+}
+function doneChip(c) {
+  const dd = DONE_DRAFT;
+  dd.chips = dd.chips.includes(c) ? dd.chips.filter((x) => x !== c) : [...dd.chips, c];
+  renderDone();
+  // 描き直すとフォーカスが外れる。複数選ぶたびに先頭から辿り直させない
+  document.querySelector(`[data-chip="${c}"]`)?.focus({ preventScroll: true });
+}
+function donePhoto() {
+  DONE_DRAFT.photos += 1;
+  renderDone();
+  // 描き直すとフォーカスが外れる。2 枚目からダイアログを辿り直させない
+  document.querySelector("[data-done-photo]")?.focus({ preventScroll: true });
+  toast("（プロト）写真を 1 枚追加しました");
+}
+function confirmDone() {
+  const dd = DONE_DRAFT;
+  const p = draft();
+  const bad = timeProblem(p);
+  if (bad) { toast(bad); return; }
+  p.chips = [...dd.chips];
+  p.freeNote = dd.note.trim();
+  // 記録になった時点を並び順に反映する。予定として作った古い順のままだと、
+  // きょう完了した記録が、きょうのクイック記録より下に沈む
+  if (p.status !== "done") p.created = seqCreated++;
+  p.body = [...dd.chips, dd.note.trim()].filter(Boolean).join("、");
+  p.photos = dd.photos;
+  p.status = "done";
+  const repeat = !!p.repeat; // 完了の経路でもチェックを尊重する
+  commit(p);
+  if (repeat) applyRepeat(p);
+  closeDone();
+  closeSheet();
+  render();
+  toast(repeat ? "記録にして、毎週のルールも保存しました" : "記録にしました");
+}
+
+// ───────── ホーム ─────────
+function renderHome() {
+  const x = planOn(TODAY);
+  const ro = isViewer();
+  if (!x) {
+    $("todayCard").innerHTML = `<div class="rounded-2xl border border-dashed border-border p-4 text-center">
+      <p class="text-sm text-muted-foreground">きょうの予定はまだありません。</p>
+      ${ro ? "" : `<button type="button" onclick="goOpenDay('${TODAY}')" class="mt-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">予定を入れる</button>`}
+    </div>`;
+  } else {
+    const t = type(x.type);
+    $("todayCard").innerHTML = `<div class="rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-border">
+      <div class="flex items-center justify-between">
+        <p class="text-xs font-bold text-muted-foreground">きょう</p>${statusBadge(x.status)}
+      </div>
+      <div class="mt-2 flex items-center gap-3">
+        <span class="text-3xl">${t.emoji}</span>
+        <div class="min-w-0 flex-1">
+          <p class="font-bold">${t.label}</p>
+          <p class="text-xs tabular-nums text-muted-foreground">${x.untimed ? "時刻なし" : `${x.start}〜${x.end}`}${x.note ? "・" + esc(x.note) : ""}</p>
+        </div>
+      </div>
+      ${t.roles.length ? `<div class="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+        ${t.roles.map(([k, l]) => `<span class="flex items-center gap-1.5 rounded-full bg-surface-muted py-1 pr-3 pl-1 text-xs">
+          ${avatar((x.who || {})[k], "sm")}<span class="text-muted-foreground">${l}</span>
+          <span class="font-bold">${member((x.who || {})[k])?.name || "未定"}</span></span>`).join("")}
+      </div>` : ""}
+      ${x.status === "done" ? `<p class="mt-3 rounded-xl bg-surface-muted px-3 py-2 text-sm">${esc(x.body) || "（本文なし）"}</p>` : ""}
+      <div class="mt-3 flex gap-2">
+        ${!ro && x.status === "planned" ? `<button type="button" onclick="openDay('${TODAY}'); openDone()" class="flex-1 rounded-xl border-2 border-emerald-600 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-emerald-950">${svg("check", "mr-1 inline h-4 w-4")}完了して記録にする</button>` : ""}
+        <button type="button" onclick="goOpenDay('${TODAY}')" class="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium transition hover:bg-surface-muted">${x.status === "planned" ? "予定を見る・変える" : "詳しく見る"}</button>
+      </div>
+    </div>`;
+  }
+
+  // 本番の一覧に合わせて record_date → created_at の降順（src/app/(app)/page.tsx）。
+  // 同じ日なら後から作った・後から完了したものが先に来る
+  const recent = ITEMS.filter((y) => y.status === "done")
+    .sort((a, b) => (a.date === b.date ? (b.created || 0) - (a.created || 0) : a.date < b.date ? 1 : -1))
+    .slice(0, 4);
+  $("recentList").innerHTML = recent.length
+    ? recent.map((y) => {
+        const t = type(y.type);
+        return `<li><button type="button" onclick="goOpenDay('${y.date}','${y.id}')" class="flex w-full items-center gap-2 rounded-xl bg-surface px-3 py-2.5 text-left text-sm shadow-sm ring-1 ring-border transition hover:bg-surface-muted">
+          <span class="w-14 shrink-0 text-xs text-muted-foreground">${fmt(y.date).replace("2026年", "")}</span>
+          <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${C[t.color].soft}">${t.emoji}${t.label}</span>
+          <span class="min-w-0 flex-1 truncate">${esc(y.body) || "（本文なし）"}</span>
+          ${y.photos ? `<span class="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground">${svg("camera", "h-3.5 w-3.5")}${y.photos}</span>` : ""}
+        </button></li>`;
+      }).join("")
+    : `<li class="rounded-xl bg-surface-muted px-3 py-2.5 text-sm text-muted-foreground">まだ記録がありません。</li>`;
+}
+
+// ───────── 毎週の予定ルール ─────────
+function renderRules() {
+  const order = [0, 1, 2, 3, 4, 5, 6];
+  const ro = isViewer();
+  $("ruleReadonly").classList.toggle("hidden", !ro);
+  const WD = ["日", "月", "火", "水", "木", "金", "土"];
+  let h = `<tr class="border-b border-border"><th scope="row" class="py-2 text-xs font-medium text-muted-foreground">予定</th>`;
+  h += order.map((w) => {
+    const r = latestRule(w);
+    return `<td class="py-1"><button type="button" data-rule="type-${w}" aria-label="${WD[w]}曜の予定 ${r ? type(r.type).label : "なし"}" ${ro ? "disabled" : ""} onclick="keepRuleFocus(() => cycleRule(${w}))"
+      class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg text-xl transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"} ${r ? "bg-surface-muted" : "text-muted-foreground"}">${r ? type(r.type).emoji : "－"}</button></td>`;
+  }).join("") + `</tr>`;
+  h += `<tr class="border-b border-border"><th scope="row" class="py-2 text-xs font-medium text-muted-foreground">時間</th>` +
+    order.map((w) => {
+      const r = latestRule(w);
+      return `<td class="py-1 text-[10px] tabular-nums text-muted-foreground">${r ? `${r.start}<br>${r.end}` : "·"}</td>`;
+    }).join("") + `</tr>`;
+  // care の呼び名は種類ごとに違う（おうち=みる人 / 通院=連れて行く）ので、
+  // 曜日をまたぐこの行では総称にする
+  for (const [key, label] of [["drop", "送り"], ["pick", "お迎え"], ["care", "担当"]]) {
+    if (!order.some((w) => latestRule(w) && type(latestRule(w).type).roles.some(([k]) => k === key))) continue;
+    h += `<tr class="border-b border-border last:border-0"><th scope="row" class="py-2 text-xs font-medium text-muted-foreground">${label}</th>`;
+    h += order.map((w) => {
+      const r = latestRule(w);
+      const okRole = r && type(r.type).roles.some(([k]) => k === key);
+      if (!okRole) return `<td class="py-1 text-xs text-muted-foreground">·</td>`;
+      return `<td class="py-1"><button type="button" data-rule="who-${w}-${key}" aria-label="${WD[w]}曜の${label} ${member((r.who || {})[key])?.name || "未定"}" ${ro ? "disabled" : ""} onclick="keepRuleFocus(() => cycleWho(${w},'${key}'))"
+        class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg transition ${ro ? "cursor-default opacity-50" : "hover:bg-surface-muted"}">${avatar((r.who || {})[key])}</button></td>`;
+    }).join("") + `</tr>`;
+  }
+  $("ruleTable").innerHTML = h;
+
+  // 日の編集・週の一括入力と同じく、未連携の人を担当にしたら連携に誘う
+  const un = [...new Set(order.flatMap((w) => {
+    const r = latestRule(w);
+    if (!r) return [];
+    return type(r.type).roles.map(([k]) => (r.who || {})[k]).filter(Boolean);
+  }))].map(member).filter((m) => m && m.link !== "linked");
+  $("ruleUnlinked").classList.toggle("hidden", ro || un.length === 0);
+  if (un.length && !ro) $("ruleUnlinked").innerHTML = unlinkedNotice(un);
+
+  const active = Object.keys(RULES).filter((w) => latestRule(w));
+  $("ruleSummary").textContent = active.length
+    ? active.map((w) => `${WD[w]}=${type(latestRule(w).type).label}`).join(" / ")
+    : "まだ設定していません";
+  $("familySummary").textContent =
+    `${MEMBERS.filter((m) => m.link === "linked").length} 人が連携済み・${MEMBERS.filter((m) => m.link !== "linked").length} 人が未連携`;
+}
+// ルール表は innerHTML を作り直すので、押したボタンと同じ場所へフォーカスを戻す
+// （戻さないと 1 回押すたびに body へ落ち、種類の切替が事実上使えない）
+function keepRuleFocus(fn) {
+  const key = document.activeElement?.dataset?.rule || null;
+  fn();
+  if (key) document.querySelector(`[data-rule="${key}"]`)?.focus({ preventScroll: true });
+}
+function cycleRule(w) {
+  const cycle = [...TYPES.map((t) => t.id), null];
+  const lv = latestVersion(w);
+  const next = cycle[(cycle.indexOf(lv ? lv.type : null) + 1) % cycle.length];
+  if (next === null) {
+    if (!lv) return;
+    // 「今日以降なし」と伝える以上、墓標は今日から効かせる。
+    // 今日より後から始まる版が残っていると、墓標のあとで復活してしまうので畳む
+    RULES[w] = versionsOf(w).filter((r) => !r.since || r.since <= TODAY);
+    putRuleVersion(w, { type: null, since: TODAY });
+    render();
+    toast("今日以降、この曜日のルールを外しました");
+    return;
+  }
+  const t = type(next);
+  const keep = {};
+  for (const [k] of t.roles) if (lv?.who?.[k]) keep[k] = lv.who[k];
+  // 時刻は「触ったかどうか」を旗で持つ。既定値との一致で推測すると、
+  // たまたま別の種類の既定と同じ時刻にしたときに勝手に上書きされる
+  // 今日から効く版として積む。画面に日付の指定が無い以上、編集は「今日から」で
+  // なければ表示と食い違う。今日より後から始まる版は畳む（「なし」と同じ扱い）
+  RULES[w] = versionsOf(w).filter((r) => !r.since || r.since <= TODAY);
+  putRuleVersion(w, {
+    type: next, who: keep,
+    start: lv && lv.timeDirty ? lv.start : t.start,
+    end: lv && lv.timeDirty ? lv.end : t.end,
+    since: TODAY,
+    timeDirty: !!(lv && lv.timeDirty),
+  });
+  render();
+}
+function cycleWho(w, key) {
+  const r = editableRule(w);
+  if (!r) return;
+  const ids = [...MEMBERS.map((m) => m.id), null];
+  r.who = r.who || {};
+  const cur = r.who[key] || null;
+  r.who[key] = ids[(ids.indexOf(cur) + 1) % ids.length];
+  render();
+}
+
+// ───────── 世帯の設定 ─────────
+// プロトの viewer トグルは「いま自分が viewer である」状態。
+// 一覧やメニューの役割表示もそれに合わせないと、権限の確認にならない
+function myRole() { return isViewer() ? "viewer" : "owner"; }
+function renderFamily() {
+  const ro = isViewer();
+  $("meRole").textContent = `わが家（${ROLE_LABEL[myRole()]}）`;
+  $("familyInvite").classList.toggle("hidden", ro);
+  $("familyReadonly").classList.toggle("hidden", !ro);
+  $("familyList").innerHTML = MEMBERS.map((m) => {
+    const linked = m.link === "linked";
+    return `<li class="flex items-center gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border">
+      ${avatar(m.id)}
+      <span class="min-w-0 flex-1">
+        <span class="block truncate font-medium">${m.name}</span>
+        <span class="block truncate text-xs ${linked ? "text-muted-foreground" : "text-primary"}">${LINK_LABEL[m.link]}${linked && m.role ? "・" + ROLE_LABEL[m.id === "m1" ? myRole() : m.role] : ""}${m.id === "m1" ? "（自分）" : ""}</span>
+      </span>
+      ${linked || ro ? "" : `<button type="button" onclick="openInvite('${m.id}')" class="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-surface-muted">${m.link === "invited" ? "再送" : "招待"}</button>`}
+    </li>`;
+  }).join("");
+}
+
+// ───────── シート開閉 ─────────
+let QR = { chips: [], source: "home", note: "", noteOpen: false };
+function renderQuick() {
+  $("qrBody").innerHTML = `
+    <div role="radiogroup" aria-label="記録元" class="grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1 text-sm">
+      ${[["home", "おうち"], ["daycare", "保育園"]].map(([id, label]) =>
+        `<button type="button" role="radio" data-qr-source="${id}" aria-checked="${QR.source === id}" onclick="setQuickSource('${id}')"
+          class="rounded-lg py-1.5 font-medium transition ${QR.source === id ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground"}">${label}</button>`).join("")}
+    </div>
+    <div class="flex flex-wrap gap-2">
+      ${CHIPS.map((c) => {
+        const on = QR.chips.includes(c);
+        return `<button type="button" data-qrchip="${c}" onclick="qrChip('${c}')" aria-pressed="${on}"
+          class="rounded-full border px-3 py-1.5 text-sm transition ${on ? "border-primary bg-primary/10 font-bold text-primary" : "border-border hover:bg-surface-muted"}">${c}</button>`;
+      }).join("")}
+    </div>
+    ${QR.noteOpen
+      ? `<input id="qrNote" value="${esc(QR.note)}" oninput="QR.note = this.value; qrPreview()" placeholder="ひとこと（任意）"
+          class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-base" />`
+      : `<button type="button" onclick="QR.noteOpen = true; renderQuick(); document.getElementById('qrNote')?.focus()"
+          class="w-full rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground transition hover:bg-surface-muted">＋ ひとことを足す</button>`}
+    <p id="qrPreview" class="rounded-xl bg-surface-muted px-3 py-2.5 text-sm"></p>`;
+  qrPreview();
+}
+function qrBody() {
+  return [...QR.chips, QR.note.trim()].filter(Boolean).join("、");
+}
+function qrPreview() {
+  const body = qrBody();
+  const el = $("qrPreview");
+  if (!el) return;
+  el.textContent = body || "チップを選ぶか、ひとことを書いてください";
+  el.className = "rounded-xl bg-surface-muted px-3 py-2.5 text-sm " + (body ? "" : "text-muted-foreground");
+  // 本番と同じく、内容が空のあいだは保存を押せない
+  const save = $("qrSave");
+  save.disabled = !body;
+  save.className = "mt-3 w-full rounded-xl py-3 text-sm font-bold transition " +
+    (body ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "bg-surface-muted text-muted-foreground");
+}
+function setQuickSource(id) {
+  QR.source = id;
+  renderQuick();
+  // 描き直すとフォーカスが外れる。チップへ進む前に先頭へ戻されないように
+  document.querySelector(`[data-qr-source="${id}"]`)?.focus({ preventScroll: true });
+}
+function qrChip(c) {
+  QR.chips = QR.chips.includes(c) ? QR.chips.filter((x) => x !== c) : [...QR.chips, c];
+  renderQuick();
+  // 描き直すとフォーカスが外れる（完了シートのチップと同じ）
+  document.querySelector(`[data-qrchip="${c}"]`)?.focus({ preventScroll: true });
+}
+// 予定を経ない記録。曜日ルールの予定を置き換えない（overridesRule を付けない）
+function quickSave() {
+  const body = qrBody();
+  if (!body) { toast("チップを選ぶか、ひとことを書いてください"); return; }
+  ITEMS.push({
+    id: "q" + seq++, date: TODAY, type: QR.source,
+    // クイック記録は日付・記録元・本文しか取らない。時刻をでっち上げると
+    // 週表示で「正午に 1 時間」あったことになってしまう
+    untimed: true, start: "", end: "",
+    who: {}, note: "", status: "done", body, chips: [...QR.chips], freeNote: QR.note.trim(),
+    photos: 0, created: seqCreated++,
+    overridesRule: false, // 予定を経ない記録。曜日ルールの予定は残す
+  });
+  QR = { chips: [], source: "home", note: "", noteOpen: false };
+  closeQuick();
+  render();
+  toast("記録しました");
+}
+function openQuick() {
+  rememberTrigger("qrSheet");
+  renderQuick();
+  const x = planOn(TODAY);
+  $("qrTodayPlan").innerHTML = x && x.status === "planned"
+    ? `<button type="button" onclick="closeQuick(); goOpenDay('${TODAY}'); openDone()"
+        class="flex w-full items-center gap-2 rounded-xl border-2 border-emerald-600 px-3 py-2.5 text-left text-sm transition hover:bg-emerald-50 dark:border-emerald-400 dark:hover:bg-emerald-950">
+        <span class="text-lg">${type(x.type).emoji}</span>
+        <span class="min-w-0 flex-1"><b class="font-bold">きょうの予定「${type(x.type).label}」を完了にする</b>
+        <span class="block text-xs text-muted-foreground">担当や時間を引き継いで記録にします</span></span>
+      </button>`
+    : "";
+  $("qrSheet").classList.remove("invisible", "translate-y-full");
+  $("qrBackdrop").classList.remove("pointer-events-none", "opacity-0");
+  syncScrollLock();
+  focusSheet("qrSheet");
+}
+function closeQuick() {
+  $("qrSheet").classList.add("invisible", "translate-y-full");
+  $("qrBackdrop").classList.add("pointer-events-none", "opacity-0");
+  syncScrollLock();
+  restoreTrigger("qrSheet");
+}
+// 今日がもう記録ずみ／見送りなら、その日の編集ではなく次に予定を入れられる日を開く
+// 「予定を入れる」なので、予定がまだ無い日を返す。
+// すでに予定がある日を返すと、追加のつもりが既存の予定の編集になってしまう
+function nextOpenDay() {
+  for (let d = dayNum(TODAY); d <= 31; d++) {
+    const ds = `2026-08-${String(d).padStart(2, "0")}`;
+    if (!planOn(ds)) return ds;
+  }
+  return null;
+}
+function openNextFreeDay() {
+  go("calendar");
+  const ds = nextOpenDay();
+  if (!ds) { toast("この先の日はすべて予定が入っています。日付をタップして編集してください"); return; }
+  openDay(ds);
+  if (ds !== TODAY) toast(`${fmt(ds)}を開きました`);
+}
+function openInvite(memberId) {
+  if (isViewer()) return;
+  rememberTrigger("invSheet");
+  const m = memberId ? member(memberId) : null;
+  $("invTitle").textContent = m ? `${m.name} を招待する` : "家族を招待する";
+  $("invBody").textContent = m
+    ? `このリンクを ${m.name} に送ると、Google アカウントでログインして世帯に加われます。連携後は担当になった日が ${m.name} のカレンダーにも出ます。`
+    : "このリンクを送ると、Google アカウントでログインして世帯に加われます。";
+  $("inviteUrl").textContent = INVITE_URL;
+  $("invSheet").classList.remove("invisible", "translate-y-full");
+  $("invBackdrop").classList.remove("pointer-events-none", "opacity-0");
+  syncScrollLock();
+  focusSheet("invSheet");
+}
+const INVITE_URL = "https://mfmf.app/invite/8f3a1d2e4b6c9a70c1";
+async function copyInvite() {
+  try {
+    await navigator.clipboard.writeText(INVITE_URL);
+    toast("招待リンクをコピーしました");
+  } catch {
+    // iframe や権限で弾かれることがある。成功したふりをしない
+    toast("コピーできませんでした。下のリンクを長押しして選んでください");
+  }
+}
+function closeInvite() {
+  $("invSheet").classList.add("invisible", "translate-y-full");
+  $("invBackdrop").classList.add("pointer-events-none", "opacity-0");
+  syncScrollLock();
+  restoreTrigger("invSheet");
+}
+
+function render() {
+  renderTabs();
+  $("tabMonth").className = "rounded-lg py-1.5 font-medium transition " + (calView === "month" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground");
+  $("tabWeek").className = "rounded-lg py-1.5 font-medium transition " + (calView === "week" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground");
+  $("tabMonth").setAttribute("aria-selected", String(calView === "month"));
+  $("tabWeek").setAttribute("aria-selected", String(calView === "week"));
+  $("calMonth").classList.toggle("hidden", calView !== "month");
+  $("calWeek").classList.toggle("hidden", calView !== "week");
+  renderMonth();
+  renderWeek();
+  renderHome();
+  renderRules();
+  renderFamily();
+  if (openDate) renderSheet();
+  document.querySelectorAll("[data-lucide]").forEach((el) => {
+    if (el.dataset.done) return;
+    el.innerHTML = svg(el.dataset.lucide, "h-5 w-5");
+    el.dataset.done = "1";
+  });
+}
+// Artifact は publish 時に <html> を組み立てるので、こちらから指定できるのは実行時だけ。
+// 指定しないと、端末の既定言語で日本語が読み上げられる
+document.documentElement.lang = "ja";
+go("calendar");
+</script>

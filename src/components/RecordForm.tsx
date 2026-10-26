@@ -12,10 +12,20 @@ import {
 } from "@/components/FormConfirm";
 import {
   PHOTO_BUCKET,
+  QUICK_SOURCES,
   RECORD_SOURCES,
   SOURCE_LABEL,
   type RecordSource,
 } from "@/types/database";
+
+// 本文の見出し。種類ごとの言い回しに合わせる（「その他での記録」は不自然）
+const BODY_LABEL: Record<RecordSource, string> = {
+  daycare: "保育園からの記録",
+  home: "おうちでの記録",
+  clinic: "病院での記録",
+  salon: "サロンでの記録",
+  other: "この日の記録",
+};
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -79,6 +89,14 @@ export default function RecordForm({
   // この経路を消すか明示的に失敗させるかは未決（PR #127 の判断待ち項目）。
   const storageScopeId = householdId ?? ownerId;
   const [source, setSource] = useState<RecordSource>(defaultSource);
+  // 記録元の選択肢。ふだんは「保育園 / おうち」の 2 つだけ出すが、予定から
+  // できた記録（病院・サロン・その他）を編集するときは全部出す ——
+  // 2 つに絞ると、いま入っている種類が選べず、一度触ると戻せなくなる
+  const sourceChoices = useMemo(
+    () =>
+      QUICK_SOURCES.includes(defaultSource) ? QUICK_SOURCES : RECORD_SOURCES,
+    [defaultSource],
+  );
 
   const formRef = useRef<HTMLFormElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -223,7 +241,7 @@ export default function RecordForm({
         </span>
         <input type="hidden" name="source" value={source} />
         <div className="inline-flex rounded-lg border border-border p-0.5">
-          {RECORD_SOURCES.map((s) => (
+          {sourceChoices.map((s) => (
             <button
               key={s}
               type="button"
@@ -298,7 +316,9 @@ export default function RecordForm({
             name="author"
             type="text"
             defaultValue={defaultAuthor}
-            placeholder={source === "home" ? "おかあさん など" : "担当スタッフ名"}
+            placeholder={
+              source === "daycare" ? "担当スタッフ名" : "おかあさん など"
+            }
             className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
           />
         </div>
@@ -356,7 +376,7 @@ export default function RecordForm({
           htmlFor="body"
           className="mb-1 block text-sm font-medium text-foreground"
         >
-          {source === "home" ? "おうちでの記録" : "保育園からの記録"}
+          {BODY_LABEL[source]}
         </label>
         <textarea
           ref={bodyRef}

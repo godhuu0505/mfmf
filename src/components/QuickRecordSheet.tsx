@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { jstTodayISO } from "@/lib/dateRange";
 import { saveQuickDraft } from "@/lib/quickDraft";
-import type { RecordSource } from "@/types/database";
+import {
+  SOURCE_EMOJI,
+  type AssigneeRole,
+  type RecordSource,
+} from "@/types/database";
+import { completePlan } from "@/app/(app)/schedule/actions";
 
 // クイック記録の定型チップ（proto/quick-record 合意時の語彙 / D32）。
 // タップで選んだ順に「、」で繋がって本文になる。IME を開かずに 1 件残せる。
@@ -39,12 +44,31 @@ type Props = {
   householdId: string;
   /** プロフィールの既定記入者（画面には出さない） */
   defaultAuthor: string;
+  /**
+   * きょうの未完了の予定（D34）。あるときだけ、シートの先頭に
+   * 「完了して記録にする」を出す（種類・時刻・担当を引き継ぐので入力が要らない）。
+   */
+  todayPlan?: {
+    recordId: string; // ルール由来はまだ行が無いので空文字
+    /** ルール由来を完了するときに作る行の id（押し直しても増やさない） */
+    draftId: string;
+    /** どの子の予定か（2 頭以上の世帯で取り違えないように出す） */
+    petName?: string | null;
+    date: string;
+    source: RecordSource;
+    label: string;
+    start: string | null;
+    end: string | null;
+    body: string;
+    who: Partial<Record<AssigneeRole, string>>;
+  } | null;
 };
 
 export default function QuickRecordSheet({
   action,
   householdId,
   defaultAuthor,
+  todayPlan = null,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -67,7 +91,9 @@ export default function QuickRecordSheet({
   // シート表示中は背景（[data-quick-record-bg]）を inert にして
   // Tab / 支援技術がモーダルの外へ出ないようにする（FAB 自身も対象）。
   useEffect(() => {
-    const els = document.querySelectorAll<HTMLElement>("[data-quick-record-bg]");
+    const els = document.querySelectorAll<HTMLElement>(
+      "[data-quick-record-bg]",
+    );
     els.forEach((el) => {
       el.inert = open;
     });
@@ -119,7 +145,9 @@ export default function QuickRecordSheet({
     setError(null);
     setOpen(true);
     // 開いた直後はダイアログ自体へフォーカス（IME は開かない）
-    requestAnimationFrame(() => sheetRef.current?.focus({ preventScroll: true }));
+    requestAnimationFrame(() =>
+      sheetRef.current?.focus({ preventScroll: true }),
+    );
   }
 
   function closeSheet() {
@@ -187,6 +215,24 @@ export default function QuickRecordSheet({
     });
   }
 
+  /**
+   * きょうの予定を完了にする。**成功してから閉じる** ——
+   * 先に閉じると、失敗したときに完了したように見えて、やり直す手がかりも消える。
+   */
+  function completeToday(fd: FormData) {
+    if (isPending) return;
+    startTransition(async () => {
+      try {
+        await completePlan(fd);
+      } catch {
+        setError("完了にできませんでした。時間をおいて再度お試しください。");
+        return;
+      }
+      closeSheet();
+      resetSheet();
+    });
+  }
+
   return (
     <>
       {/* 入口はタブバー中央の「＋」（AppTabBar → mfmf:quick-record-open イベント）。
@@ -222,7 +268,9 @@ export default function QuickRecordSheet({
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted" />
 
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-bold text-foreground">クイック記録</h2>
+            <h2 className="text-base font-bold text-foreground">
+              クイック記録
+            </h2>
             <div className="flex items-center gap-2">
               <p className="text-sm text-muted-foreground">
                 {open ? formatToday() : ""}
@@ -246,6 +294,67 @@ export default function QuickRecordSheet({
             >
               {error}
             </p>
+          )}
+
+          {/* きょうの予定があるときだけ。無ければ今までどおり（2 タップのまま） */}
+          {todayPlan && (
+            <form action={completeToday} className="mb-3">
+              {/* 近道は描画時点の写し。保存済みの行に対しては状態だけ進める */}
+              <input type="hidden" name="shortcut" value="1" />
+              <input
+                type="hidden"
+                name="record_id"
+                value={todayPlan.recordId}
+              />
+              {!todayPlan.recordId && (
+                <input
+                  type="hidden"
+                  name="draft_id"
+                  value={todayPlan.draftId}
+                />
+              )}
+              <input type="hidden" name="record_date" value={todayPlan.date} />
+              <input type="hidden" name="source" value={todayPlan.source} />
+              <input
+                type="hidden"
+                name="start_time"
+                value={todayPlan.start ?? ""}
+              />
+              <input
+                type="hidden"
+                name="end_time"
+                value={todayPlan.end ?? ""}
+              />
+              <input type="hidden" name="body" value={todayPlan.body} />
+              <input type="hidden" name="household_id" value={householdId} />
+              {(["drop", "pick", "care"] as AssigneeRole[]).map((role) => (
+                <input
+                  key={role}
+                  type="hidden"
+                  name={`who_${role}`}
+                  value={todayPlan.who[role] ?? ""}
+                />
+              ))}
+              <button
+                type="submit"
+                disabled={isPending}
+                className="flex w-full items-center gap-2 rounded-xl border-2 border-emerald-600 px-3 py-2.5 text-left text-sm transition hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-400 dark:hover:bg-emerald-950"
+              >
+                <span className="text-lg" aria-hidden="true">
+                  {SOURCE_EMOJI[todayPlan.source]}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <b className="font-bold">
+                    きょうの予定「{todayPlan.label}
+                    {todayPlan.petName ? `・${todayPlan.petName}` : ""}
+                    」を完了にする
+                  </b>
+                  <span className="block text-xs text-muted-foreground">
+                    担当や時間を引き継いで記録にします
+                  </span>
+                </span>
+              </button>
+            </form>
           )}
 
           {/* どこでのできごとか（既定: おうち） */}
@@ -307,7 +416,10 @@ export default function QuickRecordSheet({
           )}
 
           {/* 定型チップ */}
-          <div className="mb-4 flex flex-wrap gap-2" aria-label="定型のできごと">
+          <div
+            className="mb-4 flex flex-wrap gap-2"
+            aria-label="定型のできごと"
+          >
             {CHIPS.map((chip) => {
               const active = selected.includes(chip);
               return (

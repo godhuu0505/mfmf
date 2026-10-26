@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, CircleHelp, PawPrint, Scale, Users } from "lucide-react";
+import { ChevronRight, CircleHelp, PawPrint, Scale, Users,
+  Repeat,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership, type HouseholdRole } from "@/lib/household";
 import { hasActiveGuestGrant } from "@/lib/guest";
@@ -101,6 +103,15 @@ export default async function MenuPage() {
           <Link href="/weight" className={rowClass}>
             <Scale className={iconClass} aria-hidden="true" />
             体重の推移
+            {chevron}
+          </Link>
+        </div>
+
+        {/* 予定 */}
+        <div className="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border">
+          <Link href="/schedule/rules" className={rowClass}>
+            <Repeat className={iconClass} aria-hidden="true" />
+            毎週の予定ルール
             {chevron}
           </Link>
         </div>

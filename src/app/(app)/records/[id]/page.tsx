@@ -11,6 +11,7 @@ import {
   type DaycareRecord,
   type RecordPhoto,
   type RecordTagJoin,
+  SOURCE_BADGE,
 } from "@/types/database";
 import RecordForm from "@/components/RecordForm";
 import RecordActionsSheet from "@/components/RecordActionsSheet";
@@ -91,9 +92,11 @@ export default async function RecordDetailPage({
   // id を最終タイブレークにして、同時刻の記録同士でも必ず隣が決まるようにする。
   const d = record.record_date;
   const t = record.created_at;
+  // 前後の移動は記録どうしをつなぐ（予定・見送りは飛ばす）
   let prevQuery = supabase
     .from("daycare_records")
     .select("id, record_date")
+    .eq("status", "done")
     .or(
       `record_date.lt.${d},and(record_date.eq.${d},created_at.lt.${t}),and(record_date.eq.${d},created_at.eq.${t},id.lt.${record.id})`,
     )
@@ -104,6 +107,7 @@ export default async function RecordDetailPage({
   let nextQuery = supabase
     .from("daycare_records")
     .select("id, record_date")
+    .eq("status", "done")
     .or(
       `record_date.gt.${d},and(record_date.eq.${d},created_at.gt.${t}),and(record_date.eq.${d},created_at.eq.${t},id.gt.${record.id})`,
     )
@@ -189,9 +193,7 @@ export default async function RecordDetailPage({
                   <span
                     className={
                       "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium " +
-                      (record.source === "home"
-                        ? "bg-amber-100 text-amber-900"
-                        : "bg-sky-100 text-sky-900")
+                      SOURCE_BADGE[record.source]
                     }
                   >
                     <SourceIcon source={record.source} className="h-3.5 w-3.5" />

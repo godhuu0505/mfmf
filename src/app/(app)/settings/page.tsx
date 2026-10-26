@@ -73,9 +73,11 @@ export default async function SettingsPage() {
     email: string | null;
     display_name: string | null;
   }[];
-  const householdData = household as
-    | { id: string; name: string; avatar_path: string | null }
-    | null;
+  const householdData = household as {
+    id: string;
+    name: string;
+    avatar_path: string | null;
+  } | null;
   const householdAvatarUrl = await createAvatarSignedUrl(
     householdData?.avatar_path ?? null,
   );
@@ -87,7 +89,9 @@ export default async function SettingsPage() {
       ? await Promise.all([
           supabase
             .from("household_invites")
-            .select("id, email, role, token, expires_at, accepted_at, revoked_at")
+            .select(
+              "id, email, role, token, expires_at, accepted_at, revoked_at",
+            )
             .eq("household_id", membership.householdId)
             .order("created_at", { ascending: false })
             .limit(20),
@@ -125,10 +129,19 @@ export default async function SettingsPage() {
           .select("id", { count: "exact", head: true })
           .eq("household_id", membership.householdId)
       : { count: 0 };
+  // 毎週の予定ルールも「データあり」に数える（RPC 側のガードと揃える）
+  const { count: ruleCount } =
+    membership && isOwner
+      ? await supabase
+          .from("schedule_rules")
+          .select("id", { count: "exact", head: true })
+          .eq("household_id", membership.householdId)
+      : { count: 0 };
   const householdEmpty =
     isOwner &&
     (householdPets?.length ?? 0) === 0 &&
     (recordCount ?? 0) === 0 &&
+    (ruleCount ?? 0) === 0 &&
     (invites?.length ?? 0) === 0 &&
     guestRows.length === 0;
 
@@ -193,167 +206,177 @@ export default async function SettingsPage() {
           {/* 世帯（household）: 名前・メンバー・ロール（Phase 3.5 S2） */}
           {membership && (
             <>
-            <section className="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
-              <div>
-                <h2 className="text-base font-bold text-foreground">世帯</h2>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  記録・写真・ペットは世帯のメンバーで共有されます。あなたのロール:{" "}
-                  {ROLE_LABEL[membership.role] ?? membership.role}
-                </p>
-              </div>
+              <section className="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+                <div>
+                  <h2 className="text-base font-bold text-foreground">世帯</h2>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    記録・写真・ペットは世帯のメンバーで共有されます。あなたのロール:{" "}
+                    {ROLE_LABEL[membership.role] ?? membership.role}
+                  </p>
+                </div>
 
-              {memberships.length > 1 && (
+                {memberships.length > 1 && (
+                  <div>
+                    <h3 className="mb-2 text-sm font-medium text-foreground">
+                      世帯を切り替え（UC-H08）
+                    </h3>
+                    <ul className="space-y-2">
+                      {memberships.map((m) => (
+                        <li
+                          key={m.householdId}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-muted px-3 py-2 text-sm"
+                        >
+                          <span className="text-foreground">
+                            {m.householdName || "（名前未設定の世帯）"} ・{" "}
+                            {m.role}
+                            {m.householdId === membership.householdId
+                              ? "（表示中）"
+                              : ""}
+                          </span>
+                          {m.householdId !== membership.householdId && (
+                            <SwitchHouseholdButton
+                              householdId={m.householdId}
+                              className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+                            >
+                              この世帯を表示
+                            </SwitchHouseholdButton>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {isOwner ? (
+                  <form
+                    action={renameHousehold.bind(null, membership.householdId)}
+                    className="flex items-end gap-2"
+                  >
+                    <div className="flex-1">
+                      <label
+                        htmlFor="household_name"
+                        className="mb-1 block text-sm font-medium text-foreground"
+                      >
+                        世帯の名前
+                      </label>
+                      <input
+                        id="household_name"
+                        name="household_name"
+                        type="text"
+                        defaultValue={household?.name ?? ""}
+                        placeholder="例: うちの家族"
+                        className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
+                      />
+                    </div>
+                    <SubmitButton
+                      pendingLabel="保存中…"
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
+                    >
+                      保存
+                    </SubmitButton>
+                  </form>
+                ) : (
+                  <p className="rounded-lg bg-surface-muted px-3 py-2 text-sm text-foreground">
+                    世帯の名前: {household?.name || "（未設定）"}
+                  </p>
+                )}
+
+                {/* 世帯のアバター画像（owner のみ変更可・世帯で共有） */}
+                <AvatarUploader
+                  scopeId={membership.householdId}
+                  currentUrl={householdAvatarUrl}
+                  action={updateHouseholdAvatar.bind(
+                    null,
+                    membership.householdId,
+                  )}
+                  alt="世帯のアバター"
+                  label="世帯の画像"
+                  disabled={!isOwner}
+                />
+
                 <div>
                   <h3 className="mb-2 text-sm font-medium text-foreground">
-                    世帯を切り替え（UC-H08）
+                    メンバー
                   </h3>
                   <ul className="space-y-2">
-                    {memberships.map((m) => (
+                    {memberRows.map((m) => (
                       <li
-                        key={m.householdId}
+                        key={m.user_id}
                         className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-muted px-3 py-2 text-sm"
                       >
                         <span className="text-foreground">
-                          {m.householdName || "（名前未設定の世帯）"} ・ {m.role}
-                          {m.householdId === membership.householdId
-                            ? "（表示中）"
-                            : ""}
+                          {m.display_name ||
+                            m.email ||
+                            `メンバー ${m.user_id.slice(0, 8)}…`}
+                          {m.user_id === user.id ? "（自分）" : ""}
                         </span>
-                        {m.householdId !== membership.householdId && (
-                          <SwitchHouseholdButton
-                            householdId={m.householdId}
-                            className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
-                          >
-                            この世帯を表示
-                          </SwitchHouseholdButton>
+                        {isOwner && m.user_id !== user.id ? (
+                          <div className="flex items-center gap-2">
+                            <form
+                              action={updateMemberRole.bind(
+                                null,
+                                membership.householdId,
+                                m.user_id,
+                              )}
+                              className="flex items-center gap-2"
+                            >
+                              <select
+                                name="role"
+                                defaultValue={m.role}
+                                className="rounded-lg border border-border px-2 py-1 text-sm text-foreground"
+                              >
+                                <option value="owner">owner</option>
+                                <option value="editor">editor</option>
+                                <option value="viewer">viewer</option>
+                              </select>
+                              <SubmitButton
+                                pendingLabel="変更中…"
+                                className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+                              >
+                                変更
+                              </SubmitButton>
+                            </form>
+                            <form
+                              action={removeMember.bind(
+                                null,
+                                membership.householdId,
+                                m.user_id,
+                              )}
+                            >
+                              <SubmitButton
+                                pendingLabel="削除中…"
+                                className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
+                              >
+                                削除
+                              </SubmitButton>
+                            </form>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {m.role}
+                          </span>
                         )}
                       </li>
                     ))}
                   </ul>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    削除・退出しても、その人が書いた記録は世帯に残ります。
+                    世帯には最低 1 人の owner が必要です（最後の owner
+                    は降格・退出できません）。
+                  </p>
+                  <form
+                    action={leaveHousehold.bind(null, membership.householdId)}
+                    className="mt-3"
+                  >
+                    <SubmitButton
+                      pendingLabel="退出中…"
+                      className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
+                    >
+                      この世帯から退出する
+                    </SubmitButton>
+                  </form>
                 </div>
-              )}
-
-              {isOwner ? (
-                <form
-                  action={renameHousehold.bind(null, membership.householdId)}
-                  className="flex items-end gap-2"
-                >
-                  <div className="flex-1">
-                    <label
-                      htmlFor="household_name"
-                      className="mb-1 block text-sm font-medium text-foreground"
-                    >
-                      世帯の名前
-                    </label>
-                    <input
-                      id="household_name"
-                      name="household_name"
-                      type="text"
-                      defaultValue={household?.name ?? ""}
-                      placeholder="例: うちの家族"
-                      className="w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground"
-                    />
-                  </div>
-                  <SubmitButton
-                    pendingLabel="保存中…"
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-60"
-                  >
-                    保存
-                  </SubmitButton>
-                </form>
-              ) : (
-                <p className="rounded-lg bg-surface-muted px-3 py-2 text-sm text-foreground">
-                  世帯の名前: {household?.name || "（未設定）"}
-                </p>
-              )}
-
-              {/* 世帯のアバター画像（owner のみ変更可・世帯で共有） */}
-              <AvatarUploader
-                scopeId={membership.householdId}
-                currentUrl={householdAvatarUrl}
-                action={updateHouseholdAvatar.bind(null, membership.householdId)}
-                alt="世帯のアバター"
-                label="世帯の画像"
-                disabled={!isOwner}
-              />
-
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-foreground">メンバー</h3>
-                <ul className="space-y-2">
-                  {memberRows.map((m) => (
-                    <li
-                      key={m.user_id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-muted px-3 py-2 text-sm"
-                    >
-                      <span className="text-foreground">
-                        {m.display_name || m.email || `メンバー ${m.user_id.slice(0, 8)}…`}
-                        {m.user_id === user.id ? "（自分）" : ""}
-                      </span>
-                      {isOwner && m.user_id !== user.id ? (
-                        <div className="flex items-center gap-2">
-                          <form
-                            action={updateMemberRole.bind(
-                              null,
-                              membership.householdId,
-                              m.user_id,
-                            )}
-                            className="flex items-center gap-2"
-                          >
-                            <select
-                              name="role"
-                              defaultValue={m.role}
-                              className="rounded-lg border border-border px-2 py-1 text-sm text-foreground"
-                            >
-                              <option value="owner">owner</option>
-                              <option value="editor">editor</option>
-                              <option value="viewer">viewer</option>
-                            </select>
-                            <SubmitButton
-                              pendingLabel="変更中…"
-                              className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
-                            >
-                              変更
-                            </SubmitButton>
-                          </form>
-                          <form
-                            action={removeMember.bind(
-                              null,
-                              membership.householdId,
-                              m.user_id,
-                            )}
-                          >
-                            <SubmitButton
-                              pendingLabel="削除中…"
-                              className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
-                            >
-                              削除
-                            </SubmitButton>
-                          </form>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">{m.role}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  削除・退出しても、その人が書いた記録は世帯に残ります。
-                  世帯には最低 1 人の owner が必要です（最後の owner は降格・退出できません）。
-                </p>
-                <form
-                  action={leaveHousehold.bind(null, membership.householdId)}
-                  className="mt-3"
-                >
-                  <SubmitButton
-                    pendingLabel="退出中…"
-                    className="text-xs text-red-600 transition hover:text-red-800 disabled:opacity-60"
-                  >
-                    この世帯から退出する
-                  </SubmitButton>
-                </form>
-              </div>
-
-            </section>
+              </section>
 
               {/* 招待（owner のみ / UC-O09〜O11。宛先メール固定 D12）。
                   機能別のカードに分割（D33） */}
@@ -407,7 +430,8 @@ export default async function SettingsPage() {
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="text-foreground">
-                              {inv.email}（{SHORT_ROLE_LABEL[inv.role] ?? inv.role}） ・{" "}
+                              {inv.email}（
+                              {SHORT_ROLE_LABEL[inv.role] ?? inv.role}） ・{" "}
                               {inviteStatus(inv)}
                             </span>
                             {inviteStatus(inv) === "有効" && (
@@ -449,7 +473,8 @@ export default async function SettingsPage() {
                     外部ゲスト（保育園・シッター）
                   </h2>
                   <p className="mb-2 text-xs text-muted-foreground">
-                    対象のペット 1 匹と期間を限定して招待します。ゲストに見えるのは
+                    対象のペット 1
+                    匹と期間を限定して招待します。ゲストに見えるのは
                     担当ペットのプロフィールと、期間内の「ゲストに共有」した記録・
                     ゲスト自身の記入だけです（写真・他のペット・世帯情報は見えません）。
                   </p>
@@ -460,7 +485,10 @@ export default async function SettingsPage() {
                     </p>
                   ) : (
                     <form
-                      action={createGuestInvite.bind(null, membership.householdId)}
+                      action={createGuestInvite.bind(
+                        null,
+                        membership.householdId,
+                      )}
                       className="flex flex-wrap items-end gap-2"
                     >
                       <div className="flex-1 min-w-[12rem]">
@@ -563,9 +591,9 @@ export default async function SettingsPage() {
                           <span className="text-foreground">
                             {g.email ?? `ゲスト ${g.user_id.slice(0, 8)}…`}（
                             {SHORT_ROLE_LABEL[g.role] ?? g.role} /{" "}
-                            {petNameById.get(g.scope_pet_id) ?? "不明なペット"}） ・{" "}
-                            {g.valid_from} 〜 {g.valid_to ?? "失効まで"} ・{" "}
-                            {guestStatus(g)}
+                            {petNameById.get(g.scope_pet_id) ?? "不明なペット"}
+                            ） ・ {g.valid_from} 〜 {g.valid_to ?? "失効まで"}{" "}
+                            ・ {guestStatus(g)}
                           </span>
                           {!g.revoked_at && (
                             <form
@@ -603,7 +631,10 @@ export default async function SettingsPage() {
                         削除すると元に戻せません。
                       </p>
                       <DeleteHouseholdForm
-                        action={deleteHousehold.bind(null, membership.householdId)}
+                        action={deleteHousehold.bind(
+                          null,
+                          membership.householdId,
+                        )}
                         householdName={household?.name ?? ""}
                       />
                     </>

@@ -1,19 +1,142 @@
 // DB スキーマに対応する型定義 (supabase/migrations/*.sql と同期)
 // 将来 `supabase gen types typescript` で自動生成に置き換え可能。
 
-// 記録元: 保育園 / おうち(両親)
-export type RecordSource = "daycare" | "home";
+// 種類（どう過ごす日か）。もとは「記録元」だったが、予定を持つにあたって
+// 通院・おでかけなどへ広げた（D34）。列名は source のまま。
+export type RecordSource =
+  | "daycare"
+  | "home"
+  | "clinic"
+  | "salon"
+  | "other";
 
-export const RECORD_SOURCES: RecordSource[] = ["daycare", "home"];
+export const RECORD_SOURCES: RecordSource[] = [
+  "daycare",
+  "home",
+  "clinic",
+  "salon",
+  "other",
+];
 
 export const SOURCE_LABEL: Record<RecordSource, string> = {
   daycare: "保育園",
   home: "おうち",
+  clinic: "病院",
+  salon: "サロン",
+  other: "その他",
+};
+
+// バッジの配色。種類が増えたので、非 home をすべて保育園色にしない
+export const SOURCE_BADGE: Record<RecordSource, string> = {
+  daycare: "bg-sky-100 text-sky-900",
+  home: "bg-amber-100 text-amber-900",
+  clinic: "bg-violet-100 text-violet-900",
+  salon: "bg-emerald-100 text-emerald-900",
+  other: "bg-slate-100 text-slate-900",
+};
+
+// クイック記録とゲストの記入で選べる種類。ここは「記録元」の意味のままにする
+// （通院・おでかけは予定から作るものなので、最小の記入経路には出さない）
+export const QUICK_SOURCES: RecordSource[] = ["daycare", "home"];
+
+// 種類ごとの絵文字（プロトで合意した見た目。アイコンは SourceIcon 側）
+export const SOURCE_EMOJI: Record<RecordSource, string> = {
+  daycare: "🏫",
+  home: "🏡",
+  clinic: "🏥",
+  salon: "✂️",
+  other: "📌",
+};
+
+// 種類ごとの既定の時間帯。種類を選んだ時点で入り、手で触るまで追従する
+export const SOURCE_DEFAULT_TIME: Record<
+  RecordSource,
+  { start: string; end: string }
+> = {
+  daycare: { start: "09:00", end: "18:00" },
+  home: { start: "09:00", end: "18:00" },
+  clinic: { start: "09:30", end: "11:00" },
+  salon: { start: "10:00", end: "12:00" },
+  other: { start: "10:00", end: "11:00" },
 };
 
 export function toSource(value: unknown): RecordSource {
-  return value === "home" ? "home" : "daycare";
+  return RECORD_SOURCES.includes(value as RecordSource)
+    ? (value as RecordSource)
+    : "daycare";
 }
+
+// 予定 → 記録のステータス（D34）。同じ行の状態違いとして持つ。
+export const RECORD_STATUSES = ["planned", "done", "skipped"] as const;
+export type RecordStatus = (typeof RECORD_STATUSES)[number];
+
+export const STATUS_LABEL: Record<RecordStatus, string> = {
+  planned: "予定",
+  done: "記録ずみ",
+  skipped: "見送り",
+};
+
+export function toStatus(value: unknown): RecordStatus {
+  return RECORD_STATUSES.includes(value as RecordStatus)
+    ? (value as RecordStatus)
+    : "done";
+}
+
+// 担当の役割。種類ごとに必要なものだけが画面に出る
+export const ASSIGNEE_ROLES = ["drop", "pick", "care"] as const;
+export type AssigneeRole = (typeof ASSIGNEE_ROLES)[number];
+
+export const ASSIGNEE_ROLE_LABEL: Record<AssigneeRole, string> = {
+  drop: "送り",
+  pick: "お迎え",
+  care: "みる人",
+};
+
+// その種類で決める担当（おでかけ・その他は担当なし）
+export const SOURCE_ROLES: Record<RecordSource, AssigneeRole[]> = {
+  daycare: ["drop", "pick"],
+  home: ["care"],
+  clinic: ["care"], // 連れて行く人
+  salon: ["drop", "pick"], // 預けて迎えに行く形は保育園と同じ
+  other: [],
+};
+
+export type RecordAssignee = {
+  record_id: string;
+  role: AssigneeRole;
+  user_id: string;
+  created_at: string;
+};
+
+// 毎週の予定ルール。版（since）で積み、その日に効くのは since がその日以前で最新のもの。
+// kind が null の版は「この日以降はルールなし」を表す墓標。
+export type ScheduleRule = {
+  id: string;
+  household_id: string;
+  weekday: number; // 0=日曜
+  since: string; // YYYY-MM-DD
+  kind: RecordSource | null;
+  start_time: string | null; // HH:MM
+  end_time: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ScheduleRuleAssignee = {
+  rule_id: string;
+  role: AssigneeRole;
+  user_id: string;
+  created_at: string;
+};
+
+// その日だけ曜日ルールを効かせない（打ち消し）
+export type ScheduleRuleSkip = {
+  household_id: string;
+  on_date: string; // YYYY-MM-DD
+  created_by: string;
+  created_at: string;
+};
 
 export type DaycareRecord = {
   id: string;
@@ -21,6 +144,10 @@ export type DaycareRecord = {
   household_id: string; // 所属世帯（NOT NULL・S1 手順6で確定）
   record_date: string; // YYYY-MM-DD
   source: RecordSource;
+  status: RecordStatus; // planned=予定 / done=記録ずみ / skipped=見送り（D34）
+  start_time: string | null; // HH:MM。null は時刻なし。end_time と対
+  end_time: string | null;
+  overrides_rule: boolean; // true ならその日の曜日ルールを隠す
   author: string;
   weight_kg: number | null;
   pet_id: string | null; // 対象ペット。未設定は null（段階導入）
