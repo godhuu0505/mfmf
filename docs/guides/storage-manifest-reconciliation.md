@@ -1,7 +1,8 @@
 # 画像manifestのオフライン照合
 
 [GCP移行前の棚卸し](./gcp-migration-preflight.md)のP2準備として、コピー元・コピー先・DB参照・削除履歴の
-**入力metadataだけ**を比較する。現在は架空fixtureで判定を検証する段階で、本番データの取得手順や移行実行を提供しない。
+**入力metadataだけ**を比較する。このCLI自身は本番データの取得や移行を行わない。
+取得・暗号化保全は別の[運用専用Storageバックアップ](./storage-operator-backup.md)を参照する。
 
 ```bash
 node scripts/gcp/reconcile-storage-manifest.mjs < tests/fixtures/gcp/storage-manifest.synthetic.json
