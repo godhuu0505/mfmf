@@ -85,6 +85,9 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y age
           bash tests/scripts/backup-db.test.sh
+          # The earlier offline-script gate may run before age is installed.
+          # Re-run this focused suite to require the real synthetic encrypt/decrypt round trip.
+          node --test tests/scripts/storage-backup.test.mjs
 
       - name: Test GCP bootstrap and failure handling
         run: python3 tests/scripts/gcp-bootstrap.test.py
@@ -129,6 +132,9 @@ jobs:
       # supabase start でローカルスタックを起動し、supabase/migrations/*.sql を順に適用する。
       - name: Start Supabase (apply migrations)
         run: supabase start
+
+      - name: Validate Storage inventory SQL against local migrated schema
+        run: node tests/scripts/storage-backup-local-sql.mjs
 
       # supabase/tests/**/*.sql を pg_prove で実行。1 つでも失敗すれば exit≠0 でジョブが落ちる。
       - name: Run pgTAP tests

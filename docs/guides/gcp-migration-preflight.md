@@ -69,6 +69,9 @@ P2の次の小単位として、[オフライン画像照合器](./storage-manif
 共通hashがないものは「一致」で通さず、ETagをMD5へ推定変換しない。
 入力metadataの比較だけなので、実データの取得・整合したsnapshot・認可・復元の検証を代替しない。
 実データの採取・copy/sync・delete・掃除は別の手順で、照合器に実行機能はない。
+取得の前段として[運用専用Storageバックアップ](./storage-operator-backup.md)を用意した。
+固定sourceのreadonly inventoryとage暗号化画像保全だけを行い、GCS書込や参照切替は行わない。
+前後metadata一致と復号byte検証を、原子的snapshot・画像復元・切替の合格へ読み替えない。
 
 P3はその後、ローカルの隔離DBでauth互換shim・所有者/ロール・transaction限定claimsと既存pgTAPを検証する単位にする。
 既存Supabase migrationは改変せず、再生可能な別baselineを検討する。
