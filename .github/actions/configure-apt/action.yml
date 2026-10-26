@@ -1,0 +1,26 @@
+name: Configure bounded APT downloads
+description: Prefer Ubuntu's archive and bound retries on ephemeral Ubuntu CI runners.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        # The hosted image puts Azure first. It delivered packages at 46 kB/s in
+        # run 40344423687; the Ubuntu HTTPS fallback completed within seconds.
+        # Keep the image's mirrors, suites, signing keys and package versions.
+        # https://github.com/actions/runner-images/blob/main/images/ubuntu/scripts/build/configure-apt-sources.sh
+        if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+          printf '%s\tpriority:%s\n' \
+            'https://archive.ubuntu.com/ubuntu/' 1 \
+            'http://azure.archive.ubuntu.com/ubuntu/' 2 \
+            'https://security.ubuntu.com/ubuntu/' 3 \
+            | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+        fi
+        # Applies to direct apt-get and Playwright's child apt-get process.
+        # Socket timeouts do not bound a slow stream; install steps also have
+        # a wall-clock limit. No test timeouts or test retries are changed.
+        sudo tee /etc/apt/apt.conf.d/99-mfmf-ci-downloads >/dev/null <<'APT'
+        Acquire::Retries "2";
+        Acquire::http::Timeout "30";
+        Acquire::https::Timeout "30";
+        APT

@@ -62,7 +62,10 @@ export async function resumeProject({
   }
 
   async function servicesHealthy() {
-    const services = await request(`/health?services=${SERVICES.join(",")}&timeout_ms=5000`);
+    // OpenAPI の配列形式（form / explode）。CSV は実 API で HTTP 400 になるため使わない。
+    const query = new URLSearchParams(SERVICES.map((service) => ["services", service]));
+    query.set("timeout_ms", "5000");
+    const services = await request(`/health?${query}`);
     if (!Array.isArray(services) || services.some((service) =>
       !service || typeof service.name !== "string" || !SERVICE_STATUSES.has(service.status))) {
       throw new ResumeError("Supabase API returned an unexpected service health response.");
