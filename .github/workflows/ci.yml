@@ -50,6 +50,9 @@ jobs:
           sudo apt-get update && sudo apt-get install -y age
           bash tests/scripts/backup-db.test.sh
 
+      - name: Test GCP bootstrap and failure handling
+        run: python3 tests/scripts/gcp-bootstrap.test.py
+
       - name: Build
         # NEXT_PUBLIC_* はブラウザ公開前提の値。ビルド通過用のプレースホルダで十分
         # （秘密情報ではない / service_role key は使わない）。

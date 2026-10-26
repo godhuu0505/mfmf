@@ -1,0 +1,12 @@
+[
+  {
+    "name": "mfmf-delete-after-14d",
+    "action": { "type": "Delete" },
+    "condition": { "tagState": "any", "olderThan": "14d" }
+  },
+  {
+    "name": "mfmf-keep-last-5",
+    "action": { "type": "Keep" },
+    "mostRecentVersions": { "keepCount": 5 }
+  }
+]
