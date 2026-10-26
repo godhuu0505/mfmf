@@ -1,10 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_AUTH_COOKIE } from "./cookieName";
+import { siteRelativeLocation } from "@/lib/siteRedirect";
 import {
   POST_LOGIN_NEXT_COOKIE,
   POST_LOGIN_NEXT_MAX_AGE,
   sanitizeNextPath,
+  withNext,
 } from "@/lib/nextPath";
 
 // 認証セッションを更新し、未ログインなら /login へリダイレクトする。
@@ -71,11 +73,10 @@ export async function updateSession(request: NextRequest) {
     // ログインで失わないよう、行き先を ?next= と Cookie の両方で持ち回る
     // （Cookie が必要な理由は src/lib/nextPath.ts のコメント参照）。
     const next = sanitizeNextPath(`${pathname}${request.nextUrl.search}`);
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = "";
-    if (next !== "/") url.searchParams.set("next", next);
-    const redirectResponse = NextResponse.redirect(url);
+    // middleware adapter は絶対Locationを要求し、同originなら配信時に相対化する。
+    // Route Handler と違い、ここは adapter が持つ request URL を基底に保つ。
+    const redirectResponse = NextResponse.redirect(new URL(withNext("/login", next), request.url));
+    supabaseResponse.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
     if (next !== "/") {
       redirectResponse.cookies.set(POST_LOGIN_NEXT_COOKIE, next, {
         path: "/",
@@ -91,7 +92,9 @@ export async function updateSession(request: NextRequest) {
   if (user && isAuthRoute) {
     // ログイン済みで /login に来たら、指定があればその行き先へ（なければ一覧へ）
     const next = sanitizeNextPath(request.nextUrl.searchParams.get("next"));
-    return NextResponse.redirect(new URL(next, request.url));
+    const response = NextResponse.redirect(new URL(siteRelativeLocation(next), request.url));
+    supabaseResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie));
+    return response;
   }
 
   // ログイン済みのユーザーに戻り先 Cookie が残っていたら、ここで使い切る。

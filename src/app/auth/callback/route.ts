@@ -1,6 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { saveGoogleRefreshToken } from "@/lib/google/token";
+import { siteRedirect } from "@/lib/siteRedirect";
 import {
   POST_LOGIN_NEXT_COOKIE,
   callbackRetryNext,
@@ -12,7 +13,7 @@ import {
 // 初回同意で得られる refresh token を暗号化保存する。
 // （CLAUDE.md の「API Route は基本作らない」例外。OAuth コールバックは Route Handler 必須）
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   // 戻り先は ?next=（パスワード再設定リンク等）を優先し、無ければ middleware が
   // 置いた Cookie を使う（Google OAuth は redirectTo が完全一致の許可リストのため
@@ -28,12 +29,8 @@ export async function GET(request: NextRequest) {
   // Google 同意の取消・コード交換失敗の後にメールログインへ切り替えても、
   // URL の next を読む LoginForm が元の招待を失わないようにする。
   function retryLogin(reason: "oauth" | "drive") {
-    const url = new URL(
-      withNext("/login", callbackRetryNext(queryNext, cookieNext)),
-      origin,
-    );
-    url.searchParams.set("error", reason);
-    return NextResponse.redirect(url);
+    const path = withNext("/login", callbackRetryNext(queryNext, cookieNext));
+    return siteRedirect(`${path}${path.includes("?") ? "&" : "?"}error=${reason}`);
   }
 
   if (!code) {
@@ -59,7 +56,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.redirect(`${origin}${next}`);
+  const response = siteRedirect(next);
   if (consumedCookie) response.cookies.delete(POST_LOGIN_NEXT_COOKIE);
   return response;
 }
