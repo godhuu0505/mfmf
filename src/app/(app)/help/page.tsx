@@ -100,7 +100,7 @@ export default async function HelpPage() {
               <CalendarDays className={inlineIcon} aria-hidden="true" /> / アルバム
               <Images className={inlineIcon} aria-hidden="true" /> / メニュー
               <MenuIcon className={inlineIcon} aria-hidden="true" /> に移動できます。
-              中央のオレンジの「＋」がクイック記録です。ペット
+              中央のオレンジの「＋」が作成ボタンです。ペット
               <PawPrint className={inlineIcon} aria-hidden="true" /> / 体重 / 設定
               <Settings className={inlineIcon} aria-hidden="true" /> / ヘルプ
               <CircleHelp className={inlineIcon} aria-hidden="true" />{" "}
@@ -111,17 +111,18 @@ export default async function HelpPage() {
           <section id="records" className={sectionClass}>
             <h2 className={h2Class}>記録を追加する</h2>
             <p className={pClass}>
-              タブバー中央の「＋」を押すと<strong>クイック記録</strong>が開きます。
-              「ごはん完食」「さんぽ」などのチップを選ぶだけで、文字入力なしで
-              その日の記録を 1 件残せます。
+              タブバー中央の「＋」を押すと<strong>作成</strong>が開き、
+              <strong>予定</strong>（これからのこと）と<strong>記録</strong>
+              （あったこと）のどちらを作るかを選べます。
             </p>
             <p className={pClass}>
-              写真を付けたり日付・体重まで書きたいときは、クイック記録の
-              「写真つきでくわしく記録する →」から記録フォーム（
+              「記録」を選ぶと記録フォーム（
               <Link href="/records/new" className={inlineLink}>
                 /records/new
               </Link>
-              ）に進みます（選んだチップは引き継がれます）。
+              ）が開き、写真・日付・体重まで書けます。「予定」を選ぶと
+              カレンダーの今日のシートが開き、種類・時間・担当を決めて
+              予定を入れられます。
             </p>
             <ul className={ulClass}>
               <li>

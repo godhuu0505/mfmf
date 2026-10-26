@@ -414,7 +414,11 @@ export default async function HomePage({
           activeTagId={activeTag?.id ?? null}
         />
 
-        {/* 記録元チップ（常設・ワンタップ） */}
+        {/* 記録元チップ（常設・ワンタップ）。
+            素の <a>（フル遷移）にしている: カレンダーの「今日」と同じで、CI では
+            このチップの Link のクライアント遷移が確定しないことがある
+            （E2E が 90 秒待ってもクリック後に URL が変わらない）。絞り込みは
+            毎回サーバー描画なのでフル遷移でも体感差がなく、確実に動く方を取る。 */}
         <div
           className="mb-3 flex items-center gap-1.5"
           aria-label="記録元で絞り込み"
@@ -422,7 +426,7 @@ export default async function HomePage({
           {sourceChips.map((c) => {
             const isActive = filters.source === c.value;
             return (
-              <Link
+              <a
                 key={c.value}
                 href={sourceHref(c.value)}
                 aria-current={isActive ? "page" : undefined}
@@ -434,7 +438,7 @@ export default async function HomePage({
                 }
               >
                 {c.label}
-              </Link>
+              </a>
             );
           })}
         </div>

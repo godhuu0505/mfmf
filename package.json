@@ -16,11 +16,11 @@
     "feedback:issues": "node scripts/feedback-to-issues.mjs"
   },
   "dependencies": {
-    "@sentry/nextjs": "^10.62.0",
+    "@sentry/nextjs": "^10.76.2",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.58.0",
     "lucide-react": "^1.22.0",
-    "next": "^15.5.4",
+    "next": "^15.5.28",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -32,10 +32,13 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "eslint": "^9.37.0",
-    "eslint-config-next": "^15.5.4",
+    "eslint-config-next": "^15.5.28",
     "pg": "^8.22.0",
     "tailwindcss": "^4.1.14",
     "typescript": "^5.9.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "postcss": "^8.5.31"
   }
 }
