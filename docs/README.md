@@ -34,6 +34,8 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [explanation/decisions.md](./explanation/decisions.md) — 設計決定ログ（D ログ）。**却下した案とその理由**を 1 行で残す唯一の場所。
 - [explanation/prototype-first.md](./explanation/prototype-first.md) — 新機能の画面を静的プロトタイプ＋Artifact で決める理由（2026-07-30 に実コード案から方針転換した経緯と実測データ）。
 - [explanation/mobile-app-tech-selection.md](./explanation/mobile-app-tech-selection.md) — **Android / iOS アプリ化の技術選定**（7 案 × 7 観点の重み付き評価と、PWA 継続を選んだ理由・覆す条件）。
+- [explanation/gcp-migration.md](./explanation/gcp-migration.md) — **GCP段階移行計画（D38）**。月額の前提、P0 / P1の完了条件、認可・復元・切替の検証。
+- [explanation/gcp-tech-selection.md](./explanation/gcp-tech-selection.md) — GCP移行の技術選定と見送った構成。
 - [explanation/roadmap.md](./explanation/roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
 - [explanation/phase-3-5-use-cases.md](./explanation/phase-3-5-use-cases.md) — Phase 3.5（家族・権限・サインアップ・共有）のユースケース・バックログ（受け入れ条件・決定ログ・未決事項）。
 
