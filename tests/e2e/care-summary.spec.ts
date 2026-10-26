@@ -71,7 +71,7 @@ test("UC-CS01: ペット別に実績・予定・見送りと体重を整理し�
   await login(page);
   await page.goto("/menu");
   await page.getByRole("link", { name: "お世話の引き継ぎ" }).click();
-  await page.getByLabel("ペット", { exact: true }).selectOption(petA);
+  await page.getByRole("combobox", { name: "ペット", exact: true }).selectOption(petA);
   await page.getByRole("button", { name: "表示する", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`pet=${petA}`));
   const sheet = page.getByRole("article", { name: "引き継ぎテスト・むぎの引き継ぎシート" });
@@ -104,10 +104,10 @@ test("UC-CS02: 毎週の予定は対象未設定の枠に出し、期間・ペ�
   await expect(page.getByRole("region", { name: "対象ペット未設定の世帯予定" })).toContainText("毎週の予定ルールから表示");
   await expect(page.getByRole("region", { name: "これからの予定", exact: true })).not.toContainText("毎週の予定ルールから表示");
   await page.goto(`/care-summary?pet=${petA}&from=2026-02-30&to=2026-03-01`);
-  await expect(page.getByRole("alert")).toContainText("正しい日付");
+  await expect(page.getByRole("alert").filter({ hasText: "正しい日付" })).toBeVisible();
   await expect(page.getByRole("button", { name: "印刷・PDF保存" })).not.toBeVisible();
   await page.goto(`/care-summary?pet=${crypto.randomUUID()}`);
-  await expect(page.getByRole("alert")).toContainText("この世帯で確認できません");
+  await expect(page.getByRole("alert").filter({ hasText: "この世帯で確認できません" })).toBeVisible();
 });
 
 test("UC-CS03: 未ログインでは引き継ぎシートを開けない", async ({ page }) => {
