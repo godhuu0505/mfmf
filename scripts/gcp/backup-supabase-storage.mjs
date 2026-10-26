@@ -96,7 +96,7 @@ export async function inventory({ env, fetchImpl = fetch, signal = AbortSignal.t
   return validateSnapshot(result[0].snapshot);
 }
 
-async function storageKey({ env, fetchImpl, signal }) {
+export async function storageKey({ env, fetchImpl, signal }) {
   const response = await request(fetchImpl, `${MANAGEMENT}/api-keys?reveal=true`, {
     method: "GET", headers: { Authorization: `Bearer ${env.SUPABASE_ACCESS_TOKEN}` },
   }, signal);

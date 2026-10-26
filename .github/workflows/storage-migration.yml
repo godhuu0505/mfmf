@@ -1,0 +1,98 @@
+name: Storage migration and maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Explicit operator step (default is read-only planning)"
+        type: choice
+        required: true
+        default: plan
+        options: [plan, migrate, activate, rollback, abort-staging, cleanup]
+      restore_verified:
+        description: "For activate only: independently verified age decrypt and isolated GCS restore"
+        type: boolean
+        required: true
+        default: false
+  schedule:
+    # 03:00 JST. Scheduled execution is cleanup only; it cannot migrate or activate.
+    - cron: '0 18 * * *'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  # A scheduled cleanup must not replace a pending production deployment.
+  group: ${{ (github.event_name == 'schedule' || inputs.mode == 'cleanup') && 'storage-cleanup' || 'deploy-production' }}
+  cancel-in-progress: false
+
+jobs:
+  operate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Resolve fixed operation
+        id: operation
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_MODE: ${{ inputs.mode == 'plan' && 'plan' || inputs.mode == 'migrate' && 'migrate' || inputs.mode == 'activate' && 'activate' || inputs.mode == 'rollback' && 'rollback' || inputs.mode == 'abort-staging' && 'abort-staging' || inputs.mode == 'cleanup' && 'cleanup' || 'invalid' }}
+        run: |
+          if [ "$EVENT_NAME" = schedule ]; then
+            echo 'mode=cleanup' >> "$GITHUB_OUTPUT"
+          else
+            case "$REQUESTED_MODE" in
+              plan|migrate|activate|rollback|abort-staging|cleanup) echo "mode=$REQUESTED_MODE" >> "$GITHUB_OUTPUT" ;;
+              *) echo 'Invalid operation.' >&2; exit 1 ;;
+            esac
+          fi
+      - name: Configure bounded downloads
+        if: steps.operation.outputs.mode != 'plan' && steps.operation.outputs.mode != 'cleanup'
+        uses: ./.github/actions/configure-apt
+      - name: Install receipt encryption
+        if: steps.operation.outputs.mode != 'plan' && steps.operation.outputs.mode != 'cleanup'
+        timeout-minutes: 5
+        run: sudo apt-get update && sudo apt-get install -y age
+      - id: auth
+        if: steps.operation.outputs.mode != 'plan'
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_STORAGE_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_STORAGE_SERVICE_ACCOUNT }}
+          project_id: mfmf-499612
+          token_format: access_token
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Operate fixed Storage targets
+        env:
+          OPERATION: ${{ steps.operation.outputs.mode }}
+          STORAGE_RESTORE_VERIFIED: ${{ inputs.restore_verified && 'true' || 'false' }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_BACKUP_AGE_RECIPIENT: ${{ vars.SUPABASE_BACKUP_AGE_RECIPIENT }}
+          GCP_PROJECT_ID: mfmf-499612
+          GCP_PROJECT_NUMBER: '92772745697'
+          GCP_STORAGE_WIF_PROVIDER: ${{ vars.GCP_STORAGE_WIF_PROVIDER }}
+          GCP_STORAGE_SERVICE_ACCOUNT: ${{ vars.GCP_STORAGE_SERVICE_ACCOUNT }}
+          GCP_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node scripts/gcp/storage-migration.mjs "$OPERATION"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.operation.outputs.mode != 'plan' && steps.operation.outputs.mode != 'cleanup'
+        with:
+          name: storage-migration-encrypted-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/storage-migration-encrypted/backup.age
+            ${{ runner.temp }}/storage-migration-encrypted/snapshot.age
+            ${{ runner.temp }}/storage-migration-encrypted/receipt.age
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Remove local ciphertext
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/storage-migration-encrypted"
