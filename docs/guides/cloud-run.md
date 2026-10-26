@@ -9,9 +9,13 @@
 ## コンテナの検証
 
 ```bash
+# 公開のローカル検証用 fixture。実配信は専用 Secret Manager key を使う。
+NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY= \
 docker build --platform linux/amd64 -f Dockerfile.cloudrun \
   --build-arg NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
   --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key \
+  --build-arg NEXT_SERVER_ACTIONS_KEY_VERSION=local-smoke-v1 \
+  --secret id=next-server-actions-key,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY \
   -t mfmf-cloudrun:smoke .
 docker run --rm -p 127.0.0.1:8080:8080 mfmf-cloudrun:smoke
 # 別ターミナルで、ログイン画面・認証リダイレクト・静的ファイル・PWA を確認
@@ -22,6 +26,9 @@ node tests/scripts/cloudrun-smoke.mjs
 `NEXT_PUBLIC_*` はブラウザコードに埋め込まれるため、Cloud Run の実行時変数だけを変更しても
 接続先は変わらない。`service_role` や Google の秘密鍵を build arg に渡してはいけない。
 CI は本番資格情報を使わず、実際の Linux コンテナを非 root で起動して検証する。
+実配信の Server Actions 専用鍵は BuildKit secret の一時環境変数だけで渡し、build arg にしない。
+Next.js が実行に使う private server manifest には専用鍵が含まれるため、実イメージと build cache は
+private に保つ。client assets / prerendered HTML・RSC への混入は build 時に検査する。
 smoke では外部 Host / HTTPS 転送ヘッダーと内部 bind address が違う条件でも、
 OAuth の取消・ログアウト・招待誘導が同一サイトへ戻り、招待 Cookie の更新が
 同一 origin に限られることを確認する。

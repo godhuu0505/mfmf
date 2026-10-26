@@ -123,13 +123,31 @@ ETag / If-Match による CAS は文書化されていません。直前 GET と
 
 ## ビルドと出力
 
-Docker build args は `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` と
-公開の正規 boolean `SIGNUP_ENABLED` だけ。login / signup の静的生成時にも同じ flag を渡し、
+Docker build args は `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`、
+公開の正規 boolean `SIGNUP_ENABLED` と専用 build key の公開固定 version 参照だけ。
+login / signup の静的生成時にも同じ flag を渡し、
 既存の登録導線を保持します。flag を変更するときは実行時設定だけでなくイメージも再ビルドします。
 URL は hosted Supabase の HTTPS URL、キーは anon JWT / publishable key に限定し、
 `service_role` / secret key を拒否します。カスタム Supabase ドメインは未対応です。
-サーバーの値はメモリから Secret Manager の `addVersion` API へ直接渡します。
-Docker の子プロセスにもサーバーの値を渡しません。
+既存 runtime 用サーバー値はメモリから Secret Manager の `addVersion` API へ直接渡します。
+`TOKEN_ENC_KEY` / Google / Sentry の値を Docker の子プロセスへ渡しません。
+
+Server Actions には、別用途の専用 `mfmf-next-server-actions-key` を使用します。
+管理者が32 byteのランダム鍵を生成し、canonical base64 44文字のテキストとして登録した
+version を [固定参照](../../scripts/gcp/server-actions-key-version.json)で指定します。
+deploy SA にこの1 secretだけ accessor を追加し、runtime SA には追加しません。
+手動候補と継続配信は同じ `GET .../versions/<固定番号>:access` を短期 WIF token で実行し、
+二層の base64・名前・32 byte長を確認した後、メモリから Docker BuildKit secret env に渡します。
+runtime 用3件を流用せず、鍵を引数・ログ・公開 manifest・通常ENVへ出さず、秘密入力ファイルを作りません。
+Docker build が失敗した場合も出力を転送しません。
+
+Next 15 はこの鍵を build 時の Action ID生成と server manifest に使用します。
+runtime env だけで上書きせず、build 間で同じ鍵を使います。Next が必要とする private server
+manifest と builder cache には鍵が入るため、実イメージ・cache を公開 artifact にしないでください。
+build 内で server manifest の一致、`.next/static` / `public` / prerendered HTML・RSC・JSON・metadata
+への非混入を確認します。BuildKit secret値は cache key に入らないため、公開の version 参照を
+別ARGとして渡し、鍵をrotateした際は必ず新versionへ更新してbuild cacheを無効化します。
+最初に固定鍵へ移る際や Action 自体を変更した配信では、既に開いた画面の再読み込みが必要です。
 
 WIF は短期 access token を使い、認証ファイルやサービスアカウント鍵を作りません。
 Docker 認証は固定 registry だけに答える credential helper の pipe 経由とし、
@@ -155,3 +173,6 @@ Docker 認証は固定 registry だけに答える credential helper の pipe �
 [Secret Manager addVersion](https://cloud.google.com/secret-manager/docs/reference/rest/v1/projects.secrets/addVersion)、
 [GitHub Actions WIF](https://github.com/google-github-actions/auth)、
 [Artifact Registry の認証](https://cloud.google.com/artifact-registry/docs/docker/authentication)。
+専用build key: [Next.js self hosting](https://nextjs.org/docs/app/guides/self-hosting#overwriting-encryption-keys-advanced)、
+[BuildKit secrets](https://docs.docker.com/build/building/secrets/)、
+[secretとcache invalidation](https://docs.docker.com/build/cache/invalidation/#build-secrets)。

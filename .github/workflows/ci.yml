@@ -27,13 +27,19 @@ jobs:
         with:
           node-version: 22
       - name: Build standalone container (no production credentials)
+        env:
+          # Public test fixture only, never a production key.
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=
         run: |
           docker build --platform linux/amd64 -f Dockerfile.cloudrun \
             --build-arg NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key \
+            --build-arg NEXT_SERVER_ACTIONS_KEY_VERSION=ci-fixture-v1 \
+            --secret id=next-server-actions-key,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY \
             -t mfmf-cloudrun:ci .
       - name: Check non-root runtime and HTTP behavior
         run: |
+          node tests/scripts/cloudrun-image-key.mjs
           test "$(docker run --rm --entrypoint id mfmf-cloudrun:ci -u)" = "1000"
           docker run -d --name mfmf-cloudrun-smoke -p 127.0.0.1:8080:8080 mfmf-cloudrun:ci
           node tests/scripts/cloudrun-smoke.mjs

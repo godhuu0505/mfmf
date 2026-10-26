@@ -17,6 +17,9 @@
 5. [固定参照 JSON](../../scripts/gcp/production-secret-versions.json)の3項目が実際の元値を持つ
    `ENABLED` version であることを、管理者が metadata と安全な保管元で確認する。
    ファイルは参照だけを含む。鍵の再生成、値の記載、`latest`、別 project、余分なキーは禁止。
+   Server Actions 専用 `mfmf-next-server-actions-key` の固定 version と deploy SA の当該 secret
+   accessor も確認する。既存の runtime 鍵とは別に生成した32 byte鍵を BuildKit secret で使う。
+   詳細は[候補ビルド](./cloud-run-candidate.md#ビルドと出力)を参照。runtime SA へ権限を追加しない。
 6. repository variable `GCP_DEPLOY_ENABLED=true` を設定する。以降の main push が配信対象となる。
 
 有効化は管理者が行い、この変更の merge では flag / IAM / 実サービスを変更しない。

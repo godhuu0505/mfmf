@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { requireContinuousContext } from "./production-config.mjs";
+import { BuildKeyError, readServerActionsBuildKey } from "./server-actions-build-key.mjs";
 
 const execFileAsync = promisify(execFile);
 const REGISTRY = "asia-northeast1-docker.pkg.dev";
@@ -240,11 +241,15 @@ export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, l
   }
   const preseeded = parsePreseededSecretVersions(env);
   const { publicEnv, secrets, features } = await readProductionConfig(env, fetchImpl, preseeded);
+  const buildKey = await readServerActionsBuildKey(env, fetchImpl);
   const imageBase = `${REGISTRY}/${env.GCP_PROJECT_ID}/mfmf/mfmf-candidate`;
   const image = `${imageBase}:${env.GITHUB_SHA}-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
   log("Production settings validated. Building candidate with public Supabase settings and signup flag only.");
   await docker(["build", "--platform", "linux/amd64", "-f", "Dockerfile.cloudrun",
-    ...[...PUBLIC_KEYS, "SIGNUP_ENABLED"].flatMap((key) => ["--build-arg", `${key}=${publicEnv[key]}`]), "-t", image, "."], false);
+    ...[...PUBLIC_KEYS, "SIGNUP_ENABLED"].flatMap((key) => ["--build-arg", `${key}=${publicEnv[key]}`]),
+    "--build-arg", `NEXT_SERVER_ACTIONS_KEY_VERSION=${buildKey.reference}`,
+    "--secret", "id=next-server-actions-key,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY", "-t", image, "."], false,
+  { NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: buildKey.key });
 
   const secretVersions = { ...preseeded };
   for (const [key, value] of Object.entries(secrets)) {
@@ -294,7 +299,9 @@ async function main() {
   await prepareWithDocker(workflowEnv);
 }
 
-export async function prepareWithDocker(workflowEnv, { save, mode = "manual" } = {}) {
+/** @param {{ save?: (manifest: object) => unknown, mode?: string }} options */
+export async function prepareWithDocker(workflowEnv, options = {}) {
+  const { save, mode = "manual" } = options;
   parsePreseededSecretVersions(workflowEnv);
   const scratch = await mkdtemp(join(tmpdir(), "mfmf-candidate-"));
   try {
@@ -309,10 +316,10 @@ export async function prepareWithDocker(workflowEnv, { save, mode = "manual" } =
     await prepareCandidate({
       env: workflowEnv,
       mode,
-      docker: async (args, authenticate) => {
+      docker: async (args, authenticate, buildSecrets = {}) => {
         try {
           const result = await execFileAsync("docker", args, {
-            env: { ...dockerEnv, ...(authenticate ? { GCP_ACCESS_TOKEN: workflowEnv.GCP_ACCESS_TOKEN } : {}) },
+            env: { ...dockerEnv, ...buildSecrets, ...(authenticate ? { GCP_ACCESS_TOKEN: workflowEnv.GCP_ACCESS_TOKEN } : {}) },
             timeout: 20 * 60 * 1000, maxBuffer: 16 * 1024 * 1024,
           });
           return result.stdout;
@@ -330,7 +337,7 @@ export async function prepareWithDocker(workflowEnv, { save, mode = "manual" } =
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
-    console.error(error instanceof CandidateError ? error.message : "Candidate preparation failed; details withheld.");
+    console.error(error instanceof CandidateError || error instanceof BuildKeyError ? error.message : "Candidate preparation failed; details withheld.");
     process.exitCode = 1;
   });
 }
