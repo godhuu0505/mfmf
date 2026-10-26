@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
 
 // Docker が子プロセスの pipe で呼ぶ credential helper。ログや credential file は作らない。
 export function dockerCredential(command, server, token) {
@@ -9,7 +10,13 @@ export function dockerCredential(command, server, token) {
   return { Username: "oauth2accesstoken", Secret: token };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// 一時ディレクトリが symlink（macOS の /var → /private/var 等）でも直接実行を判定する。
+let isEntrypoint = false;
+try {
+  isEntrypoint = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
+} catch { /* imported by a runner without a file entrypoint */ }
+
+if (isEntrypoint) {
   try {
     let server = "";
     for await (const chunk of process.stdin) {
