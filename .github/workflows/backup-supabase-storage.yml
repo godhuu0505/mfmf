@@ -1,0 +1,63 @@
+name: Back up Supabase Storage
+
+# Read-only source access. Never a PR trigger, app deploy, restore, or GCP write.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Inventory counts only, or encrypted object-byte backup"
+        type: choice
+        required: true
+        default: inventory
+        options: [inventory, backup]
+
+permissions:
+  contents: read
+
+# Serialize with database migrations. This does NOT freeze application writes.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Configure bounded package downloads
+        if: inputs.mode == 'backup'
+        uses: ./.github/actions/configure-apt
+      - name: Install encryption
+        if: inputs.mode == 'backup'
+        timeout-minutes: 5
+        run: sudo apt-get update && sudo apt-get install -y age
+      - name: Inventory fixed source (counts only)
+        if: inputs.mode == 'inventory'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: node scripts/gcp/backup-supabase-storage.mjs --inventory
+      - name: Encrypt object bytes and complete manifest
+        if: inputs.mode == 'backup'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_BACKUP_AGE_RECIPIENT: ${{ vars.SUPABASE_BACKUP_AGE_RECIPIENT }}
+        run: node scripts/gcp/backup-supabase-storage.mjs
+      - uses: actions/upload-artifact@v4
+        if: success() && inputs.mode == 'backup'
+        with:
+          name: storage-backup-encrypted-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/storage-backup-encrypted/storage-objects.mfmf.age
+          retention-days: 90
+          if-no-files-found: error
+      - name: Remove local ciphertext
+        if: always() && inputs.mode == 'backup'
+        run: rm -rf -- "$RUNNER_TEMP/storage-backup-encrypted"
