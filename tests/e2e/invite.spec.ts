@@ -23,6 +23,21 @@ test("未ログインで招待リンクを開くと、ログイン後に招待�
   await expect(page).toHaveURL(/\/invite\/dummy-token-for-redirect$/);
 });
 
+test("ログイン画面の計測送信は招待の戻り先 Cookie を書き換えない", async ({
+  page,
+  context,
+}) => {
+  const next = "/invite/telemetry-original";
+  await page.goto(next);
+  const response = await page.request.post("/api/vitals", {
+    data: { name: "FCP", value: 100, path: "/login" },
+  });
+  expect(response.status()).toBe(204);
+  expect((await context.cookies()).find((c) => c.name === POST_LOGIN_NEXT_COOKIE)?.value).toBe(
+    encodeURIComponent(next),
+  );
+});
+
 test("別タブの戻り先を OAuth 開始時に更新し、同意取消後のメールログインでも招待へ戻る", async ({
   page,
   context,

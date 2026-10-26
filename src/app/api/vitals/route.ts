@@ -2,7 +2,8 @@ import * as Sentry from "@sentry/nextjs";
 
 // Web Vitals 受け口。クライアント Sentry SDK を入れない方針なので、
 // 計測値はここで受けて Sentry に server-side で投げる（DSN 未設定なら no-op）。
-// 認証は要求しない（送信元はあくまで自分たちのブラウザ、悪用余地は小さい）。
+// middleware が認証済みの計測だけをここへ渡す。ログイン画面からの未認証
+// Beacon は 204 で破棄し、ログインの戻り先 Cookie に影響させない。
 //
 // p75 を Sentry で集計できるよう、captureMessage（値が extra 行きで数値集計
 // 不可）ではなく Trace Metrics の distribution として送る。distribution 型は

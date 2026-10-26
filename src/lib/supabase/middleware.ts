@@ -39,6 +39,14 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+  // Web Vitals はログイン画面からも送られる。ページ離脱時の
+  // Beacon を /login へ飛ばすと、OAuth 直前の戻り先が /api/vitals に
+  // 上書きされる。未認証の計測は body を読まず 204 で破棄し、匿名の
+  // 入力を Sentry へ転送しない。認証済みでも回復中の Cookie を消費させない。
+  if (pathname === "/api/vitals") {
+    return user ? supabaseResponse : new NextResponse(null, { status: 204 });
+  }
+
   // ログイン済みユーザーには不要な認証系ページ（/login・/signup）
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/signup");
