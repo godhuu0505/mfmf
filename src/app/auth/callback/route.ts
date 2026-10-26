@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { saveGoogleRefreshToken } from "@/lib/google/token";
-import { POST_LOGIN_NEXT_COOKIE, sanitizeNextPath } from "@/lib/nextPath";
+import {
+  POST_LOGIN_NEXT_COOKIE,
+  callbackRetryNext,
+  sanitizeNextPath,
+  withNext,
+} from "@/lib/nextPath";
 
 // Google OAuth のコールバック。認可コードをセッションへ交換し、
 // 初回同意で得られる refresh token を暗号化保存する。
@@ -20,14 +25,25 @@ export async function GET(request: NextRequest) {
   // 回った場合、元の招待は Cookie にしか残っていないため。
   const consumedCookie = !queryNext;
 
+  // Google 同意の取消・コード交換失敗の後にメールログインへ切り替えても、
+  // URL の next を読む LoginForm が元の招待を失わないようにする。
+  function retryLogin(reason: "oauth" | "drive") {
+    const url = new URL(
+      withNext("/login", callbackRetryNext(queryNext, cookieNext)),
+      origin,
+    );
+    url.searchParams.set("error", reason);
+    return NextResponse.redirect(url);
+  }
+
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=oauth`);
+    return retryLogin("oauth");
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error || !data.session) {
-    return NextResponse.redirect(`${origin}/login?error=oauth`);
+    return retryLogin("oauth");
   }
 
   // access_type=offline + prompt=consent で毎回 refresh token が返る想定。
@@ -39,7 +55,7 @@ export async function GET(request: NextRequest) {
       await saveGoogleRefreshToken(supabase, userId, refreshToken);
     } catch (e) {
       console.error("failed to save google refresh token", e);
-      return NextResponse.redirect(`${origin}/login?error=drive`);
+      return retryLogin("drive");
     }
   }
 

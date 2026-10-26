@@ -34,3 +34,14 @@ export function sanitizeNextPath(
 export function withNext(path: string, next: string): string {
   return next === "/" ? path : `${path}?next=${encodeURIComponent(next)}`;
 }
+
+// コールバックに失敗してログインし直すときの戻り先。
+// 回復リンクの /reset-password は認証フローの途中なので、メール/パスワードで
+// ログインし直す場合は Cookie に残した元の招待へ戻す。
+export function callbackRetryNext(
+  queryNext: string | null,
+  cookieNext: string | undefined,
+): string {
+  const next = sanitizeNextPath(queryNext ?? cookieNext);
+  return next === "/reset-password" ? sanitizeNextPath(cookieNext) : next;
+}

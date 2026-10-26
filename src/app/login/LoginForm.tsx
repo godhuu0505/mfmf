@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { sanitizeNextPath, withNext } from "@/lib/nextPath";
+import { keepPostLoginNext } from "@/lib/keepPostLoginNext";
 
 // Drive 連携のため drive.file スコープを要求する。
 // drive.file は「アプリが作成・選択したファイルのみ」アクセスでき、
@@ -57,6 +58,10 @@ export default function LoginForm({ signupEnabled }: Props) {
   async function signInWithGoogle() {
     setLoading(true);
     setError(null);
+
+    // ログイン画面を開いてから Cookie が失効したり、別タブの招待で上書き
+    // されたりしても、このタブから始めるログインはこの戻り先を使う。
+    await keepPostLoginNext(next);
 
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({

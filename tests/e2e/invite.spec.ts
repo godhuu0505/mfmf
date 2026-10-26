@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { issueInviteLink, login } from "./helpers";
+import { E2E_USER } from "./global-setup";
+import { POST_LOGIN_NEXT_COOKIE } from "../../src/lib/nextPath";
 
 // 招待リンク（/invite/{token}）の受入条件（UC-O09〜O10 / D12・D13）。
 //
@@ -15,6 +17,69 @@ test("未ログインで招待リンクを開くと、ログイン後に招待�
   await expect(page).toHaveURL(
     /\/login\?next=%2Finvite%2Fdummy-token-for-redirect/,
   );
+  await page.getByLabel("メールアドレス").fill(E2E_USER.email);
+  await page.getByLabel("パスワード").fill(E2E_USER.password);
+  await page.getByRole("button", { name: "メールアドレスでログイン" }).click();
+  await expect(page).toHaveURL(/\/invite\/dummy-token-for-redirect$/);
+});
+
+test("別タブの戻り先を OAuth 開始時に更新し、同意取消後のメールログインでも招待へ戻る", async ({
+  page,
+  context,
+}) => {
+  const next = "/invite/oauth-retry-original";
+  await page.goto(`/login?next=${encodeURIComponent(next)}`);
+  const origin = new URL(page.url()).origin;
+  // 別タブで別の招待を開き、ブラウザ共通 Cookie が上書きされた状態。
+  await context.addCookies([
+    {
+      name: POST_LOGIN_NEXT_COOKIE,
+      value: "/invite/another-tab",
+      url: origin,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  // 外部 Google には接続しない。同意を取り消したときと同じ callback を返す。
+  await page.route("**/auth/v1/authorize?**", (route) =>
+    route.fulfill({
+      status: 302,
+      headers: { location: `${origin}/auth/callback?error=access_denied` },
+    }),
+  );
+
+  await page.getByRole("button", { name: "Google でログイン" }).click();
+  await expect(page).toHaveURL((url) =>
+    url.pathname === "/login" &&
+    url.searchParams.get("error") === "oauth" &&
+    url.searchParams.get("next") === next,
+  );
+  await expect(page.getByRole("alert")).toContainText("ログインに失敗しました");
+  await page.getByLabel("メールアドレス").fill(E2E_USER.email);
+  await page.getByLabel("パスワード").fill(E2E_USER.password);
+  await page.getByRole("button", { name: "メールアドレスでログイン" }).click();
+  await expect(page).toHaveURL(new RegExp(`${next}$`));
+  expect((await context.cookies()).some((c) => c.name === POST_LOGIN_NEXT_COOKIE)).toBe(false);
+});
+
+test("回復コード交換に失敗しても、メールログインの戻り先は元の招待になる", async ({
+  page,
+  context,
+}) => {
+  const next = "/invite/recovery-retry-original";
+  await page.goto(next);
+  // ローカル Supabase に無効なコードを渡し、exchangeCodeForSession の失敗を通す。
+  await page.goto("/auth/callback?code=invalid-recovery-code&next=%2Freset-password");
+  await expect(page).toHaveURL((url) =>
+    url.pathname === "/login" &&
+    url.searchParams.get("error") === "oauth" &&
+    url.searchParams.get("next") === next,
+  );
+  await page.getByLabel("メールアドレス").fill(E2E_USER.email);
+  await page.getByLabel("パスワード").fill(E2E_USER.password);
+  await page.getByRole("button", { name: "メールアドレスでログイン" }).click();
+  await expect(page).toHaveURL(new RegExp(`${next}$`));
+  expect((await context.cookies()).some((c) => c.name === POST_LOGIN_NEXT_COOKIE)).toBe(false);
 });
 
 test.describe("宛先違いの受諾", () => {

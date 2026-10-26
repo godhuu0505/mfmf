@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeNextPath, withNext } from "@/lib/nextPath";
+import { callbackRetryNext, sanitizeNextPath, withNext } from "@/lib/nextPath";
 
 describe("sanitizeNextPath", () => {
   it("サイト内の絶対パスはそのまま通す（招待リンクの deep link）", () => {
@@ -40,5 +40,30 @@ describe("withNext", () => {
     expect(withNext("/signup", "/records/1?edit=1")).toBe(
       "/signup?next=%2Frecords%2F1%3Fedit%3D1",
     );
+  });
+});
+
+describe("callbackRetryNext", () => {
+  it("OAuth の失敗時は Cookie の元の招待へ戻す", () => {
+    expect(callbackRetryNext(null, "/invite/original")).toBe("/invite/original");
+  });
+
+  it("通常の明示的な戻り先は Cookie より優先する", () => {
+    expect(callbackRetryNext("/invite/current", "/invite/previous")).toBe(
+      "/invite/current",
+    );
+  });
+
+  it("回復リンクに失敗したときは再設定画面でなく元の招待へ戻す", () => {
+    expect(callbackRetryNext("/reset-password", "/invite/original")).toBe(
+      "/invite/original",
+    );
+    expect(callbackRetryNext("/reset-password", undefined)).toBe("/");
+  });
+
+  it("回復経路でも外部 URL を戻り先にしない", () => {
+    expect(callbackRetryNext("/reset-password", "//evil.example")).toBe("/");
+    expect(callbackRetryNext(null, "/\\evil.example")).toBe("/");
+    expect(callbackRetryNext("https://evil.example", "/invite/safe")).toBe("/");
   });
 });
