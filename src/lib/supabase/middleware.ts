@@ -41,7 +41,9 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (process.env.VERCEL === "1") {
+  // The canonical old entry must redirect even if Vercel's optional system-env
+  // exposure is disabled. Preview deployments still use the platform flag.
+  if (process.env.VERCEL === "1" || request.nextUrl.hostname === "mfmf-1223.vercel.app") {
     const { data: readBackend, error: readError } = await supabase.rpc("get_media_read_backend");
     let cutoverResponse: NextResponse | null = null;
     if (readError || !["supabase", "gcs"].includes(readBackend)) {
