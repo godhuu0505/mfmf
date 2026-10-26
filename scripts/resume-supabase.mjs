@@ -62,7 +62,7 @@ export async function resumeProject({
   }
 
   async function servicesHealthy() {
-    // OpenAPI の配列形式（form / explode）。CSV は実 API で HTTP 400 になるため使わない。
+    // 公開 OpenAPI が許可する配列形式。HTTP 400 の原因は GET 専用診断で切り分ける。
     const query = new URLSearchParams(SERVICES.map((service) => ["services", service]));
     query.set("timeout_ms", "5000");
     const services = await request(`/health?${query}`);
