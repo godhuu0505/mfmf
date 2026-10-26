@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { chmod, copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -270,6 +270,24 @@ export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, l
 
 async function main() {
   if (!process.env.CANDIDATE_PUBLIC_CONFIG) throw new CandidateError("Public configuration output path is missing.");
+  // workflow env へ input を直接展開すると runner が開始ログへ表示する。
+  // GitHub が作成した event metadata からだけ読み、検証済み参照をメモリ内で渡す。
+  let input;
+  try {
+    const path = process.env.GITHUB_EVENT_PATH;
+    if (!path) throw new Error();
+    const file = await stat(path);
+    if (!file.isFile() || file.size > 65_536) throw new Error();
+    const eventText = await readFile(path, "utf8");
+    if (Buffer.byteLength(eventText) > 65_536) throw new Error();
+    const event = JSON.parse(eventText);
+    if (!event || typeof event !== "object" || Array.isArray(event)) throw new Error();
+    input = event.inputs?.preseeded_secret_versions ?? "";
+  } catch {
+    throw new CandidateError("Workflow event is missing, invalid, or too large; input withheld.");
+  }
+  const workflowEnv = { ...process.env, PRESEEDED_SECRET_VERSIONS: input };
+  parsePreseededSecretVersions(workflowEnv);
   const scratch = await mkdtemp(join(tmpdir(), "mfmf-candidate-"));
   try {
     const bin = join(scratch, "bin");
@@ -281,7 +299,7 @@ async function main() {
     await writeFile(join(scratch, "config.json"), JSON.stringify({ credHelpers: { [REGISTRY]: "mfmf-wif" } }), { mode: 0o600 });
     const dockerEnv = { PATH: `${bin}:${process.env.PATH}`, HOME: process.env.HOME, DOCKER_CONFIG: scratch };
     await prepareCandidate({
-      env: process.env,
+      env: workflowEnv,
       docker: async (args, authenticate) => {
         try {
           const result = await execFileAsync("docker", args, {

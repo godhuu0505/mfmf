@@ -59,6 +59,9 @@ Secret は deployment が使用できますが、保存後の値を member が�
 `TOKEN_ENC_KEY` / `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` の3つだけです。
 設定していないキーは従来の Vercel 個別取得 → `addVersion` 経路を使用し、
 読み取れない型が残っていれば転送前に停止します。
+入力を step の env 欄へ展開せず、Node CLI が既存の `GITHUB_EVENT_PATH` から
+メモリ内へ読みます（64 KiB 上限、参照 JSON は4 KiB 上限）。壊れた JSON や誤入力も
+stdout / stderr へ出しません。実 env ファイルを読んだり、新しい秘密ファイルを作ったりしません。
 
 ```json
 {

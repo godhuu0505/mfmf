@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parsePreseededSecretVersions, prepareCandidate, SECRET_NAMES, selectProductionConfig } from "../../scripts/gcp/prepare-candidate.mjs";
 import { dockerCredential } from "../../scripts/gcp/docker-credential-mfmf-wif.mjs";
 
@@ -54,6 +59,38 @@ function harness(data = response(), failureAt?: number, details = data) {
 }
 
 describe("candidate preparation", () => {
+  it.each(["invalid-pin", "invalid-json", "missing-event", "oversized-event"])("CLI wrapper withholds %s from stdout/stderr before side effects", async (failure) => {
+    const scratch = await mkdtemp(join(tmpdir(), "mfmf-candidate-cli-test-"));
+    try {
+      const marker = "SECRET_INPUT_MUST_NEVER_APPEAR_IN_LOGS";
+      const eventPath = join(scratch, "event.json");
+      const fetchMarker = join(scratch, "fetch-called");
+      const preload = join(scratch, "offline.mjs");
+      // Any accidental network attempt is recorded locally and rejected. No real API is used.
+      await writeFile(preload, `import {writeFileSync} from 'node:fs'; globalThis.fetch = async () => { writeFileSync(${JSON.stringify(fetchMarker)}, 'called'); throw new Error('network prohibited'); };`);
+      const event = failure === "invalid-json" ? marker : failure === "oversized-event" ? marker.repeat(4000)
+        : JSON.stringify({ inputs: { preseeded_secret_versions: JSON.stringify({ TOKEN_ENC_KEY: marker }) } });
+      if (failure !== "missing-event") await writeFile(eventPath, event);
+      const result = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+        const child = spawn(process.execPath, ["--import", preload, fileURLToPath(new URL("../../scripts/gcp/prepare-candidate.mjs", import.meta.url))], {
+          env: { ...env, NODE_ENV: "test", GITHUB_EVENT_PATH: eventPath, CANDIDATE_PUBLIC_CONFIG: join(scratch, "manifest.json") },
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        let stdout = ""; let stderr = "";
+        child.stdout.on("data", (chunk) => { stdout += chunk; });
+        child.stderr.on("data", (chunk) => { stderr += chunk; });
+        child.on("error", reject);
+        child.on("close", (code) => resolve({ code, stdout, stderr }));
+      });
+      expect(result.code).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).not.toContain(marker);
+      expect(result.stderr).not.toContain(eventPath);
+      await expect(readFile(fetchMarker)).rejects.toThrow();
+      await expect(readFile(join(scratch, "manifest.json"))).rejects.toThrow();
+    } finally { await rm(scratch, { recursive: true, force: true }); }
+  });
+
   it("uses explicitly pinned versions without retrieving, uploading, or exposing their values", async () => {
     const data = sensitiveResponse();
     data.envs.push({ ...entry("TOKEN_ENC_KEY", "preview-key-must-not-be-used"), target: ["preview"] });

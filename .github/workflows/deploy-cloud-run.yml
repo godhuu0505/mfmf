@@ -57,7 +57,6 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
           GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
-          PRESEEDED_SECRET_VERSIONS: ${{ inputs.preseeded_secret_versions }}
           GCP_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
           CANDIDATE_PUBLIC_CONFIG: ${{ runner.temp }}/candidate-public.json
         run: node scripts/gcp/prepare-candidate.mjs
