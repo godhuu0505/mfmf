@@ -44,11 +44,23 @@ Storage objects・全参照元・親・台帳の table lock を取得し、進�
 active backend 同士の直接変更は拒否し、必ず `frozen` を通す。
 
 - `supabase`: 従来の Storage RLS と画像パス参照を維持する。
-- `frozen`: 利用者の Storage INSERT/UPDATE/DELETE、参照変更、画像親の削除/移動を拒否する。現在の read_backend を保持して読取を続ける。
+- `frozen`: Storage INSERT/UPDATE/DELETE、利用者の参照変更、画像親の削除/移動を拒否する。現在の read_backend を保持して読取を続ける。
 - `gcs`: 旧 2 バケットの SELECT も拒否する。アプリから旧 Storage へ fallback しない。
 
-table lock は DB transaction の境界であり、DB 外のアップロード完了や発行済み署名 URL の失効を証明しない。
-移送手順は両配信元・古いタブ・直接 Storage API の書込凍結と in-flight drain、前後 snapshot 照合を別に実施する。
+`20261027082000_storage_freeze_completion_guard.sql` は旧 2 バケットの metadata 書込を
+Storage 管理 role・operator にも拒否する。RLS の事前検査を通過した upload が後から完了しても、
+version・path・metadata・owner の変更を DB で止める。他バケットは対象外。
+移送・復帰は旧 Storage を読むだけなので管理者例外は設けない。凍結中の手動 ownership 変更も拒否される。
+
+table lock は DB transaction の境界であり、DB 外の upload/cleanup や発行済み署名 URL の失効を証明しない。
+特に確認時の本番 Storage v1.80.2 の [uploader](https://github.com/supabase/storage/blob/db42280506a07a165376219b2d6ac7bc92ccdfcc/src/storage/uploader.ts) は、
+完了処理の例外時に今回の version を削除する cleanup を送る。通常の完了済み TUS 再送では
+multipart の再取得が先に失敗するため、既存 current version の削除へ到達することは未確認である。
+この実装差を踏まえ、metadata guard だけで DB 外の旧 bytes の不変まで保証しない。
+凍結前に全件 SHA 検証した暗号 backup と隔離復元結果を保全し、凍結後も fresh 全件暗号 backup を取得する。
+移送にはその取得済み bytes だけを使い、activation 前に GCS 固定 generation の全件 SHA を再検証する。
+途中の source bytes 消失・不一致は source 照合/rollback を失敗させる。無検証の自動復帰や fallback はしない。
+旧 metadata の前後 snapshot 照合だけを画像の原子的 snapshot 成功と扱わない。
 既発行の旧署名 URL は最大 1 時間の失効待ちが必要。
 
 operator は `frozen` で移送対象ごとに新しい UUID/key を作り、GCS の全バイト・generation・binding を確認後、

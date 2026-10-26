@@ -66,7 +66,20 @@ describe("media storage transaction boundaries", () => {
       .then(() => ({ code: "unexpected success" }), (error: { code: string }) => ({ code: error.code }));
     await waitForLock();
     await first.query("commit");
-    expect(await pending).toEqual({ code: "42501" });
+    expect(await pending).toEqual({ code: "55000" });
+    await second.query("rollback");
+    await admin.query("select public.set_media_storage_mode('gcs')");
+  });
+
+  it("rejects privileged Storage completion queued behind the freeze lock", async () => {
+    await first.query("begin; select public.set_media_storage_mode('frozen')");
+    // The local postgres fixture identity has BYPASSRLS; authenticated probes do not.
+    await second.query("begin");
+    const pending = second.query("insert into storage.objects(bucket_id,name) values('avatars',$1)", [`${editor}/avatars/privileged-queued.jpg`])
+      .then(() => ({ code: "unexpected success" }), (error: { code: string }) => ({ code: error.code }));
+    await waitForLock();
+    await first.query("commit");
+    expect(await pending).toEqual({ code: "55000" });
     await second.query("rollback");
     await admin.query("select public.set_media_storage_mode('gcs')");
   });

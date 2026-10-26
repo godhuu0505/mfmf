@@ -44,7 +44,7 @@ select is(public.get_media_read_backend(),'supabase','initial freeze preserves S
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"a1000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
 select is((select count(*)::int from storage.objects where bucket_id='avatars'),1,'frozen retains old reads');
-select throws_ok($$insert into storage.objects(bucket_id,name) values('avatars','a1000000-0000-4000-8000-000000000001/avatars/new.jpg')$$,'42501',null,'frozen denies direct Storage inserts');
+select throws_ok($$insert into storage.objects(bucket_id,name) values('avatars','a1000000-0000-4000-8000-000000000001/avatars/new.jpg')$$,'55000',null,'frozen denies direct Storage inserts');
 select is_empty($$delete from storage.objects where bucket_id='avatars' returning id$$,'frozen hides rows from direct Storage deletes');
 select is_empty($$update storage.objects set name=name where bucket_id='avatars' returning id$$,'frozen denies Storage update');
 select throws_ok($$update public.profiles set avatar_path=null where owner_id=auth.uid()$$,'55000',null,'frozen denies avatar mutations');
@@ -59,7 +59,7 @@ select public.set_media_storage_mode('gcs');
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"a1000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
 select is((select count(*)::int from storage.objects where bucket_id in ('avatars','daycare-photos')),0,'GCS denies both old Storage buckets reads');
-select throws_ok($$insert into storage.objects(bucket_id,name) values('avatars','a1000000-0000-4000-8000-000000000001/avatars/new.jpg')$$,'42501',null,'GCS denies old Storage upload');
+select throws_ok($$insert into storage.objects(bucket_id,name) values('avatars','a1000000-0000-4000-8000-000000000001/avatars/new.jpg')$$,'55000',null,'GCS denies old Storage upload');
 select throws_ok($$update public.media_assets set state='ready'$$,'42501',null,'direct ledger DML denied');
 select throws_ok($$select public.media_retire_unreferenced(gen_random_uuid())$$,'42501',null,'private helpers are not RPC capabilities');
 select throws_ok($$select public.reserve_media_upload('photo','c1000000-0000-4000-8000-000000000002','b1000000-0000-4000-8000-000000000001',100,'image/jpeg')$$,'42501',null,'invisible existing record collision rejected');
