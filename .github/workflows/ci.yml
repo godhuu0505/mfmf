@@ -42,6 +42,9 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
+      - name: Test synthetic ranking CLI (no external API calls)
+        run: node --test tests/scripts/genai-ranking-experiment.test.mjs
+
       - name: Test backup encryption and failure handling
         run: |
           sudo apt-get update && sudo apt-get install -y age
