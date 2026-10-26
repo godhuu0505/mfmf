@@ -97,6 +97,30 @@ null と空の URL は `not-configured` にまとめるため、生の設定値�
 仕様: [Auth config API](https://supabase.com/docs/reference/api/v1-get-auth-service-config)、
 [Redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls)。
 
+## 候補環境の callback を追加する
+
+**Actions → Add Cloud Run Auth URLs → Run workflow（main）** の既定値 `apply: false` は
+GET 1回の plan だけを実行します。追加対象は次の固定2件で、任意 URL の入力はありません。
+
+- `https://mfmf-candidate-wspqvmhj6q-an.a.run.app/auth/callback`
+- `https://mfmf-candidate-wspqvmhj6q-an.a.run.app/auth/callback?next=/reset-password`
+
+plan を確認し、同じ workflow を `apply: true` で実行すると、GET → 直前 GET による
+`uri_allow_list` / `site_url` の厳密な不変確認 → `uri_allow_list` だけの PATCH 1回 → GET 照合を行います。
+既存 allowlist の文字列は空白・順番・重複も含めて保持し、足りない固定 URL だけを末尾へ追加します。
+2件とも既にあれば PATCH は送りません。`site_url` とその他の設定は変更しません。
+`*` / `**` で許可範囲を広げず、追加は上記の固定2文字列だけです。Supabase は query 区切りの
+`?` も glob の1文字パターンとして扱うため、厳密な文字列完全一致の許可規則とは異なります。
+これは候補の callback 許可だけであり、Cloud Run の公開や本番 URL の切替は実行しません。
+
+[公式 PATCH API](https://supabase.com/docs/reference/api/v1-update-auth-service-config) は部分更新を許しますが、
+ETag / If-Match による CAS は文書化されていません。直前 GET と PATCH の短い間の競合は防げないため、
+実行中は Dashboard や別の処理で認証 URL 設定を変更しないでください。専用 concurrency はこの workflow の
+同時実行だけを防ぎます。自動 retry / rollback はせず、PATCH 後に失敗した場合は適用済みか不明なため、
+診断と plan を再実行して確認してから次の操作を判断してください。
+各要求は15秒、GET 応答は256 KiB、allowlist は32 KiB / 200項目までに制限し、応答本文・元設定・
+秘密情報・例外の詳細を出力またはファイル保存しません。表示する URL は上の固定追加対象だけです。
+
 ## ビルドと出力
 
 Docker build args は `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` と
