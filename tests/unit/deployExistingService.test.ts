@@ -28,6 +28,9 @@ const manifest = () => ({
 });
 const oldRevision = `${SERVICE}-00001-dsb`;
 const revision = `${SERVICE}-${env.GITHUB_SHA.slice(0, 12)}-${env.GITHUB_RUN_ID}-1`;
+const tag = `verify-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
+const taggedOrigin = `https://${tag}---${new URL(PUBLIC_ORIGIN).hostname}`;
+type Traffic = { type: string; revision?: string; percent?: number; tag?: string; uri?: string };
 const API = `https://run.googleapis.com/v2/${SERVICE_NAME}`;
 const REVISION = "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION";
 const LATEST = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST";
@@ -36,7 +39,7 @@ const initial = () => ({
   generation: "1", observedGeneration: "1", terminalCondition: { state: "CONDITION_SUCCEEDED" },
   latestCreatedRevision: `${SERVICE_NAME}/revisions/${oldRevision}`, latestReadyRevision: `${SERVICE_NAME}/revisions/${oldRevision}`,
   ingress: "INGRESS_TRAFFIC_ALL", scaling: { maxInstanceCount: 1 },
-  traffic: [{ type: LATEST, percent: 100 }], trafficStatuses: [{ type: LATEST, revision: oldRevision, percent: 100 }],
+  traffic: [{ type: LATEST, percent: 100 }] as Traffic[], trafficStatuses: [{ type: LATEST, revision: oldRevision, percent: 100 }] as Traffic[],
   template: {
     serviceAccount: RUNTIME, scaling: { maxInstanceCount: 1 }, maxInstanceRequestConcurrency: 10,
     timeout: "60s", executionEnvironment: "EXECUTION_ENVIRONMENT_GEN2",
@@ -55,38 +58,60 @@ function harness({ service = initial(), failure = "", candidate = manifest() } =
   let smokeCount = 0;
   const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0], options?: RequestInit) => {
     const url = String(input);
-    if (url.startsWith(PUBLIC_ORIGIN)) {
+    if ([PUBLIC_ORIGIN, taggedOrigin].includes(new URL(url).origin)) {
       smokeCount++;
-      if (failure === "concurrent-promotion" && smokeCount === 3) {
+      if ((failure === "post-smoke-race" && smokeCount === 6) ||
+          (failure === "cleanup-smoke-race" && smokeCount === 5) ||
+          (failure === "unchanged-smoke-race" && smokeCount === 4)) {
+        state.traffic = [...state.traffic, { type: REVISION, revision: oldRevision, percent: 0, tag: "operator-tag" }];
+        state.trafficStatuses = structuredClone(state.traffic);
+        state.etag = "operator-after-smoke";
+      }
+      if (failure === "concurrent-promotion" && smokeCount === 5) {
         state.latestCreatedRevision = `${SERVICE_NAME}/revisions/${SERVICE}-operator-new`;
         return new Response("private-response-marker", { status: 403 });
       }
-      if (failure === "concurrent-template" && smokeCount === 3) {
+      if (failure === "concurrent-template" && smokeCount === 5) {
         Object.assign(state.template, { revision: `${SERVICE}-operator-new` });
         return new Response("private-response-marker", { status: 403 });
       }
-      if ((failure === "baseline-private" && smokeCount === 1) || (failure === "smoke" && smokeCount === 3)) return new Response("private-response-marker", { status: 403 });
+      if (failure === "operator-promoted-during-stage" && smokeCount === 3) {
+        state.traffic = state.trafficStatuses = [{ type: REVISION, revision, percent: 100 }];
+        state.etag = "operator-promotion";
+        return new Response("private-response-marker", { status: 403 });
+      }
+      if ((failure === "baseline-private" && smokeCount === 1) || (failure === "smoke" && smokeCount === 5) || (["tag-smoke", "cleanup-smoke-race"].includes(failure) && smokeCount === 3)) return new Response("private-response-marker", { status: 403 });
+      if (failure === "tag-redirect" && smokeCount === 4) return new Response(null, {status: 307, headers: {location: `${PUBLIC_ORIGIN}/login`}});
       return url.endsWith("/login") ? new Response("login", { status: 200 }) : new Response(null, { status: 307, headers: { location: "/login" } });
     }
     if (options?.method === "PATCH") {
       patches++;
-      if (failure === "stage-denied" && patches === 1) return new Response("private-response-marker", { status: 403 });
-      if (failure === "rollback-denied" && patches === 3) return new Response("private-response-marker", { status: 403 });
-      if (failure === "rollback-conflict" && patches === 3) return new Response("private-response-marker", { status: 409 });
+      if (["stage-denied", "unchanged-smoke-race"].includes(failure) && patches === 1) return new Response("private-response-marker", { status: 403 });
+      if ((failure === "rollback-denied" && patches === 3) || (failure === "cleanup-denied" && patches === 2)) return new Response("private-response-marker", { status: 403 });
+      if ((failure === "rollback-conflict" && patches === 3) || (failure === "cleanup-conflict" && patches === 2)) return new Response("private-response-marker", { status: 409 });
       const patch = JSON.parse(String(options.body));
       expect(patch.etag).toBe(state.etag);
       if (patch.template) {
         Object.assign(state.template, patch.template);
         state.latestCreatedRevision = `${SERVICE_NAME}/revisions/${revision}`;
-        state.latestReadyRevision = state.latestCreatedRevision;
+        // Real Cloud Run 0%/min0 shape: created is new, Ready still names the old serving revision.
+        state.latestReadyRevision = `${SERVICE_NAME}/revisions/${oldRevision}`;
       }
       state.traffic = patch.traffic;
-      state.trafficStatuses = patch.traffic;
+      state.trafficStatuses = patch.traffic.map((target: Traffic) => target.tag
+        ? { ...target, percent: undefined, uri: failure === "wrong-tag-uri" ? "https://attacker.invalid" : taggedOrigin } : { ...target });
+      if (!patch.template) {
+        state.latestReadyRevision = `${SERVICE_NAME}/revisions/${patch.traffic[0].revision}`;
+        state.terminalCondition.state = "CONDITION_SUCCEEDED";
+      }
       state.etag = `etag-${patches}`;
       state.generation = state.observedGeneration = String(patches + 1);
-      if (failure === "stage-readiness" && patches === 1) state.terminalCondition.state = "CONDITION_FAILED";
+      if (["stage-readiness", "cleanup-denied", "cleanup-conflict"].includes(failure) && patches === 1) state.terminalCondition.state = "CONDITION_FAILED";
       if (failure === "stage-pending" && patches === 1) state.terminalCondition.state = "CONDITION_PENDING";
-      if (["promote-uncertain", "rollback-denied", "rollback-conflict"].includes(failure) && patches === 2) throw new Error("private-response-marker");
+      if (failure === "stage-uncertain" && patches === 1) throw new Error("private-response-marker");
+      if (failure === "foreign-tag" && patches === 1) state.traffic.push({ type: REVISION, revision: oldRevision, percent: 0, tag: "operator-tag" });
+      if (failure === "cleanup-revision-race" && patches === 3) state.latestCreatedRevision = `${SERVICE_NAME}/revisions/${SERVICE}-operator-new`;
+      if (["promote-uncertain", "rollback-denied", "rollback-conflict", "cleanup-revision-race"].includes(failure) && patches === 2) throw new Error("private-response-marker");
       return Response.json({ name: "operation-fixture" });
     }
     if (url === `${API}/revisions/${revision}`) return Response.json({
@@ -120,7 +145,7 @@ describe("existing Cloud Run continuous deployment", () => {
     const writes = h.fetchImpl.mock.calls.filter(([, options]) => options?.method === "PATCH");
     expect(writes).toHaveLength(2);
     const stage = JSON.parse(String(writes[0][1]?.body));
-    expect(stage.traffic).toEqual([{ type: REVISION, revision: oldRevision, percent: 100 }]);
+    expect(stage.traffic).toEqual([{ type: REVISION, revision: oldRevision, percent: 100 }, {type: REVISION, revision, percent: 0, tag}]);
     expect(stage.template.revision).toBe(revision);
     expect(stage.template.containers[0].image).toBe(manifest().image);
     expect(stage.template.containers[0].env.filter((item: { valueSource?: object }) => item.valueSource)).toEqual([
@@ -132,7 +157,7 @@ describe("existing Cloud Run continuous deployment", () => {
     expect(JSON.parse(String(writes[1][1]?.body))).toEqual({ name: SERVICE_NAME, etag: "etag-1", traffic: [{ type: REVISION, revision, percent: 100 }] });
     for (const [input, options] of h.fetchImpl.mock.calls) {
       const url = String(input);
-      if (url.startsWith(PUBLIC_ORIGIN)) { expect(options?.headers).toBeUndefined(); expect(options?.redirect).toBe("manual"); }
+      if ([PUBLIC_ORIGIN, taggedOrigin].includes(new URL(url).origin)) { expect(options?.headers).toBeUndefined(); expect(options?.redirect).toBe("manual"); }
       else { expect(options?.redirect).toBe("error"); expect(options?.headers).toHaveProperty("Authorization", `Bearer ${env.GCP_ACCESS_TOKEN}`); }
       if (options?.method === "PATCH") expect(new URL(url).searchParams.get("allowMissing")).toBe("false");
     }
@@ -173,9 +198,10 @@ describe("existing Cloud Run continuous deployment", () => {
   it.each(["baseline-private", "prepare", "race", "old-unhealthy"])("makes no Cloud Run mutation on %s", async (failure) => {
     const h = harness({ failure }); await expect(h.run()).rejects.toThrow(); expect(h.patches()).toBe(0);
   });
-  it.each(["stage-denied", "stage-readiness", "stage-pending", "wrong-digest", "wrong-env"])("never promotes on %s", async (failure) => {
+  it.each(["stage-denied", "stage-readiness", "stage-pending", "stage-uncertain", "wrong-digest", "wrong-env", "tag-smoke", "tag-redirect", "wrong-tag-uri"])("never promotes on %s", async (failure) => {
     const h = harness({ failure }); const error = await h.run().catch((value: Error) => value);
-    expect(error).toBeInstanceOf(Error); expect(String(error)).not.toContain("private-response-marker"); expect(h.patches()).toBe(1);
+    expect(error).toBeInstanceOf(Error); expect(String(error)).not.toContain("private-response-marker"); expect(h.patches()).toBe(failure === "stage-denied" ? 1 : 2);
+    expect(h.state().traffic).toHaveLength(1);
     expect(h.state().traffic[0].percent).toBe(100);
     expect((h.state().traffic[0] as { revision?: string }).revision ?? oldRevision).toBe(oldRevision);
   });
@@ -190,12 +216,47 @@ describe("existing Cloud Run continuous deployment", () => {
     service.trafficStatuses = [{ type: REVISION, percent: 100, revision: oldRevision }];
     const h = harness({ service }); await expect(h.run()).resolves.toEqual(manifest()); expect(h.patches()).toBe(2);
   });
+  it("recovers the observed retired 0% revision without requiring latestCreated to equal latestReady", async () => {
+    const service = initial();
+    service.generation = service.observedGeneration = "2";
+    service.latestCreatedRevision = `${SERVICE_NAME}/revisions/${SERVICE}-previous-retired`;
+    Object.assign(service.template, { revision: `${SERVICE}-previous-retired` });
+    Object.assign(service, { conditions: [{ type: "ConfigurationsReady", state: "CONDITION_SUCCEEDED", revisionReason: "RETIRED" }] });
+    service.traffic = [{ type: REVISION, revision: oldRevision, percent: 100 }];
+    service.trafficStatuses = structuredClone(service.traffic);
+    const h = harness({ service }); await expect(h.run()).resolves.toEqual(manifest());
+    const requests = h.fetchImpl.mock.calls.map(([input]) => String(input));
+    expect(requests.indexOf(`${taggedOrigin}/login`)).toBeLessThan(requests.indexOf(`${API}/revisions/${revision}`));
+    expect(h.state().traffic).toEqual([{ type: REVISION, revision, percent: 100 }]);
+  });
+  it("never follows an unexpected tag URI and removes only the owned tag", async () => {
+    const h = harness({ failure: "wrong-tag-uri" }); await expect(h.run()).rejects.toThrow("Staging failed");
+    expect(h.fetchImpl.mock.calls.some(([input]) => String(input).includes("attacker.invalid") || String(input).startsWith(taggedOrigin))).toBe(false);
+    expect(h.patches()).toBe(2); expect(h.state().traffic).toEqual([{ type: REVISION, revision: oldRevision, percent: 100 }]);
+    expect(h.state().latestReadyRevision).toBe(`${SERVICE_NAME}/revisions/${oldRevision}`);
+  });
+  it.each(["cleanup-denied", "cleanup-conflict"])("does not retry failed tag cleanup on %s", async (failure) => {
+    const h = harness({ failure }); await expect(h.run()).rejects.toThrow("cleanup could not be verified"); expect(h.patches()).toBe(2);
+  });
+  it.each(["foreign-tag", "operator-promoted-during-stage"])("does not overwrite %s before its own promotion", async (failure) => {
+    const h = harness({ failure }); await expect(h.run()).rejects.toThrow("cleanup could not be verified"); expect(h.patches()).toBe(1);
+  });
+  it("does not claim cleanup if another revision appears after the cleanup PATCH", async () => {
+    const h = harness({ failure: "cleanup-revision-race" }); await expect(h.run()).rejects.toThrow("cleanup could not be verified"); expect(h.patches()).toBe(3);
+  });
+  it.each([["post-smoke-race", 2], ["cleanup-smoke-race", 2], ["unchanged-smoke-race", 1]])("rechecks traffic after anonymous smoke on %s without overwriting the operator", async (failure, patches) => {
+    const h = harness({ failure: String(failure) });
+    await expect(h.run()).rejects.toThrow("cleanup could not be verified");
+    expect(h.patches()).toBe(patches);
+    expect(h.state().traffic.some((target) => target.tag === "operator-tag")).toBe(true);
+    expect(JSON.stringify(h.log.mock.calls)).not.toContain("deployment succeeded");
+  });
   it.each(["rollback-denied", "rollback-conflict"])("does not retry or falsely claim rollback on %s", async (failure) => {
-    const h = harness({ failure }); await expect(h.run()).rejects.toThrow("rollback could not be verified"); expect(h.patches()).toBe(3);
+    const h = harness({ failure }); await expect(h.run()).rejects.toThrow("cleanup could not be verified"); expect(h.patches()).toBe(3);
   });
   it.each(["concurrent-promotion", "concurrent-template"])("does not overwrite %s during rollback", async (failure) => {
     const h = harness({ failure });
-    await expect(h.run()).rejects.toThrow("rollback could not be verified"); expect(h.patches()).toBe(2);
+    await expect(h.run()).rejects.toThrow("cleanup could not be verified"); expect(h.patches()).toBe(2);
   });
   it("rejects unreviewed secrets, mutable images and privileged public values before staging", async () => {
     for (const mutate of [

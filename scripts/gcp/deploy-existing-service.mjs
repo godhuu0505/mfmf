@@ -133,17 +133,17 @@ async function api(fetchImpl, token, url = API, patch) {
   } catch { fail("Cloud Run response is invalid or too large; contents withheld."); }
 }
 
-async function smoke(fetchImpl) {
+async function smoke(fetchImpl, origin = PUBLIC_ORIGIN) {
   for (const [path, status, location] of [["/login", 200, null], ["/records/new", 307, "/login"]]) {
     let response;
-    try { response = await fetchImpl(`${PUBLIC_ORIGIN}${path}`, { redirect: "manual", signal: AbortSignal.timeout(30_000) }); }
+    try { response = await fetchImpl(`${origin}${path}`, { redirect: "manual", signal: AbortSignal.timeout(30_000) }); }
     catch { fail("Anonymous public smoke request failed; details withheld."); }
     const received = response.headers.get("location");
     let valid = response.status === status && (location === null ? received === null : false);
     if (location && received) {
       try {
-        const url = new URL(received, PUBLIC_ORIGIN);
-        valid = response.status === status && url.origin === PUBLIC_ORIGIN && url.pathname === location && !url.hash;
+        const url = new URL(received, origin);
+        valid = response.status === status && url.origin === origin && url.pathname === location && !url.hash;
       } catch { /* fail below */ }
     }
     await response.body?.cancel();
@@ -160,16 +160,19 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   validateService(initial);
   assertReady(initial);
   const oldRevision = shortRevision(initial.trafficStatuses?.[0]?.revision);
-  if (!revisionName(oldRevision) || initial.latestCreatedRevision !== initial.latestReadyRevision ||
+  if (!revisionName(oldRevision) ||
       !trafficIs(initial.traffic, oldRevision, shortRevision(initial.latestReadyRevision) === oldRevision) || !trafficIs(initial.trafficStatuses, oldRevision, true)) {
     fail("Deployment requires one healthy serving revision without split or tagged traffic.");
   }
-  const serving = await api(fetchImpl, env.GCP_ACCESS_TOKEN, `${API}/revisions/${oldRevision}`);
-  if (serving.name !== `${SERVICE_NAME}/revisions/${oldRevision}` || serving.serviceAccount !== RUNTIME || serving.reconciling === true ||
-      !Array.isArray(serving.conditions) || !serving.conditions.some((condition) => condition.type === "Ready" && succeeded(condition)) ||
-      serving.containers?.length !== 1 || !imageDigest(serving.containers[0].image)) {
-    fail("The currently serving revision is not verified healthy; no update was attempted.");
-  }
+  const verifyServing = async () => {
+    const serving = await api(fetchImpl, env.GCP_ACCESS_TOKEN, `${API}/revisions/${oldRevision}`);
+    if (serving.name !== `${SERVICE_NAME}/revisions/${oldRevision}` || serving.serviceAccount !== RUNTIME || serving.reconciling === true ||
+        !Array.isArray(serving.conditions) || !serving.conditions.some((condition) => condition.type === "Ready" && succeeded(condition)) ||
+        serving.containers?.length !== 1 || !imageDigest(serving.containers[0].image)) {
+      fail("The currently serving revision is not verified healthy; no update was attempted.");
+    }
+  };
+  await verifyServing();
   const oldTraffic = [{ type: REVISION_TYPE, revision: oldRevision, percent: 100 }];
   // Enable only after publication. Never modify IAM / invoker settings to make this check pass.
   await smoke(fetchImpl);
@@ -182,6 +185,22 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   if (current.uid !== initial.uid || current.etag !== initial.etag) fail("Service changed while building; refusing concurrent deployment.");
   const revision = `${SERVICE}-${env.GITHUB_SHA.slice(0, 12)}-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
   if (!revisionName(revision)) fail("Generated revision name is invalid.");
+  const tag = `verify-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
+  const taggedHost = `${tag}---${new URL(PUBLIC_ORIGIN).hostname}`;
+  if (!/^[a-z][a-z0-9-]*[a-z0-9]$/.test(tag) || taggedHost.split(".")[0].length > 63) fail("Generated staging tag is invalid.");
+  const taggedOrigin = `https://${taggedHost}`;
+  const stagedTraffic = [...oldTraffic, { type: REVISION_TYPE, revision, percent: 0, tag }];
+  const stagedTrafficIs = (targets, resolved = false) => {
+    if (!Array.isArray(targets) || targets.length !== 2) return false;
+    const old = targets.filter((target) => !target.tag);
+    const tagged = targets.filter((target) => target.tag === tag);
+    if (!trafficIs(old, oldRevision) || tagged.length !== 1 || tagged[0].type !== REVISION_TYPE ||
+        shortRevision(tagged[0].revision) !== revision || (tagged[0].percent === undefined ? 0 : tagged[0].percent) !== 0) return false;
+    if (resolved && tagged[0].uri && ![taggedOrigin, `${taggedOrigin}/`].includes(tagged[0].uri)) {
+      fail("Cloud Run returned an unexpected staging URL; no request was sent to it.");
+    }
+    return !resolved || [taggedOrigin, `${taggedOrigin}/`].includes(tagged[0].uri);
+  };
   const runtimeEnv = [
     ...Object.entries(manifest.env).map(([name, value]) => ({ name, value })),
     ...Object.entries(manifest.secretVersions).map(([name, ref]) => {
@@ -195,50 +214,89 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
     });
     if (result.error) fail("Cloud Run update failed; operation details withheld.");
   };
-  const poll = async (target, trafficRevision) => {
+  const ownsCandidate = (service) => service.uid === initial.uid && shortRevision(service.template.revision) === revision &&
+    service.template.containers[0].image === manifest.image && runtimeEnvMatches(service.template.containers[0].env, runtimeEnv);
+  const poll = async (phase) => {
     for (let count = 0; count < maxPolls; count++) {
       const service = await get();
       validateService(service);
-      if (service.uid !== initial.uid) fail("Service identity changed during deployment.");
+      if (!ownsCandidate(service)) {
+        // A just-accepted PATCH may not be visible yet. Only the unchanged pre-PATCH snapshot is tolerable.
+        if (phase === "staged" && service.uid === initial.uid && service.etag === current.etag) { await wait(5_000); continue; }
+        fail("Service changed during deployment; refusing another update.");
+      }
+      if (![initial.latestCreatedRevision, `${SERVICE_NAME}/revisions/${revision}`, revision].includes(service.latestCreatedRevision)) {
+        fail("Another revision appeared during deployment; refusing another update.");
+      }
+      if (phase === "staged" && !stagedTrafficIs(service.traffic)) fail("Staging traffic was changed; refusing promotion.");
+      const reconciled = service.reconciling !== true && typeof service.generation === "string" && service.generation === service.observedGeneration;
       const created = shortRevision(service.latestCreatedRevision);
-      if (created === target && service.reconciling !== true && service.terminalCondition?.state === "CONDITION_FAILED") {
+      if (phase !== "restored" && created === revision && reconciled && service.terminalCondition?.state === "CONDITION_FAILED") {
         fail("Cloud Run revision failed readiness; details withheld.");
       }
-      if (created === target && shortRevision(service.template.revision) === target && shortRevision(service.latestReadyRevision) === target && service.reconciling !== true &&
-          succeeded(service.terminalCondition) && service.generation === service.observedGeneration &&
-          trafficIs(service.traffic, trafficRevision) && trafficIs(service.trafficStatuses, trafficRevision)) return service;
+      if (reconciled) {
+        if (phase === "restored" && trafficIs(service.traffic, oldRevision) && trafficIs(service.trafficStatuses, oldRevision)) return service;
+        if (created === revision && succeeded(service.terminalCondition)) {
+          // 0% / min0 can leave latestReady pointing at the serving old revision. The tag URI is probed below.
+          if (phase === "staged" && stagedTrafficIs(service.traffic) && stagedTrafficIs(service.trafficStatuses, true)) return service;
+          if (phase === "promoted" && shortRevision(service.latestReadyRevision) === revision &&
+              trafficIs(service.traffic, revision) && trafficIs(service.trafficStatuses, revision)) return service;
+        }
+      }
       await wait(5_000);
     }
     fail("Cloud Run reconciliation timed out; inspect the service before retrying.");
   };
-  log("Existing public service validated. Staging the fixed image while retaining the healthy revision's traffic.");
-  await patch(current, { template: { revision, containers: [{ ...current.template.containers[0], image: manifest.image, env: runtimeEnv }] }, traffic: oldTraffic }, "template.revision,template.containers,traffic");
-  const staged = await poll(revision, oldRevision);
-  const actual = await api(fetchImpl, env.GCP_ACCESS_TOKEN, `${API}/revisions/${revision}`);
-  if (actual.name !== `${SERVICE_NAME}/revisions/${revision}` || actual.serviceAccount !== RUNTIME || actual.reconciling === true ||
-      !Array.isArray(actual.conditions) || !actual.conditions.some((condition) => condition.type === "Ready" && succeeded(condition)) ||
-      actual.containers?.length !== 1 || actual.containers[0].image !== manifest.image || staged.template.containers[0].image !== manifest.image ||
-      !runtimeEnvMatches(actual.containers[0].env, runtimeEnv) || !runtimeEnvMatches(staged.template.containers[0].env, runtimeEnv)) {
-    fail("Staged revision identity, readiness, or image digest differs; healthy traffic remains unchanged.");
-  }
-  log("Staged revision is ready and its digest matches. Promoting the verified revision.");
+  log("Existing public service validated. Staging a tagged revision while retaining the healthy revision's traffic.");
+  let promotionAttempted = false;
   try {
+    await patch(current, { template: { revision, containers: [{ ...current.template.containers[0], image: manifest.image, env: runtimeEnv }] }, traffic: stagedTraffic }, "template.revision,template.containers,traffic");
+    await poll("staged");
+    // The API's URI must match the fixed service-derived URI, but fetch always uses our constructed constant.
+    await smoke(fetchImpl, taggedOrigin);
+    const actual = await api(fetchImpl, env.GCP_ACCESS_TOKEN, `${API}/revisions/${revision}`);
+    if (actual.name !== `${SERVICE_NAME}/revisions/${revision}` || actual.serviceAccount !== RUNTIME || actual.reconciling === true ||
+        !Array.isArray(actual.conditions) || !actual.conditions.some((condition) => condition.type === "Ready" && succeeded(condition)) ||
+        actual.containers?.length !== 1 || actual.containers[0].image !== manifest.image || !runtimeEnvMatches(actual.containers[0].env, runtimeEnv)) {
+      fail("Staged revision identity, readiness, image digest or environment differs.");
+    }
+    // Re-read after smoke/readiness checks; the ETag and exact owned traffic guard the promotion.
+    const staged = await poll("staged");
+    log("Tagged revision passed anonymous smoke, Ready, digest and environment checks. Promoting and removing the tag.");
+    promotionAttempted = true;
     await patch(staged, { traffic: [{ type: REVISION_TYPE, revision, percent: 100 }] }, "traffic");
-    await poll(revision, revision);
+    await poll("promoted");
     await smoke(fetchImpl);
+    await poll("promoted");
   } catch {
     try {
       const failed = await get();
       validateService(failed);
-      if (failed.uid !== initial.uid || shortRevision(failed.template.revision) !== revision ||
-          shortRevision(failed.latestCreatedRevision) !== revision || failed.template.containers[0].image !== manifest.image) throw new Error();
-      if (!trafficIs(failed.traffic, oldRevision)) {
-        if (!trafficIs(failed.traffic, revision)) throw new Error();
-        await patch(failed, { traffic: oldTraffic }, "traffic");
+      const unchanged = failed.uid === initial.uid && failed.etag === current.etag &&
+        trafficIs(failed.traffic, oldRevision, shortRevision(failed.latestReadyRevision) === oldRevision) &&
+        trafficIs(failed.trafficStatuses, oldRevision, true);
+      if (!unchanged) {
+        if (!ownsCandidate(failed) || ![initial.latestCreatedRevision, `${SERVICE_NAME}/revisions/${revision}`, revision].includes(failed.latestCreatedRevision)) throw new Error();
+        if (!trafficIs(failed.traffic, oldRevision)) {
+          if (!stagedTrafficIs(failed.traffic) && !(promotionAttempted && trafficIs(failed.traffic, revision))) throw new Error();
+          await patch(failed, { traffic: oldTraffic }, "traffic");
+        }
+        // Removing the tag can retire the new revision again. Only old traffic and its health matter here.
+        await poll("restored");
       }
-      await poll(revision, oldRevision);
-    } catch { fail("Promotion failed and rollback could not be verified; inspect traffic manually. Details withheld."); }
-    fail("Promotion or anonymous smoke failed; traffic was restored to the previous healthy revision.");
+      await verifyServing();
+      await smoke(fetchImpl);
+      if (unchanged) {
+        const finalState = await get();
+        validateService(finalState);
+        assertReady(finalState);
+        if (finalState.uid !== initial.uid || finalState.etag !== current.etag ||
+            !trafficIs(finalState.traffic, oldRevision, shortRevision(finalState.latestReadyRevision) === oldRevision) ||
+            !trafficIs(finalState.trafficStatuses, oldRevision, true)) throw new Error();
+      } else await poll("restored");
+    } catch { fail("Deployment failed and traffic/tag cleanup could not be verified; inspect manually. Details withheld."); }
+    fail(promotionAttempted ? "Promotion or anonymous smoke failed; traffic was restored to the previous healthy revision and the staging tag removed."
+      : "Staging failed; the previous healthy revision retains all traffic and the staging tag is absent.");
   }
   log("Cloud Run deployment succeeded: Ready revision, matching digest, login 200 and protected-page redirect verified.");
   return manifest;

@@ -48,18 +48,27 @@ API 本文・token・Docker出力・例外内容はログに出さない。
 1. 既存 service が Ready で、単一の healthy revision に100%配信されていることを確認する。
    split / tag 付き traffic、進行中の更新は拒否する。匿名 `/login` 200 と
    `/records/new` → 同一 origin の `/login` 307 も確認する。
+   過去の0% revision が Retired で `latestCreatedRevision` と `latestReadyRevision` が違っていても、
+   旧100%・タグなし・reconciled と配信中 revision の Ready を確認できれば次の配信を開始できる。
 2. 公開設定でイメージをビルド・pushし、固定 digest を取得する。ビルド中に service の
    etag が変わっていれば停止し、別の管理者の更新を上書きしない。
-3. **旧 healthy revision に100%を明示固定したまま**新しい revision を作る。
-   Ready、実 revision の digest、公開設定と固定 secret refs の一致を確認する。
-   この段階で失敗・タイムアウトしても旧 revision の traffic は維持される。
-4. 検証済み revision へ traffic を100%切り替え、反映と匿名 smoke を確認する。
-   切り替え要求や smoke が失敗した場合は、同じ service / 作成 revision / digest と etag を
-   再確認して旧 healthy revision へ traffic を戻す。
+3. **旧 healthy revision に100%を明示固定したまま**新しい revision を0%・実行ごとに固有のタグ付きで作る。
+   API が返すタグ URI を固定 service origin から組み立てた URL と完全照合し、その URL へ匿名 smoke を行う。
+   0% / min0 の revision はタグなしでは Retired のままになり得るため、`latestReadyRevision` の一致だけを待たない。
+   タグへのリクエスト後に実 revision の Ready・digest・公開設定・固定 secret refs を確認し、
+   service の所有対象・旧100% / 新0% と etag を再取得する。
+4. 検証済み revision へ100%切り替えると同時にタグを削除し、反映と本来の URL の匿名 smoke を確認する。
+   smoke 後にも traffic を再取得する。stage または切り替えで失敗した場合は、同じ service / 作成 revision /
+   digest / 環境設定と etag を再確認して、自分が作ったタグを除去し旧 healthy revision へ100%を戻す。
+   復旧確認は旧 revision の Ready と匿名 smoke・最終 traffic で行い、タグ除去後の新 revision の Ready は要求しない。
+   別のタグや revision、まだ自分が切り替えていない候補への外部 promotion があれば上書きせず停止する。
 5. 成功時に公開設定・digest・secret version参照だけの artifact を保存する。
 
 rollback 自体の権限 / API / 通信障害や外部同時編集があれば、復旧確認不能として job は失敗する。
 この場合は実 traffic を管理者が確認する。盲目的な PATCH 再送や IAM の追加はしない。
+検証タグの URL は一時的に匿名到達可能になる。OAuth の許可リストには追加せず、成功・確認可能な失敗処理で除去する。
+設定上の最小0・最大1は維持するが、0% のタグ付き revision は service 最大数の計数外になり得るため、
+検証中は旧・新に各1インスタンスが同時起動し、一時的に追加料金が発生する場合がある。
 artifact upload の失敗は、完了済みの healthy な配信を戻す理由にはしない。
 切り戻すのは **アプリの traffic だけ**で、適用済みの DB migration や追加済み SecretVersion は戻さない。
 破壊的 migration を含む場合は、旧 revision と新 DB の互換性・データ復元手順を別途確認する。
@@ -72,4 +81,6 @@ artifact upload の失敗は、完了済みの healthy な配信を戻す理由�
 公式仕様: [Service PATCH](https://docs.cloud.google.com/run/docs/reference/rest/v2/projects.locations.services/patch)、
 [Service の reconciliation / traffic / etag](https://docs.cloud.google.com/run/docs/reference/rest/v2/projects.locations.services)、
 [Revision](https://docs.cloud.google.com/run/docs/reference/rest/v2/projects.locations.services.revisions)、
-[Container / secretKeyRef](https://docs.cloud.google.com/run/docs/reference/rest/v2/Container)。
+[Container / secretKeyRef](https://docs.cloud.google.com/run/docs/reference/rest/v2/Container)、
+[タグでの検証と段階配信](https://docs.cloud.google.com/run/docs/rollouts-rollbacks-traffic-migration)、
+[タグ付き revision と service 最大数](https://docs.cloud.google.com/run/docs/configuring/max-instances#tagged-revisions-and-service-level-maximum-instances)。
