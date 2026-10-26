@@ -12,7 +12,8 @@ GCS バケット・IAM・本番の mode は、この migration では変更し�
 
 | 関数 | 契約 |
 | --- | --- |
-| `get_media_storage_mode()` | anon/authenticated が配信元 enum だけ取得 |
+| `get_media_storage_mode()` | anon/authenticated が書込状態 enum だけ取得 |
+| `get_media_read_backend()` | anon/authenticated が現在の読取配信元 enum だけ取得。frozen 中も前値を保持 |
 | `reserve_media_upload(kind, entity_id, household_id, byte_size, content_type)` | 個人アバターは本人、世帯アバターは owner、写真・ペットは対象世帯 owner/editor。サーバー生成 ID と固定 path を返す |
 | `get_media_upload(asset_id)` | 本人 profile または現在の世帯 member。削除後も同じ範囲で cleanup に必要な台帳を返す。ゲスト権限だけでは取得不可 |
 | `commit_media_upload(asset_id, generation, expected_old_path, expected_old_asset_id)` | 予約者と対象の権限を再確認。写真は既存親必須、アバターは旧 path/asset ID の両方を CAS。置換した旧台帳を返す |
@@ -40,7 +41,7 @@ Storage objects・全参照元・親・台帳の table lock を取得し、進�
 active backend 同士の直接変更は拒否し、必ず `frozen` を通す。
 
 - `supabase`: 従来の Storage RLS と画像パス参照を維持する。
-- `frozen`: 利用者の Storage INSERT/UPDATE/DELETE、参照変更、画像親の削除/移動を拒否する。従来画像の読取は残す。
+- `frozen`: 利用者の Storage INSERT/UPDATE/DELETE、参照変更、画像親の削除/移動を拒否する。現在の read_backend を保持して読取を続ける。
 - `gcs`: 旧 2 バケットの SELECT も拒否する。アプリから旧 Storage へ fallback しない。
 
 table lock は DB transaction の境界であり、DB 外のアップロード完了や発行済み署名 URL の失効を証明しない。
@@ -48,7 +49,7 @@ table lock は DB transaction の境界であり、DB 外のアップロード�
 既発行の旧署名 URL は最大 1 時間の失効待ちが必要。
 
 operator は `frozen` で移送対象ごとに新しい UUID/key を作り、GCS の全バイト・generation・binding を確認後、
-単一 DB transaction で台帳 INSERT と旧 path/asset ID/対象所有者/世帯の参照 CAS を行う。
+台帳だけを INSERT し、旧参照を保持する。activation の単一 DB transaction で旧 path/asset ID/対象所有者/世帯の参照 CAS 全件と mode/read_backend の gcs 変更を行う。
 既存 path が共有されている場合も参照ごとに複製する。利用者 RPC に legacy 登録入口はない。
 
 移送台帳は `is_legacy=true`, `created_by=NULL`, `state=ready` とし、`legacy_sha256`（64 桁小文字 hex）、

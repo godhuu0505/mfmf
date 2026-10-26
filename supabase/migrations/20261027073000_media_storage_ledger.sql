@@ -5,9 +5,10 @@
 
 create table public.media_storage_state (
   singleton boolean primary key default true check (singleton),
-  mode text not null default 'supabase' check (mode in ('supabase','frozen','gcs'))
+  mode text not null default 'supabase' check (mode in ('supabase','frozen','gcs')),
+  read_backend text not null default 'supabase' check (read_backend in ('supabase','gcs'))
 );
-insert into public.media_storage_state values (true, 'supabase');
+insert into public.media_storage_state values (true, 'supabase', 'supabase');
 alter table public.media_storage_state enable row level security;
 revoke all on public.media_storage_state from public, anon, authenticated;
 
@@ -19,6 +20,15 @@ language sql volatile security definer set search_path = '' as $$
 $$;
 revoke all on function public.get_media_storage_mode() from public, anon;
 grant execute on function public.get_media_storage_mode() to anon, authenticated;
+
+-- Freeze affects writes, not the currently active read backend. Operator
+-- activation changes all references and this value in one transaction.
+create function public.get_media_read_backend() returns text
+language sql volatile security definer set search_path = '' as $$
+  select read_backend from public.media_storage_state where singleton;
+$$;
+revoke all on function public.get_media_read_backend() from public, anon;
+grant execute on function public.get_media_read_backend() to anon, authenticated;
 
 -- Operator sessions have no end-user claims. SECURITY DEFINER alone must never
 -- turn an authenticated RPC into an operator bypass.
@@ -93,7 +103,7 @@ create index pets_avatar_asset_idx on public.pets(avatar_asset_id);
 
 -- Restrictive policies intersect every existing permissive Storage policy.
 create policy media_storage_read_mode on storage.objects as restrictive for select to authenticated using (
-  bucket_id not in ('daycare-photos','avatars') or public.get_media_storage_mode() in ('supabase','frozen')
+  bucket_id not in ('daycare-photos','avatars') or public.get_media_read_backend() = 'supabase'
 );
 create policy media_storage_insert_mode on storage.objects as restrictive for insert to authenticated with check (
   bucket_id not in ('daycare-photos','avatars') or public.get_media_storage_mode() = 'supabase'
@@ -118,7 +128,8 @@ begin
   if v_mode <> p_mode and v_mode <> 'frozen' and p_mode <> 'frozen' then
     raise exception 'Transition requires frozen mode' using errcode = '55000';
   end if;
-  update public.media_storage_state set mode = p_mode where singleton;
+  update public.media_storage_state set mode = p_mode,
+    read_backend = case when p_mode = 'frozen' then read_backend else p_mode end where singleton;
 end;
 $$;
 revoke all on function public.set_media_storage_mode(text) from public, anon, authenticated;
