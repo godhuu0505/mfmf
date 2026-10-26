@@ -1,0 +1,24 @@
+{
+  "formatVersion": 1,
+  "source": [
+    { "bucket": "daycare-photos", "path": "synthetic-owner/synthetic-record/photo.jpg", "size": 12, "hashes": { "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+    { "bucket": "avatars", "path": "synthetic-user/profile.jpg", "size": 13, "hashes": { "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } },
+    { "bucket": "avatars", "path": "synthetic-household/household.jpg", "size": 14, "hashes": { "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" } },
+    { "bucket": "avatars", "path": "synthetic-household/pet.jpg", "size": 15, "hashes": { "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" } }
+  ],
+  "destination": [
+    { "bucket": "daycare-photos", "path": "synthetic-owner/synthetic-record/photo.jpg", "size": 12, "hashes": { "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+    { "bucket": "avatars", "path": "synthetic-user/profile.jpg", "size": 13, "hashes": { "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } },
+    { "bucket": "avatars", "path": "synthetic-household/household.jpg", "size": 14, "hashes": { "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" } },
+    { "bucket": "avatars", "path": "synthetic-household/pet.jpg", "size": 15, "hashes": { "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" } }
+  ],
+  "references": {
+    "record_photos": ["synthetic-owner/synthetic-record/photo.jpg"],
+    "profiles": ["synthetic-user/profile.jpg", null],
+    "households": ["synthetic-household/household.jpg"],
+    "pets": ["synthetic-household/pet.jpg"]
+  },
+  "tombstones": [
+    { "bucket": "avatars", "path": "synthetic-user/old-profile.jpg" }
+  ]
+}
