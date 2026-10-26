@@ -55,6 +55,11 @@ if starts('iam', 'workload-identity-pools', 'providers', 'create-oidc'):
         'attributeCondition': opt('--attribute-condition'),
         'attributeMapping': dict(item.split('=', 1) for item in opt('--attribute-mapping').split(','))}]; save({})
 if starts('iam', 'service-accounts', 'get-iam-policy'): save(s.get('sa_policy', {}).get(args[3], {}))
+if starts('secrets', 'list'): save(s.get('secrets', []))
+if starts('secrets', 'create'):
+    s.setdefault('secrets', []).append({'name': 'projects/test-project/secrets/' + args[2],
+        'replication': {'userManaged': {'replicas': [{'location': 'asia-northeast1'}]}}}); save({})
+if starts('secrets', 'get-iam-policy'): save(s.get('secret_policy', {}))
 if starts('run', 'services', 'describe'):
     save(s.get('service', {'spec': {'template': {'spec': {'serviceAccountName': 'mfmf-runtime@test-project.iam.gserviceaccount.com'}}}}))
 if starts('run', 'services', 'get-iam-policy'): save(s.get('run_policy', {}))
@@ -80,7 +85,7 @@ class BootstrapTests(unittest.TestCase):
         args = ['bash', str(ROOT / 'scripts/gcp' / script), '--project', 'test-project']
         if script == 'bootstrap.sh':
             args += ['--project-number', '123456789', '--billing-account', 'ABCDEF-123456-ABCDEF']
-        else:
+        elif script == 'grant-deploy-access.sh':
             args += ['--service', 'mfmf-candidate']
         if apply:
             args.append('--apply')
@@ -150,6 +155,30 @@ class BootstrapTests(unittest.TestCase):
         self.state.write_text(json.dumps(state)); self.log.unlink()
         self.assertNotEqual(self.invoke().returncode, 0)
         self.assertFalse(any('add-iam-policy-binding' in c or 'update-oidc' in c for c in self.calls()))
+
+    def test_secret_preparation_never_reads_or_writes_values(self):
+        self.assertEqual(self.invoke(apply=False, script='prepare-runtime-secrets.sh').returncode, 0)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.invoke().returncode, 0)
+        self.log.unlink()
+        result = self.invoke(script='prepare-runtime-secrets.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.calls()
+        self.assertEqual(len([c for c in calls if c[:2] == ['secrets', 'create']]), 4)
+        grants = [c for c in calls if 'add-iam-policy-binding' in c]
+        self.assertEqual(len(grants), 8)
+        self.assertTrue(all(c[0] == 'secrets' for c in grants))
+        self.assertFalse(any('versions' in c or 'access' in c for c in calls))
+        self.log.unlink()
+        self.assertEqual(self.invoke(script='prepare-runtime-secrets.sh').returncode, 0)
+        self.assertFalse(any('create' in c for c in self.calls()))
+
+    def test_public_secret_refuses_iam_grants(self):
+        self.assertEqual(self.invoke().returncode, 0)
+        self.configure(secret_policy={'bindings': [{'members': ['allUsers']}]})
+        self.log.unlink()
+        self.assertNotEqual(self.invoke(script='prepare-runtime-secrets.sh').returncode, 0)
+        self.assertFalse(any('add-iam-policy-binding' in c for c in self.calls()))
 
     def test_private_service_grant_is_service_scoped(self):
         self.assertEqual(self.invoke(script='grant-deploy-access.sh').returncode, 0)

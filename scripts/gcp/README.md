@@ -66,10 +66,26 @@ bash scripts/gcp/grant-deploy-access.sh --project PROJECT_ID --service SERVICE_N
 このロールにはサービスの IAM 公開設定変更権限がない。
 サービスの新規作成/再作成や一般公開は管理者の作業として残る。
 
+## 秘密値の移送前
+
+P1 の配信準備が実行される前に、管理者が対象コンテナと権限だけを用意する。
+
+```bash
+bash scripts/gcp/prepare-runtime-secrets.sh --project PROJECT_ID
+# 対象確認後に --apply を追加する。
+```
+
+対象は `mfmf-token-enc-key` / `mfmf-google-client-id` / `mfmf-google-client-secret` /
+`mfmf-sentry-dsn` の4つ。東京の単一レプリカで作成する。既存のレプリカ設定は変更しない。
+配信用 SA に対象ごとの `secretVersionAdder`、runtime SA に対象ごとの `secretAccessor` を追加する。
+配信用 SA には秘密の読取・削除・IAM 変更権限を与えない。
+この段階では秘密値/バージョンの読み書きは一切しない。Sentry の値は任意であり、空の
+コンテナが存在しても Cloud Run が存在しないバージョンを参照する設定にはしない。
+
 ## 検証
 
 ```bash
-bash -n scripts/gcp/bootstrap.sh scripts/gcp/grant-deploy-access.sh
+bash -n scripts/gcp/*.sh
 python3 tests/scripts/gcp-bootstrap.test.py
 ```
 
