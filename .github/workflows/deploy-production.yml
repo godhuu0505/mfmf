@@ -81,7 +81,11 @@ jobs:
       - name: Link Supabase project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
+      - name: Configure bounded package downloads
+        uses: ./.github/actions/configure-apt
+
       - name: Install backup encryption
+        timeout-minutes: 5
         run: sudo apt-get update && sudo apt-get install -y age
 
       # 公開リポジトリの Artifact は閲覧者も取得できる。SQL は必ず age で
