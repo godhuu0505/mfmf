@@ -43,6 +43,9 @@ checks all existing resources, then creates missing fixed resources and adds onl
 Existing divergent configuration or permissions stop the run; they are not silently repaired. IAM writes
 preserve other members and use etags. A partial failure may leave created resources: inspect them before
 retrying. The script does not blindly retry conflicts or delete resources to recover.
+Failed API calls report only the fixed resource category, HTTP method and status. Newly created custom
+roles can take time to propagate; a failed binding does not justify recreating buckets or widening IAM.
+Read and validate the partial state before explicitly resuming the missing bindings.
 
 ## Real contract check
 
@@ -54,6 +57,8 @@ with that single permission and bind it to the confirmed operator on the runtime
 contents must be checked before reuse. Remove precisely that temporary member/role binding afterward.
 The broader predefined Service Account Token Creator role is unnecessary for this test. The permanent
 runtime self-signBlob binding remains separate.
+IAM policy reads can reflect a grant before token issuance does. Allow propagation time, checking only
+the fixed permission; do not repeatedly mutate the policy or broaden the role to bypass a transient 403.
 
 ```bash
 # Without --execute, no cloud call is made.
@@ -68,6 +73,9 @@ All GCS JSON API and self-signBlob calls then use that runtime token. Signed URL
 object identifiers are not printed. It tests CORS, exact size ±1, MIME/header tampering, valid upload,
 create-only replay, actual image decoding, generation-bound rewrite and metadata replacement, deletion
 followed by replay into incoming only, old-generation deletion isolation and final signed URL invalidation.
+The live XML API rejects a missing signed header with `400 MalformedSecurityHeader`; altered signed
+values are rejected with 403. The contract verifies that specific error code and checks that rejected
+uploads created no live object. Cleanup verifies absence and reports only fixture counts and bytes.
 
 The incoming replay intentionally demonstrates that generation zero is not a one-time credential.
 Production must never authorize browser writes to final names. Cleanup only visits this run's random

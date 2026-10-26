@@ -71,11 +71,13 @@ export async function bootstrapStorage({ token, origins = [], apply = false, fet
   if (typeof token !== "string" || !token || /[\r\n]/.test(token)) fail();
   const configs = BUCKETS.map((name) => storageBucketConfig(name, origins));
   const request = async (url, { method = "GET", body, missing = false } = {}) => {
+    const path = new URL(url).pathname;
+    const stage = path.endsWith("/iam") ? "bucket-iam" : path.includes("IamPolicy") ? "runtime-iam" : path.includes("/roles") ? "custom-role" : "bucket-config";
     let response;
     try { response = await fetchImpl(url, { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}), redirect: "error", signal: AbortSignal.timeout(30_000) }); } catch { fail(); }
     if (response.status === 404 && missing) { await response.body?.cancel(); return null; }
-    if (!response.ok) { await response.body?.cancel(); fail(); }
+    if (!response.ok) { log(`Storage API stopped: ${stage} ${method} HTTP ${response.status}. Response details withheld; inspect existing state before retrying.`); await response.body?.cancel(); fail(); }
     try {
       const chunks = []; let bytes = 0;
       for await (const chunk of response.body) { bytes += chunk.length; if (bytes > 262_144) fail(); chunks.push(Buffer.from(chunk)); }

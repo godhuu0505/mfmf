@@ -10,10 +10,21 @@ const fail = () => { throw new Error("Storage contract failed; URL, token and AP
 
 export async function runStorageContract({ storage, png, fetchImpl = fetch, log = console.log }) {
   const cleanup = [];
-  const request = async (url, options, expected) => {
+  const generations = new Map();
+  const remember = (object) => { if (object) generations.set(`${object.bucket}/${object.name}/${object.generation}`, object.size); return object; };
+  const request = async (url, options, expected, expectedCode) => {
     const response = await fetchImpl(url, { ...options, redirect: "manual", signal: AbortSignal.timeout(30_000) });
-    if (response.status !== expected) { await response.body?.cancel(); fail(); }
-    await response.body?.cancel();
+    if (response.status !== expected) { log(`Contract HTTP mismatch: expected ${expected}, received ${response.status}; response details withheld.`); await response.body?.cancel(); fail(); }
+    if (expectedCode) {
+      const chunks = []; let size = 0;
+      for await (const chunk of response.body) { size += chunk.length; if (size > 16_384) fail(); chunks.push(Buffer.from(chunk)); }
+      const xml = Buffer.concat(chunks).toString("utf8");
+      if (!xml.includes(`<Code>${expectedCode}</Code>`)) {
+        const code = xml.match(/<Code>([A-Za-z]+)<\/Code>/)?.[1];
+        const category = ["MissingSecurityHeader", "MalformedSecurityHeader", "InvalidArgument", "MalformedHeaderValue", "InvalidAuthentication", "SignatureDoesNotMatch", "AccessDenied"].includes(code) ? code : "other";
+        log(`Contract XML rejection category: ${category}; response details withheld.`); fail();
+      }
+    } else await response.body?.cancel();
     return response;
   };
   try {
@@ -34,16 +45,18 @@ export async function runStorageContract({ storage, png, fetchImpl = fetch, log 
       await request(upload.url, { method: "PUT", headers: upload.headers, body: png.subarray(0, -1) }, 400);
       await request(upload.url, { method: "PUT", headers: { ...upload.headers, "content-type": "image/jpeg" }, body: png }, 403);
       const missingHeader = { ...upload.headers }; delete missingHeader["x-goog-content-length-range"];
-      await request(upload.url, { method: "PUT", headers: missingHeader, body: png }, 403);
+      // XML distinguishes an absent security header (400) from a modified signed value (403).
+      await request(upload.url, { method: "PUT", headers: missingHeader, body: png }, 400, "MalformedSecurityHeader");
       await request(upload.url, { method: "PUT", headers: { ...upload.headers, "x-goog-if-generation-match": "1" }, body: png }, 403);
+      if (remember(await storage.stat(incoming))) fail();
       log(`Testing ${bucket}: real upload, image decode and immutable publication.`);
       await request(upload.url, { method: "PUT", headers: upload.headers, body: png }, 200);
-      const source = await storage.stat(incoming); if (!source) fail();
+      const source = remember(await storage.stat(incoming)); if (!source) fail();
       await request(upload.url, { method: "PUT", headers: upload.headers, body: png }, 412);
       const binding = { schema: "1", state: "ready", kind: bucket === "photos" ? "record-photo" : "profile-avatar", entityId, householdId, ownerId, reservationId, sourceGeneration: source.generation };
       const destinationName = `${householdId ?? ownerId}/${bucket === "photos" ? entityId : "avatars"}/${reservationId}`;
       const destination = { bucket, name: destinationName }; cleanup.push(destination);
-      const final = await storage.publish({ source, destinationName, binding, expectedSize: png.length, contentType: "image/png" });
+      const final = remember(await storage.publish({ source, destinationName, binding, expectedSize: png.length, contentType: "image/png" }));
       const readUrl = await storage.signRead(final, 300);
       await request(readUrl, {}, 200);
       let conflict = false;
@@ -54,7 +67,7 @@ export async function runStorageContract({ storage, png, fetchImpl = fetch, log 
       await storage.deleteGeneration(source);
       // Demonstrate that generation=0 is not a single-use credential after deletion.
       await request(upload.url, { method: "PUT", headers: upload.headers, body: png }, 200);
-      const replayed = await storage.stat(incoming);
+      const replayed = remember(await storage.stat(incoming));
       if (!replayed || replayed.generation === source.generation || (await storage.stat(final))?.generation !== final.generation) fail();
       await storage.deleteGeneration(source); // an old deletion must not delete the new incoming generation
       if (!(await storage.stat(replayed))) fail();
@@ -66,10 +79,11 @@ export async function runStorageContract({ storage, png, fetchImpl = fetch, log 
   } finally {
     let failed = false;
     for (const object of cleanup.reverse()) {
-      try { const metadata = await storage.stat(object); if (metadata) await storage.deleteGeneration(metadata); }
+      try { const metadata = remember(await storage.stat(object)); if (metadata) await storage.deleteGeneration(metadata); if (await storage.stat(object)) failed = true; }
       catch { failed = true; }
     }
     if (failed) throw new Error("Storage contract cleanup could not be verified; inspect isolated fixture objects. Details withheld.");
+    log(`Fixture cleanup verified: ${cleanup.length} isolated names, zero live objects; ${generations.size} observed generations (${[...generations.values()].reduce((sum, size) => sum + size, 0)} bytes) may remain soft-deleted for seven days.`);
   }
   log("Real GCS contract completed. Only isolated fixture objects were written; soft-deleted fixtures retain their seven-day policy.");
 }

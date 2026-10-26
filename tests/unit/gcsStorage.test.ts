@@ -3,6 +3,7 @@ import sharp from "sharp";
 vi.mock("server-only", () => ({}));
 import { createGcsStorage, GCS_BUCKETS, GCS_MAX_BYTES, GCS_RUNTIME, gcsBindingMetadata, validateGcsObject, validateGcsBinding, type GcsBinding, type GcsObject, type GcsRef } from "../../src/lib/gcsStorage";
 import { bootstrapStorage, storageBucketConfig, STORAGE_ORIGIN } from "../../scripts/gcp/bootstrap-storage.mjs";
+import { runStorageContract } from "../../scripts/gcp/test-storage-contract.mjs";
 
 const owner = "11111111-1111-4111-8111-111111111111";
 const household = "22222222-2222-4222-8222-222222222222";
@@ -162,6 +163,53 @@ describe("fixed GCS adapter", () => {
   });
 });
 
+describe("operator storage contract", () => {
+  function harness(missingCode = "MalformedSecurityHeader") {
+    const live = new Map<string, GcsRef & { size: number }>();
+    const incoming = new Map<string, GcsObject>(); const reads = new Map<string, GcsRef>(); let generation = 0;
+    const key = (object: GcsObject) => `${object.bucket}/${object.name}`;
+    const stat = async (object: GcsObject & { generation?: string }) => {
+      const value = live.get(key(object)); return value && (!object.generation || object.generation === value.generation) ? value : null;
+    };
+    const storage = {
+      stat,
+      signUpload: async (object: GcsObject) => {
+        incoming.set(object.bucket, object);
+        return { url: `https://fixture.invalid/${object.bucket}/upload`, headers: { "content-type": "image/png", "x-goog-content-length-range": `${png.length},${png.length}`, "x-goog-if-generation-match": "0" } };
+      },
+      publish: async ({ source: original, destinationName }: { source: GcsRef; destinationName: string }) => {
+        const object = { bucket: original.bucket, name: destinationName }; if (live.has(key(object))) throw { code: "conflict" };
+        const result = { ...object, generation: String(++generation), size: png.length }; live.set(key(object), result); return result;
+      },
+      signRead: async (object: GcsRef) => { const url = `https://fixture.invalid/read/${object.generation}`; reads.set(url, object); return url; },
+      deleteGeneration: async (object: GcsRef) => { if (live.get(key(object))?.generation === object.generation) live.delete(key(object)); },
+    };
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0], options: RequestInit = {}) => {
+      const url = String(input);
+      if (options.method === "OPTIONS") return new Response(null, { status: 200, headers: (options.headers as Record<string, string>).Origin === STORAGE_ORIGIN ? { "Access-Control-Allow-Origin": STORAGE_ORIGIN } : {} });
+      if (options.method !== "PUT") return new Response(null, { status: await stat(reads.get(url)!) ? 200 : 404 });
+      const headers = options.headers as Record<string, string>;
+      if ((options.body as Buffer).length !== png.length) return new Response(null, { status: 400 });
+      if (!headers["x-goog-content-length-range"]) return new Response(`<Error><Code>${missingCode}</Code><Message>private-response-marker</Message></Error>`, { status: 400 });
+      if (headers["content-type"] !== "image/png" || headers["x-goog-if-generation-match"] !== "0") return new Response(null, { status: 403 });
+      const object = incoming.get(new URL(url).pathname.split("/")[1])!;
+      if (live.has(key(object))) return new Response(null, { status: 412 });
+      live.set(key(object), { ...object, generation: String(++generation), size: png.length }); return new Response(null, { status: 200 });
+    });
+    return { live, storage, fetchImpl, log: vi.fn() };
+  }
+  it("distinguishes missing security headers, verifies cleanup and reports only aggregate fixture data", async () => {
+    const h = harness(); await runStorageContract({ ...h, png });
+    expect(h.live.size).toBe(0);
+    expect(h.log).toHaveBeenCalledWith(`Fixture cleanup verified: 4 isolated names, zero live objects; 6 observed generations (${png.length * 6} bytes) may remain soft-deleted for seven days.`);
+    expect(JSON.stringify(h.log.mock.calls)).not.toContain("private-response-marker");
+  });
+  it("does not accept an unrelated 400 as missing-header rejection", async () => {
+    const h = harness("UnrelatedFailure"); await expect(runStorageContract({ ...h, png })).rejects.toThrow("details withheld");
+    expect(h.live.size).toBe(0); expect(JSON.stringify(h.log.mock.calls)).not.toContain("private-response-marker");
+  });
+});
+
 describe("storage operator bootstrap", () => {
   it("uses only two fixed private Tokyo buckets and incoming-only lifecycle", () => {
     const config = storageBucketConfig(GCS_BUCKETS.photos, ["https://mfmf-fixture.vercel.app"]);
@@ -236,7 +284,10 @@ describe("storage operator bootstrap", () => {
   });
   it("does not retry an IAM conflict or print its response", async () => {
     const h = setupHarness("conflict");
-    await expect(bootstrapStorage({ token: "fixture", apply: true, fetchImpl: h.fetchImpl, log: vi.fn() })).rejects.not.toThrow("private-conflict");
+    const log = vi.fn();
+    await expect(bootstrapStorage({ token: "fixture", apply: true, fetchImpl: h.fetchImpl, log })).rejects.not.toThrow("private-conflict");
     expect(h.fetchImpl.mock.calls.filter(([, options]) => options?.method === "PUT")).toHaveLength(1);
+    expect(log).toHaveBeenCalledWith("Storage API stopped: bucket-iam PUT HTTP 409. Response details withheld; inspect existing state before retrying.");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("private-conflict");
   });
 });
