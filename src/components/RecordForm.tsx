@@ -1,16 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { uploadMedia, cancelUploadedMedia, type UploadedMedia } from "@/lib/uploadMedia";
 import { resizeImages } from "@/lib/imageResize";
-import { buildStoragePath } from "@/lib/storagePath";
 import TagInput from "@/components/TagInput";
 import {
   ConfirmCancelButton,
   ConfirmDialog,
 } from "@/components/FormConfirm";
 import {
-  PHOTO_BUCKET,
   QUICK_SOURCES,
   RECORD_SOURCES,
   SOURCE_LABEL,
@@ -157,28 +155,16 @@ export default function RecordForm({
     const form = e.currentTarget;
     setError(null);
 
-    // 1. 写真は Supabase Storage へブラウザから直接アップロード（Vercel の本体 4.5MB 制限を回避）。
-    const supabase = createClient();
-    const paths: string[] = [];
+    // 画像本体は private Storage に直接送信し、メタデータだけを Action へ渡す。
+    const uploads: UploadedMedia[] = [];
     try {
       setUploading(true);
       for (const file of files) {
         if (!file || file.size === 0) continue;
-        const path = buildStoragePath(storageScopeId, recordId, file.name);
-        const { error: uploadError } = await supabase.storage
-          .from(PHOTO_BUCKET)
-          .upload(path, file, { contentType: file.type, upsert: false });
-        if (uploadError) throw uploadError;
-        paths.push(path);
+        uploads.push(await uploadMedia({ kind: "photo", entityId: recordId, householdId }, storageScopeId, file));
       }
     } catch (err) {
-      // 途中まで成功したアップロードはオーファンになるため取り消す。
-      if (paths.length > 0) {
-        await supabase.storage
-          .from(PHOTO_BUCKET)
-          .remove(paths)
-          .catch(() => {});
-      }
+      await cancelUploadedMedia(uploads).catch(() => {});
       const message = err instanceof Error ? err.message : String(err);
       setError(`写真のアップロードに失敗しました: ${message}`);
       setUploading(false);
@@ -194,7 +180,10 @@ export default function RecordForm({
     // Cookie の「現在の世帯」ではなくこの値を検証して使う（別タブで世帯を切り替えた
     // 後に送信しても、記録と写真パスの世帯が食い違わない）。
     if (householdId) fd.set("household_id", householdId);
-    paths.forEach((p) => fd.append("photo_paths", p));
+    for (const upload of uploads) {
+      if (upload.backend === "supabase") fd.append("photo_paths", upload.path);
+      else fd.append("photo_upload_ids", upload.assetId);
+    }
 
     // action を await して、リダイレクト完了まで isPending=true を維持し二重送信を防ぐ。
     startTransition(async () => {

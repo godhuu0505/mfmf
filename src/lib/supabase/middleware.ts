@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_AUTH_COOKIE } from "./cookieName";
 import { siteRelativeLocation } from "@/lib/siteRedirect";
+import { cloudRunCutoverRoute } from "@/lib/cloudRunCutover";
 import {
   POST_LOGIN_NEXT_COOKIE,
   POST_LOGIN_NEXT_MAX_AGE,
@@ -39,6 +40,26 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // The canonical old entry must redirect even if Vercel's optional system-env
+  // exposure is disabled. Preview deployments still use the platform flag.
+  if (process.env.VERCEL === "1" || request.nextUrl.hostname === "mfmf-1223.vercel.app") {
+    const { data: readBackend, error: readError } = await supabase.rpc("get_media_read_backend");
+    let cutoverResponse: NextResponse | null = null;
+    if (readError || !["supabase", "gcs"].includes(readBackend)) {
+      cutoverResponse = new NextResponse("保存先を確認できません。時間をおいて再度お試しください。", { status: 503 });
+    } else {
+      const decision = cloudRunCutoverRoute({ vercel: true, readBackend, method: request.method,
+        pathname: request.nextUrl.pathname, search: request.nextUrl.search });
+      if (decision.kind === "redirect") cutoverResponse = NextResponse.redirect(decision.location, 307);
+      if (decision.kind === "reload") cutoverResponse = new NextResponse("保存先が移行しました。このページを再読み込みして、もう一度お試しください。", { status: 409 });
+    }
+    if (cutoverResponse) {
+      cutoverResponse.headers.set("Cache-Control", "private, no-store");
+      supabaseResponse.cookies.getAll().forEach((cookie) => cutoverResponse.cookies.set(cookie));
+      return cutoverResponse;
+    }
+  }
 
   const { pathname } = request.nextUrl;
   // Web Vitals はログイン画面からも送られる。ページ離脱時の

@@ -52,6 +52,7 @@ export default async function AccountSettingsPage() {
               </p>
             </div>
             <AvatarUploader
+              target={{ kind: "profile", entityId: user.id, householdId: null }}
               scopeId={user.id}
               currentUrl={avatarUrl}
               fallbackUrl={getOAuthAvatarUrl(user)}

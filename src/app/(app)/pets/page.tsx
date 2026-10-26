@@ -56,6 +56,7 @@ export default async function PetsPage() {
               >
                 <div className="mb-3">
                   <AvatarUploader
+                    target={{ kind: "pet", entityId: pet.id, householdId: pet.household_id }}
                     scopeId={pet.household_id}
                     currentUrl={
                       pet.avatar_path

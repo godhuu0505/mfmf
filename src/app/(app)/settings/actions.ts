@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { handleGcsAvatar } from "@/lib/mediaStorage";
 import { cookies } from "next/headers";
 import { getRoleInHousehold, HOUSEHOLD_COOKIE } from "@/lib/household";
 import { AVATAR_BUCKET, GUEST_ROLES, type GuestRole } from "@/types/database";
@@ -67,9 +68,17 @@ export async function updateUserAvatar(formData: FormData) {
 
   const { data: current } = await supabase
     .from("profiles")
-    .select("avatar_path")
+    .select("avatar_path, avatar_asset_id")
     .eq("owner_id", user.id)
     .maybeSingle();
+
+  try {
+    if (await handleGcsAvatar(supabase, user.id, { kind: "profile", entityId: user.id, householdId: null }, formData, current)) return;
+  } finally {
+    revalidatePath("/settings/account");
+    revalidatePath("/settings");
+    revalidatePath("/", "layout");
+  }
 
   // profiles 行が無いユーザーもいるため upsert。avatar_path 以外の列は
   // 既存行では温存され（提供列のみ更新）、新規行では既定 null になる。
@@ -176,7 +185,7 @@ export async function updateHouseholdAvatar(
   householdId: string,
   formData: FormData,
 ) {
-  const { supabase } = await requireOwnerOf(householdId);
+  const { supabase, user } = await requireOwnerOf(householdId);
 
   const newPath = String(formData.get("avatar_path") || "").trim();
   // 新規パスは当該世帯配下のものだけ受け付ける（越境防止・RLS が最終防衛）。
@@ -186,9 +195,15 @@ export async function updateHouseholdAvatar(
 
   const { data: current } = await supabase
     .from("households")
-    .select("avatar_path")
+    .select("avatar_path, avatar_asset_id")
     .eq("id", householdId)
     .maybeSingle();
+
+  try {
+    if (await handleGcsAvatar(supabase, user.id, { kind: "household", entityId: householdId, householdId }, formData, current)) return;
+  } finally {
+    revalidatePath("/settings");
+  }
 
   const { error } = await supabase
     .from("households")

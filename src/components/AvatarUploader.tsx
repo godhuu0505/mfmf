@@ -3,12 +3,12 @@
 import { useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { ImagePlus, UserRound } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { uploadMedia, cancelUploadedMedia, type UploadedMedia } from "@/lib/uploadMedia";
+import type { MediaTarget } from "@/lib/mediaStorage";
 import { resizeImage } from "@/lib/imageResize";
-import { buildAvatarPath } from "@/lib/storagePath";
-import { AVATAR_BUCKET } from "@/types/database";
 
 type Props = {
+  target: MediaTarget;
   /** アップロード先の scope（household_id または owner_id）。Storage パス先頭に入る。 */
   scopeId: string;
   /** 現在のアバターの署名付き URL（未設定は null）。 */
@@ -37,6 +37,7 @@ type Props = {
 // パターンで扱う共通部品（record 写真と同方針。Vercel の本体上限を避ける）。
 // アバターは 1 枚・長辺 512px に縮小する。
 export default function AvatarUploader({
+  target,
   scopeId,
   currentUrl,
   fallbackUrl = null,
@@ -63,27 +64,18 @@ export default function AvatarUploader({
     setError(null);
     setBusy(true);
 
-    const supabase = createClient();
-    let uploadedPath: string | null = null;
+    let upload: UploadedMedia | null = null;
     try {
       const resized = await resizeImage(file, { maxDimension: 512, quality: 0.85 });
-      const path = buildAvatarPath(scopeId, resized.name);
-      const { error: uploadError } = await supabase.storage
-        .from(AVATAR_BUCKET)
-        .upload(path, resized, { contentType: resized.type, upsert: false });
-      if (uploadError) throw uploadError;
-      uploadedPath = path;
-
+      upload = await uploadMedia(target, scopeId, resized);
       const fd = new FormData();
-      fd.set("avatar_path", path);
-      startTransition(async () => {
-        await action(fd);
-      });
+      if (upload.backend === "supabase") fd.set("avatar_path", upload.path);
+      else fd.set("media_upload_id", upload.assetId);
+      // Keep the upload and the final DB publication in the same error boundary.
+      // The caller can retry a failed upload; a completed reservation is never cancelled.
+      await action(fd);
     } catch (err) {
-      // Server Action 前の失敗ならアップロード済みオブジェクトはオーファンになるため取り消す。
-      if (uploadedPath) {
-        await supabase.storage.from(AVATAR_BUCKET).remove([uploadedPath]).catch(() => {});
-      }
+      if (upload) await cancelUploadedMedia([upload]).catch(() => {});
       const message = err instanceof Error ? err.message : String(err);
       setError(`アバターの保存に失敗しました: ${message}`);
     } finally {

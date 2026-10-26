@@ -136,6 +136,9 @@ jobs:
       - name: Validate Storage inventory SQL against local migrated schema
         run: node tests/scripts/storage-backup-local-sql.mjs
 
+      - name: Validate Storage migration transactions in isolated local database
+        run: node tests/scripts/storage-migration-local-sql.mjs
+
       # supabase/tests/**/*.sql を pg_prove で実行。1 つでも失敗すれば exit≠0 でジョブが落ちる。
       - name: Run pgTAP tests
         run: supabase test db

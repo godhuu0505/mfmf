@@ -26,6 +26,7 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [guides/gcp-migration-preflight.md](./guides/gcp-migration-preflight.md) — 外部接続なしの移行棚卸しとP2のStorage認可境界。
 - [guides/storage-manifest-reconciliation.md](./guides/storage-manifest-reconciliation.md) — 架空の画像manifestをオフラインで照合するCLIと、結果を移行合格にしない境界。
 - [guides/storage-operator-backup.md](./guides/storage-operator-backup.md) — 運用専用の固定source一覧取得、画像本体のage暗号化保全と全件byte検証。
+- [guides/storage-migration-operator.md](./guides/storage-migration-operator.md) — GCSへの段階移送、独立復元、同時CAS切替/rollback、terminal ledgerの定期回収。
 - [guides/genai-ranking-experiment.md](./guides/genai-ranking-experiment.md) — 架空の日本語記録だけを使うRanking APIのCLI実験・実測・料金。
 - [guides/sentry.md](./guides/sentry.md) — Sentry でエラーモニタリング / Web Vitals の p75 を有効化する（任意）。
 

@@ -55,8 +55,9 @@ descriptorは型のブランドだけで安全になるものではない。生�
 最初のPRは既存Supabase実装で契約を固定し、GCSへの切替・署名発行・クラウドIAM変更を混ぜない。
 
 次のPRでGCS読取adapterを追加するときも、**対象行の認可後にオブジェクト存在を確認**する。
-署名生成の成功を存在確認に使わない。存在しない場合だけSupabaseへfallbackし、403・timeout等を
-「見つからない」に変換して権限/障害を隠さない。切替期間の削除も両系統で扱う。
+署名生成の成功を存在確認に使わない。`gcs` 切替後はSupabaseへfallbackしない（保持した旧コピーから削除済み画像を復活させない）。
+403・timeout等を「見つからない」に変換して権限/障害を隠さない。
+凍結・参照CAS・終端化・旧署名URLの失効待ちは [台帳の契約](../reference/media-storage-ledger.md) を参照する。
 
 PUTの実GCS契約試験には、署名されたXML APIヘッダ `x-goog-if-generation-match: 0`、CORS、サイズ上限、
 同一URL再使用、削除後の再PUT、完了前後の競合を含める。エミュレータだけの成功でIAM/signBlobまで確認済みにしない。

@@ -51,10 +51,11 @@
 - パスエイリアスは `@/*` → `src/*`。
 - 型は `src/types/database.ts`。Storage バケット名は定数 `PHOTO_BUCKET`。
 - 画像は送信前にブラウザで長辺 1600px へ縮小・JPEG 再圧縮（`src/lib/imageResize.ts`）。
-- **写真はクライアントから Supabase Storage へ直接アップロード**する（`RecordForm`）。Server Action
-  には画像本体を渡さず、アップロード済みのオブジェクトパスだけを送って `record_photos` に登録する
-  （Vercel の Function ボディ上限 4.5MB を超えないため）。新規作成時は `record_id` をクライアントで
-  生成し、パス規約と DB 行の id を一致させる。
+- **画像本体はブラウザから非公開Storageへ直接アップロード**する（`RecordForm` / `AvatarUploader`）。
+  Server Actionには予約IDまたは従来のオブジェクトパスだけを送り、本体のサイズ上限を避ける。
+  保存先の正はDBの`get_media_storage_mode()`。GCSでは認可済み予約のincomingだけに署名PUTし、
+  サーバーが実画像・世代を検証してimmutable finalへコピーする。詳細は
+  [media-storage-ledger.md](docs/reference/media-storage-ledger.md)。切替後はSupabaseへfallbackしない。
 - Storage オブジェクトパス規約: `{household_id}/{record_id}/{filename}`。生成/検証は
   `src/lib/storagePath.ts`。**新規アップロードはこの形だけが通る** —— 旧規約
   `{owner_id}/{record_id}/{filename}` への insert ポリシーは削除済みで

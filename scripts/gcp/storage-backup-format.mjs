@@ -96,7 +96,7 @@ export function summarize(snapshot) {
 }
 
 // Bounded, framing-aware reader. No extraction to names supplied by the archive.
-export async function verifyArchive(input) {
+async function consumeArchive(input, capture) {
   const iterator = input[Symbol.asyncIterator]();
   let pending = Buffer.alloc(0);
   let ended = false;
@@ -127,14 +127,17 @@ export async function verifyArchive(input) {
     const snapshot = validateSnapshot(header.snapshot);
     requireValue(snapshot.objects.length > 0);
     const sources = [];
+    const objects = [];
     for (let index = 0; index < snapshot.objects.length; index++) {
       const object = await readFrame();
       exact(object, ["kind", "index", "size", "sha256"]);
       requireValue(object.kind === "object" && object.index === index && object.size === snapshot.objects[index].metadata.size);
       requireValue(typeof object.sha256 === "string" && /^[a-f0-9]{64}$/.test(object.sha256));
-      requireValue(sha256(await read(object.size)) === object.sha256);
+      const bytes = await read(object.size);
+      requireValue(sha256(bytes) === object.sha256);
       const { bucket, path } = snapshot.objects[index];
       sources.push({ bucket, path, size: object.size, hashes: { sha256: object.sha256 } });
+      if (capture) objects.push({ bucket, path, bytes, sha256: object.sha256 });
     }
     const footer = await readFrame();
     exact(footer, ["kind", "manifest", "snapshotSha256", "consistency"]);
@@ -143,8 +146,14 @@ export async function verifyArchive(input) {
     requireValue(canonical(footer.manifest) === canonical(manifestFor(snapshot, sources)));
     requireValue(!pending.length && (await iterator.next()).done);
     ended = true;
-    return { operation: "archive-byte-verification", readiness: "not-assessed", ...summarize(snapshot), verifiedObjects: sources.length };
+    const summary = { operation: "archive-byte-verification", readiness: "not-assessed", ...summarize(snapshot), verifiedObjects: sources.length };
+    return capture ? { snapshot, manifest: footer.manifest, objects, summary } : summary;
   } finally {
     if (!ended && iterator.return) await iterator.return().catch(() => {});
   }
 }
+
+export const verifyArchive = (input) => consumeArchive(input, false);
+// Private caller memory only, returned after the entire archive/footer/EOF verifies.
+// Never log or persist this return value unencrypted.
+export const decodeArchiveForOperator = (input) => consumeArchive(input, true);
