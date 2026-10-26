@@ -48,8 +48,8 @@ export default async function GalleryPage() {
     return db.localeCompare(da);
   });
 
-  const urlByPath = await createPhotoSignedUrls(
-    rows.map((r) => r.storage_path),
+  const urlById = await createPhotoSignedUrls(
+    rows.map((r) => r.id),
   );
 
   // 月ごとにグループ化して見出しを付ける（proto 合意 / notes.md「アルバム」）。
@@ -57,7 +57,7 @@ export default async function GalleryPage() {
   const monthGroups: { ym: string; label: string; images: GalleryImage[] }[] =
     [];
   for (const r of rows) {
-    const url = urlByPath.get(r.storage_path);
+    const url = urlById.get(r.id);
     if (!url || !r.daycare_records) continue;
     const image: GalleryImage = {
       id: r.id,

@@ -63,7 +63,7 @@ export async function getUserAvatarData(
 
   // アップロード済みアバターは private バケットなので署名付き URL にする。
   // 署名に失敗した（オブジェクトが消えている等）ときは Google の画像に落とす。
-  const uploadedUrl = await createAvatarSignedUrl(resolved?.avatar_path);
+  const uploadedUrl = await createAvatarSignedUrl({ kind: "profile", entityId: user.id });
 
   return {
     url: uploadedUrl ?? getOAuthAvatarUrl(user),

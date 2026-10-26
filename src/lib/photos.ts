@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET, type RecordPhoto } from "@/types/database";
+import { authorizePhotoReads } from "@/lib/mediaAuthorization";
 
 const SIGNED_URL_TTL = 60 * 60; // 1時間
 
@@ -17,21 +18,30 @@ export function toBrowserUrl(url: string): string {
   return url;
 }
 
-// 指定パスの署名付き URL（ブラウザ到達可能な形）を path -> url の Map で返す。
+// 写真行の ID から認可とパスの帰属を再確認し、ID -> URL を返す。
+// 呼出元が取得した行や、クライアント申告のパスを署名権限として扱わない。
 export async function createPhotoSignedUrls(
-  paths: string[],
+  photoIds: string[],
   ttlSeconds: number = SIGNED_URL_TTL,
 ): Promise<Map<string, string>> {
-  if (paths.length === 0) return new Map();
+  if (photoIds.length === 0) return new Map();
+  const photos = await authorizePhotoReads(photoIds);
+  if (photos.length === 0) return new Map();
   const supabase = await createClient();
-  const { data } = await supabase.storage
+  const { data, error } = await supabase.storage
     .from(PHOTO_BUCKET)
-    .createSignedUrls(paths, ttlSeconds);
+    .createSignedUrls([...new Set(photos.map((photo) => photo.path))], ttlSeconds);
+  if (error) throw new Error("写真の表示を準備できませんでした");
 
-  const map = new Map<string, string>();
+  const urlByPath = new Map<string, string>();
   data?.forEach((s) => {
-    if (s.path && s.signedUrl) map.set(s.path, toBrowserUrl(s.signedUrl));
+    if (s.path && s.signedUrl) urlByPath.set(s.path, toBrowserUrl(s.signedUrl));
   });
+  const map = new Map<string, string>();
+  for (const photo of photos) {
+    const url = urlByPath.get(photo.path);
+    if (url) map.set(photo.photoId, url);
+  }
   return map;
 }
 
@@ -40,11 +50,11 @@ export async function withSignedUrls(
   photos: RecordPhoto[],
 ): Promise<(RecordPhoto & { url: string | null })[]> {
   if (photos.length === 0) return [];
-  const urlByPath = await createPhotoSignedUrls(
-    photos.map((p) => p.storage_path),
+  const urlById = await createPhotoSignedUrls(
+    photos.map((p) => p.id),
   );
   return photos.map((photo) => ({
     ...photo,
-    url: urlByPath.get(photo.storage_path) ?? null,
+    url: urlById.get(photo.id) ?? null,
   }));
 }

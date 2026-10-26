@@ -293,11 +293,11 @@ export default async function HomePage({
   ];
 
   // 各記録の先頭写真サムネに署名付き URL を付与
-  const thumbPaths = list
-    .map((r) => r.record_photos?.[0]?.storage_path)
+  const thumbIds = list
+    .map((r) => r.record_photos?.[0]?.id)
     .filter((p): p is string => Boolean(p));
 
-  const urlByPath = await createPhotoSignedUrls(thumbPaths);
+  const urlById = await createPhotoSignedUrls(thumbIds);
 
   // 日付ソート時は日付見出しのタイムラインにする（UC-H01）。体重ソート時は
   // 日付順にならないため、従来どおりカード内に日付を出すフラット表示のまま。
@@ -317,8 +317,8 @@ export default async function HomePage({
     d === todayISO ? "今日" : d === yesterdayISO ? "昨日" : null;
 
   const recordCard = (r: (typeof list)[number], showDate: boolean) => {
-    const thumbPath = r.record_photos?.[0]?.storage_path;
-    const thumbUrl = thumbPath ? urlByPath.get(thumbPath) : undefined;
+    const thumbId = r.record_photos?.[0]?.id;
+    const thumbUrl = thumbId ? urlById.get(thumbId) : undefined;
     const photoCount = r.record_photos?.length ?? 0;
 
     return (
