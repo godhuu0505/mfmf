@@ -25,6 +25,9 @@ export function selectProductionConfig(response) {
   const values = new Map();
   for (const item of response.envs) {
     if (!item || !ALLOWED.has(item.key)) continue;
+    if (typeof item.target !== "string" && !Array.isArray(item.target)) {
+      throw new CandidateError(`Environment scope is ambiguous: ${item.key}.`);
+    }
     const targets = Array.isArray(item.target) ? item.target : [item.target];
     if (!targets.includes("production") || item.gitBranch) continue;
     if (values.has(item.key)) throw new CandidateError(`Duplicate production setting: ${item.key}.`);

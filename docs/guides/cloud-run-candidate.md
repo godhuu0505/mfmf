@@ -34,7 +34,7 @@ Sensitive 型など API から読めない値は管理者が安全な保管元�
 
 Docker build args は `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` と
 公開の正規 boolean `SIGNUP_ENABLED` だけ。login / signup の静的生成時にも同じ flag を渡し、
-既存の登録導線を保持します。
+既存の登録導線を保持します。flag を変更するときは実行時設定だけでなくイメージも再ビルドします。
 URL は hosted Supabase の HTTPS URL、キーは anon JWT / publishable key に限定し、
 `service_role` / secret key を拒否します。カスタム Supabase ドメインは未対応です。
 サーバーの値はメモリから Secret Manager の `addVersion` API へ直接渡します。

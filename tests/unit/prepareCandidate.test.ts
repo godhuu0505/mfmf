@@ -128,6 +128,13 @@ describe("candidate preparation", () => {
     expect(() => selectProductionConfig({ ...response(), ...extra })).toThrow("complete visible");
   });
 
+  it("does not silently disable an optional integration with missing environment scope", () => {
+    const data = response();
+    expect(() => selectProductionConfig({
+      envs: data.envs.map((item) => item.key === "GOOGLE_CLIENT_ID" ? { ...item, target: undefined } : item),
+    })).toThrow("scope is ambiguous");
+  });
+
   it("rejects service_role and secret keys before Docker", async () => {
     for (const value of ["sb_secret_fixture", `header.${Buffer.from(JSON.stringify({ role: "service_role" })).toString("base64url")}.signature`]) {
       const data = response();
