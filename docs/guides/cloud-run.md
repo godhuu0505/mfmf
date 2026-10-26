@@ -3,6 +3,8 @@
 最初に配信だけを検証し、DB・認証・写真は Supabase の認可を維持する。
 `Dockerfile.cloudrun` は本番用、従来の `Dockerfile` はローカル開発用。
 本番の入口を変更する前に下の確認を完了する。
+実公開値での候補イメージ作成と Secret Manager への設定移送は
+[候補イメージの準備](./cloud-run-candidate.md)を参照。
 
 ## コンテナの検証
 

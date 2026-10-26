@@ -19,6 +19,7 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [guides/local-supabase.md](./guides/local-supabase.md) — Supabase CLI でローカルスタックを立てる / トラブルシュート。
 - [guides/google-drive-setup.md](./guides/google-drive-setup.md) — Google ログイン / Drive 連携の設定（Google Cloud・Supabase・環境変数）。
 - [guides/deploy.md](./guides/deploy.md) — デプロイ・リリース手順（main→Preview、Release→Production）と初回セットアップ。
+- [guides/cloud-run-candidate.md](./guides/cloud-run-candidate.md) — WIF で候補イメージと公開設定を準備し、サーバーの秘密を Secret Manager へ移す。
 - [guides/verify-backend.md](./guides/verify-backend.md) — デプロイ済みアプリと Supabase バックエンドの動作確認。
 - [guides/feedback-to-issues.md](./guides/feedback-to-issues.md) — ご意見・不具合フォームの内容を非公開リポへ Issue 化する運用。
 - [guides/genai-ranking-experiment.md](./guides/genai-ranking-experiment.md) — 架空の日本語記録だけを使うRanking APIのCLI実験・実測・料金。
