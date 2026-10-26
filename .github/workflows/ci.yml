@@ -18,6 +18,32 @@ permissions:
   contents: read
 
 jobs:
+  cloudrun-container:
+    name: Cloud Run container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build standalone container (no production credentials)
+        run: |
+          docker build --platform linux/amd64 -f Dockerfile.cloudrun \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key \
+            -t mfmf-cloudrun:ci .
+      - name: Check non-root runtime and HTTP behavior
+        run: |
+          test "$(docker run --rm --entrypoint id mfmf-cloudrun:ci -u)" = "1000"
+          docker run -d --name mfmf-cloudrun-smoke -p 127.0.0.1:8080:8080 mfmf-cloudrun:ci
+          node tests/scripts/cloudrun-smoke.mjs
+      - name: Container diagnostics
+        if: failure()
+        run: docker logs mfmf-cloudrun-smoke || true
+      - name: Stop smoke container
+        if: always()
+        run: docker rm -f mfmf-cloudrun-smoke || true
+
   verify:
     name: lint / typecheck / build
     runs-on: ubuntu-latest
@@ -42,10 +68,20 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
+      - name: Test synthetic ranking CLI (no external API calls)
+        run: node --test tests/scripts/genai-ranking-experiment.test.mjs
+
+      - name: Configure APT downloads
+        uses: ./.github/actions/configure-apt
+
       - name: Test backup encryption and failure handling
+        timeout-minutes: 5
         run: |
           sudo apt-get update && sudo apt-get install -y age
           bash tests/scripts/backup-db.test.sh
+
+      - name: Test GCP bootstrap and failure handling
+        run: python3 tests/scripts/gcp-bootstrap.test.py
 
       - name: Build
         # NEXT_PUBLIC_* はブラウザ公開前提の値。ビルド通過用のプレースホルダで十分
@@ -146,11 +182,16 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321" >> "$GITHUB_ENV"
 
+      - name: Configure APT downloads
+        uses: ./.github/actions/configure-apt
+
       # VRT のフォントをベースライン生成環境と揃える（D31）
       - name: Install Japanese fonts
+        timeout-minutes: 5
         run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
 
       - name: Install Playwright browser
+        timeout-minutes: 5
         run: npx playwright install --with-deps chromium
 
       - name: Build

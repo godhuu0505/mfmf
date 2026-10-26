@@ -19,8 +19,10 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [guides/local-supabase.md](./guides/local-supabase.md) — Supabase CLI でローカルスタックを立てる / トラブルシュート。
 - [guides/google-drive-setup.md](./guides/google-drive-setup.md) — Google ログイン / Drive 連携の設定（Google Cloud・Supabase・環境変数）。
 - [guides/deploy.md](./guides/deploy.md) — デプロイ・リリース手順（main→Preview、Release→Production）と初回セットアップ。
+- [guides/cloud-run-candidate.md](./guides/cloud-run-candidate.md) — WIF で候補イメージと公開設定を準備し、サーバーの秘密を Secret Manager へ移す。
 - [guides/verify-backend.md](./guides/verify-backend.md) — デプロイ済みアプリと Supabase バックエンドの動作確認。
 - [guides/feedback-to-issues.md](./guides/feedback-to-issues.md) — ご意見・不具合フォームの内容を非公開リポへ Issue 化する運用。
+- [guides/genai-ranking-experiment.md](./guides/genai-ranking-experiment.md) — 架空の日本語記録だけを使うRanking APIのCLI実験・実測・料金。
 - [guides/sentry.md](./guides/sentry.md) — Sentry でエラーモニタリング / Web Vitals の p75 を有効化する（任意）。
 
 ## リファレンス（reference/）
@@ -34,6 +36,8 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [explanation/decisions.md](./explanation/decisions.md) — 設計決定ログ（D ログ）。**却下した案とその理由**を 1 行で残す唯一の場所。
 - [explanation/prototype-first.md](./explanation/prototype-first.md) — 新機能の画面を静的プロトタイプ＋Artifact で決める理由（2026-07-30 に実コード案から方針転換した経緯と実測データ）。
 - [explanation/mobile-app-tech-selection.md](./explanation/mobile-app-tech-selection.md) — **Android / iOS アプリ化の技術選定**（7 案 × 7 観点の重み付き評価と、PWA 継続を選んだ理由・覆す条件）。
+- [explanation/gcp-migration.md](./explanation/gcp-migration.md) — **GCP段階移行計画（D38）**。月額の前提、P0 / P1の完了条件、認可・復元・切替の検証。
+- [explanation/gcp-tech-selection.md](./explanation/gcp-tech-selection.md) — GCP移行の技術選定と見送った構成。
 - [explanation/roadmap.md](./explanation/roadmap.md) — 将来構想・機能カタログ・フェーズ別ロードマップ（家族共有・権限・Google 統合）。
 - [explanation/phase-3-5-use-cases.md](./explanation/phase-3-5-use-cases.md) — Phase 3.5（家族・権限・サインアップ・共有）のユースケース・バックログ（受け入れ条件・決定ログ・未決事項）。
 

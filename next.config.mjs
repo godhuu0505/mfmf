@@ -3,6 +3,9 @@ import { withSentryConfig } from "@sentry/nextjs";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Cloud Run 用コンテナだけ自己完結した Node サーバーを生成する。
+  // Vercel / ローカル開発の出力形式は従来どおりにする。
+  ...(process.env.NEXT_OUTPUT_STANDALONE === "1" ? { output: "standalone" } : {}),
 };
 
 // Sentry のビルド時統合。DSN が無くてもラップして問題ないが、source map の

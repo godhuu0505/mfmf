@@ -1,0 +1,39 @@
+name: Resume Supabase Production
+
+# 停止中の本番プロジェクトを手動で復帰する。migration / deploy はここでは実行しない。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 通常の本番 migration / deploy と同時に操作しない。
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: Resume paused project and verify health
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check status, resume only if paused, and wait for healthy services
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: node scripts/resume-supabase.mjs
+
+      - name: Record result
+        run: |
+          echo 'Supabase project and db/auth/rest/storage are ACTIVE_HEALTHY.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No migration or deployment was performed. Review and rerun the intended Deploy Production run separately.' >> "$GITHUB_STEP_SUMMARY"
