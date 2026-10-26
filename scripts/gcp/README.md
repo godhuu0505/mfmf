@@ -120,3 +120,9 @@ python3 tests/scripts/gcp-bootstrap.test.py
 一次資料: [WIF とデプロイパイプライン](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines)、
 [Cloud Run IAM](https://docs.cloud.google.com/run/docs/reference/iam/roles)、
 [予算作成 CLI](https://docs.cloud.google.com/sdk/gcloud/reference/billing/budgets/create)。
+
+## P2 / P3の前段調査
+
+`node scripts/gcp/migration-inventory.mjs` はGit管理下のソースだけを読み、Supabase依存の静的候補をJSONで出す。
+クラウド・DB・実envには接続しない。件数は移行完了の判定ではない。
+使い方・検出限界・次のStorage境界は [移行前調査](../../docs/guides/gcp-migration-preflight.md) を参照。
