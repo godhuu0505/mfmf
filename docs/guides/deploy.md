@@ -177,6 +177,35 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f pre-migrate-data.sql
 - 複数 migration があり N 個目で失敗した場合、N-1 個目までは適用済み。SQL を直して **同じ commit を re-run** すれば N 個目から再開される（冪等）。
 - 明示的に `COMMIT;` を書いた DDL を含めると部分適用が残り `supabase migration repair --status applied <version>` で履歴修復が必要になる。原則 migration ファイル内で明示 COMMIT を書かないこと。
 
+### `supabase link` が `project is paused` で失敗した時
+
+Free プランは低利用が続くと一時停止されます。この場合は migration 前に止まり、
+Vercel Production も実行されません。既存プロジェクトの復帰には
+**Actions → Resume Supabase Production → Run workflow（main）** を使います。
+`workflow_dispatch` 専用で、production Environment の既存
+`SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_ID` を使います。DB password は不要です。
+
+1. Management API で対象プロジェクトの状態を確認する。
+2. 停止状態 `INACTIVE` のときだけ `POST /v1/projects/{ref}/restore` を一度送る。
+   既に `ACTIVE_HEALTHY` / `RESTORING` / `COMING_UP` なら POST せず健康確認へ進む。
+   それ以外の初期状態は停止し、Dashboard で原因を確認する。
+3. 最大20分、プロジェクトと `db` / `auth` / `rest` / `storage` がすべて
+   `ACTIVE_HEALTHY` になるまで待つ。API エラー・失敗状態・タイムアウトはジョブを失敗させる。
+4. 成功後に、反映したい commit の **Deploy Production** run を確認して手動で再実行する。
+   バックアップ → migration → deploy の既存ゲートを通す。
+
+復帰 workflow は SQL・migration・Vercel deploy を実行せず、API 応答本文・token・接続情報も
+ログへ出しません。通常の本番デプロイと同じ concurrency group で直列化します。
+復帰要求の通信結果が不明でも自動再送しません。Dashboard の状態を確認してから再実行してください。
+
+[公式の停止・復帰仕様](https://supabase.com/docs/guides/platform/free-project-pausing)では
+停止後1年以内が復帰可能期間です（2026-10-27確認）。プロジェクト個別の復帰可否や token の権限は
+API が判定します。権限不足・期間超過等で拒否された場合は Dashboard / Supabase サポートで確認し、
+別プロジェクトへの復元やアップグレードをこの workflow で自動実行することはありません。
+API 仕様: [状態取得](https://supabase.com/docs/reference/api/v1-get-project) /
+[復帰](https://supabase.com/docs/reference/api/v1-restore-a-project) /
+[サービス健康確認](https://supabase.com/docs/reference/api/v1-get-services-health)。
+
 ## 補足: リリースノート / バージョニング
 
 本番デプロイは main マージで自動化されているため、GitHub Release はデプロイのトリガではなく
