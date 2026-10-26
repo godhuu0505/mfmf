@@ -42,6 +42,8 @@ Cloud Build、Cloud SQL、公開サービス、秘密鍵、秘密の値、デプ
 
 同名リソースがあれば内容を検査して再利用する。予算や WIF の条件が異なる場合、
 別 provider が同じ pool にある場合、対象 SA にプロジェクトロールやユーザー管理鍵がある場合は停止する。
+WIF は初期条件と、次節の専用スクリプトで有効化する継続配信用の条件だけを厳密一致で認識する。
+bootstrap 自体は初期条件を作るだけで、継続配信を有効化したり既存条件を戻したりしない。
 既存権限を置き換える `set-iam-policy`、権限削除、鍵作成は行わない。
 IAM はリソースごとの `add-iam-policy-binding` だけを使う。
 
@@ -49,6 +51,37 @@ IAM はリソースごとの `add-iam-policy-binding` だけを使う。
 失敗した理由と既存設定を確認してから再実行する。読み取りが権限不足で失敗した場合は
 「リソースが無い」とみなさず停止する。既存 SA の組織/フォルダ継承や他リソースへの
 個別付与まで全探索するものではないので、既存アカウントを再利用する場合は管理者が確認する。
+
+## 本番 push からの継続配信を許可する
+
+配信 workflow のレビュー後、管理者が `enable-production-wif.sh` を明示実行する。
+既定は外部呼出のない計画表示で、実際の設定照合・更新には `--apply` が必要。
+
+```bash
+bash scripts/gcp/enable-production-wif.sh --project PROJECT_ID --project-number PROJECT_NUMBER
+# 表示された対象と配信 workflow を確認後、同じ引数へ --apply を追加する。
+```
+
+変更するのは既存 `mfmf-github/github-main` provider の **attribute condition だけ**。
+repository ID `1271210275`、owner ID `19723431`、`refs/heads/main` を共通必須条件に保ち、
+既存の `deploy-cloud-run.yml@refs/heads/main` の push / workflow_dispatch に加え、
+`deploy-production.yml@refs/heads/main` の **push だけ**を許可する。
+本番 workflow の手動実行、PR、別 ref、別 repository/owner、別 workflow は許可しない。
+この変更は workflow にデプロイ処理を追加するものではない。
+
+プロジェクトの数値 ID、pool/provider の名前・有効状態、GitHub issuer、属性 mapping、
+空の custom audience を確認する。独自の JWKS/discovery 設定や actor provider、別 provider の
+同居も拒否する。condition は旧文字列か新文字列の厳密一致だけを受け入れ、
+新条件なら変更なしで終了し、それ以外（空白だけの差異を含む）は上書きしない。
+IAM・SA・secret・Cloud Run・予算・課金設定は変更しない。
+
+更新直前に provider を再取得し、他の変更があれば停止する。
+CLI に compare-and-swap 用の引数はなく、再取得と更新の間の競合までは防げないため、
+実行中は Dashboard / CLI / 他 workflow から同じ provider を編集しない。
+更新後は新条件とその他 metadata の不変を照合する。更新試行後に失敗した場合は、
+適用結果が未確認のまま自動再試行や rollback をせず、管理者が既存設定を確認する。
+
+一次資料: [OIDC provider の条件更新](https://docs.cloud.google.com/sdk/gcloud/reference/iam/workload-identity-pools/providers/update-oidc)。
 
 ## 初回サービス作成後
 
@@ -109,13 +142,17 @@ bash scripts/gcp/prepare-runtime-secrets.sh --project PROJECT_ID
 ## 検証
 
 ```bash
-bash -n scripts/gcp/*.sh
+for gcp_script in scripts/gcp/*.sh; do bash -n "$gcp_script" || exit; done
 python3 tests/scripts/gcp-bootstrap.test.py
 ```
 
 テストは一時フォルダの偽 gcloud だけを実行し、クラウドに接続しない。
 計画表示、繰り返し適用、対象取り違え、読取失敗、不一致の既存予算/WIF、
 秘密鍵/広い既存権限、公開サービスへの付与拒否を確認する。
+継続配信の条件については許可する3組の workflow/event と、PR・手動本番実行・
+別 ref/repository/owner の拒否、既存設定の不一致、更新失敗後の再試行禁止も確認する。
+条件式のローカル検証は使用する CEL の論理演算・等値・集合判定だけを対象とし、
+実際の OIDC token 交換や GCP 上の権限を検証した結果ではない。
 
 一次資料: [WIF とデプロイパイプライン](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines)、
 [Cloud Run IAM](https://docs.cloud.google.com/run/docs/reference/iam/roles)、

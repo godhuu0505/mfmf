@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Exercise provisioning and refusal paths with a stateful fake CLI. No cloud access."""
+import ast
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import unittest
@@ -55,12 +57,24 @@ if starts('projects', 'get-iam-policy'): save(s.get('project_policy', {}))
 if starts('iam', 'workload-identity-pools', 'list'): save(s.get('pools', []))
 if starts('iam', 'workload-identity-pools', 'create'):
     s['pools'] = [{'name': 'projects/123456789/locations/global/workloadIdentityPools/mfmf-github', 'state': 'ACTIVE'}]; save({})
-if starts('iam', 'workload-identity-pools', 'providers', 'list'): save(s.get('providers', []))
+if starts('iam', 'workload-identity-pools', 'providers', 'list'):
+    if s.get('deny_provider_list'): sys.exit(1)
+    s['provider_reads'] = s.get('provider_reads', 0) + 1
+    if s.get('drift_before_update') and s['provider_reads'] == 2:
+        s['providers'][0]['attributeCondition'] = 'true'
+    save(s.get('providers', []))
 if starts('iam', 'workload-identity-pools', 'providers', 'create-oidc'):
     s['providers'] = [{'name': 'projects/123456789/locations/global/workloadIdentityPools/mfmf-github/providers/github-main',
         'state': 'ACTIVE', 'oidc': {'issuerUri': opt('--issuer-uri')},
         'attributeCondition': opt('--attribute-condition'),
         'attributeMapping': dict(item.split('=', 1) for item in opt('--attribute-mapping').split(','))}]; save({})
+if starts('iam', 'workload-identity-pools', 'providers', 'update-oidc'):
+    s['providers'][0]['attributeCondition'] = opt('--attribute-condition')
+    if s.get('tamper_after_update'): s['providers'][0]['displayName'] = 'Unexpected change'
+    if s.get('condition_after_update'): s['providers'][0]['attributeCondition'] = s['condition_after_update']
+    if s.get('deny_update'):
+        state_path.write_text(json.dumps(s)); sys.exit(1)
+    save({})
 if starts('iam', 'service-accounts', 'get-iam-policy'): save(s.get('sa_policy', {}).get(args[3], {}))
 if starts('secrets', 'list'): save(s.get('secrets', []))
 if starts('secrets', 'create'):
@@ -92,7 +106,7 @@ class BootstrapTests(unittest.TestCase):
         args = ['bash', str(ROOT / 'scripts/gcp' / script), '--project', 'test-project']
         if script == 'bootstrap.sh':
             args += ['--project-number', '123456789', '--billing-account', 'ABCDEF-123456-ABCDEF']
-        elif script == 'configure-artifact-cleanup.sh':
+        elif script in ['configure-artifact-cleanup.sh', 'enable-production-wif.sh']:
             args += ['--project-number', '123456789']
         elif script == 'grant-deploy-access.sh':
             args += ['--service', 'mfmf-candidate']
@@ -165,6 +179,117 @@ class BootstrapTests(unittest.TestCase):
         self.assertNotEqual(self.invoke().returncode, 0)
         self.assertFalse(any('add-iam-policy-binding' in c or 'update-oidc' in c for c in self.calls()))
 
+    def wif_base(self):
+        result = self.invoke()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state = json.loads(self.state.read_text())
+        state['provider_reads'] = 0
+        self.state.write_text(json.dumps(state))
+        self.log.unlink(missing_ok=True)
+        return state
+
+    def test_production_wif_plan_has_no_cloud_calls(self):
+        result = self.invoke(apply=False, script='enable-production-wif.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_production_wif_changes_only_condition_once_and_bootstrap_accepts_it(self):
+        before = self.wif_base()['providers'][0]
+        result = self.invoke(script='enable-production-wif.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.calls()
+        updates = [c for c in calls if 'update-oidc' in c]
+        self.assertEqual(len(updates), 1)
+        update = updates[0]
+        self.assertEqual(update[:5], ['iam', 'workload-identity-pools', 'providers', 'update-oidc', 'github-main'])
+        flags = {arg.split('=', 1)[0] for arg in update[5:]}
+        self.assertEqual(flags, {'--project', '--quiet', '--location', '--workload-identity-pool', '--attribute-condition'})
+        self.assertIn('--project=test-project', update)
+        self.assertIn('--location=global', update)
+        self.assertIn('--workload-identity-pool=mfmf-github', update)
+        self.assertEqual(sum(c[:4] == ['iam', 'workload-identity-pools', 'providers', 'list'] for c in calls), 3)
+        self.assertFalse(any('add-iam-policy-binding' in c or 'create' in c or 'enable' in c or 'set-iam-policy' in c for c in calls))
+        after = json.loads(self.state.read_text())['providers'][0]
+        self.assertEqual({k: v for k, v in before.items() if k != 'attributeCondition'},
+                         {k: v for k, v in after.items() if k != 'attributeCondition'})
+        self.log.unlink()
+        self.assertEqual(self.invoke(script='enable-production-wif.sh').returncode, 0)
+        self.assertFalse(any('update-oidc' in c for c in self.calls()))
+        self.log.unlink()
+        self.assertEqual(self.invoke().returncode, 0)
+        self.assertFalse(any('update-oidc' in c or 'create-oidc' in c for c in self.calls()))
+
+    def test_production_wif_condition_keeps_claim_boundaries(self):
+        self.wif_base()
+        result = self.invoke(script='enable-production-wif.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        condition = json.loads(self.state.read_text())['providers'][0]['attributeCondition']
+        claims = {'repository_id': '1271210275', 'repository_owner_id': '19723431',
+                  'ref': 'refs/heads/main', 'event_name': 'push',
+                  'workflow_ref': 'godhuu0505/mfmf/.github/workflows/deploy-production.yml@refs/heads/main'}
+
+        def permits(overrides):
+            values = {**claims, **overrides}
+            # The policy uses only CEL equality, list membership and boolean operators.
+            # Evaluate that restricted subset against fixture claims without external CEL/runtime calls.
+            expression = re.sub(r'assertion\.([a-z_]+)', lambda m: json.dumps(values.get(m[1])), condition)
+            expression = expression.replace('&&', ' and ').replace('||', ' or ')
+            tree = ast.parse(expression, mode='eval')
+            allowed = (ast.Expression, ast.BoolOp, ast.And, ast.Or, ast.Compare, ast.Eq,
+                       ast.In, ast.Constant, ast.List, ast.Load)
+            self.assertTrue(all(isinstance(node, allowed) for node in ast.walk(tree)))
+            return eval(compile(tree, '<fixture-policy>', 'eval'), {'__builtins__': {}}, {})
+
+        manual = 'godhuu0505/mfmf/.github/workflows/deploy-cloud-run.yml@refs/heads/main'
+        self.assertTrue(permits({}))
+        self.assertTrue(permits({'workflow_ref': manual, 'event_name': 'push'}))
+        self.assertTrue(permits({'workflow_ref': manual, 'event_name': 'workflow_dispatch'}))
+        for override in [
+            {'event_name': 'workflow_dispatch'}, {'event_name': 'pull_request'},
+            {'event_name': 'pull_request_target'}, {'event_name': 'workflow_call'}, {'event_name': 'schedule'},
+            {'repository_id': '999'}, {'repository_owner_id': '999'},
+            {'ref': 'refs/heads/other'}, {'ref': 'refs/pull/1/merge'}, {'ref': 'refs/tags/main'},
+            {'workflow_ref': manual.replace('refs/heads/main', 'refs/heads/other')},
+            {'workflow_ref': manual.replace('deploy-cloud-run.yml', 'other.yml')},
+            {'workflow_ref': manual, 'event_name': 'pull_request_target'},
+            {'workflow_ref': manual, 'repository_id': '999'},
+            {'workflow_ref': manual, 'repository_owner_id': '999'},
+            {'workflow_ref': manual, 'ref': 'refs/heads/other'},
+        ]:
+            with self.subTest(override=override): self.assertFalse(permits(override))
+
+    def test_production_wif_refuses_unknown_or_changed_trust_before_update(self):
+        base = self.wif_base()
+        cases = []
+        for field, value in [('attributeCondition', 'true'), ('attributeCondition', base['providers'][0]['attributeCondition'] + ' '),
+                             ('state', 'DELETED'), ('disabled', True), ('name', 'projects/other/providers/github-main'),
+                             ('attributeMapping', {'google.subject': 'assertion.sub'}), ('actorProviders', ['unexpected'])]:
+            state = json.loads(json.dumps(base)); state['providers'][0][field] = value; cases.append(state)
+        for field, value in [('issuerUri', 'https://evil.example'), ('allowedAudiences', ['unexpected']),
+                             ('jwksJson', '{}'), ('discoveryUri', 'https://evil.example')]:
+            state = json.loads(json.dumps(base)); state['providers'][0]['oidc'][field] = value; cases.append(state)
+        for changed in [{'number': '999'}, {'pools': []}, {'providers': []}, {'deny_provider_list': True}, {'drift_before_update': True},
+                        {'pools': 'PRIVATE_FIXTURE_NEVER_PRINT'}, {'providers': 'PRIVATE_FIXTURE_NEVER_PRINT'}]:
+            state = json.loads(json.dumps(base)); state.update(changed); cases.append(state)
+        state = json.loads(json.dumps(base)); state['providers'].append({**state['providers'][0], 'name': 'another-provider'}); cases.append(state)
+        for state in cases:
+            with self.subTest(state=state):
+                self.state.write_text(json.dumps(state)); self.log.unlink(missing_ok=True)
+                result = self.invoke(script='enable-production-wif.sh')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn('PRIVATE_FIXTURE', result.stdout + result.stderr)
+                self.assertFalse(any('update-oidc' in c or 'add-iam-policy-binding' in c for c in self.calls()))
+
+    def test_production_wif_failed_update_or_verification_does_not_retry_or_rollback(self):
+        base = self.wif_base()
+        for changed in [{'deny_update': True}, {'tamper_after_update': True}, {'condition_after_update': 'true'}]:
+            with self.subTest(changed=changed):
+                state = json.loads(json.dumps(base)); state.update(changed)
+                self.state.write_text(json.dumps(state)); self.log.unlink(missing_ok=True)
+                result = self.invoke(script='enable-production-wif.sh')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(sum('update-oidc' in c for c in self.calls()), 1)
+                self.assertFalse(any('add-iam-policy-binding' in c or 'set-iam-policy' in c or 'delete' in c for c in self.calls()))
     def test_cleanup_plan_simulation_and_apply(self):
         script = 'configure-artifact-cleanup.sh'
         self.assertEqual(self.invoke(apply=False, script=script).returncode, 0)

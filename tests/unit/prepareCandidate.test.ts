@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parsePreseededSecretVersions, prepareCandidate, SECRET_NAMES, selectProductionConfig } from "../../scripts/gcp/prepare-candidate.mjs";
+import { parsePreseededSecretVersions, prepareCandidate, prepareWithDocker, SECRET_NAMES, selectProductionConfig } from "../../scripts/gcp/prepare-candidate.mjs";
 import { dockerCredential } from "../../scripts/gcp/docker-credential-mfmf-wif.mjs";
 
+const buildKey = Buffer.alloc(32, 6).toString("base64");
+const buildKeyRef = "projects/92772745697/secrets/mfmf-next-server-actions-key/versions/1";
 const secretValues = {
   TOKEN_ENC_KEY: " exact-existing-key-do-not-change ",
   GOOGLE_CLIENT_ID: "123-test.apps.googleusercontent.com",
@@ -20,18 +22,18 @@ const publicValues = {
 const env = {
   GITHUB_ACTIONS: "true", GITHUB_REF: "refs/heads/main", GITHUB_EVENT_NAME: "workflow_dispatch",
   GITHUB_SHA: "a".repeat(40), GITHUB_RUN_ID: "123", GITHUB_RUN_ATTEMPT: "1",
-  GCP_PROJECT_ID: "mfmf-project", GCP_PROJECT_NUMBER: "123456789", GCP_ACCESS_TOKEN: "wif-fixture",
+  GCP_PROJECT_ID: "mfmf-499612", GCP_PROJECT_NUMBER: "92772745697", GCP_ACCESS_TOKEN: "wif-fixture",
   PRESEEDED_SECRET_VERSIONS: "",
   VERCEL_TOKEN: "vercel-fixture", VERCEL_ORG_ID: "team_fixture", VERCEL_PROJECT_ID: "prj_fixture",
 };
-const imageBase = "asia-northeast1-docker.pkg.dev/mfmf-project/mfmf/mfmf-candidate";
+const imageBase = "asia-northeast1-docker.pkg.dev/mfmf-499612/mfmf/mfmf-candidate";
 const digest = `${imageBase}@sha256:${"b".repeat(64)}`;
 const entry = (key: string, value: string) => ({ id: `env_${key}`, key, value, target: ["production"], type: "encrypted", decrypted: true });
 const response = () => ({ envs: Object.entries({ ...publicValues, ...secretValues }).map(([key, value]) => entry(key, value)) });
 const pinned = {
-  TOKEN_ENC_KEY: "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/1",
-  GOOGLE_CLIENT_ID: "projects/123456789/secrets/mfmf-google-client-id/versions/2",
-  GOOGLE_CLIENT_SECRET: "projects/mfmf-project/secrets/mfmf-google-client-secret/versions/3",
+  TOKEN_ENC_KEY: "projects/mfmf-499612/secrets/mfmf-token-enc-key/versions/1",
+  GOOGLE_CLIENT_ID: "projects/92772745697/secrets/mfmf-google-client-id/versions/2",
+  GOOGLE_CLIENT_SECRET: "projects/mfmf-499612/secrets/mfmf-google-client-secret/versions/3",
 };
 const preseededEnv = { ...env, PRESEEDED_SECRET_VERSIONS: JSON.stringify(pinned) };
 const sensitiveResponse = () => ({ envs: response().envs.filter((item) => item.key !== "SENTRY_DSN").map((item) =>
@@ -44,14 +46,15 @@ function harness(data = response(), failureAt?: number, details = data) {
     requestCount++;
     if (requestCount === failureAt) return new Response("never-log-sensitive-api-body", { status: 403 });
     if (options?.method === "GET") {
+      if (url.endsWith(":access")) return Response.json({ name: buildKeyRef, payload: { data: Buffer.from(buildKey).toString("base64") } });
       if (url.includes("/v10/")) return Response.json(data);
       const id = new URL(url).pathname.split("/").pop();
       return Response.json(details.envs[data.envs.findIndex((item) => item.id === id)] ?? {});
     }
     const secret = url.split("/secrets/")[1].split(":")[0];
-    return Response.json({ name: `projects/123456789/secrets/${secret}/versions/4` });
+    return Response.json({ name: `projects/92772745697/secrets/${secret}/versions/4` });
   });
-  const docker = vi.fn(async (args: string[]) => args[0] === "image" ? JSON.stringify([digest]) : "");
+  const docker = vi.fn(async (args: string[], _authenticate?: boolean, _buildSecrets?: Record<string, string>) => args[0] === "image" ? JSON.stringify([digest]) : "");
   const save = vi.fn(async () => {});
   const log = vi.fn();
   const run = (settings = env) => prepareCandidate({ env: settings, fetchImpl, docker, save, log });
@@ -59,6 +62,61 @@ function harness(data = response(), failureAt?: number, details = data) {
 }
 
 describe("candidate preparation", () => {
+  it("real Docker wrapper passes only the dedicated key to build and only WIF token to push", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "mfmf-build-key-child-test-"));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const record = join(scratch, "calls.jsonl");
+      const executable = join(scratch, "docker");
+      await writeFile(executable, `#!${process.execPath}\nimport fs from 'node:fs'; const args=process.argv.slice(2); fs.appendFileSync(${JSON.stringify(record)}, JSON.stringify({args,env:process.env})+'\\n'); if(args[0]==='image') process.stdout.write(${JSON.stringify(JSON.stringify([digest]))});`);
+      await chmod(executable, 0o700);
+      const h = harness(sensitiveResponse()); vi.stubGlobal("fetch", h.fetchImpl);
+      const save = vi.fn(async () => {});
+      await prepareWithDocker({ ...preseededEnv, PATH: `${scratch}:${process.env.PATH}`, HOME: scratch }, { save });
+      const calls = (await readFile(record, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+      expect(calls).toHaveLength(3);
+      expect(calls[0].env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY).toBe(buildKey);
+      expect(calls[0].env.GCP_ACCESS_TOKEN).toBeUndefined();
+      expect(calls[1].env.GCP_ACCESS_TOKEN).toBe(env.GCP_ACCESS_TOKEN);
+      expect(calls[1].env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY).toBeUndefined();
+      expect(calls[2].env.GCP_ACCESS_TOKEN).toBeUndefined(); expect(calls[2].env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY).toBeUndefined();
+      for (const call of calls) {
+        expect(call.env.VERCEL_TOKEN).toBeUndefined(); expect(call.env.TOKEN_ENC_KEY).toBeUndefined();
+        expect(call.env.GOOGLE_CLIENT_SECRET).toBeUndefined(); expect(JSON.stringify(call.args)).not.toContain(buildKey);
+      }
+      expect(JSON.stringify([save.mock.calls, log.mock.calls])).not.toContain(buildKey);
+      await expect(readFile(join(calls[0].env.DOCKER_CONFIG, "config.json"))).rejects.toThrow();
+    } finally { vi.unstubAllGlobals(); log.mockRestore(); await rm(scratch, { recursive: true, force: true }); }
+  });
+
+  it("refuses an inaccessible dedicated build key before Docker or Secret Manager writes", async () => {
+    const h = harness(); const normal = h.fetchImpl.getMockImplementation()!;
+    h.fetchImpl.mockImplementation(async (input, options) => String(input).endsWith(":access")
+      ? new Response("private-build-key-error", { status: 403 }) : normal(input, options));
+    await expect(h.run()).rejects.toThrow("Dedicated Server Actions build key");
+    expect(h.docker).not.toHaveBeenCalled(); expect(h.save).not.toHaveBeenCalled();
+    expect(h.fetchImpl.mock.calls.every(([, options]) => options?.method === "GET")).toBe(true);
+  });
+
+  it("reuses strict source validation for enabled production main push while manual entry stays manual", async () => {
+    const production = {
+      ...env, GCP_PROJECT_ID: "mfmf-499612", GCP_PROJECT_NUMBER: "92772745697", GITHUB_EVENT_NAME: "push",
+      GCP_DEPLOY_ENABLED: "true", GITHUB_WORKFLOW_REF: "godhuu0505/mfmf/.github/workflows/deploy-production.yml@refs/heads/main",
+      PRESEEDED_SECRET_VERSIONS: JSON.stringify(Object.fromEntries(Object.keys(pinned).map((key) =>
+        [key, `projects/92772745697/secrets/${SECRET_NAMES[key as keyof typeof SECRET_NAMES]}/versions/1`]))),
+    };
+    const h = harness(sensitiveResponse());
+    const docker = vi.fn(async (args: string[], _authenticate?: boolean, _buildSecrets?: Record<string, string>) => args[0] === "image"
+      ? JSON.stringify([`asia-northeast1-docker.pkg.dev/mfmf-499612/mfmf/mfmf-candidate@sha256:${"c".repeat(64)}`]) : "");
+    await prepareCandidate({ env: production, mode: "production", fetchImpl: h.fetchImpl, docker, save: h.save, log: h.log });
+    expect(h.fetchImpl.mock.calls.every(([, options]) => options?.method === "GET")).toBe(true);
+    expect(h.save).toHaveBeenCalledOnce();
+    const blocked = harness(sensitiveResponse());
+    await expect(prepareCandidate({ env: production, fetchImpl: blocked.fetchImpl, docker, save: blocked.save })).rejects.toThrow("manual main");
+    await expect(prepareCandidate({ env: { ...production, GCP_DEPLOY_ENABLED: "false" }, mode: "production", fetchImpl: blocked.fetchImpl, docker, save: blocked.save })).rejects.toThrow("enabled production main push");
+    expect(blocked.fetchImpl).not.toHaveBeenCalled();
+  });
+
   it.each(["invalid-pin", "invalid-json", "missing-event", "oversized-event"])("CLI wrapper withholds %s from stdout/stderr before side effects", async (failure) => {
     const scratch = await mkdtemp(join(tmpdir(), "mfmf-candidate-cli-test-"));
     try {
@@ -96,11 +154,12 @@ describe("candidate preparation", () => {
     data.envs.push({ ...entry("TOKEN_ENC_KEY", "preview-key-must-not-be-used"), target: ["preview"] });
     const { run, fetchImpl, docker, save, log } = harness(data);
     await run(preseededEnv);
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
-    expect(fetchImpl.mock.calls.every(([url, options]) => options?.method === "GET" && String(url).startsWith("https://api.vercel.com/"))).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    expect(fetchImpl.mock.calls.every(([url, options]) => options?.method === "GET" && (String(url).startsWith("https://api.vercel.com/") || String(url) === `https://secretmanager.googleapis.com/v1/${buildKeyRef}:access`))).toBe(true);
     expect(fetchImpl.mock.calls.slice(1).map(([url]) => String(url))).toEqual([
       "https://api.vercel.com/v1/projects/prj_fixture/env/env_NEXT_PUBLIC_SUPABASE_URL?teamId=team_fixture",
       "https://api.vercel.com/v1/projects/prj_fixture/env/env_NEXT_PUBLIC_SUPABASE_ANON_KEY?teamId=team_fixture",
+      `https://secretmanager.googleapis.com/v1/${buildKeyRef}:access`,
     ]);
     expect(save).toHaveBeenCalledWith(expect.objectContaining({
       secretVersions: pinned, features: { googleDriveConfigured: true, sentryConfigured: false },
@@ -125,12 +184,12 @@ describe("candidate preparation", () => {
   it.each([
     "projects/other-project/secrets/mfmf-token-enc-key/versions/1",
     "projects/987654321/secrets/mfmf-token-enc-key/versions/1",
-    "projects/mfmf-project/secrets/another-secret/versions/1",
-    "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/latest",
-    "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/0",
-    "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/-1",
-    "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/01",
-    "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/1?alt=json",
+    "projects/mfmf-499612/secrets/another-secret/versions/1",
+    "projects/mfmf-499612/secrets/mfmf-token-enc-key/versions/latest",
+    "projects/mfmf-499612/secrets/mfmf-token-enc-key/versions/0",
+    "projects/mfmf-499612/secrets/mfmf-token-enc-key/versions/-1",
+    "projects/mfmf-499612/secrets/mfmf-token-enc-key/versions/01",
+    "projects/mfmf-499612/secrets/mfmf-token-enc-key/versions/1?alt=json",
   ])("rejects an invalid pin before any API request: %s", async (reference) => {
     const { run, fetchImpl, docker } = harness(sensitiveResponse());
     await expect(run({ ...env, PRESEEDED_SECRET_VERSIONS: JSON.stringify({ TOKEN_ENC_KEY: reference }) })).rejects.toThrow("fixed names");
@@ -184,7 +243,10 @@ describe("candidate preparation", () => {
     await expect(h.run({ ...env, GCP_PROJECT_NUMBER: "" })).rejects.toThrow("identity is invalid");
     expect(h.fetchImpl).not.toHaveBeenCalled();
     const other = harness();
-    await expect(other.run({ ...env, GCP_PROJECT_NUMBER: "987654321" })).rejects.toThrow("unexpected version reference");
+    const normal = other.fetchImpl.getMockImplementation()!;
+    other.fetchImpl.mockImplementation(async (input, options) => options?.method === "POST"
+      ? Response.json({ name: "projects/987654321/secrets/mfmf-token-enc-key/versions/4" }) : normal(input, options));
+    await expect(other.run()).rejects.toThrow("unexpected version reference");
     expect(other.save).not.toHaveBeenCalled();
     expect(other.docker).toHaveBeenCalledTimes(1);
     expect(parsePreseededSecretVersions(preseededEnv)).toEqual(pinned);
@@ -206,12 +268,15 @@ describe("candidate preparation", () => {
       expect(name).toBeTruthy();
       expect(Buffer.from(JSON.parse(String(options.body)).payload.data, "base64").toString()).toBe(secretValues[name as keyof typeof secretValues]);
     }
-    expect(fetchImpl.mock.calls).toHaveLength(11);
+    expect(fetchImpl.mock.calls).toHaveLength(12);
     const buildArgs = docker.mock.calls[0][0];
-    expect(buildArgs.filter((arg) => arg === "--build-arg")).toHaveLength(3);
+    expect(buildArgs.filter((arg) => arg === "--build-arg")).toHaveLength(4);
     expect(buildArgs).toContain(`NEXT_PUBLIC_SUPABASE_URL=${publicValues.NEXT_PUBLIC_SUPABASE_URL}`);
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ image: digest, region: "asia-northeast1", service: "mfmf-candidate" }));
-    const exposed = JSON.stringify([docker.mock.calls, save.mock.calls, log.mock.calls]);
+    expect(docker.mock.calls[0][2]).toEqual({ NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: buildKey });
+    expect(docker.mock.calls.slice(1).every((call) => call[2] === undefined)).toBe(true);
+    const exposed = JSON.stringify([docker.mock.calls.map((call) => call.slice(0, 2)), save.mock.calls, log.mock.calls]);
+    expect(exposed).not.toContain(buildKey);
     for (const value of [...Object.values(secretValues), "never-copy-this", env.VERCEL_TOKEN, env.GCP_ACCESS_TOKEN]) {
       expect(exposed).not.toContain(value);
     }
@@ -240,10 +305,10 @@ describe("candidate preparation", () => {
     data.envs = data.envs.filter((item) => !["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "SENTRY_DSN"].includes(item.key));
     const { run, fetchImpl, save } = harness(data);
     await run();
-    expect(fetchImpl).toHaveBeenCalledTimes(5);
+    expect(fetchImpl).toHaveBeenCalledTimes(6);
     expect(save).toHaveBeenCalledWith(expect.objectContaining({
       features: { googleDriveConfigured: false, sentryConfigured: false },
-      secretVersions: { TOKEN_ENC_KEY: "projects/123456789/secrets/mfmf-token-enc-key/versions/4" },
+      secretVersions: { TOKEN_ENC_KEY: "projects/92772745697/secrets/mfmf-token-enc-key/versions/4" },
     }));
   });
 

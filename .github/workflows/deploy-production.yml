@@ -146,3 +146,54 @@ jobs:
       # ビルド済み成果物だけをアップロードして Production デプロイする。
       - name: Deploy prebuilt to Vercel (production)
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+  # 移行期間は Vercel も継続。未設定 / false の間は認証もビルドも実行しない。
+  deploy-cloud-run:
+    name: Cloud Run Production (opt-in)
+    needs: [verify, check-secrets, migrate]
+    if: |
+      !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      vars.GCP_DEPLOY_ENABLED == 'true' &&
+      needs.verify.result == 'success' &&
+      needs.check-secrets.outputs.has_vercel == 'true' &&
+      needs.migrate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          token_format: access_token
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Build, stage and promote existing Cloud Run service
+        env:
+          # Constant after the job gate. No arbitrary workflow input is expanded into logs.
+          GCP_DEPLOY_ENABLED: 'true'
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
+          GCP_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          CANDIDATE_PUBLIC_CONFIG: ${{ runner.temp }}/cloud-run-public.json
+        run: node scripts/gcp/deploy-existing-service.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-run-production-public-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cloud-run-public.json
+          if-no-files-found: error
+          retention-days: 7
