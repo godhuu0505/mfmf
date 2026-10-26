@@ -1,0 +1,36 @@
+name: Diagnose Supabase Health
+
+# Read-only: at most eight fixed GETs; never restore, migrate, or deploy.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-health-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    name: Compare documented health queries without changing production
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read project status and sanitized health diagnostics
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: node scripts/diagnose-supabase-health.mjs
+      - name: Record diagnostic scope
+        if: always()
+        run: |
+          echo 'GET-only diagnosis; no restore, migration, settings change or deployment was attempted.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'See the sanitized per-probe HTTP status, parameter names and health states in the log. Raw responses and credentials are withheld.' >> "$GITHUB_STEP_SUMMARY"

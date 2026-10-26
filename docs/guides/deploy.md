@@ -212,3 +212,28 @@ API 仕様: [状態取得](https://supabase.com/docs/reference/api/v1-get-projec
 **変更履歴の記録用途**になる。タグ付け + リリースノートを残したくなったら、Conventional Commits を
 ベースに **release-please** や **Changesets** を導入し「バージョン上げ PR → マージで自動タグ + Release
 公開（ノート生成のみ、デプロイには非連動）」にできる。まずは無しで運用し、必要になったら検討する。
+
+
+### 復帰後の健康確認が HTTP 400 になる場合
+
+プロジェクトが既に `ACTIVE_HEALTHY` なら、原因調査のために復帰 workflow を繰り返さない。
+**Actions → Diagnose Supabase Health → Run workflow（main）** は GET だけを実行する。
+プロジェクト状態を確認した後、以下の固定した形式を計7回比較する（合計最大8 GET、再試行なし）。
+
+- 現在の repeated `services` と `timeout_ms=5000`
+- repeated `services` で `timeout_ms` を省略
+- CSV `services` で `timeout_ms` を省略
+- `db` / `auth` / `rest` / `storage` を1つずつ指定して `timeout_ms` を省略
+
+[公開 OpenAPI](https://api.supabase.com/api/v1) は CSV と配列の両方を許可し、
+`timeout_ms` は任意の 0〜10000 の整数とする。
+[Supabase 自身の E2E](https://github.com/supabase/supabase/blob/master/e2e/studio/scripts/common/wait-healthy-services.ts)
+では CSV と既定タイムアウトを使っている。どの形式が実環境で受理されるかを比較し、
+結果が得られてから復帰 workflow の確認方法を修正する。
+
+出力するのは固定された probe 名、HTTP 状態、許可済みの validation 分類と項目名
+（`services` / `timeout_ms` / `ref`）、4サービスの状態だけ。API 本文・自由文エラー・
+project ref・token・接続情報は出さず、応答の読み取りも32 KiBで打ち切る。
+`allServicesHealthy` と `allQueriesAccepted` は別に出力する。4サービスの健康を1つの全体GET、
+または4つの単独GETで確認できなければ診断は失敗する。
+この workflow は restore・設定変更・migration・deploy を行わない。
