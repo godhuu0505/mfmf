@@ -59,7 +59,9 @@ const verify = (bytes) => verifyArchive(Readable.from([bytes]));
 
 test("fixed SQL is one read-only SELECT, all sources bounded, no app text/identity columns", () => {
   assert.match(INVENTORY_SQL, /^SELECT /);
-  assert.doesNotMatch(INVENTORY_SQL, /;|\b(INSERT|UPDATE|DELETE|COPY|ALTER|DROP|email|owner_id|content)\b/i);
+  assert.doesNotMatch(INVENTORY_SQL, /;|\b(INSERT|UPDATE|DELETE|COPY|ALTER|DROP|email|content)\b/i);
+  assert.match(INVENTORY_SQL, /SELECT owner_id, avatar_path FROM public\.profiles/);
+  assert.doesNotMatch(INVENTORY_SQL, /'owner_id'/); // sort key is never part of the returned JSON
   for (const table of ["record_photos", "profiles", "households", "pets"]) assert.match(INVENTORY_SQL, new RegExp(`public\\.${table}`));
   assert.equal((INVENTORY_SQL.match(/LIMIT 5001/g) ?? []).length, 4);
   assert.match(INVENTORY_SQL, /LIMIT 1001/);

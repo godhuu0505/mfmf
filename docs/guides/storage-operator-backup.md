@@ -88,6 +88,10 @@ age --decrypt --identity /protected/local/age-identity.txt /protected/local/stor
 全本体のSHA256/size、順番、manifest、snapshot digest、完了footer、末尾の余分なbyteまで検査する。
 出力は件数と容量のみ。秘密/元path/filename/本体/hashは出さない。
 架空の2bucket/4参照元と実ageの暗号化・復号、改変/途中切断/末尾追加・失敗時非公開をCIで検証する。
+さらにCIのlocal Supabase起動後に`node tests/scripts/storage-backup-local-sql.mjs`を実行し、
+実migration適用済みschema上のread-only transactionで固定SQLを検証する。
+これにより、例えば`profiles`のキーが`id`ではなく`owner_id`であることをSQL実行で確認する。
+SQL testは固定local Docker socketの`supabase_db_mfmf`だけを使い、結果の値を出力しない。
 
 ## 切替と復元の未達gate
 

@@ -31,8 +31,8 @@ export const INVENTORY_SQL = `SELECT jsonb_build_object(
   'references', jsonb_build_object(
     'record_photos', COALESCE((SELECT jsonb_agg(storage_path ORDER BY storage_path, id) FROM
       (SELECT id, storage_path FROM public.record_photos ORDER BY storage_path, id LIMIT 5001) AS bounded_photos), '[]'::jsonb),
-    'profiles', COALESCE((SELECT jsonb_agg(avatar_path ORDER BY avatar_path NULLS FIRST, id) FROM
-      (SELECT id, avatar_path FROM public.profiles ORDER BY avatar_path NULLS FIRST, id LIMIT 5001) AS bounded_profiles), '[]'::jsonb),
+    'profiles', COALESCE((SELECT jsonb_agg(avatar_path ORDER BY avatar_path NULLS FIRST, owner_id) FROM
+      (SELECT owner_id, avatar_path FROM public.profiles ORDER BY avatar_path NULLS FIRST, owner_id LIMIT 5001) AS bounded_profiles), '[]'::jsonb),
     'households', COALESCE((SELECT jsonb_agg(avatar_path ORDER BY avatar_path NULLS FIRST, id) FROM
       (SELECT id, avatar_path FROM public.households ORDER BY avatar_path NULLS FIRST, id LIMIT 5001) AS bounded_households), '[]'::jsonb),
     'pets', COALESCE((SELECT jsonb_agg(avatar_path ORDER BY avatar_path NULLS FIRST, id) FROM
