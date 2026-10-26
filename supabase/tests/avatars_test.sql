@@ -2,9 +2,9 @@
 -- mfmf / アバター画像（20260706120000_avatars.sql）の Storage RLS pgTAP 証明
 --
 -- 目的: private バケット avatars のパス規約 {scope_id}/avatars/{uuid}-{filename} が
---   「先頭セグメント（scope_id）= 自分の uid または自分がメンバーの household」の
---   ときだけ select / insert / delete を許し、他人 uid・非メンバー世帯のスコープには
---   一切開かないことを継続的に証明する。
+--   自分の uid スコープは select / insert / delete 可、世帯スコープはメンバーなら
+--   select 可・owner/editor のみ insert / delete 可であることを証明する。
+--   他人 uid・非メンバー世帯のスコープには一切開かない。
 --   household_storage_tags_test.sql と同じ流儀:
 --     fixture は postgres（RLS 迂回）で投入し、検証だけ authenticated に降格する。
 --
@@ -16,13 +16,15 @@
 --   ① 別世帯のユーザー(B)は対称に、自分のスコープしか触れない。
 --   ③ メンバー追加(C を HA へ)で世帯スコープが開く。ただしユーザーアバター
 --      （uid スコープ）は個人のままで、同世帯メンバーにも開かない。
+--   ④ C を viewer へ降格すると、以前アップロードした世帯画像も削除できなくなる。
+--      共有画像の閲覧と、自分の個人アバターの select / insert / delete は維持する。
 -- =============================================================
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(28);
+select plan(35);
 
 -- ---------------------------------------------------------------
 -- 固定 UUID（fixture）
@@ -261,6 +263,70 @@ select isnt_empty(
       and name = '11111111-1111-1111-1111-111111111111/avatars/00000000-0000-0000-0000-0000000000a1-ha.jpg'
     returning 1$$,
   'メンバー追加後: C は HA スコープのアバターを delete 可（差し替え時の片付けを世帯メンバーが行える）'
+);
+
+reset role;
+
+-- ===============================================================
+-- シナリオ④: viewer は共有画像を読めるが、直接 Storage を操作しても書けない。
+--             世帯内の role は自分の個人アバターには影響しない。
+-- ===============================================================
+update public.household_members
+  set role = 'viewer'
+  where household_id = '11111111-1111-1111-1111-111111111111'
+    and user_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+
+select results_eq(
+  $$select count(*)::int from storage.objects
+    where bucket_id = 'avatars'
+      and name = '11111111-1111-1111-1111-111111111111/avatars/00000000-0000-0000-0000-0000000000c6-by-c.jpg'$$,
+  $$values (1)$$,
+  'viewer は世帯スコープのアバターを select 可（閲覧権限は維持）'
+);
+select throws_ok(
+  $$insert into storage.objects (bucket_id, name)
+    values ('avatars', '11111111-1111-1111-1111-111111111111/avatars/00000000-0000-0000-0000-0000000000c8-viewer.jpg')$$,
+  '42501',
+  null,
+  'viewer は直接 Storage を呼んでも世帯スコープへ insert 不可'
+);
+select is_empty(
+  $$delete from storage.objects
+    where bucket_id = 'avatars'
+      and name = '11111111-1111-1111-1111-111111111111/avatars/00000000-0000-0000-0000-0000000000c6-by-c.jpg'
+    returning 1$$,
+  'viewer は以前 editor としてアップロードした世帯画像も delete 不可'
+);
+select results_eq(
+  $$select count(*)::int from storage.objects
+    where bucket_id = 'avatars'
+      and name = '11111111-1111-1111-1111-111111111111/avatars/00000000-0000-0000-0000-0000000000c6-by-c.jpg'$$,
+  $$values (1)$$,
+  'viewer の削除試行後も共有画像が残る'
+);
+
+select lives_ok(
+  $$insert into storage.objects (bucket_id, name)
+    values ('avatars', 'cccccccc-cccc-cccc-cccc-cccccccccccc/avatars/00000000-0000-0000-0000-0000000000c9-personal.jpg')$$,
+  'viewer も自分の uid スコープへ個人アバターを insert 可'
+);
+select results_eq(
+  $$select count(*)::int from storage.objects
+    where bucket_id = 'avatars'
+      and name = 'cccccccc-cccc-cccc-cccc-cccccccccccc/avatars/00000000-0000-0000-0000-0000000000c9-personal.jpg'$$,
+  $$values (1)$$,
+  'viewer も自分の個人アバターを select 可'
+);
+select isnt_empty(
+  $$delete from storage.objects
+    where bucket_id = 'avatars'
+      and name = 'cccccccc-cccc-cccc-cccc-cccccccccccc/avatars/00000000-0000-0000-0000-0000000000c9-personal.jpg'
+    returning 1$$,
+  'viewer も自分の個人アバターを delete 可'
 );
 
 reset role;

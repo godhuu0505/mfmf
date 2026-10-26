@@ -66,6 +66,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_BACKUP_AGE_RECIPIENT: ${{ vars.SUPABASE_BACKUP_AGE_RECIPIENT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -80,22 +81,22 @@ jobs:
       - name: Link Supabase project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
-      # migrate 前に本番 DB をダンプして Artifact に上げる。
-      # Free プランには自動バックアップ / PITR が無いため、これが唯一のロールバック資産。
-      # 90 日保持。復元手順は docs/guides/deploy.md を参照。
-      - name: Backup remote DB (schema)
-        run: supabase db dump --linked --schema public -f pre-migrate-schema.sql
+      - name: Install backup encryption
+        run: sudo apt-get update && sudo apt-get install -y age
 
-      - name: Backup remote DB (data)
-        run: supabase db dump --linked --schema public --data-only -f pre-migrate-data.sql
+      # 公開リポジトリの Artifact は閲覧者も取得できる。SQL は必ず age で
+      # 暗号化してからアップロードする。復号鍵は CI / GitHub に置かない。
+      # 公開鍵が未設定・不正、dump / 暗号化が失敗した場合は migration も止める。
+      - name: Encrypt remote DB backup
+        run: bash scripts/backup-db.sh "$RUNNER_TEMP/supabase-backup-encrypted"
 
       - uses: actions/upload-artifact@v4
         with:
           # commit SHA を入れて「どの main マージ直前の DB か」を Artifact 一覧から判別できるようにする。
-          name: supabase-backup-production-${{ github.sha }}
+          name: supabase-backup-production-encrypted-${{ github.sha }}
           path: |
-            pre-migrate-schema.sql
-            pre-migrate-data.sql
+            ${{ runner.temp }}/supabase-backup-encrypted/pre-migrate-schema.sql.age
+            ${{ runner.temp }}/supabase-backup-encrypted/pre-migrate-data.sql.age
           retention-days: 90
           if-no-files-found: error
 
@@ -105,13 +106,13 @@ jobs:
   deploy:
     name: Vercel Production
     needs: [verify, check-secrets, migrate]
-    # migrate が skip された場合（Supabase secrets 未設定）でも deploy は続行する。
-    # 既定の success() は skipped を許容しないため明示的に書く。!cancelled() でキャンセル時は走らせない。
+    # DB の確認・バックアップ・migration に成功した場合だけ新コードを出す。
+    # secrets 欠落による skip も、新コードと旧 DB の組み合わせを避けるため停止する。
     if: |
       !cancelled() &&
       needs.verify.result == 'success' &&
       needs.check-secrets.outputs.has_vercel == 'true' &&
-      (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
+      needs.migrate.result == 'success'
     runs-on: ubuntu-latest
     # GitHub Environment。承認ルールを付ければ本番への誤発射を防げる。
     environment:
