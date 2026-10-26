@@ -82,6 +82,21 @@ Google は本番 metadata に ID / secret の両方が必要です。preview の
 この workflow は SecretVersion の読取権限を持たないため、存在/状態/元値の確認は
 実行前の管理者の作業です。deploy SA に追加の読取権限は不要です。
 
+## 認証URLの診断
+
+認証の戻り先設定は **Actions → Inspect Supabase Auth URLs → Run workflow（main）** で参照できます。
+既存 production secrets の `SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_ID` を使用し、
+Management API の `GET /v1/projects/{ref}/config/auth` を1回だけ実行します。
+出力は `site_url` / カンマ区切りの `uri_allow_list` の origin と、既知の認証用 pathname・
+一般的な wildcard pathname に限定します。それ以外のパス、userinfo、query/hash の値、
+SMTP/OAuth 設定や応答本文は表示・保存しません。応答は256 KiB、一覧は200項目までです。
+これは表示用の要約であり、`?` も glob として使えるため実際の許可判定は行いません。
+null と空の URL は `not-configured` にまとめるため、生の設定値の厳密比較にも使いません。
+`pattern-unverified` や伏せた項目を、対象 callback の許可確認済みと解釈しないでください。
+設定変更・復帰・migration・デプロイは行わず、本番配信の concurrency group も使いません。
+仕様: [Auth config API](https://supabase.com/docs/reference/api/v1-get-auth-service-config)、
+[Redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls)。
+
 ## ビルドと出力
 
 Docker build args は `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` と
