@@ -10,7 +10,7 @@ Supabase migration は実行しません。初回の private サービス作成�
 - `Dockerfile.cloudrun` によるコンテナ検証が CI で成功していること。
 - GitHub production Environment の既存 secrets:
   `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID`。
-- GitHub variables: `GCP_WIF_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` / `GCP_PROJECT_ID`。
+- GitHub variables: `GCP_WIF_PROVIDER` / `GCP_DEPLOY_SERVICE_ACCOUNT` / `GCP_PROJECT_ID` / `GCP_PROJECT_NUMBER`。
 - WIF の信頼先は、このリポジトリの main / `deploy-cloud-run.yml` に限定する。
 - Artifact Registry `mfmf`（`asia-northeast1`）を事前作成し、deploy SA に当該 repository の writer を付ける。
 - 次の Secret Manager containers を事前作成し、deploy SA に対象ごとの
@@ -52,6 +52,38 @@ Secret は deployment が使用できますが、保存後の値を member が�
 読み取り制限を迂回しません。特に `TOKEN_ENC_KEY` は既存の暗号化データに必要なため、
 新しい鍵を生成して置き換えないでください。
 
+## 事前登録した固定バージョンを使う場合
+
+管理者が元の値を Secret Manager へ直接登録し、対象 version の存在と `ENABLED` を確認した後、
+手動実行の `preseeded_secret_versions` に非秘密の参照 JSON を渡せます。許可するキーは
+`TOKEN_ENC_KEY` / `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` の3つだけです。
+設定していないキーは従来の Vercel 個別取得 → `addVersion` 経路を使用し、
+読み取れない型が残っていれば転送前に停止します。
+入力を step の env 欄へ展開せず、Node CLI が既存の `GITHUB_EVENT_PATH` から
+メモリ内へ読みます（64 KiB 上限、参照 JSON は4 KiB 上限）。壊れた JSON や誤入力も
+stdout / stderr へ出しません。実 env ファイルを読んだり、新しい秘密ファイルを作ったりしません。
+
+```json
+{
+  "TOKEN_ENC_KEY": "projects/mfmf-499612/secrets/mfmf-token-enc-key/versions/1",
+  "GOOGLE_CLIENT_ID": "projects/mfmf-499612/secrets/mfmf-google-client-id/versions/1",
+  "GOOGLE_CLIENT_SECRET": "projects/mfmf-499612/secrets/mfmf-google-client-secret/versions/1"
+}
+```
+
+例の version `1` は**管理者が確認した実際の番号へ置き換えます**。project は設定済み
+`GCP_PROJECT_ID` または `GCP_PROJECT_NUMBER` と完全一致、secret 名は上表の固定名、
+version は正整数のみです。別 project、別 secret、`latest`、余分なキーは拒否します。
+指定した参照に対応する本番 metadata が存在しない・重複する・scope/type が不明な場合も拒否します。
+Google は本番 metadata に ID / secret の両方が必要です。preview の値へ切り替えません。
+
+指定項目は Vercel の復号 API も Secret Manager の `addVersion` も呼びません。
+値の取得・比較・代替値の生成はせず、確認済みの参照を manifest にそのまま固定します。
+この workflow は SecretVersion の読取権限を持たないため、存在/状態/元値の確認は
+実行前の管理者の作業です。deploy SA に追加の読取権限は不要です。
+
+## ビルドと出力
+
 Docker build args は `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` と
 公開の正規 boolean `SIGNUP_ENABLED` だけ。login / signup の静的生成時にも同じ flag を渡し、
 既存の登録導線を保持します。flag を変更するときは実行時設定だけでなくイメージも再ビルドします。
@@ -72,7 +104,7 @@ Docker 認証は固定 registry だけに答える credential helper の pipe �
 - push 済みイメージの固定 digest、region `asia-northeast1`、service `mfmf-candidate`
 - Supabase 公開設定と `SIGNUP_ENABLED` / `SENTRY_ENVIRONMENT` / `SENTRY_TRACES_SAMPLE_RATE`
 - Drive / Sentry の設定有無だけを示す `features`（秘密の値は出さない）
-- 追加した SecretVersion の完全な名前（数値 version を固定。`latest` は使わない）
+- 追加または事前登録した SecretVersion の完全な名前（数値 version を固定。`latest` は使わない）
 
 初回 private Cloud Run の作成では、この artifact の digest と固定 SecretVersion を使います。
 候補サービスの起動後にログイン・招待・閲覧・作成・写真・権限の確認を終えるまで公開しません。

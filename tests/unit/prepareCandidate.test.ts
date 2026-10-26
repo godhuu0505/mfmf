@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { prepareCandidate, SECRET_NAMES, selectProductionConfig } from "../../scripts/gcp/prepare-candidate.mjs";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parsePreseededSecretVersions, prepareCandidate, SECRET_NAMES, selectProductionConfig } from "../../scripts/gcp/prepare-candidate.mjs";
 import { dockerCredential } from "../../scripts/gcp/docker-credential-mfmf-wif.mjs";
 
 const secretValues = {
@@ -15,13 +20,22 @@ const publicValues = {
 const env = {
   GITHUB_ACTIONS: "true", GITHUB_REF: "refs/heads/main", GITHUB_EVENT_NAME: "workflow_dispatch",
   GITHUB_SHA: "a".repeat(40), GITHUB_RUN_ID: "123", GITHUB_RUN_ATTEMPT: "1",
-  GCP_PROJECT_ID: "mfmf-project", GCP_ACCESS_TOKEN: "wif-fixture",
+  GCP_PROJECT_ID: "mfmf-project", GCP_PROJECT_NUMBER: "123456789", GCP_ACCESS_TOKEN: "wif-fixture",
+  PRESEEDED_SECRET_VERSIONS: "",
   VERCEL_TOKEN: "vercel-fixture", VERCEL_ORG_ID: "team_fixture", VERCEL_PROJECT_ID: "prj_fixture",
 };
 const imageBase = "asia-northeast1-docker.pkg.dev/mfmf-project/mfmf/mfmf-candidate";
 const digest = `${imageBase}@sha256:${"b".repeat(64)}`;
 const entry = (key: string, value: string) => ({ id: `env_${key}`, key, value, target: ["production"], type: "encrypted", decrypted: true });
 const response = () => ({ envs: Object.entries({ ...publicValues, ...secretValues }).map(([key, value]) => entry(key, value)) });
+const pinned = {
+  TOKEN_ENC_KEY: "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/1",
+  GOOGLE_CLIENT_ID: "projects/123456789/secrets/mfmf-google-client-id/versions/2",
+  GOOGLE_CLIENT_SECRET: "projects/mfmf-project/secrets/mfmf-google-client-secret/versions/3",
+};
+const preseededEnv = { ...env, PRESEEDED_SECRET_VERSIONS: JSON.stringify(pinned) };
+const sensitiveResponse = () => ({ envs: response().envs.filter((item) => item.key !== "SENTRY_DSN").map((item) =>
+  item.key in pinned ? { ...item, type: "sensitive", decrypted: false } : item) });
 
 function harness(data = response(), failureAt?: number, details = data) {
   let requestCount = 0;
@@ -45,6 +59,137 @@ function harness(data = response(), failureAt?: number, details = data) {
 }
 
 describe("candidate preparation", () => {
+  it.each(["invalid-pin", "invalid-json", "missing-event", "oversized-event"])("CLI wrapper withholds %s from stdout/stderr before side effects", async (failure) => {
+    const scratch = await mkdtemp(join(tmpdir(), "mfmf-candidate-cli-test-"));
+    try {
+      const marker = "SECRET_INPUT_MUST_NEVER_APPEAR_IN_LOGS";
+      const eventPath = join(scratch, "event.json");
+      const fetchMarker = join(scratch, "fetch-called");
+      const preload = join(scratch, "offline.mjs");
+      // Any accidental network attempt is recorded locally and rejected. No real API is used.
+      await writeFile(preload, `import {writeFileSync} from 'node:fs'; globalThis.fetch = async () => { writeFileSync(${JSON.stringify(fetchMarker)}, 'called'); throw new Error('network prohibited'); };`);
+      const event = failure === "invalid-json" ? marker : failure === "oversized-event" ? marker.repeat(4000)
+        : JSON.stringify({ inputs: { preseeded_secret_versions: JSON.stringify({ TOKEN_ENC_KEY: marker }) } });
+      if (failure !== "missing-event") await writeFile(eventPath, event);
+      const result = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+        const child = spawn(process.execPath, ["--import", preload, fileURLToPath(new URL("../../scripts/gcp/prepare-candidate.mjs", import.meta.url))], {
+          env: { ...env, NODE_ENV: "test", GITHUB_EVENT_PATH: eventPath, CANDIDATE_PUBLIC_CONFIG: join(scratch, "manifest.json") },
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        let stdout = ""; let stderr = "";
+        child.stdout.on("data", (chunk) => { stdout += chunk; });
+        child.stderr.on("data", (chunk) => { stderr += chunk; });
+        child.on("error", reject);
+        child.on("close", (code) => resolve({ code, stdout, stderr }));
+      });
+      expect(result.code).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).not.toContain(marker);
+      expect(result.stderr).not.toContain(eventPath);
+      await expect(readFile(fetchMarker)).rejects.toThrow();
+      await expect(readFile(join(scratch, "manifest.json"))).rejects.toThrow();
+    } finally { await rm(scratch, { recursive: true, force: true }); }
+  });
+
+  it("uses explicitly pinned versions without retrieving, uploading, or exposing their values", async () => {
+    const data = sensitiveResponse();
+    data.envs.push({ ...entry("TOKEN_ENC_KEY", "preview-key-must-not-be-used"), target: ["preview"] });
+    const { run, fetchImpl, docker, save, log } = harness(data);
+    await run(preseededEnv);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl.mock.calls.every(([url, options]) => options?.method === "GET" && String(url).startsWith("https://api.vercel.com/"))).toBe(true);
+    expect(fetchImpl.mock.calls.slice(1).map(([url]) => String(url))).toEqual([
+      "https://api.vercel.com/v1/projects/prj_fixture/env/env_NEXT_PUBLIC_SUPABASE_URL?teamId=team_fixture",
+      "https://api.vercel.com/v1/projects/prj_fixture/env/env_NEXT_PUBLIC_SUPABASE_ANON_KEY?teamId=team_fixture",
+    ]);
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      secretVersions: pinned, features: { googleDriveConfigured: true, sentryConfigured: false },
+      env: expect.objectContaining({ SIGNUP_ENABLED: "false" }),
+    }));
+    const output = JSON.stringify([fetchImpl.mock.calls, docker.mock.calls, save.mock.calls, log.mock.calls]);
+    for (const value of [...Object.values(secretValues), "preview-key-must-not-be-used"]) expect(output).not.toContain(value);
+  });
+
+  it("only skips explicit pins while transferring other readable production secrets", async () => {
+    const data = response();
+    data.envs[2].type = "sensitive";
+    const { run, fetchImpl, save } = harness(data);
+    await run({ ...env, PRESEEDED_SECRET_VERSIONS: JSON.stringify({ TOKEN_ENC_KEY: pinned.TOKEN_ENC_KEY }) });
+    expect(fetchImpl.mock.calls.some(([url]) => String(url).includes("env_TOKEN_ENC_KEY"))).toBe(false);
+    const writes = fetchImpl.mock.calls.filter(([, options]) => options?.method === "POST");
+    expect(writes).toHaveLength(3);
+    expect(writes.some(([url]) => String(url).includes("mfmf-token-enc-key"))).toBe(false);
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ secretVersions: expect.objectContaining({ TOKEN_ENC_KEY: pinned.TOKEN_ENC_KEY }) }));
+  });
+
+  it.each([
+    "projects/other-project/secrets/mfmf-token-enc-key/versions/1",
+    "projects/987654321/secrets/mfmf-token-enc-key/versions/1",
+    "projects/mfmf-project/secrets/another-secret/versions/1",
+    "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/latest",
+    "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/0",
+    "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/-1",
+    "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/01",
+    "projects/mfmf-project/secrets/mfmf-token-enc-key/versions/1?alt=json",
+  ])("rejects an invalid pin before any API request: %s", async (reference) => {
+    const { run, fetchImpl, docker } = harness(sensitiveResponse());
+    await expect(run({ ...env, PRESEEDED_SECRET_VERSIONS: JSON.stringify({ TOKEN_ENC_KEY: reference }) })).rejects.toThrow("fixed names");
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(docker).not.toHaveBeenCalled();
+  });
+
+  it.each(["null", "[]", "invalid-secret-fixture", '{"UNRELATED_SECRET":"private-fixture"}', '{"SENTRY_DSN":"private-fixture"}', '{"TOKEN_ENC_KEY":12}'])("rejects invalid pin JSON without exposing it", async (input) => {
+    const { run, fetchImpl, save } = harness();
+    const error = await run({ ...env, PRESEEDED_SECRET_VERSIONS: input }).then(() => null, (value: Error) => value);
+    expect(error).toBeInstanceOf(Error);
+    expect(error?.message).not.toContain("private-fixture");
+    expect(error?.message).not.toContain("invalid-secret-fixture");
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it.each(["missing-token", "missing-google", "both-google-absent", "preview-only", "branch-only", "duplicate", "system", "unknown-type", "unknown-visibility", "missing-scope", "unknown-scope"])("pins do not bypass production metadata validation: %s", async (failure) => {
+    const data = sensitiveResponse();
+    if (failure === "missing-token") data.envs = data.envs.filter((item) => item.key !== "TOKEN_ENC_KEY");
+    if (failure === "missing-google") data.envs = data.envs.filter((item) => item.key !== "GOOGLE_CLIENT_SECRET");
+    if (failure === "both-google-absent") data.envs = data.envs.filter((item) => !item.key.startsWith("GOOGLE_"));
+    if (failure === "preview-only") data.envs[2].target = ["preview"];
+    if (failure === "branch-only") Object.assign(data.envs[2], { gitBranch: "some-branch" });
+    if (failure === "duplicate") data.envs.push({ ...data.envs[2] });
+    if (failure === "system") data.envs[2].type = "system";
+    if (failure === "unknown-type") data.envs[2].type = "unknown";
+    if (failure === "unknown-visibility") Object.assign(data.envs[2], { visibility: "unknown" });
+    if (failure === "missing-scope") delete (data.envs[2] as Partial<typeof data.envs[number]>).target;
+    if (failure === "unknown-scope") data.envs[2].target = ["production", "unknown"];
+    const { run, fetchImpl, docker, save } = harness(data);
+    await expect(run(preseededEnv)).rejects.toThrow();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(docker).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("honors Secret visibility even when legacy type says encrypted", async () => {
+    const data = response();
+    Object.assign(data.envs[2], { visibility: "secret" });
+    const h = harness(data);
+    await expect(h.run()).rejects.toThrow("not readable plaintext");
+    expect(h.docker).not.toHaveBeenCalled();
+    const allowed = harness(data);
+    await allowed.run({ ...env, PRESEEDED_SECRET_VERSIONS: JSON.stringify({ TOKEN_ENC_KEY: pinned.TOKEN_ENC_KEY }) });
+    expect(allowed.fetchImpl.mock.calls.some(([url]) => String(url).includes("env_TOKEN_ENC_KEY"))).toBe(false);
+  });
+
+  it("requires the configured project number and rejects unrelated addVersion responses", async () => {
+    const h = harness();
+    await expect(h.run({ ...env, GCP_PROJECT_NUMBER: "" })).rejects.toThrow("identity is invalid");
+    expect(h.fetchImpl).not.toHaveBeenCalled();
+    const other = harness();
+    await expect(other.run({ ...env, GCP_PROJECT_NUMBER: "987654321" })).rejects.toThrow("unexpected version reference");
+    expect(other.save).not.toHaveBeenCalled();
+    expect(other.docker).toHaveBeenCalledTimes(1);
+    expect(parsePreseededSecretVersions(preseededEnv)).toEqual(pinned);
+  });
+
   it("moves only allowed plaintext secrets and writes only public config with pinned references", async () => {
     const data = response();
     data.envs.push(entry("UNRELATED_SERVER_SECRET", "never-copy-this"));

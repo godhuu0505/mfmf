@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { chmod, copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -16,9 +16,32 @@ export const SECRET_NAMES = {
 };
 const OPTIONAL_CONFIG = ["SIGNUP_ENABLED", "SENTRY_ENVIRONMENT", "SENTRY_TRACES_SAMPLE_RATE"];
 const ALLOWED = new Set([...PUBLIC_KEYS, ...Object.keys(SECRET_NAMES), ...OPTIONAL_CONFIG]);
+const PRESEEDED_KEYS = ["TOKEN_ENC_KEY", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
 class CandidateError extends Error {}
 
-function productionEntries(response) {
+function validSecretVersion(value, key, env) {
+  if (typeof value !== "string") return false;
+  const parts = value.split("/");
+  return parts.length === 6 && parts[0] === "projects" &&
+    [env.GCP_PROJECT_ID, env.GCP_PROJECT_NUMBER].filter(Boolean).includes(parts[1]) &&
+    parts[2] === "secrets" && parts[3] === SECRET_NAMES[key] &&
+    parts[4] === "versions" && /^[1-9][0-9]*$/.test(parts[5]);
+}
+
+export function parsePreseededSecretVersions(env) {
+  const input = env.PRESEEDED_SECRET_VERSIONS ?? "";
+  if (typeof input !== "string" || input.length > 4096) throw new CandidateError("Preseeded secret references are invalid.");
+  if (!input.trim()) return {};
+  let refs;
+  try { refs = JSON.parse(input); } catch { throw new CandidateError("Preseeded secret references must be JSON; input withheld."); }
+  if (!refs || typeof refs !== "object" || Array.isArray(refs) ||
+      Object.entries(refs).some(([key, value]) => !PRESEEDED_KEYS.includes(key) || !validSecretVersion(value, key, env))) {
+    throw new CandidateError("Preseeded secret references must use fixed names, this project, and positive numeric versions.");
+  }
+  return refs;
+}
+
+function productionEntries(response, preseeded = {}) {
   if (!Array.isArray(response?.envs) || response.pagination?.next != null || response.hiddenProductionEnvCount > 0) {
     throw new CandidateError("Vercel did not return a complete visible environment list.");
   }
@@ -29,9 +52,15 @@ function productionEntries(response) {
       throw new CandidateError(`Environment scope is ambiguous: ${item.key}.`);
     }
     const targets = Array.isArray(item.target) ? item.target : [item.target];
+    if (targets.some((target) => !["production", "preview", "development"].includes(target))) {
+      throw new CandidateError(`Environment scope is ambiguous: ${item.key}.`);
+    }
     if (!targets.includes("production") || item.gitBranch) continue;
     if (entries.has(item.key)) throw new CandidateError(`Duplicate production setting: ${item.key}.`);
-    if (!["plain", "encrypted"].includes(item.type)) {
+    const knownType = ["plain", "encrypted", "secret", "sensitive"].includes(item.type);
+    const knownVisibility = item.visibility === undefined || ["config", "secret"].includes(item.visibility);
+    const readable = ["plain", "encrypted"].includes(item.type) && item.visibility !== "secret";
+    if (!knownType || !knownVisibility || (!readable && !Object.hasOwn(preseeded, item.key))) {
       throw new CandidateError(`Production setting is not readable plaintext: ${item.key}.`);
     }
     entries.set(item.key, item);
@@ -39,15 +68,26 @@ function productionEntries(response) {
   return [...entries.values()];
 }
 
-export function selectProductionConfig(response) {
+export function selectProductionConfig(response, preseeded = {}) {
+  const entries = productionEntries(response, preseeded);
+  const present = new Set(entries.map((item) => item.key));
+  for (const key of Object.keys(preseeded)) {
+    if (!present.has(key)) throw new CandidateError("A preseeded reference has no matching production setting.");
+  }
+  const googleDriveConfigured = present.has("GOOGLE_CLIENT_ID");
+  if (googleDriveConfigured !== present.has("GOOGLE_CLIENT_SECRET")) {
+    throw new CandidateError("Google Drive client ID and secret must be configured together.");
+  }
   const values = new Map();
-  for (const item of productionEntries(response)) {
+  for (const item of entries) {
+    if (Object.hasOwn(preseeded, item.key)) continue;
     if ((item.type === "encrypted" && item.decrypted !== true) || typeof item.value !== "string") {
       throw new CandidateError(`Production setting is not readable plaintext: ${item.key}.`);
     }
     values.set(item.key, item.value);
   }
-  for (const key of [...PUBLIC_KEYS, "TOKEN_ENC_KEY"]) {
+  for (const key of [...PUBLIC_KEYS, "TOKEN_ENC_KEY", ...(googleDriveConfigured ? ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] : [])]) {
+    if (Object.hasOwn(preseeded, key)) continue;
     const value = values.get(key);
     if (!value?.trim() || Buffer.byteLength(value) > 65_536 || value.includes("\0")) {
       throw new CandidateError(`Required production setting is missing or invalid: ${key}.`);
@@ -69,11 +109,8 @@ export function selectProductionConfig(response) {
       throw new CandidateError("Supabase browser key must be anon or publishable; privileged keys are rejected.");
     }
   }
-  const googleDriveConfigured = Boolean(values.get("GOOGLE_CLIENT_ID")?.trim());
-  if (googleDriveConfigured !== Boolean(values.get("GOOGLE_CLIENT_SECRET")?.trim())) {
-    throw new CandidateError("Google Drive client ID and secret must be configured together.");
-  }
-  if (googleDriveConfigured && !/^[A-Za-z0-9._-]+\.apps\.googleusercontent\.com$/.test(values.get("GOOGLE_CLIENT_ID"))) {
+  if (googleDriveConfigured && !Object.hasOwn(preseeded, "GOOGLE_CLIENT_ID") &&
+      !/^[A-Za-z0-9._-]+\.apps\.googleusercontent\.com$/.test(values.get("GOOGLE_CLIENT_ID"))) {
     throw new CandidateError("Google OAuth client identifier is invalid.");
   }
   const signup = values.get("SIGNUP_ENABLED") ?? "false";
@@ -138,17 +175,29 @@ function safeEnvironmentMetadata(item, key) {
   });
 }
 
-async function readProductionConfig(env, fetchImpl) {
+async function readProductionConfig(env, fetchImpl, preseeded) {
   const project = encodeURIComponent(env.VERCEL_PROJECT_ID);
   const listUrl = new URL(`https://api.vercel.com/v10/projects/${project}/env`);
   listUrl.searchParams.set("teamId", env.VERCEL_ORG_ID);
   // v10 list の decrypted は optional。deprecated な decrypt query と list.value に依存しない。
-  const entries = productionEntries(await requestJson(fetchImpl, listUrl.href, env.VERCEL_TOKEN));
+  const entries = productionEntries(await requestJson(fetchImpl, listUrl.href, env.VERCEL_TOKEN), preseeded);
+  const present = new Set(entries.map((item) => item.key));
   for (const key of [...PUBLIC_KEYS, "TOKEN_ENC_KEY"]) {
-    if (!entries.some((item) => item.key === key)) throw new CandidateError(`Required production setting is missing or invalid: ${key}.`);
+    if (!present.has(key)) throw new CandidateError(`Required production setting is missing or invalid: ${key}.`);
+  }
+  if (present.has("GOOGLE_CLIENT_ID") !== present.has("GOOGLE_CLIENT_SECRET")) {
+    throw new CandidateError("Google Drive client ID and secret must be configured together.");
+  }
+  if (Object.keys(preseeded).some((key) => !present.has(key))) {
+    throw new CandidateError("A preseeded reference has no matching production setting.");
   }
   const decrypted = [];
   for (const entry of entries) {
+    if (Object.hasOwn(preseeded, entry.key)) {
+      // 値は取得・代入しない。metadata と利用者が確認した固定 version 参照だけを保持する。
+      decrypted.push(entry);
+      continue;
+    }
     if (typeof entry.id !== "string" || !/^[A-Za-z0-9_-]{1,256}$/.test(entry.id)) {
       throw new CandidateError(`Environment ID is missing or invalid: ${entry.key}.`);
     }
@@ -159,6 +208,7 @@ async function readProductionConfig(env, fetchImpl) {
     const detail = await requestJson(fetchImpl, detailUrl.href, env.VERCEL_TOKEN);
     const targets = Array.isArray(detail?.target) ? detail.target : [detail?.target];
     if (detail?.key !== entry.key || detail?.type !== entry.type ||
+        (detail.visibility !== undefined && detail.visibility !== "config") ||
         (detail.id !== undefined && detail.id !== entry.id) || detail.gitBranch ||
         (detail.target !== undefined && !targets.includes("production")) ||
         (detail.decrypted !== undefined && typeof detail.decrypted !== "boolean") ||
@@ -169,7 +219,7 @@ async function readProductionConfig(env, fetchImpl) {
     // list の ciphertext をここへフォールバックさせず、取得した平文だけを既存の値検証へ渡す。
     decrypted.push({ ...entry, value: detail.value, decrypted: true });
   }
-  return selectProductionConfig({ envs: decrypted });
+  return selectProductionConfig({ envs: decrypted }, preseeded);
 }
 
 export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, log = console.log }) {
@@ -180,18 +230,20 @@ export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, l
     if (!env[key] || /[\r\n]/.test(env[key])) throw new CandidateError("Required deployment credentials are missing or invalid.");
   }
   if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(env.GCP_PROJECT_ID ?? "") ||
+      !/^[1-9][0-9]{5,19}$/.test(env.GCP_PROJECT_NUMBER ?? "") ||
       !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? "") ||
       !/^\d+$/.test(env.GITHUB_RUN_ID ?? "") || !/^\d+$/.test(env.GITHUB_RUN_ATTEMPT ?? "")) {
     throw new CandidateError("Deployment project or workflow identity is invalid.");
   }
-  const { publicEnv, secrets, features } = await readProductionConfig(env, fetchImpl);
+  const preseeded = parsePreseededSecretVersions(env);
+  const { publicEnv, secrets, features } = await readProductionConfig(env, fetchImpl, preseeded);
   const imageBase = `${REGISTRY}/${env.GCP_PROJECT_ID}/mfmf/mfmf-candidate`;
   const image = `${imageBase}:${env.GITHUB_SHA}-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
   log("Production settings validated. Building candidate with public Supabase settings and signup flag only.");
   await docker(["build", "--platform", "linux/amd64", "-f", "Dockerfile.cloudrun",
     ...[...PUBLIC_KEYS, "SIGNUP_ENABLED"].flatMap((key) => ["--build-arg", `${key}=${publicEnv[key]}`]), "-t", image, "."], false);
 
-  const secretVersions = {};
+  const secretVersions = { ...preseeded };
   for (const [key, value] of Object.entries(secrets)) {
     const parent = `projects/${env.GCP_PROJECT_ID}/secrets/${SECRET_NAMES[key]}`;
     // addVersion だけ。対象は bootstrap 済み固定名であり、secret 作成・読取・上書き権限は不要。
@@ -199,13 +251,12 @@ export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, l
       payload: { data: Buffer.from(value, "utf8").toString("base64") },
     });
     // API は request の project ID を canonical project number に正規化することがある。
-    const versionPattern = new RegExp(`^projects/(?:${env.GCP_PROJECT_ID}|[0-9]+)/secrets/${SECRET_NAMES[key]}/versions/[0-9]+$`);
-    if (typeof version?.name !== "string" || !versionPattern.test(version.name)) {
+    if (!validSecretVersion(version?.name, key, env)) {
       throw new CandidateError("Secret Manager returned an unexpected version reference.");
     }
     secretVersions[key] = version.name;
   }
-  log("Server settings stored as versions of pre-created secrets. Pushing candidate image.");
+  log("Server settings have fixed secret version references. Pushing candidate image.");
   await docker(["push", image], true);
   const result = await docker(["image", "inspect", image, "--format", "{{json .RepoDigests}}"], false);
   let digests;
@@ -219,6 +270,24 @@ export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, l
 
 async function main() {
   if (!process.env.CANDIDATE_PUBLIC_CONFIG) throw new CandidateError("Public configuration output path is missing.");
+  // workflow env へ input を直接展開すると runner が開始ログへ表示する。
+  // GitHub が作成した event metadata からだけ読み、検証済み参照をメモリ内で渡す。
+  let input;
+  try {
+    const path = process.env.GITHUB_EVENT_PATH;
+    if (!path) throw new Error();
+    const file = await stat(path);
+    if (!file.isFile() || file.size > 65_536) throw new Error();
+    const eventText = await readFile(path, "utf8");
+    if (Buffer.byteLength(eventText) > 65_536) throw new Error();
+    const event = JSON.parse(eventText);
+    if (!event || typeof event !== "object" || Array.isArray(event)) throw new Error();
+    input = event.inputs?.preseeded_secret_versions ?? "";
+  } catch {
+    throw new CandidateError("Workflow event is missing, invalid, or too large; input withheld.");
+  }
+  const workflowEnv = { ...process.env, PRESEEDED_SECRET_VERSIONS: input };
+  parsePreseededSecretVersions(workflowEnv);
   const scratch = await mkdtemp(join(tmpdir(), "mfmf-candidate-"));
   try {
     const bin = join(scratch, "bin");
@@ -230,7 +299,7 @@ async function main() {
     await writeFile(join(scratch, "config.json"), JSON.stringify({ credHelpers: { [REGISTRY]: "mfmf-wif" } }), { mode: 0o600 });
     const dockerEnv = { PATH: `${bin}:${process.env.PATH}`, HOME: process.env.HOME, DOCKER_CONFIG: scratch };
     await prepareCandidate({
-      env: process.env,
+      env: workflowEnv,
       docker: async (args, authenticate) => {
         try {
           const result = await execFileAsync("docker", args, {
