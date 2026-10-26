@@ -15,6 +15,7 @@ const FAILURE = "画像へのアクセスを確認できませんでした";
 type DescriptorBase = Readonly<{
   [authorized]: true;
   actorId: string;
+  assetId: string | null;
   entityId: string;
   path: string;
   householdId: string | null;
@@ -80,7 +81,7 @@ async function context() {
   return { supabase, user, memberOf };
 }
 
-type PhotoRow = { id: string; record_id: string; household_id: string; storage_path: string };
+type PhotoRow = { id: string; record_id: string; household_id: string; storage_path: string; media_asset_id: string | null };
 type RecordRow = { id: string; household_id: string; owner_id: string };
 
 /** Read authorization only. Missing, invisible and invalidly bound rows are omitted. */
@@ -89,7 +90,7 @@ async function photoReads(photoIds: readonly string[]): Promise<readonly Authori
   const { supabase, user, memberOf } = await context();
   if (!requested.length) return [];
   const { data: photos, error } = await supabase.from("record_photos")
-    .select("id, record_id, household_id, storage_path").in("id", requested).returns<PhotoRow[]>();
+    .select("id, record_id, household_id, storage_path, media_asset_id").in("id", requested).returns<PhotoRow[]>();
   if (error) throw new Error(FAILURE);
   if (!photos?.length) return [];
   const recordIds = ids(photos.map((photo) => photo.record_id));
@@ -106,28 +107,28 @@ async function photoReads(photoIds: readonly string[]): Promise<readonly Authori
         parts[1].toLowerCase() !== parent.id ||
         ![parent.household_id, parent.owner_id].includes(parts[0].toLowerCase())) continue;
     byId.set(photo.id, issue({ kind: "photo" as const, bucket: PHOTO_BUCKET, actorId: user.id,
-      entityId: photo.id, photoId: photo.id, recordId: parent.id, householdId: parent.household_id,
+      assetId: photo.media_asset_id ?? null, entityId: photo.id, photoId: photo.id, recordId: parent.id, householdId: parent.household_id,
       ownerId: parent.owner_id, path: photo.storage_path }));
   }
   return requested.flatMap((id) => byId.has(id) ? [byId.get(id)!] : []);
 }
 
-type AvatarRow = { id: string; household_id: string | null; owner_id: string | null; avatar_path: string | null };
+type AvatarRow = { id: string; household_id: string | null; owner_id: string | null; avatar_path: string | null; avatar_asset_id: string | null };
 async function avatarRows(supabase: ServerClient, kind: AvatarKind, requested: string[]): Promise<AvatarRow[]> {
   if (!requested.length) return [];
   if (kind === "profile") {
-    const { data, error } = await supabase.from("profiles").select("owner_id, avatar_path")
-      .in("owner_id", requested).returns<{ owner_id: string; avatar_path: string | null }[]>();
+    const { data, error } = await supabase.from("profiles").select("owner_id, avatar_path, avatar_asset_id")
+      .in("owner_id", requested).returns<{ owner_id: string; avatar_path: string | null; avatar_asset_id: string | null }[]>();
     if (error) throw new Error(FAILURE);
     return (data ?? []).map((row) => ({ ...row, id: row.owner_id, household_id: null }));
   }
   if (kind === "household") {
-    const { data, error } = await supabase.from("households").select("id, avatar_path")
-      .in("id", requested).returns<{ id: string; avatar_path: string | null }[]>();
+    const { data, error } = await supabase.from("households").select("id, avatar_path, avatar_asset_id")
+      .in("id", requested).returns<{ id: string; avatar_path: string | null; avatar_asset_id: string | null }[]>();
     if (error) throw new Error(FAILURE);
     return (data ?? []).map((row) => ({ ...row, household_id: row.id, owner_id: null }));
   }
-  const { data, error } = await supabase.from("pets").select("id, household_id, owner_id, avatar_path")
+  const { data, error } = await supabase.from("pets").select("id, household_id, owner_id, avatar_path, avatar_asset_id")
     .in("id", requested).returns<AvatarRow[]>();
   if (error) throw new Error(FAILURE);
   return data ?? [];
@@ -152,7 +153,7 @@ async function avatarReads(targets: readonly AvatarTarget[]): Promise<readonly A
       } else if (!row.household_id || !await memberOf(row.household_id) ||
           parts[0].toLowerCase() !== row.household_id) continue;
       byTarget.set(`${kind}:${row.id}`, issue({ kind, bucket: AVATAR_BUCKET, actorId: user.id,
-        entityId: row.id, householdId: row.household_id, ownerId: row.owner_id, path: row.avatar_path! }));
+        assetId: row.avatar_asset_id ?? null, entityId: row.id, householdId: row.household_id, ownerId: row.owner_id, path: row.avatar_path! }));
     }
   }
   return [...new Set(targets.map((target) => `${target.kind}:${target.entityId.toLowerCase()}`))]

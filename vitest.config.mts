@@ -11,6 +11,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    setupFiles: ["tests/server-only.ts"],
     include: ["tests/unit/**/*.test.ts"],
   },
 });

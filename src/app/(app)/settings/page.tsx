@@ -283,6 +283,7 @@ export default async function SettingsPage() {
 
                 {/* 世帯のアバター画像（owner のみ変更可・世帯で共有） */}
                 <AvatarUploader
+                  target={{ kind: "household", entityId: membership.householdId, householdId: membership.householdId }}
                   scopeId={membership.householdId}
                   currentUrl={householdAvatarUrl}
                   action={updateHouseholdAvatar.bind(

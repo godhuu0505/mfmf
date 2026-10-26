@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { handleGcsAvatar, requireMediaWrites, getMediaAsset, cleanupDeletedMedia } from "@/lib/mediaStorage";
 import { canEdit, getRoleInHousehold, requireEditableHousehold } from "@/lib/household";
 import { AVATAR_BUCKET } from "@/types/database";
 import { isAvatarPathForScope } from "@/lib/storagePath";
@@ -112,7 +113,7 @@ export async function updatePetAvatar(petId: string, formData: FormData) {
   // 対象ペットの世帯・現在のアバターを取得（ロール検査は「ペットの世帯」基準）。
   const { data: pet } = await supabase
     .from("pets")
-    .select("household_id, avatar_path")
+    .select("household_id, avatar_path, avatar_asset_id")
     .eq("id", petId)
     .maybeSingle();
   if (!pet) {
@@ -122,6 +123,12 @@ export async function updatePetAvatar(petId: string, formData: FormData) {
   if (!role) throw new Error("この世帯のメンバーではありません");
   if (!canEdit(role)) {
     throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
+  }
+
+  if (await handleGcsAvatar(supabase, user.id, { kind: "pet", entityId: petId, householdId: pet.household_id }, formData, pet)) {
+    revalidatePath("/pets");
+    revalidatePath("/");
+    return;
   }
 
   const newPath = String(formData.get("avatar_path") || "").trim();
@@ -151,12 +158,18 @@ export async function updatePetAvatar(petId: string, formData: FormData) {
 export async function deletePet(petId: string) {
   const { supabase, user } = await requireUser();
   await requireEditablePetHousehold(supabase, user.id, petId);
+  const mode = await requireMediaWrites();
+  const { data: pet, error: readError } = await supabase.from("pets").select("avatar_asset_id").eq("id", petId).single();
+  if (readError || !pet) throw new Error("ペットを確認できませんでした");
   // 記録の pet_id は ON DELETE SET NULL のため、削除しても記録自体は残る。
   const { error } = await supabase.from("pets").delete().eq("id", petId);
   if (error) {
     throw new Error(`ペットの削除に失敗しました: ${error.message}`);
   }
 
+  if (mode === "gcs" && pet.avatar_asset_id) {
+    await cleanupDeletedMedia(await getMediaAsset(supabase, pet.avatar_asset_id));
+  }
   revalidatePath("/pets");
   revalidatePath("/");
 }

@@ -1,3 +1,4 @@
+import { getMediaStorageMode, signedGcsMediaUrls } from "@/lib/mediaStorage";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTO_BUCKET, type RecordPhoto } from "@/types/database";
 import { authorizePhotoReads } from "@/lib/mediaAuthorization";
@@ -27,6 +28,9 @@ export async function createPhotoSignedUrls(
   if (photoIds.length === 0) return new Map();
   const photos = await authorizePhotoReads(photoIds);
   if (photos.length === 0) return new Map();
+  if (await getMediaStorageMode() === "gcs") {
+    return signedGcsMediaUrls(photos, ttlSeconds);
+  }
   const supabase = await createClient();
   const { data, error } = await supabase.storage
     .from(PHOTO_BUCKET)

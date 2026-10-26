@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({ createClient: vi.fn(), getRole: vi.fn(), remove: vi.fn(), revalidate: vi.fn() }));
+vi.mock("@/lib/mediaStorage", () => ({ requireMediaWrites: async () => "supabase", handleGcsAvatar: async () => false }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mock.createClient }));
 vi.mock("next/cache", () => ({ revalidatePath: mock.revalidate }));
 vi.mock("next/navigation", () => ({ redirect: () => { throw new Error("redirect"); } }));
