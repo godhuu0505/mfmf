@@ -30,14 +30,16 @@ export default defineConfig({
     toHaveScreenshot: { maxDiffPixelRatio: 0.02 },
   },
   use: {
-    baseURL: `http://127.0.0.1:${PORT}`,
+    // NextURL は loopback の 127.0.0.1 を localhost に正規化する。
+    // auth Route Handler の Origin 検証・redirect・Cookie のホストを揃える。
+    baseURL: `http://localhost:${PORT}`,
     locale: "ja-JP",
     timezoneId: "Asia/Tokyo",
     trace: "retain-on-failure",
   },
   webServer: {
     command: `npm run start -- -p ${PORT}`,
-    url: `http://127.0.0.1:${PORT}/login`,
+    url: `http://localhost:${PORT}/login`,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },

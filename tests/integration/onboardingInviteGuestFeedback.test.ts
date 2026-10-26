@@ -158,8 +158,11 @@ describe("invite: acceptInvite（検証は accept_household_invite RPC / D12）"
     );
 
     await loginAs(PERSONAS.bOwner); // 宛先ではない
-    await expect(acceptInvite(invites[0].token)).rejects.toThrow(
-      /受諾できませんでした/,
+    // 拒否は throw ではなく受諾ページへの差し戻し（throw だと本番ビルドでは
+    // 画面全体が Next の素のエラーになり、理由が届かない）。
+    await expectRedirectTo(
+      acceptInvite(invites[0].token),
+      `/invite/${invites[0].token}?error=mismatch`,
     );
     const { rows } = await db.query(
       "select 1 from public.household_members where household_id = $1 and user_id = $2",

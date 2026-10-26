@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sanitizeNextPath, withNext } from "@/lib/nextPath";
+import { keepPostLoginNext } from "@/lib/keepPostLoginNext";
 
 const inputClass =
   "w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground";
@@ -21,11 +23,21 @@ function signupErrorMessage(message: string): string {
 // UC-O02（D3）: email/password でのセルフ登録。メール確認を伴う。
 // UC-O06: 利用規約・プライバシーへの同意を必須にし、同意時刻を user_metadata に残す
 //（正式な文書・同意台帳は #50 法務で整備。それまで本画面は flag で閉塞 UC-O08）。
+
+
 export default function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [agreed, setAgreed] = useState(false);
+  // 招待リンク等からの戻り先。登録時に貼り直すほか、ログイン導線にも引き継ぐ。
+  const [next, setNext] = useState("/");
+
+  useEffect(() => {
+    setNext(
+      sanitizeNextPath(new URLSearchParams(window.location.search).get("next")),
+    );
+  }, []);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +60,11 @@ export default function SignupForm() {
     }
 
     setLoading(true);
+
+    // 招待リンクから来た場合の戻り先を貼り直す（確認メールの往復に耐えるように。
+    // 寿命の起点を「登録した時刻」にして確認リンクの有効期限と揃える）。
+    await keepPostLoginNext(next);
+
     const supabase = createClient();
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -67,7 +84,7 @@ export default function SignupForm() {
 
     // メール確認が無効な環境（ローカル既定）では即セッションが返る。
     if (data.session) {
-      window.location.assign("/");
+      window.location.assign(next);
       return;
     }
 
@@ -196,7 +213,7 @@ export default function SignupForm() {
       <p className="text-center text-xs text-muted-foreground">
         すでにアカウントをお持ちの方は{" "}
         <Link
-          href="/login"
+          href={withNext("/login", next)}
           className="font-medium text-foreground underline-offset-2 hover:underline"
         >
           ログイン
