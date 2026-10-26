@@ -58,6 +58,7 @@ create table public.media_assets (
       and length(legacy_path) <= 1024 and legacy_reference_id is not null)
     or (not is_legacy and created_by is not null and legacy_sha256 is null
       and legacy_path is null and legacy_reference_id is null)),
+  constraint media_assets_legacy_reference_scope check (not is_legacy or kind = 'photo' or legacy_reference_id = entity_id),
   check ((kind = 'profile' and household_id is null and owner_id is not null and owner_id = entity_id)
     or (kind = 'household' and household_id is not null and household_id = entity_id and owner_id is null)
     or (kind in ('photo','pet') and household_id is not null and owner_id is not null)),
@@ -300,7 +301,7 @@ begin
   if not found or v_asset.state <> 'ready' or v_asset.generation is null
     or v_asset.kind <> v_kind or v_asset.entity_id <> v_entity or v_asset.final_key <> v_path
     or v_asset.household_id is distinct from v_hh or v_asset.owner_id is distinct from v_owner
-    or (v_kind = 'photo' and not v_asset.is_legacy and v_photo_id <> v_asset.id) then
+    or (v_kind = 'photo' and v_photo_id <> (case when v_asset.is_legacy then v_asset.legacy_reference_id else v_asset.id end)) then
     raise exception 'Media reference mismatch' using errcode = '23514';
   end if;
   return new;

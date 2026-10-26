@@ -136,6 +136,7 @@ set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"a1000000-0000-4000-8000-000000000002","role":"authenticated"}',true);
 select is(public.get_media_upload('f1000000-0000-4000-8000-000000000001')->>'created_by',null,'legacy migration has no fictional uploader');
 select lives_ok($$update public.record_photos set storage_path=storage_path where id='e1000000-0000-4000-8000-000000000001'$$,'legacy original photo ID remains valid after cutover');
+select throws_ok($$insert into public.record_photos(record_id,household_id,storage_path,media_asset_id) select record_id,household_id,storage_path,media_asset_id from public.record_photos where id='e1000000-0000-4000-8000-000000000001'$$,'23514',null,'legacy asset is bound to its exact original photo reference');
 select throws_ok($$select public.commit_media_upload('f1000000-0000-4000-8000-000000000001','200')$$,'42501',null,'legacy cannot use public finalize');
 select throws_ok($$select public.cancel_media_upload('f1000000-0000-4000-8000-000000000001')$$,'42501',null,'legacy NULL uploader cannot authorize cancellation');
 insert into slots values('household-pending',public.reserve_media_upload('photo','c1000000-0000-4000-8000-000000000001','b1000000-0000-4000-8000-000000000001',100,'image/jpeg'));
