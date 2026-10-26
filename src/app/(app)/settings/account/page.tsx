@@ -27,7 +27,7 @@ export default async function AccountSettingsPage() {
     getCurrentProfile(),
     getCurrentMembership(supabase),
   ]);
-  const avatarUrl = await createAvatarSignedUrl(profile?.avatar_path);
+  const avatarUrl = await createAvatarSignedUrl({ kind: "profile", entityId: user.id });
 
   return (
     <>

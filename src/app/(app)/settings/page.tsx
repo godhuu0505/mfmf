@@ -79,7 +79,7 @@ export default async function SettingsPage() {
     avatar_path: string | null;
   } | null;
   const householdAvatarUrl = await createAvatarSignedUrl(
-    householdData?.avatar_path ?? null,
+    householdData ? { kind: "household", entityId: householdData.id } : null,
   );
 
   // 招待一覧（owner のみ。RLS invites_select_owner が強制）。

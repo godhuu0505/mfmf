@@ -1,38 +1,44 @@
 import { createClient } from "@/lib/supabase/server";
 import { AVATAR_BUCKET } from "@/types/database";
 import { toBrowserUrl } from "@/lib/photos";
+import { authorizeAvatarReads } from "@/lib/mediaAuthorization";
 
-const SIGNED_URL_TTL = 60 * 60; // 1時間（record_photos と揃える）
+const SIGNED_URL_TTL = 60 * 60;
 
-// private な avatars バケットのアバターに署名付き URL（ブラウザ到達可能な形）を付与する。
-// path が null の場合は null を返す（未設定アバター）。
+type AvatarTarget = { kind: "profile" | "household" | "pet"; entityId: string };
+
+// パスではなく参照元の ID を受ける。RLS と対象世帯の所属、実際の保存パスを
+// 毎回照合するため、別世帯のパスを自分の行へ書き込んでも署名できない。
 export async function createAvatarSignedUrl(
-  path: string | null | undefined,
+  target: AvatarTarget | null,
   ttlSeconds: number = SIGNED_URL_TTL,
 ): Promise<string | null> {
-  if (!path) return null;
-  const supabase = await createClient();
-  const { data } = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .createSignedUrl(path, ttlSeconds);
-  return data?.signedUrl ? toBrowserUrl(data.signedUrl) : null;
+  if (!target) return null;
+  const urls = await createAvatarSignedUrls([target], ttlSeconds);
+  return urls.get(`${target.kind}:${target.entityId}`) ?? null;
 }
 
-// 複数パスの署名付き URL を path -> url の Map でまとめて返す（一覧表示用）。
 export async function createAvatarSignedUrls(
-  paths: string[],
+  targets: AvatarTarget[],
   ttlSeconds: number = SIGNED_URL_TTL,
 ): Promise<Map<string, string>> {
-  const uniquePaths = Array.from(new Set(paths.filter((p): p is string => Boolean(p))));
-  if (uniquePaths.length === 0) return new Map();
+  if (targets.length === 0) return new Map();
+  const avatars = await authorizeAvatarReads(targets);
+  if (avatars.length === 0) return new Map();
   const supabase = await createClient();
-  const { data } = await supabase.storage
+  const { data, error } = await supabase.storage
     .from(AVATAR_BUCKET)
-    .createSignedUrls(uniquePaths, ttlSeconds);
+    .createSignedUrls([...new Set(avatars.map((avatar) => avatar.path))], ttlSeconds);
+  if (error) throw new Error("アバターの表示を準備できませんでした");
 
-  const map = new Map<string, string>();
+  const urlByPath = new Map<string, string>();
   data?.forEach((s) => {
-    if (s.path && s.signedUrl) map.set(s.path, toBrowserUrl(s.signedUrl));
+    if (s.path && s.signedUrl) urlByPath.set(s.path, toBrowserUrl(s.signedUrl));
   });
+  const map = new Map<string, string>();
+  for (const avatar of avatars) {
+    const url = urlByPath.get(avatar.path);
+    if (url) map.set(`${avatar.kind}:${avatar.entityId}`, url);
+  }
   return map;
 }

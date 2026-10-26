@@ -79,7 +79,8 @@ async function requireEditableRecordHousehold(
     throw new Error("記録が見つかりません（または権限がありません）");
   }
   const role = await getRoleInHousehold(supabase, userId, data.household_id);
-  if (role && !canEdit(role)) {
+  if (!role) throw new Error("この世帯のメンバーではありません");
+  if (!canEdit(role)) {
     throw new Error(
       "閲覧のみの権限（viewer）のため、追加・編集・削除はできません",
     );
@@ -438,17 +439,17 @@ export async function deletePhoto(photoId: string, recordId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  await requireEditableRecordHousehold(supabase, user.id, recordId);
-
   const { data: photo, error: fetchError } = await supabase
     .from("record_photos")
-    .select("storage_path")
+    .select("storage_path, record_id")
     .eq("id", photoId)
+    .eq("record_id", recordId)
     .single();
 
-  if (fetchError || !photo) {
-    throw new Error(`写真が見つかりません: ${fetchError?.message}`);
+  if (fetchError || !photo || photo.record_id !== recordId) {
+    throw new Error("写真が見つかりません（または権限がありません）");
   }
+  await requireEditableRecordHousehold(supabase, user.id, photo.record_id);
 
   // Storage オブジェクトを削除 (RLS でオーナー / 世帯メンバーのみ削除可能)
   await supabase.storage.from(PHOTO_BUCKET).remove([photo.storage_path]);

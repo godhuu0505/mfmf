@@ -46,7 +46,8 @@ async function requireEditablePetHousehold(
     throw new Error("ペットが見つかりません（または権限がありません）");
   }
   const role = await getRoleInHousehold(supabase, userId, data.household_id);
-  if (role && !canEdit(role)) {
+  if (!role) throw new Error("この世帯のメンバーではありません");
+  if (!canEdit(role)) {
     throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
   }
 }
@@ -118,7 +119,8 @@ export async function updatePetAvatar(petId: string, formData: FormData) {
     throw new Error("ペットが見つかりません（または権限がありません）");
   }
   const role = await getRoleInHousehold(supabase, user.id, pet.household_id);
-  if (role && !canEdit(role)) {
+  if (!role) throw new Error("この世帯のメンバーではありません");
+  if (!canEdit(role)) {
     throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
   }
 

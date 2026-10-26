@@ -30,7 +30,7 @@ export default async function PetsPage() {
   const readOnly = membership !== null && !canEdit(membership.role);
   // 各ペットのアバター（private バケット）の署名付き URL をまとめて解決する。
   const avatarUrls = await createAvatarSignedUrls(
-    pets.map((p) => p.avatar_path).filter((p): p is string => Boolean(p)),
+    pets.map((p) => ({ kind: "pet", entityId: p.id })),
   );
 
   return (
@@ -59,7 +59,7 @@ export default async function PetsPage() {
                     scopeId={pet.household_id}
                     currentUrl={
                       pet.avatar_path
-                        ? avatarUrls.get(pet.avatar_path) ?? null
+                        ? avatarUrls.get(`pet:${pet.id}`) ?? null
                         : null
                     }
                     action={updatePetAvatar.bind(null, pet.id)}
