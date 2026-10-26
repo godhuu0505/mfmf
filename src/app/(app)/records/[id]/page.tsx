@@ -42,10 +42,10 @@ export default async function RecordDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; save_notice?: string }>;
 }) {
   const { id } = await params;
-  const { edit } = await searchParams;
+  const { edit, save_notice: saveNotice } = await searchParams;
   const isEdit = edit === "1";
 
   const supabase = await createClient();
@@ -144,6 +144,12 @@ export default async function RecordDetailPage({
               ← 一覧へ戻る
             </Link>
           </div>
+        )}
+
+        {saveNotice === "partial" && (
+          <p role="status" className="mb-4 rounded-lg border border-border bg-surface-muted p-3 text-sm text-foreground">
+            記録は保存しましたが、写真またはタグの処理が完了していません。保存済みの内容を確認し、必要な項目を追加してください。
+          </p>
         )}
 
         {isEditable ? (

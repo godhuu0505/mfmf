@@ -125,10 +125,11 @@ export async function updatePetAvatar(petId: string, formData: FormData) {
     throw new Error("閲覧のみの権限（viewer）のため、追加・編集・削除はできません");
   }
 
-  if (await handleGcsAvatar(supabase, user.id, { kind: "pet", entityId: petId, householdId: pet.household_id }, formData, pet)) {
+  try {
+    if (await handleGcsAvatar(supabase, user.id, { kind: "pet", entityId: petId, householdId: pet.household_id }, formData, pet)) return;
+  } finally {
     revalidatePath("/pets");
     revalidatePath("/");
-    return;
   }
 
   const newPath = String(formData.get("avatar_path") || "").trim();
@@ -167,9 +168,12 @@ export async function deletePet(petId: string) {
     throw new Error(`ペットの削除に失敗しました: ${error.message}`);
   }
 
-  if (mode === "gcs" && pet.avatar_asset_id) {
-    await cleanupDeletedMedia(await getMediaAsset(supabase, pet.avatar_asset_id));
+  try {
+    if (mode === "gcs" && pet.avatar_asset_id) {
+      await cleanupDeletedMedia(await getMediaAsset(supabase, pet.avatar_asset_id));
+    }
+  } finally {
+    revalidatePath("/pets");
+    revalidatePath("/");
   }
-  revalidatePath("/pets");
-  revalidatePath("/");
 }

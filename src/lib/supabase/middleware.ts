@@ -42,12 +42,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (process.env.VERCEL === "1") {
-    const { data: mode, error: modeError } = await supabase.rpc("get_media_storage_mode");
+    const { data: readBackend, error: readError } = await supabase.rpc("get_media_read_backend");
     let cutoverResponse: NextResponse | null = null;
-    if (modeError || !["supabase", "frozen", "gcs"].includes(mode)) {
+    if (readError || !["supabase", "gcs"].includes(readBackend)) {
       cutoverResponse = new NextResponse("保存先を確認できません。時間をおいて再度お試しください。", { status: 503 });
     } else {
-      const decision = cloudRunCutoverRoute({ vercel: true, mode, method: request.method,
+      const decision = cloudRunCutoverRoute({ vercel: true, readBackend, method: request.method,
         pathname: request.nextUrl.pathname, search: request.nextUrl.search });
       if (decision.kind === "redirect") cutoverResponse = NextResponse.redirect(decision.location, 307);
       if (decision.kind === "reload") cutoverResponse = new NextResponse("保存先が移行しました。このページを再読み込みして、もう一度お試しください。", { status: 409 });

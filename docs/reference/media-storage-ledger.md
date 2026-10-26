@@ -7,6 +7,9 @@ GCS バケット・IAM・本番の mode は、この migration では変更し�
 **サーバー検証の証明ではない。** アプリは対象行と世帯権限を確認し、GCS final object の
 サーバー専用 metadata・固定 generation・対象 entity/owner/household/reservation の一致を別に確認する。
 任意 path を署名する入口を設けない。ブラウザーの PUT は `_incoming/{asset.id}` のみ。
+署名生成後にも台帳を再取得し、処理中の削除・所属失効を観測したら URL を返さない。
+最終確認より後の変更や既発行 URL の即時失効は保証しない。既発行 URL は固定 generation の削除、
+または最大 1 時間の期限で使えなくなる。
 
 ## アプリ用 RPC
 

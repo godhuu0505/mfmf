@@ -82,4 +82,12 @@ test("UC-P01: 長辺 1600px を超える写真が縮小されて記録に付き�
     return res.headers.get("content-type");
   });
   expect(contentType).toContain("image/jpeg");
+
+  // A partially saved creation redirects to this recovery page. The real DB/GCS
+  // integration test exercises the failing publish; here verify its mobile UI.
+  const detailPath = new URL(page.url()).pathname;
+  await page.goto(`${detailPath}?edit=1&save_notice=partial`);
+  await expect(page.getByRole("status")).toContainText("記録は保存しましたが");
+  await expect(page.getByRole("button", { name: "更新する", exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/screenshots/record-partial-save.png", fullPage: true });
 });

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   photos: vi.fn(), avatars: vi.fn(), sign: vi.fn(), from: vi.fn(),
 }));
-vi.mock("@/lib/mediaStorage", () => ({ getMediaStorageMode: async () => "supabase" }));
+vi.mock("@/lib/mediaStorage", () => ({ getMediaReadBackend: async () => "supabase" }));
 vi.mock("@/lib/mediaAuthorization", () => ({
   authorizePhotoReads: mocks.photos,
   authorizeAvatarReads: mocks.avatars,

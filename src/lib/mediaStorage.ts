@@ -28,6 +28,14 @@ export const getMediaStorageMode = cache(async (): Promise<"supabase" | "frozen"
   if (error || !["supabase", "frozen", "gcs"].includes(data)) throw new Error(FAILURE);
   return data;
 });
+// A write freeze preserves the last active read backend. This is independent
+// of mode so a post-cutover maintenance window never falls back to Supabase.
+export const getMediaReadBackend = cache(async (): Promise<"supabase" | "gcs"> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_media_read_backend");
+  if (error || !["supabase", "gcs"].includes(data)) throw new Error(FAILURE);
+  return data;
+});
 export async function requireMediaWrites(): Promise<"supabase" | "gcs"> {
   const mode = await getMediaStorageMode();
   if (mode === "frozen") throw new Error("画像の保存先を切り替えています。少し待ってから保存してください");
@@ -98,7 +106,13 @@ export async function signedGcsMediaUrl(descriptor: AuthorizedMediaDescriptor, t
   const metadata = await gcs.stat({ bucket: bucket(asset), name: asset.final_key, generation: asset.generation });
   if (!metadata) return null; // A definite 404 only. Never resurrect a deleted source copy.
   checkMetadata(asset, metadata);
-  return gcs.signRead(metadata, ttl);
+  const url = await gcs.signRead(metadata, ttl);
+  // signBlob is a network operation. Discard its result if a deletion or role
+  // revocation won while metadata/signing was in flight. Previously returned
+  // URLs remain bearer capabilities until generation deletion or their expiry.
+  const current = await getMediaAsset(supabase, asset.id);
+  if (current.state !== "ready" || current.generation !== asset.generation) return null;
+  return url;
 }
 
 // Cleanup follows the database tombstone. A failed cleanup cannot restore a

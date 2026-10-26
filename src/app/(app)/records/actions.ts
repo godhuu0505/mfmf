@@ -132,6 +132,7 @@ async function attachUploadedPhotos(
 ) {
   const paths = readPhotoPaths(formData);
   const ids = formData.getAll("photo_upload_ids").map(String).filter(Boolean);
+  if (paths.length === 0 && ids.length === 0) return;
   const mode = await requireMediaWrites();
   if (mode === "supabase") {
     if (ids.length) throw new Error("保存先が変わりました。再読み込みして画像を選び直してください");
@@ -341,14 +342,18 @@ export async function createRecord(formData: FormData) {
     throw new Error(`記録の作成に失敗しました: ${error.message}`);
   }
 
-  await attachUploadedPhotos(supabase, user.id, recordId, formData, householdId);
-  await syncRecordTags(
-    supabase,
-    user.id,
-    householdId,
-    recordId,
-    readTagNames(formData),
-  );
+  try {
+    await attachUploadedPhotos(supabase, user.id, recordId, formData, householdId);
+    await syncRecordTags(supabase, user.id, householdId, recordId, readTagNames(formData));
+  } catch {
+    // The parent is already saved. Re-entering create with the same UUID would
+    // fail permanently (or duplicate photos after a partially completed batch).
+    // Pending uploads expire and operator GC terminalizes them; ready ones stay.
+    revalidatePath("/");
+    revalidatePath(`/records/${recordId}`);
+    revalidatePath("/gallery");
+    redirect(`/records/${recordId}?edit=1&save_notice=partial`);
+  }
 
   revalidatePath("/");
   redirect(`/records/${recordId}`);
@@ -428,17 +433,16 @@ export async function updateRecord(recordId: string, formData: FormData) {
     }
   }
 
-  await attachUploadedPhotos(supabase, user.id, recordId, formData, householdId);
-  await syncRecordTags(
-    supabase,
-    user.id,
-    householdId,
-    recordId,
-    readTagNames(formData),
-  );
-
-  revalidatePath("/");
-  revalidatePath(`/records/${recordId}`);
+  try {
+    await attachUploadedPhotos(supabase, user.id, recordId, formData, householdId);
+    await syncRecordTags(supabase, user.id, householdId, recordId, readTagNames(formData));
+  } finally {
+    // Publication can succeed before provider cleanup fails. Refresh committed
+    // rows even when the action reports that remaining work failed.
+    revalidatePath("/");
+    revalidatePath(`/records/${recordId}`);
+    revalidatePath("/gallery");
+  }
   redirect(`/records/${recordId}`);
 }
 
@@ -460,11 +464,14 @@ export async function deletePhoto(photoId: string, recordId: string) {
   }
   const householdId = await requireEditableRecordHousehold(supabase, user.id, photo.record_id);
   if (await requireMediaWrites() === "gcs") {
-    await deleteGcsMediaReference(supabase, { kind: "photo", entityId: photo.record_id, householdId },
-      { photoId, assetId: photo.media_asset_id, path: photo.storage_path });
-    revalidatePath(`/records/${recordId}`);
-    revalidatePath("/");
-    revalidatePath("/gallery");
+    try {
+      await deleteGcsMediaReference(supabase, { kind: "photo", entityId: photo.record_id, householdId },
+        { photoId, assetId: photo.media_asset_id, path: photo.storage_path });
+    } finally {
+      revalidatePath(`/records/${recordId}`);
+      revalidatePath("/");
+      revalidatePath("/gallery");
+    }
     return;
   }
 
@@ -516,14 +523,18 @@ export async function deleteRecord(recordId: string) {
     throw new Error(`記録の削除に失敗しました: ${error.message}`);
   }
 
-  if (mode === "gcs") {
-    for (const photo of photos ?? []) {
-      if (photo.media_asset_id) await cleanupDeletedMedia(await getMediaAsset(supabase, photo.media_asset_id));
+  try {
+    if (mode === "gcs") {
+      for (const photo of photos ?? []) {
+        if (photo.media_asset_id) await cleanupDeletedMedia(await getMediaAsset(supabase, photo.media_asset_id));
+      }
     }
+  } finally {
+    revalidatePath("/");
+    revalidatePath("/calendar");
+    revalidatePath("/gallery");
+    revalidatePath(`/records/${recordId}`);
   }
-
-  revalidatePath("/");
-  revalidatePath("/calendar");
   redirect("/");
 }
 

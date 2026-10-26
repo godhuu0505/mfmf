@@ -72,11 +72,12 @@ export async function updateUserAvatar(formData: FormData) {
     .eq("owner_id", user.id)
     .maybeSingle();
 
-  if (await handleGcsAvatar(supabase, user.id, { kind: "profile", entityId: user.id, householdId: null }, formData, current)) {
+  try {
+    if (await handleGcsAvatar(supabase, user.id, { kind: "profile", entityId: user.id, householdId: null }, formData, current)) return;
+  } finally {
     revalidatePath("/settings/account");
     revalidatePath("/settings");
     revalidatePath("/", "layout");
-    return;
   }
 
   // profiles 行が無いユーザーもいるため upsert。avatar_path 以外の列は
@@ -198,9 +199,10 @@ export async function updateHouseholdAvatar(
     .eq("id", householdId)
     .maybeSingle();
 
-  if (await handleGcsAvatar(supabase, user.id, { kind: "household", entityId: householdId, householdId }, formData, current)) {
+  try {
+    if (await handleGcsAvatar(supabase, user.id, { kind: "household", entityId: householdId, householdId }, formData, current)) return;
+  } finally {
     revalidatePath("/settings");
-    return;
   }
 
   const { error } = await supabase

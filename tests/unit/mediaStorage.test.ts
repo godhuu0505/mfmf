@@ -4,7 +4,7 @@ const mock = vi.hoisted(() => ({ rpc: vi.fn(), stat: vi.fn(), signRead: vi.fn(),
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc: mock.rpc }) }));
 vi.mock("@/lib/mediaAuthorization", () => ({ assertAuthorizedMediaDescriptor: () => {} }));
 vi.mock("@/lib/gcsStorage", () => ({ createGcsStorage: () => ({ stat: mock.stat, signRead: mock.signRead, publish: mock.publish, deleteGeneration: mock.remove }) }));
-import { parseMediaAsset, signedGcsMediaUrl, cleanupDeletedMedia, finalizeMediaUpload, requireMediaWrites } from "@/lib/mediaStorage";
+import { parseMediaAsset, signedGcsMediaUrl, cleanupDeletedMedia, finalizeMediaUpload, requireMediaWrites, getMediaReadBackend } from "@/lib/mediaStorage";
 import type { AuthorizedMediaDescriptor } from "@/lib/mediaAuthorization";
 
 const id = "10000000-0000-4000-8000-000000000001";
@@ -44,6 +44,23 @@ describe("GCS media application boundary", () => {
     expect(await signedGcsMediaUrl(descriptor, 300)).toBeNull();
     expect(mock.stat).not.toHaveBeenCalled();
     expect(mock.signRead).not.toHaveBeenCalled();
+  });
+  it("discards a freshly signed URL if deletion wins while signing", async () => {
+    mock.rpc.mockResolvedValueOnce({ data: asset(), error: null })
+      .mockResolvedValueOnce({ data: asset({ state: "deleted" }), error: null });
+    expect(await signedGcsMediaUrl(descriptor, 300)).toBeNull();
+    expect(mock.signRead).toHaveBeenCalledOnce();
+  });
+  it("discards a freshly signed URL if membership is revoked while signing", async () => {
+    mock.rpc.mockResolvedValueOnce({ data: asset(), error: null })
+      .mockResolvedValueOnce({ data: null, error: { code: "42501" } });
+    await expect(signedGcsMediaUrl(descriptor, 300)).rejects.toThrow();
+    expect(mock.signRead).toHaveBeenCalledOnce();
+  });
+  it("uses the active read backend independently of a write freeze", async () => {
+    mock.rpc.mockImplementation(async (name) => ({ data: name === "get_media_read_backend" ? "gcs" : "frozen", error: null }));
+    expect(await getMediaReadBackend()).toBe("gcs");
+    await expect(requireMediaWrites()).rejects.toThrow("切り替えています");
   });
   it("does not treat a client-claimed completed RPC as evidence an object exists", async () => {
     mock.stat.mockResolvedValue(null);

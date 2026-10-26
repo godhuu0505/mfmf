@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cloudRunCutoverRoute } from "@/lib/cloudRunCutover";
 
-const input = { vercel: true, mode: "gcs" as const, method: "GET", pathname: "/gallery", search: "?page=2" };
+const input = { vercel: true, readBackend: "gcs" as const, method: "GET", pathname: "/gallery", search: "?page=2" };
 describe("Cloud Run storage cutover", () => {
   it("preserves the app path and query at the fixed GCP origin", () => {
     expect(cloudRunCutoverRoute(input)).toEqual({ kind: "redirect", location: "https://mfmf-candidate-wspqvmhj6q-an.a.run.app/gallery?page=2" });
@@ -14,8 +14,12 @@ describe("Cloud Run storage cutover", () => {
   it.each(["POST", "PUT", "PATCH", "DELETE"])("refuses forwarding an old %s body", (method) => {
     expect(cloudRunCutoverRoute({ ...input, method })).toEqual({ kind: "reload" });
   });
-  it.each(["supabase", "frozen"] as const)("keeps the source origin before %s is activated", (mode) => {
-    expect(cloudRunCutoverRoute({ ...input, mode })).toEqual({ kind: "continue" });
+  it("keeps the source origin while its read backend is Supabase", () => {
+    expect(cloudRunCutoverRoute({ ...input, readBackend: "supabase" })).toEqual({ kind: "continue" });
+  });
+  it("keeps GCP routing during a write freeze after cutover", () => {
+    // The database returns gcs for read_backend even when mode is frozen.
+    expect(cloudRunCutoverRoute(input).kind).toBe("redirect");
   });
   it("never redirects the Cloud Run runtime back to itself", () => {
     expect(cloudRunCutoverRoute({ ...input, vercel: false })).toEqual({ kind: "continue" });

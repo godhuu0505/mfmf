@@ -1,4 +1,4 @@
-import { getMediaStorageMode, signedGcsMediaUrls } from "@/lib/mediaStorage";
+import { getMediaReadBackend, signedGcsMediaUrls } from "@/lib/mediaStorage";
 import { createClient } from "@/lib/supabase/server";
 import { AVATAR_BUCKET } from "@/types/database";
 import { toBrowserUrl } from "@/lib/photos";
@@ -26,7 +26,7 @@ export async function createAvatarSignedUrls(
   if (targets.length === 0) return new Map();
   const avatars = await authorizeAvatarReads(targets);
   if (avatars.length === 0) return new Map();
-  if (await getMediaStorageMode() === "gcs") {
+  if (await getMediaReadBackend() === "gcs") {
     return signedGcsMediaUrls(avatars, ttlSeconds);
   }
   const supabase = await createClient();
