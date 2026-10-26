@@ -39,6 +39,19 @@ Sensitive 型など API から読めない値は管理者が安全な保管元�
 拒否時の診断は allowlist の変数名・固定 type 分類・decrypted の有無/型・value の型と
 公開キーの分類だけであり、応答本文や値は出力しません。
 
+設定の型が原因で停止したら `Inspect Vercel Environment Metadata` を main から手動実行します。
+production 環境の既存 Vercel 資格情報で一覧を GET 1回だけ読み、移行対象9キーの
+type / visibility、scope、decrypted の有無・型、value の有無・型、旧 secret 移行印の有無を
+固定分類として表示します。任意の値・ID・ブランチ名・応答本文は表示せず、ファイルや
+artifact にも保存しません。prepare の読み取り制限は変更しません。
+
+Vercel は 2026-08-24 から Config / Secret を区別し、旧 Sensitive は Secret として扱います。
+Secret は deployment が使用できますが、保存後の値を member が取得することはできません。
+この型が確認された場合は元のパスワード管理等の保管元から、安全に Secret Manager の既存
+対象へ新しい version を入力する手順を別途確認します。アプリの一時ルートやログで Vercel の
+読み取り制限を迂回しません。特に `TOKEN_ENC_KEY` は既存の暗号化データに必要なため、
+新しい鍵を生成して置き換えないでください。
+
 Docker build args は `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` と
 公開の正規 boolean `SIGNUP_ENABLED` だけ。login / signup の静的生成時にも同じ flag を渡し、
 既存の登録導線を保持します。flag を変更するときは実行時設定だけでなくイメージも再ビルドします。
@@ -67,6 +80,7 @@ Docker 認証は固定 registry だけに答える credential helper の pipe �
 公式仕様:
 [Vercel project env API](https://vercel.com/docs/rest-api/projects/retrieve-the-environment-variables-of-a-project-by-id-or-name)、
 [Vercel decrypted value API](https://vercel.com/docs/rest-api/projects/retrieve-the-decrypted-value-of-an-environment-variable-of-a-project-by-id)、
+[Vercel Config / Secret の変更](https://vercel.com/changelog/environment-variables-now-use-config-and-secret-types)、
 [Secret Manager addVersion](https://cloud.google.com/secret-manager/docs/reference/rest/v1/projects.secrets/addVersion)、
 [GitHub Actions WIF](https://github.com/google-github-actions/auth)、
 [Artifact Registry の認証](https://cloud.google.com/artifact-registry/docs/docker/authentication)。
