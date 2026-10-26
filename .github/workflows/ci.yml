@@ -42,6 +42,9 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
+      - name: Test synthetic ranking CLI (no external API calls)
+        run: node --test tests/scripts/genai-ranking-experiment.test.mjs
+
       - name: Configure APT downloads
         uses: ./.github/actions/configure-apt
 
@@ -50,6 +53,9 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y age
           bash tests/scripts/backup-db.test.sh
+
+      - name: Test GCP bootstrap and failure handling
+        run: python3 tests/scripts/gcp-bootstrap.test.py
 
       - name: Build
         # NEXT_PUBLIC_* はブラウザ公開前提の値。ビルド通過用のプレースホルダで十分
