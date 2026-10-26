@@ -1,0 +1,62 @@
+name: Prepare Cloud Run Candidate
+
+# P1: private Cloud Run の初回作成前にイメージと設定を準備する。サービスは変更しない。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: cloud-run-candidate
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Require WIF configuration
+        env:
+          GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          GCP_DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          node -e 'for (const key of ["GCP_WIF_PROVIDER", "GCP_DEPLOY_SERVICE_ACCOUNT", "GCP_PROJECT_ID"]) { if (!process.env[key]) { console.error("Required GCP variable is missing."); process.exit(1); } }'
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          token_format: access_token
+          create_credentials_file: false
+          export_environment_variables: false
+
+      - name: Prepare secrets and push candidate image
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          CANDIDATE_PUBLIC_CONFIG: ${{ runner.temp }}/candidate-public.json
+        run: node scripts/gcp/prepare-candidate.mjs
+
+      # 公開設定・イメージdigest・SecretVersion参照だけ。秘密の値は含めない。
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-run-candidate-public-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidate-public.json
+          if-no-files-found: error
+          retention-days: 7
