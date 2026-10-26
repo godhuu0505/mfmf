@@ -22,10 +22,12 @@ export async function resumeProject({
   log = console.log,
   timeoutMs = 20 * 60 * 1000,
   pollMs = 15 * 1000,
+  verifyOnly = false,
 }) {
   if (!token || /[\r\n]/.test(token) || !/^[a-z]{20}$/.test(projectRef ?? "")) {
     throw new ResumeError("Required Supabase secrets are missing or invalid.");
   }
+  if (typeof verifyOnly !== "boolean") throw new ResumeError("Verification mode must be a boolean.");
   const baseUrl = `https://api.supabase.com/v1/projects/${projectRef}`;
   const deadline = now() + timeoutMs;
 
@@ -62,9 +64,9 @@ export async function resumeProject({
   }
 
   async function servicesHealthy() {
-    // 公開 OpenAPI が許可する配列形式。HTTP 400 の原因は GET 専用診断で切り分ける。
+    // 2026-10-27 の実 GET 診断で timeout_ms=5000 だけが invalid_type / HTTP 400。
+    // 任意パラメータを省略した同じ配列形式は 200。通信上限は request の AbortSignal で保持。
     const query = new URLSearchParams(SERVICES.map((service) => ["services", service]));
-    query.set("timeout_ms", "5000");
     const services = await request(`/health?${query}`);
     if (!Array.isArray(services) || services.some((service) =>
       !service || typeof service.name !== "string" || !SERVICE_STATUSES.has(service.status))) {
@@ -79,7 +81,9 @@ export async function resumeProject({
 
   let status = await getStatus();
   log(`Initial project status: ${status}`);
+  if (verifyOnly) log("Verification-only mode: no restore request will be sent.");
   if (status === "INACTIVE") {
+    if (verifyOnly) throw new ResumeError("Project is INACTIVE; verification-only mode did not request resume.");
     // Supabase の paused 状態は INACTIVE。POST は一度だけで、通信失敗時にも再送しない。
     await request("/restore", "POST");
     log("Resume request accepted. Waiting for project and service health.");
@@ -105,11 +109,18 @@ export async function resumeProject({
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  resumeProject({
-    token: process.env.SUPABASE_ACCESS_TOKEN,
-    projectRef: process.env.SUPABASE_PROJECT_ID,
-  }).catch((error) => {
-    console.error(error instanceof ResumeError ? error.message : "Unexpected error; resume verification stopped.");
+  const verifyOnly = process.env.SUPABASE_VERIFY_ONLY ?? "false";
+  if (!["true", "false"].includes(verifyOnly)) {
+    console.error("Verification mode must be true or false.");
     process.exitCode = 1;
-  });
+  } else {
+    resumeProject({
+      token: process.env.SUPABASE_ACCESS_TOKEN,
+      projectRef: process.env.SUPABASE_PROJECT_ID,
+      verifyOnly: verifyOnly === "true",
+    }).catch((error) => {
+      console.error(error instanceof ResumeError ? error.message : "Unexpected error; resume verification stopped.");
+      process.exitCode = 1;
+    });
+  }
 }

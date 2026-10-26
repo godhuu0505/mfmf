@@ -184,6 +184,9 @@ Vercel Production も実行されません。既存プロジェクトの復帰�
 **Actions → Resume Supabase Production → Run workflow（main）** を使います。
 `workflow_dispatch` 専用で、production Environment の既存
 `SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_ID` を使います。DB password は不要です。
+復帰後の健康確認だけを再実行するときは **`verify_only` を有効**にします。
+このモードは GET だけを使い、対象が `INACTIVE` なら復帰せず失敗停止します。
+実際に停止中のプロジェクトを復帰するときは既定の `verify_only=false` を使います。
 
 1. Management API で対象プロジェクトの状態を確認する。
 2. 停止状態 `INACTIVE` のときだけ `POST /v1/projects/{ref}/restore` を一度送る。
@@ -220,7 +223,7 @@ API 仕様: [状態取得](https://supabase.com/docs/reference/api/v1-get-projec
 **Actions → Diagnose Supabase Health → Run workflow（main）** は GET だけを実行する。
 プロジェクト状態を確認した後、以下の固定した形式を計7回比較する（合計最大8 GET、再試行なし）。
 
-- 現在の repeated `services` と `timeout_ms=5000`
+- HTTP 400 が発生した repeated `services` と `timeout_ms=5000`
 - repeated `services` で `timeout_ms` を省略
 - CSV `services` で `timeout_ms` を省略
 - `db` / `auth` / `rest` / `storage` を1つずつ指定して `timeout_ms` を省略
@@ -228,8 +231,14 @@ API 仕様: [状態取得](https://supabase.com/docs/reference/api/v1-get-projec
 [公開 OpenAPI](https://api.supabase.com/api/v1) は CSV と配列の両方を許可し、
 `timeout_ms` は任意の 0〜10000 の整数とする。
 [Supabase 自身の E2E](https://github.com/supabase/supabase/blob/master/e2e/studio/scripts/common/wait-healthy-services.ts)
-では CSV と既定タイムアウトを使っている。どの形式が実環境で受理されるかを比較し、
-結果が得られてから復帰 workflow の確認方法を修正する。
+では CSV と既定タイムアウトを使っている。
+
+2026-10-27 の [GET-only 診断 run](https://github.com/godhuu0505/mfmf/actions/runs/40356139502)
+では `timeout_ms=5000` を付けた形式だけが HTTP 400 となり、許可語彙で抽出した validation は
+`timeout_ms` の `invalid_type` だった。同じ repeated `services` から `timeout_ms` を省くと
+HTTP 200 で4サービスすべて正常になり、CSV・各単独形式も正常だった。
+この結果に基づき復帰 workflow の健康確認では任意の `timeout_ms` を省略する。
+API 内部の型変換の問題かどうかは断定せず、クライアントの30秒通信上限と20分の全体上限は維持する。
 
 出力するのは固定された probe 名、HTTP 状態、許可済みの validation 分類と項目名
 （`services` / `timeout_ms` / `ref`）、4サービスの状態だけ。API 本文・自由文エラー・

@@ -3,6 +3,12 @@ name: Resume Supabase Production
 # 停止中の本番プロジェクトを手動で復帰する。migration / deploy はここでは実行しない。
 on:
   workflow_dispatch:
+    inputs:
+      verify_only:
+        description: "GET-only health verification; never request restore"
+        type: boolean
+        default: false
+        required: true
 
 permissions:
   contents: read
@@ -31,6 +37,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_VERIFY_ONLY: ${{ inputs.verify_only }}
         run: node scripts/resume-supabase.mjs
 
       - name: Record result

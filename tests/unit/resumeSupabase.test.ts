@@ -6,7 +6,7 @@ const token = "dummy-secret-not-for-logs";
 const project = (status: string) => ({ ref: projectRef, status });
 const healthy = () => ["db", "auth", "rest", "storage"].map((name) => ({ name, status: "ACTIVE_HEALTHY" }));
 
-function harness(responses: (object | Response | Error)[]) {
+function harness(responses: (object | Response | Error)[], verifyOnly = false) {
   let clock = 0;
   const fetchImpl = vi.fn(async () => {
     const response = responses.shift();
@@ -20,7 +20,7 @@ function harness(responses: (object | Response | Error)[]) {
     token, projectRef, fetchImpl, log,
     now: () => clock,
     sleep: async (ms: number) => { clock += ms; },
-    timeoutMs: 30, pollMs: 10,
+    timeoutMs: 30, pollMs: 10, verifyOnly,
   });
   return { run, fetchImpl, log };
 }
@@ -44,7 +44,7 @@ describe("manual Supabase resume", () => {
     expect(healthCalls).toHaveLength(2);
     for (const [url] of healthCalls) {
       expect(new URL(url).searchParams.getAll("services")).toEqual(["db", "auth", "rest", "storage"]);
-      expect(new URL(url).searchParams.get("timeout_ms")).toBe("5000");
+      expect(new URL(url).searchParams.has("timeout_ms")).toBe(false);
     }
     expect(log).toHaveBeenLastCalledWith(expect.stringContaining("No migration or deployment"));
   });
@@ -53,6 +53,34 @@ describe("manual Supabase resume", () => {
     const { run, fetchImpl } = harness([project(status), project("ACTIVE_HEALTHY"), healthy()]);
     await run();
     expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ method: "POST" }));
+  });
+
+  it("verifies the real API query contract without the rejected optional timeout", async () => {
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0], options?: RequestInit) => {
+      const url = new URL(String(input));
+      expect(options?.method).toBe("GET");
+      expect(options?.signal).toBeInstanceOf(AbortSignal);
+      if (!url.pathname.endsWith("/health")) return Response.json(project("ACTIVE_HEALTHY"));
+      if (url.searchParams.has("timeout_ms")) return Response.json({ message: "timeout_ms: invalid_type" }, { status: 400 });
+      expect(url.searchParams.getAll("services")).toEqual(["db", "auth", "rest", "storage"]);
+      return Response.json(healthy());
+    });
+    await resumeProject({ token, projectRef, fetchImpl, log: vi.fn(), verifyOnly: true });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(["ACTIVE_HEALTHY", "RESTORING", "COMING_UP"])("permits GET-only verification for %s", async (status) => {
+    const { run, fetchImpl } = harness([project(status), project("ACTIVE_HEALTHY"), healthy()], true);
+    await run();
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ method: "POST" }));
+  });
+
+  it("stops an INACTIVE project in verification-only mode before any POST", async () => {
+    const { run, fetchImpl } = harness([project("INACTIVE")], true);
+    await expect(run()).rejects.toThrow("verification-only mode did not request resume");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(fetchImpl).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ method: "POST" }));
   });
 
