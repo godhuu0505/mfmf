@@ -71,7 +71,11 @@ jobs:
       - name: Test synthetic ranking CLI (no external API calls)
         run: node --test tests/scripts/genai-ranking-experiment.test.mjs
 
+      - name: Configure APT downloads
+        uses: ./.github/actions/configure-apt
+
       - name: Test backup encryption and failure handling
+        timeout-minutes: 5
         run: |
           sudo apt-get update && sudo apt-get install -y age
           bash tests/scripts/backup-db.test.sh
@@ -178,11 +182,16 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321" >> "$GITHUB_ENV"
 
+      - name: Configure APT downloads
+        uses: ./.github/actions/configure-apt
+
       # VRT のフォントをベースライン生成環境と揃える（D31）
       - name: Install Japanese fonts
+        timeout-minutes: 5
         run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
 
       - name: Install Playwright browser
+        timeout-minutes: 5
         run: npx playwright install --with-deps chromium
 
       - name: Build
