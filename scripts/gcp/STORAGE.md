@@ -103,6 +103,33 @@ prevents a delayed delete from removing replacement data. Soft-delete restore is
 a new generation and therefore requires a deliberate DB/provider-binding update before publication.
 The runtime adapter intentionally provides no restore operation.
 
+## Dedicated migration and cleanup identity
+
+`bootstrap-storage-operator.mjs` configures the independent `mfmf-storage` pool, `github-storage`
+provider and `mfmf-storage-operator@mfmf-499612.iam.gserviceaccount.com` account. It never edits the
+deployment pool, deployer, runtime or bucket configuration. Default execution only reads and validates;
+`--apply` creates missing fixed identities and uses etags to add the two bucket IAM grants and the
+account's one workload identity binding. A different existing condition, provider, role permission set
+or account principal stops the process. No key is issued.
+
+```bash
+node scripts/gcp/bootstrap-storage-operator.mjs
+node scripts/gcp/bootstrap-storage-operator.mjs --apply
+```
+
+The GitHub OIDC condition requires repository ID `1271210275`, owner ID `19723431`, `refs/heads/main`,
+the exact `godhuu0505/mfmf/.github/workflows/storage-migration.yml@refs/heads/main` workflow and an event
+of `workflow_dispatch` or `schedule`. Only that dedicated pool's repository principal receives
+`roles/iam.workloadIdentityUser` on the operator account. The account receives custom role
+`mfmfStorageOperator` only on the two media buckets, with exactly `storage.buckets.get` and
+`storage.objects.get/create/delete/list/restore`. It has no Cloud Run, Secret Manager, bucket-admin or
+IAM administration grant from this setup.
+
+After post-read verification, set the non-secret repository variables `GCP_STORAGE_WIF_PROVIDER` to
+`projects/92772745697/locations/global/workloadIdentityPools/mfmf-storage/providers/github-storage`
+and `GCP_STORAGE_SERVICE_ACCOUNT` to the operator account above. This does not execute migration or
+switch the application's storage mode. The dedicated workflow must retain its own review and gates.
+
 Official references: [XML headers](https://docs.cloud.google.com/storage/docs/xml-api/reference-headers),
 [preconditions](https://docs.cloud.google.com/storage/docs/request-preconditions),
 [signing permissions](https://docs.cloud.google.com/storage/docs/access-control/signing-urls-with-helpers),
