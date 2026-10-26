@@ -26,8 +26,6 @@ export default async function NewRecordPage({
   const today = jstTodayISO();
   // カレンダーの「この日の記録を追加」から日付を引き継ぐ（UC-C01）。不正値は今日。
   const defaultDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : today;
-  // クイック記録からの下書きは sessionStorage 経由（RecordForm がマウント時に
-  // 取り込む。src/lib/quickDraft.ts）。URL には載せない。
   // householdId は Storage パス {household_id}/{record_id}/... の先頭セグメント（手順8）。
   const [profile, pets, dictionaryTags, membership] = await Promise.all([
     getCurrentProfile(),
