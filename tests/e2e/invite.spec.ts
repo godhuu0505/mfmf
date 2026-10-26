@@ -38,6 +38,27 @@ test("ログイン画面の計測送信は招待の戻り先 Cookie を書き換
   );
 });
 
+test("戻り先 Cookie の更新は同一 Origin からだけ許可する", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/login");
+  const next = "/invite/same-origin-only";
+  const allowed = await page.request.post("/auth/next", {
+    form: { next },
+    headers: { origin: new URL(page.url()).origin },
+  });
+  expect(allowed.status()).toBe(204);
+  const denied = await page.request.post("/auth/next", {
+    form: { next: "/invite/cross-origin" },
+    headers: { origin: "https://other.example" },
+  });
+  expect(denied.status()).toBe(403);
+  expect((await context.cookies()).find((c) => c.name === POST_LOGIN_NEXT_COOKIE)?.value).toBe(
+    encodeURIComponent(next),
+  );
+});
+
 test("別タブの戻り先を OAuth 開始時に更新し、同意取消後のメールログインでも招待へ戻る", async ({
   page,
   context,
