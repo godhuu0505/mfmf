@@ -90,7 +90,7 @@ test("別タブの戻り先を OAuth 開始時に更新し、同意取消後の�
     url.searchParams.get("error") === "oauth" &&
     url.searchParams.get("next") === next,
   );
-  await expect(page.getByRole("alert")).toContainText("ログインに失敗しました");
+  await expect(page.getByRole("alert").filter({ hasText: "ログインに失敗しました" })).toBeVisible();
   await page.getByLabel("メールアドレス").fill(E2E_USER.email);
   await page.getByLabel("パスワード").fill(E2E_USER.password);
   await page.getByRole("button", { name: "メールアドレスでログイン" }).click();
