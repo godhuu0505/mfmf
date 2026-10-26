@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 
 const origin = process.env.SMOKE_ORIGIN ?? "http://127.0.0.1:8080";
 async function request(path) {
-  return fetch(new URL(path, origin), { redirect: "manual" });
+  return fetch(new URL(path, origin), {
+    redirect: "manual",
+    signal: AbortSignal.timeout(5000),
+  });
 }
 
 let ready = false;
