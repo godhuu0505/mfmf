@@ -40,6 +40,12 @@ describe("manual Supabase resume", () => {
       })],
     ]);
     expect(log.mock.calls.flat().join(" ")).not.toContain(token);
+    const healthCalls = calls.filter(([url]) => new URL(url).pathname.endsWith("/health"));
+    expect(healthCalls).toHaveLength(2);
+    for (const [url] of healthCalls) {
+      expect(new URL(url).searchParams.getAll("services")).toEqual(["db", "auth", "rest", "storage"]);
+      expect(new URL(url).searchParams.get("timeout_ms")).toBe("5000");
+    }
     expect(log).toHaveBeenLastCalledWith(expect.stringContaining("No migration or deployment"));
   });
 
