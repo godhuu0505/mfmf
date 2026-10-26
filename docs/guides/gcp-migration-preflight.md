@@ -64,10 +64,11 @@ PUTの実GCS契約試験には、署名されたXML APIヘッダ `x-goog-if-gene
 
 ## データ照合とP3を独立させる
 
-P2の次の小単位は、**架空manifestだけを入力する照合器**。
-写真/アバターの両bucketと4参照元を対象に、欠落・余分・size/hash不一致・比較不能・削除tombstoneを区別する。
-ETagを無条件にMD5とみなさず、共通hashがないものは「一致」で通さない。
-実データの採取・copy/sync・delete・掃除は別の手順で、照合器自体に実行機能を持たせない。
+P2の次の小単位として、[オフライン画像照合器](./storage-manifest-reconciliation.md)を用意した。
+架空manifestだけで、写真/アバターの両bucketと4参照元の欠落・余分・size/hash不一致・比較不能・削除tombstoneを区別できる。
+共通hashがないものは「一致」で通さず、ETagをMD5へ推定変換しない。
+入力metadataの比較だけなので、実データの取得・整合したsnapshot・認可・復元の検証を代替しない。
+実データの採取・copy/sync・delete・掃除は別の手順で、照合器に実行機能はない。
 
 P3はその後、ローカルの隔離DBでauth互換shim・所有者/ロール・transaction限定claimsと既存pgTAPを検証する単位にする。
 既存Supabase migrationは改変せず、再生可能な別baselineを検討する。
