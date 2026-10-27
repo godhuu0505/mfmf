@@ -8,16 +8,17 @@ import { hasActiveGuestGrant } from "@/lib/guest";
 import { jstTodayISO } from "@/lib/dateRange";
 import { buildCareSummary, careMemberLabel, careSummaryRange, CareSummaryRangeError, shiftCareDate, type CareRecord } from "@/lib/careSummary";
 import { CareSummaryReadError, fetchCarePets, fetchCareSummary } from "@/lib/careSummaryQuery";
-import { ASSIGNEE_ROLES, ASSIGNEE_ROLE_LABEL, SOURCE_LABEL, type AssigneeRole } from "@/types/database";
+import { careAssigneeLabel, careDateLabel as dateLabel, formatCareSummaryText } from "@/lib/careSummaryText";
+import { SOURCE_LABEL, type AssigneeRole } from "@/types/database";
 import { type ScheduleItem } from "@/lib/schedule";
 import CareSummaryPrintButton from "@/components/CareSummaryPrintButton";
+import CareSummaryCopyButton from "@/components/CareSummaryCopyButton";
 import styles from "./summary.module.css";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "お世話の引き継ぎ", robots: { index: false, follow: false } };
 type Params = Record<string, string | string[] | undefined>;
 const first = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value;
-const dateLabel = (date: string) => date.replace(/-/g, "/");
 
 function Section({ title, description, count, children }: { title: string; description: string; count: number; children: ReactNode }) {
   return (
@@ -66,10 +67,7 @@ export default async function CareSummaryPage({ searchParams }: { searchParams: 
   const pet = pets.find((p) => p.id === petId);
   const summary = report && pet ? buildCareSummary({ ...report, petId, range, today }) : null;
   const memberNames = new Map(report?.members.map((m) => [m.user_id, careMemberLabel(m)]) ?? []);
-  const whoLabel = (who: Partial<Record<AssigneeRole, string>> = {}) => {
-    const labels = ASSIGNEE_ROLES.filter((role) => who[role]).map((role) => `${ASSIGNEE_ROLE_LABEL[role]}：${memberNames.get(who[role]!) ?? "確認できないメンバー"}`);
-    return labels.length ? labels.join(" / ") : "担当未設定";
-  };
+  const whoLabel = (who?: Partial<Record<AssigneeRole, string>>) => careAssigneeLabel(memberNames, who);
   function recordList(rows: CareRecord[], empty: string) {
     return rows.length ? <ul>{rows.map((row) => (
       <li key={row.id} className="space-y-2 border-b border-border py-4 last:border-0 print:break-inside-avoid">
@@ -134,6 +132,7 @@ export default async function CareSummaryPage({ searchParams }: { searchParams: 
           {summary.pastPlanned.length > 0 && <Section title="過去の未完了予定" description="保存済みの予定のうち、完了・見送りが記録されていないもの" count={summary.pastPlanned.length}>{recordList(summary.pastPlanned, "")}</Section>}
           {summary.unassignedRecordCount > 0 && <p className="text-xs text-muted-foreground">対象ペットが未設定の記録{summary.unassignedRecordCount}件は、このシートの記録に含めていません。</p>}
         </article>
+        <CareSummaryCopyButton key={`${pet.id}:${range.from}:${range.to}`} text={formatCareSummaryText({ pet, range, today, asOf: report.asOf, latestWeight: report.latestWeight, summary, memberNames })} />
         <CareSummaryPrintButton />
         <footer className="border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground"><p>mfmf · 入力された記録と予定を整理したシートです。</p><p>記載内容は作成時点のものです。渡す相手に必要な情報か確認してください。</p></footer>
       </>}
