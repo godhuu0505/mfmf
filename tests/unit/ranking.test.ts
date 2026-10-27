@@ -19,7 +19,7 @@ describe("opt-in record ranking", () => {
   it("requires an explicit flag, valid expiry and an unexpired hard stop", () => {
     expect(rankingEnabled({}, now())).toBe(false);
     expect(rankingEnabled({ ...enabled, MFMF_RANKING_ENABLED: "TRUE" }, now())).toBe(false);
-    for (const value of [undefined, "", "tomorrow", "2027-06-25T00:00:00+09:00", "2026-01-01T00:00:00Z"]) {
+    for (const value of [undefined, "", "tomorrow", "2027-06-25T00:00:00+09:00", "2026-01-01T00:00:00Z", "2027-02-30T00:00:00Z", "2027-04-31T00:00:00+09:00"]) {
       expect(rankingEnabled({ ...enabled, MFMF_RANKING_EXPIRES_AT: value }, now())).toBe(false);
     }
     expect(rankingEnabled(enabled, now())).toBe(true);
@@ -55,6 +55,7 @@ describe("opt-in record ranking", () => {
   it("normalizes full-width numbers and masks common honorific names and bare links", () => {
     const text = maskRankingText("架空さん １２３４ example.test/path a@example.test");
     expect(text).not.toMatch(/１２３４|1234|example|架空/);
+    expect(maskRankingText("利用者@架空.jp 名前＠例え.日本")).toBe("[メール] [メール]");
   });
   it.each([
     { records: [{ id: "foreign-id", score: 0.4 }, { id: "candidate-0", score: 0.2 }] },

@@ -654,7 +654,7 @@ input[type="date"] {
       <h2 id="search-heading" class="font-semibold">検索・絞り込み</h2>
       <label class="block"><span class="mb-1 block text-xs font-medium text-muted-foreground">思い出したいこと</span><input id="query" class="w-full rounded-lg border border-border bg-surface px-3 py-3 text-base" value="保育園から帰って、ゆっくりした日" maxlength="200"></label>
       <div class="grid grid-cols-2 gap-2"><button id="keyword" type="button" class="rounded-lg border border-border px-3 py-3 text-sm font-medium">キーワードで探す</button><button id="related" type="button" class="rounded-lg bg-primary px-3 py-3 text-sm font-semibold text-primary-foreground">関連度で探す</button></div>
-      <div class="rounded-xl bg-surface-muted p-3 text-xs leading-6 text-muted-foreground"><p><strong class="text-foreground">「関連度で探す」を押したときだけ</strong>、閲覧できる最近の記録を最大100件、Google Cloudへ送って並べ替えます。</p><p>写真・連絡先・URL・数値は送りません。本文の識別情報を除きますが、東京内での処理は保証されません。記録の保存先や共有範囲は変わりません。</p></div>
+      <div class="rounded-xl bg-surface-muted p-3 text-xs leading-6 text-muted-foreground"><p><strong class="text-foreground">「関連度で探す」を押したときだけ</strong>、閲覧できる最近の記録を最大100件、Google Cloudへ送って並べ替えます。</p><p>写真は送らず、メール・URL・数字列を伏せます。把握できる名前などを伏せますが、本文の完全な匿名化は保証できません。秘密情報は入力しないでください。東京内での処理は保証されません。記録の保存先や共有範囲は変わりません。</p></div>
       <div class="flex flex-wrap gap-2 text-sm"><button type="button" class="rounded-full border border-border px-3 py-1.5">期間：最近3か月</button><button type="button" class="rounded-full border border-border px-3 py-1.5">記録元：すべて</button><button type="button" class="rounded-full border border-border px-3 py-1.5">タグ：すべて</button></div>
     </section>
     <section aria-live="polite"><p id="status" class="mb-3 text-sm text-muted-foreground">キーワードに完全一致しなくても、近い内容を探せます。</p><div id="results" class="space-y-3"></div></section>

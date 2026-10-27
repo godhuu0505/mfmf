@@ -161,6 +161,8 @@ describe("existing Cloud Run continuous deployment", () => {
     [{ name: "MFMF_RANKING_ENABLED", value: "true" }],
     [{ name: "MFMF_RANKING_EXPIRES_AT", value: "2027-06-25T00:00:00+09:00" }],
     [{ name: "MFMF_RANKING_EXPIRES_AT", value: "tomorrow" }],
+    [{ name: "MFMF_RANKING_EXPIRES_AT", value: "2027-02-30T00:00:00Z" }],
+    [{ name: "MFMF_RANKING_EXPIRES_AT", value: "2027-04-31T00:00:00+09:00" }],
     [{ name: "MFMF_RANKING_ENABLED", value: "false" }, { name: "MFMF_RANKING_ENABLED", value: "false" }],
     [{ name: "MFMF_RANKING_ENABLED", valueSource: { secretKeyRef: { secret: "unreviewed", version: "1" } } }],
   ])("rejects malformed or overlong-lived ranking configuration", (...items) => {

@@ -17,7 +17,7 @@ export function maskRankingText(text: string, knownNames: readonly string[] = []
   for (const name of names) result = result.split(name).join("[名前]");
   return result
     .replace(/(?:https?|ftp):\/\/\S+|www\.\S+/giu, "[URL]")
-    .replace(/[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu, "[メール]")
+    .replace(/[\p{L}\p{N}.!#$%&'*+/=?^_`{|}~-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}/giu, "[メール]")
     .replace(/\b[A-Z0-9][A-Z0-9-]*(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}(?:\/[^\s]*)?/giu, "[URL]")
     .replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]{1,12}(?:さん|様|ちゃん|くん|先生)/gu, "[名前]")
     .replace(/[\p{N}]+(?:[.,:/+−-][\p{N}]+)*/gu, "[数値]")

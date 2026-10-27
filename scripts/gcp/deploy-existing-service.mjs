@@ -29,8 +29,12 @@ export function preserveRankingEnv(items = []) {
   if (values.MFMF_RANKING_ENABLED !== undefined && !["true", "false"].includes(values.MFMF_RANKING_ENABLED)) fail("Existing ranking flag is invalid.");
   const expiry = values.MFMF_RANKING_EXPIRES_AT;
   if ((values.MFMF_RANKING_ENABLED === "true" && !expiry) || (expiry !== undefined &&
-      (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(expiry) ||
+      (!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:Z|[+-]\d{2}:\d{2})$/.test(expiry) ||
        !Number.isFinite(Date.parse(expiry)) || Date.parse(expiry) > RANKING_HARD_STOP))) fail("Existing ranking expiry is invalid.");
+  if (expiry !== undefined) {
+    const calendarDay = new Date(`${expiry.slice(0, 10)}T00:00:00Z`);
+    if (!Number.isFinite(calendarDay.getTime()) || calendarDay.toISOString().slice(0, 10) !== expiry.slice(0, 10)) fail("Existing ranking expiry is invalid.");
+  }
   return selected.map(({ name, value }) => ({ name, value }));
 }
 

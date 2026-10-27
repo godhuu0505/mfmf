@@ -16,9 +16,12 @@ const object = (value: unknown): value is Record<string, unknown> => Boolean(val
 
 export function rankingEnabled(env: Readonly<Record<string, string | undefined>> = process.env, now = Date.now()): boolean {
   const raw = env.MFMF_RANKING_EXPIRES_AT;
-  if (env.MFMF_RANKING_ENABLED !== "true" || !raw || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(raw)) return false;
+  if (env.MFMF_RANKING_ENABLED !== "true" || !raw || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:Z|[+-]\d{2}:\d{2})$/.test(raw)) return false;
   const expires = Date.parse(raw);
-  return Number.isFinite(expires) && now < expires && expires <= RANKING_HARD_STOP;
+  const calendarDay = new Date(`${raw.slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(expires) && Number.isFinite(calendarDay.getTime()) &&
+    calendarDay.toISOString().slice(0, 10) === raw.slice(0, 10) &&
+    now < expires && expires <= RANKING_HARD_STOP;
 }
 
 async function readJson(response: Response, maxBytes: number): Promise<unknown> {
