@@ -8,6 +8,8 @@ const REVISION_TYPE = "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION";
 const LATEST_TYPE = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST";
 const PIN_KEYS = ["TOKEN_ENC_KEY", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
 const PUBLIC_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SIGNUP_ENABLED", "SENTRY_ENVIRONMENT", "SENTRY_TRACES_SAMPLE_RATE"];
+const RANKING_KEYS = ["MFMF_RANKING_ENABLED", "MFMF_RANKING_EXPIRES_AT"];
+const RANKING_HARD_STOP = Date.parse("2027-06-24T00:00:00+09:00");
 class DeploymentError extends Error {}
 const fail = (message) => { throw new DeploymentError(message); };
 const exactKeys = (object, keys) => object && typeof object === "object" && !Array.isArray(object) &&
@@ -16,6 +18,25 @@ const revisionName = (name) => typeof name === "string" && /^mfmf-candidate-[a-z
 const shortRevision = (value) => typeof value === "string" && value.startsWith(`${SERVICE_NAME}/revisions/`) ? value.slice(`${SERVICE_NAME}/revisions/`.length) : value;
 const succeeded = (condition) => condition?.state === "CONDITION_SUCCEEDED";
 const imageDigest = (value) => typeof value === "string" && value.startsWith(`${IMAGE_BASE}@sha256:`) && /^[a-f0-9]{64}$/.test(value.slice(`${IMAGE_BASE}@sha256:`.length));
+
+// Server-only settings are read from the verified existing service, never from a
+// public/build manifest or untrusted workflow input. Missing settings stay missing.
+export function preserveRankingEnv(items = []) {
+  const selected = items.filter((item) => RANKING_KEYS.includes(item?.name));
+  if (new Set(selected.map((item) => item.name)).size !== selected.length || selected.some((item) =>
+    !exactKeys(item, ["name", "value"]) || typeof item.value !== "string")) fail("Existing ranking settings are invalid.");
+  const values = Object.fromEntries(selected.map((item) => [item.name, item.value]));
+  if (values.MFMF_RANKING_ENABLED !== undefined && !["true", "false"].includes(values.MFMF_RANKING_ENABLED)) fail("Existing ranking flag is invalid.");
+  const expiry = values.MFMF_RANKING_EXPIRES_AT;
+  if ((values.MFMF_RANKING_ENABLED === "true" && !expiry) || (expiry !== undefined &&
+      (!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:Z|[+-]\d{2}:\d{2})$/.test(expiry) ||
+       !Number.isFinite(Date.parse(expiry)) || Date.parse(expiry) > RANKING_HARD_STOP))) fail("Existing ranking expiry is invalid.");
+  if (expiry !== undefined) {
+    const calendarDay = new Date(`${expiry.slice(0, 10)}T00:00:00Z`);
+    if (!Number.isFinite(calendarDay.getTime()) || calendarDay.toISOString().slice(0, 10) !== expiry.slice(0, 10)) fail("Existing ranking expiry is invalid.");
+  }
+  return selected.map(({ name, value }) => ({ name, value }));
+}
 
 export function validateFixedVersions(text, env) {
   const refs = parsePreseededSecretVersions({ ...env, PRESEEDED_SECRET_VERSIONS: text });
@@ -71,7 +92,7 @@ function validateService(service) {
   }
   const seen = new Set();
   for (const item of container.env ?? []) {
-    if (!item || seen.has(item.name) || ![...PUBLIC_KEYS, ...Object.keys(SECRET_NAMES)].includes(item.name)) {
+    if (!item || seen.has(item.name) || ![...PUBLIC_KEYS, ...RANKING_KEYS, ...Object.keys(SECRET_NAMES)].includes(item.name)) {
       fail("Existing runtime has duplicate or unmanaged environment settings.");
     }
     seen.add(item.name);
@@ -79,6 +100,7 @@ function validateService(service) {
       fail("Existing server settings must use secret references.");
     }
   }
+  preserveRankingEnv(container.env);
   return container;
 }
 
@@ -203,6 +225,7 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   };
   const runtimeEnv = [
     ...Object.entries(manifest.env).map(([name, value]) => ({ name, value })),
+    ...preserveRankingEnv(current.template.containers[0].env),
     ...Object.entries(manifest.secretVersions).map(([name, ref]) => {
       const parts = ref.split("/");
       return { name, valueSource: { secretKeyRef: { secret: parts[3], version: parts[5] } } };

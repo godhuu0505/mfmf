@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
     "test:integration": "vitest run --config vitest.config.integration.mts",
+    "test:ranking-budget": "vitest run --config vitest.config.ranking.mts",
     "test:e2e": "playwright test",
     "icons": "node scripts/generate-icons.mjs",
     "feedback:issues": "node scripts/feedback-to-issues.mjs"
