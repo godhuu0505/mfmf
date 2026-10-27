@@ -38,6 +38,7 @@ describe("opt-in record ranking", () => {
     expect(url).toBe("https://discoveryengine.googleapis.com/v1/projects/mfmf-499612/locations/global/rankingConfigs/default_ranking_config:rank");
     expect(options?.redirect).toBe("error"); expect(options?.cache).toBe("no-store"); expect(options?.signal).toBeInstanceOf(AbortSignal);
     expect(options?.headers).toHaveProperty("Authorization", "Bearer synthetic-access-token");
+    expect(options?.headers).not.toHaveProperty("X-Goog-User-Project");
     const body = String(options?.body);
     for (const privateValue of [...names, "test@example.com", "https://example.test", "token=secret", "4.2", ...candidates.map((r) => r.id)]) expect(body).not.toContain(privateValue);
     expect(JSON.parse(body)).toMatchObject({ model: RANKING_MODEL, topN: 2, ignoreRecordDetailsInResponse: true });

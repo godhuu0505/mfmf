@@ -24,7 +24,7 @@ const empty = (status: "disabled" | "empty" | "limited" | "unavailable"): Relate
 /** Called only by an explicit opt-in action, never by a normal keyword search or prefetch. */
 export async function findRelatedRecords(input: RelatedRecordInput, dependencies: {
   supabase?: ServerClient;
-  membership?: Membership | null;
+  getMembership?: (client: ServerClient) => Promise<Membership | null>;
   rank?: ReturnType<typeof createRanking>;
   enabled?: boolean;
 } = {}): Promise<RelatedRecordResult> {
@@ -40,7 +40,8 @@ export async function findRelatedRecords(input: RelatedRecordInput, dependencies
 
   // Membership is resolved again from the authenticated caller, never from request data.
   const { getCurrentMembership } = await import("@/lib/household");
-  const membership = dependencies.membership === undefined ? await getCurrentMembership(supabase) : dependencies.membership;
+  const getMembership = dependencies.getMembership ?? getCurrentMembership;
+  const membership = await getMembership(supabase);
   if (!membership) return empty("unavailable");
   let taggedIds: string[] | null = null;
   if (input.tagId) {
@@ -72,9 +73,29 @@ export async function findRelatedRecords(input: RelatedRecordInput, dependencies
   if (reservation.error || !reservation.data || typeof reservation.data !== "object" || reservation.data.allowed !== true) return empty("limited");
   try {
     const ids = await (dependencies.rank ?? createRanking())(input.query, preparedCandidates, names);
-    const byId = new Map(candidates.map((row) => [row.id, row]));
-    if (ids.length !== candidates.length || new Set(ids).size !== ids.length || ids.some((id) => !byId.has(id))) return empty("unavailable");
-    return { status: "ranked", records: ids.map((id) => byId.get(id)!), candidateCount: candidates.length,
+    const candidateIds = new Set(candidates.map((row) => row.id));
+    if (ids.length !== candidates.length || new Set(ids).size !== ids.length || ids.some((id) => !candidateIds.has(id))) return empty("unavailable");
+    // Google can take several seconds. Revalidate the same identity and current
+    // membership, then let RLS read the current rows. Never return a stale body
+    // from before a deletion, edit, membership revocation or session change.
+    const freshAuth = await supabase.auth.getUser();
+    if (freshAuth.error || freshAuth.data.user?.id !== user.id) return empty("unavailable");
+    const freshMembership = await getMembership(supabase);
+    if (!freshMembership || freshMembership.householdId !== membership.householdId) return empty("unavailable");
+    let freshQuery = supabase.from("daycare_records").select("id, record_date, source, body, author")
+      .in("id", ids).eq("status", "done").or(householdScopeFilter(freshMembership.householdId));
+    if (input.source && input.source !== "all") freshQuery = freshQuery.eq("source", input.source);
+    if (input.from) freshQuery = freshQuery.gte("record_date", input.from);
+    if (input.to) freshQuery = freshQuery.lte("record_date", input.to);
+    const fresh = await freshQuery.limit(RANKING_MAX_CANDIDATES);
+    if (fresh.error || !fresh.data) return empty("unavailable");
+    const currentRows = fresh.data as unknown as RelatedRecord[];
+    const byId = new Map(currentRows.filter((row) => candidateIds.has(row.id)).map((row) => [row.id, {
+      id: row.id, record_date: row.record_date, source: row.source, body: row.body, author: row.author,
+    }]));
+    const records = ids.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
+    if (!records.length) return empty("empty");
+    return { status: "ranked", records, candidateCount: records.length,
       truncated: data.length > RANKING_MAX_CANDIDATES };
   } catch { return empty("unavailable"); }
 }

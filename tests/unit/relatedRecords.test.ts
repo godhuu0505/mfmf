@@ -7,8 +7,9 @@ vi.mock("@/lib/household", () => ({
 import { findRelatedRecords } from "@/lib/relatedRecords";
 
 const membership = { householdId: "11111111-1111-4111-8111-111111111111", role: "viewer" as const };
-function fake(options: { denied?: boolean; guest?: boolean; rows?: number; noUser?: boolean } = {}) {
+function fake(options: { denied?: boolean; guest?: boolean; rows?: number; noUser?: boolean; currentRows?: number; edited?: boolean; freshUser?: "expired" | "other" } = {}) {
   const events: string[] = [];
+  let reads = 0; let authReads = 0;
   const rows = Array.from({ length: options.rows ?? 2 }, (_, i) => ({
     id: `local-record-${i}`, body: "架空ポチが休んだ。連絡先 fake@example.test 12時", source: "daycare", author: "架空太郎",
     pets: { name: "架空ポチ" }, record_date: "2026-10-27", record_photos: [{ storage_path: "never-send-this-photo" }],
@@ -16,16 +17,27 @@ function fake(options: { denied?: boolean; guest?: boolean; rows?: number; noUse
   const chain = {
     select: vi.fn(function () { return chain; }), eq: vi.fn(function () { return chain; }), or: vi.fn(function () { return chain; }),
     order: vi.fn(function () { return chain; }), gte: vi.fn(function () { return chain; }), lte: vi.fn(function () { return chain; }),
-    in: vi.fn(function () { return chain; }), limit: vi.fn(async () => { events.push("read-authorized-candidates"); return { data: rows, error: null }; }),
+    in: vi.fn(function () { return chain; }), limit: vi.fn(async () => {
+      reads++;
+      events.push(reads === 1 ? "read-authorized-candidates" : "read-current-candidates");
+      const current = reads === 1 ? rows : rows.slice(0, options.currentRows ?? 100).map((row) => options.edited ? { ...row, body: "現在の本文", source: "home", record_date: "2026-10-28" } : row);
+      return { data: current, error: null };
+    }),
   };
   const supabase = {
-    auth: { getUser: vi.fn(async () => { events.push("auth"); return { data: { user: options.noUser ? null : { id: "authenticated-user", email: "fake@example.test", user_metadata: {} } }, error: null }; }) },
+    auth: { getUser: vi.fn(async () => {
+      authReads++; events.push("auth");
+      const missing = options.noUser || (authReads > 1 && options.freshUser === "expired");
+      const id = authReads > 1 && options.freshUser === "other" ? "different-user" : "authenticated-user";
+      return { data: { user: missing ? null : { id, email: "fake@example.test", user_metadata: {} } }, error: null };
+    }) },
     from: vi.fn(() => chain),
     rpc: vi.fn(async () => { events.push("reserve-budget"); return { data: { allowed: !options.denied }, error: null }; }),
   };
   const rank = vi.fn(async (_q: string, candidates: readonly { id: string }[]) => { events.push("paid-api"); return candidates.map((r) => r.id).reverse(); });
-  const dependencies = { supabase: supabase as never, membership: options.guest ? null : membership, rank, enabled: true };
-  return { events, supabase, rank, dependencies, chain, rows };
+  const getMembership = vi.fn(async () => options.guest ? null : membership);
+  const dependencies = { supabase: supabase as never, getMembership, rank, enabled: true };
+  return { events, supabase, rank, getMembership, dependencies, chain, rows };
 }
 
 describe("authorized opt-in candidate ranking", () => {
@@ -43,7 +55,7 @@ describe("authorized opt-in candidate ranking", () => {
     const h = fake();
     const result = await findRelatedRecords({ query: "休息", source: "daycare", from: "2026-10-01" }, h.dependencies);
     expect(result.status).toBe("ranked"); expect(result.records.map((r) => r.id)).toEqual(["local-record-1", "local-record-0"]);
-    expect(h.events).toEqual(["auth", "read-authorized-candidates", "reserve-budget", "paid-api"]);
+    expect(h.events).toEqual(["auth", "read-authorized-candidates", "reserve-budget", "paid-api", "auth", "read-current-candidates"]);
     expect(h.chain.or).toHaveBeenCalledWith(`household_id.eq.${membership.householdId},household_id.is.null`);
     expect(h.chain.limit).toHaveBeenCalledWith(101); expect(h.chain.eq).toHaveBeenCalledWith("status", "done");
     expect(h.supabase.rpc).toHaveBeenCalledWith("reserve_record_ranking", { p_household: membership.householdId });
@@ -70,5 +82,26 @@ describe("authorized opt-in candidate ranking", () => {
     const h = fake(); h.rank.mockResolvedValue(["not-authorized-record"]);
     expect((await findRelatedRecords({ query: "休息" }, h.dependencies)).status).toBe("unavailable");
     expect(h.supabase.rpc).toHaveBeenCalledTimes(1);
+  });
+  it.each(["expired", "other"] as const)("does not return results after a %s session", async (freshUser) => {
+    const h = fake({ freshUser });
+    expect((await findRelatedRecords({ query: "休息" }, h.dependencies)).status).toBe("unavailable");
+    expect(h.rank).toHaveBeenCalledTimes(1);
+    expect(h.chain.limit).toHaveBeenCalledTimes(1);
+  });
+  it("does not return the pre-request body after household membership is revoked", async () => {
+    const h = fake(); h.getMembership.mockResolvedValueOnce(membership).mockResolvedValueOnce(null);
+    expect((await findRelatedRecords({ query: "休息" }, h.dependencies)).status).toBe("unavailable");
+    expect(h.rank).toHaveBeenCalledTimes(1); expect(h.chain.limit).toHaveBeenCalledTimes(1);
+  });
+  it("omits deleted rows and returns only current body, date and source values", async () => {
+    const h = fake({ currentRows: 1, edited: true });
+    const result = await findRelatedRecords({ query: "休息" }, h.dependencies);
+    expect(result).toMatchObject({ status: "ranked", candidateCount: 1, records: [{ id: "local-record-0", body: "現在の本文", record_date: "2026-10-28", source: "home" }] });
+    expect(result.records).toHaveLength(1); expect(JSON.stringify(result.records)).not.toContain("架空ポチ");
+  });
+  it("returns an empty result if RLS no longer permits any of the ranked rows", async () => {
+    const h = fake({ currentRows: 0 });
+    expect((await findRelatedRecords({ query: "休息" }, h.dependencies)).status).toBe("empty");
   });
 });

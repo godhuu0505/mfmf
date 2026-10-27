@@ -66,7 +66,7 @@ export function createRanking(dependencies: {
       if (!rankingEnabled(dependencies.env ?? process.env, now())) return unavailable();
       const response = await fetchImpl(RANK_URL, {
         method: "POST", redirect: "error", signal, cache: "no-store",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "X-Goog-User-Project": RANKING_PROJECT },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: RANKING_MODEL, query: prepared.query, records: prepared.records,
           topN: prepared.records.length, ignoreRecordDetailsInResponse: true }),
       });
