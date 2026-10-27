@@ -7,6 +7,8 @@ import { canonical, decodeArchiveForOperator, requireValue, fail, sha256, MAX_TO
 import { createOperatorGcs, bindingFor, responseBytes } from "./storage-migration-gcs.mjs";
 import { requireMigrationContext, managementQuery, encryptedJournal } from "./storage-migration-io.mjs";
 import { cleanupStorage } from "./storage-migration-cleanup.mjs";
+import { cleanupStage, cleanupDiagnostic } from "./storage-migration-diagnostics.mjs";
+import { diagnoseCleanup } from "./storage-cleanup-diagnosis.mjs";
 import { MIGRATION_SNAPSHOT_SQL, COMMIT_MIGRATION_SQL, ACTIVATE_MIGRATION_SQL, ROLLBACK_MIGRATION_SQL, CANCEL_STAGED_SQL,
   validateMigrationSnapshot, createMigrationPlan, migrationSummary, committedAssets, normalizedSnapshotSql } from "./storage-migration-plan.mjs";
 
@@ -49,12 +51,13 @@ export async function runMigration({ mode = "plan", env, fetchImpl = fetch,
   signal = AbortSignal.timeout(20 * 60_000), journalFactory = encryptedJournal, uuid,
   archiveFactory = backupArchive }) {
   requireMigrationContext(env);
-  requireValue(["plan", "migrate", "activate", "rollback", "abort-staging", "cleanup"].includes(mode));
+  requireValue(["plan", "migrate", "activate", "rollback", "abort-staging", "cleanup", "diagnose-cleanup"].includes(mode));
   requireValue(env.GITHUB_EVENT_NAME !== "schedule" || mode === "cleanup");
   const query = managementQuery({ env, fetchImpl, signal });
+  if (mode === "diagnose-cleanup") return diagnoseCleanup(query);
   if (mode === "cleanup") {
     const gcs = createOperatorGcs({ token: env.GCP_ACCESS_TOKEN, fetchImpl, signal });
-    await gcs.verifyBuckets();
+    await cleanupStage("verify-buckets", () => gcs.verifyBuckets());
     return cleanupStorage({ query, gcs });
   }
   const snapshot = async () => {
@@ -209,8 +212,8 @@ export async function main(args = process.argv.slice(2), env = process.env) {
       signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20 * 60_000)]) });
     await new Promise((done, reject) => process.stdout.write(`${JSON.stringify(result)}\n`, (error) => error ? reject(error) : done()));
     return result.failures > 0 ? 1 : 0;
-  } catch {
-    process.stderr.write("Storage operator stopped; outcome may be incomplete. Inspect encrypted receipt; no automatic unfreeze.\n");
+  } catch (error) {
+    process.stderr.write(cleanupDiagnostic(error) ?? "Storage operator stopped; outcome may be incomplete. Inspect encrypted receipt; no automatic unfreeze.\n");
     return 1;
   } finally { process.off("SIGINT", stop); process.off("SIGTERM", stop); }
 }

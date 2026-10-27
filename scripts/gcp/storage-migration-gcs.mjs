@@ -1,5 +1,6 @@
 // Operator-only fixed-target GCS JSON API. No token acquisition or app imports.
 import { requireValue, fail, sha256, json, MAX_OBJECT_BYTES } from "./storage-backup-format.mjs";
+import { failStorageHttp } from "./storage-migration-diagnostics.mjs";
 
 export const MIGRATION_PROJECT = "mfmf-499612";
 export const MIGRATION_PROJECT_NUMBER = "92772745697";
@@ -63,7 +64,7 @@ export function createOperatorGcs({ token, fetchImpl = fetch, signal = AbortSign
     const response = await fetchImpl(url, { ...options, headers: { ...options.headers, Authorization: `Bearer ${token}` },
       redirect: "error", signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]) });
     if (response.status === 404 && allowMissing) { await response.body?.cancel().catch(() => {}); return null; }
-    if (!response.ok) { await response.body?.cancel().catch(() => {}); fail(); }
+    if (!response.ok) { await response.body?.cancel().catch(() => {}); failStorageHttp(response.status); }
     return response;
   };
   const readJson = async (url, options, allowMissing = false) => {

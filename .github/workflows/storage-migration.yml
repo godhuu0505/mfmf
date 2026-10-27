@@ -8,7 +8,7 @@ on:
         type: choice
         required: true
         default: plan
-        options: [plan, migrate, activate, rollback, abort-staging, cleanup]
+        options: [plan, migrate, activate, rollback, abort-staging, cleanup, diagnose-cleanup]
       restore_verified:
         description: "For activate only: independently verified age decrypt and isolated GCS restore"
         type: boolean
@@ -24,7 +24,7 @@ permissions:
 
 concurrency:
   # A scheduled cleanup must not replace a pending production deployment.
-  group: ${{ (github.event_name == 'schedule' || inputs.mode == 'cleanup') && 'storage-cleanup' || 'deploy-production' }}
+  group: ${{ (github.event_name == 'schedule' || inputs.mode == 'cleanup' || inputs.mode == 'diagnose-cleanup') && 'storage-cleanup' || 'deploy-production' }}
   cancel-in-progress: false
 
 jobs:
@@ -43,25 +43,25 @@ jobs:
         id: operation
         env:
           EVENT_NAME: ${{ github.event_name }}
-          REQUESTED_MODE: ${{ inputs.mode == 'plan' && 'plan' || inputs.mode == 'migrate' && 'migrate' || inputs.mode == 'activate' && 'activate' || inputs.mode == 'rollback' && 'rollback' || inputs.mode == 'abort-staging' && 'abort-staging' || inputs.mode == 'cleanup' && 'cleanup' || 'invalid' }}
+          REQUESTED_MODE: ${{ inputs.mode == 'plan' && 'plan' || inputs.mode == 'migrate' && 'migrate' || inputs.mode == 'activate' && 'activate' || inputs.mode == 'rollback' && 'rollback' || inputs.mode == 'abort-staging' && 'abort-staging' || inputs.mode == 'cleanup' && 'cleanup' || inputs.mode == 'diagnose-cleanup' && 'diagnose-cleanup' || 'invalid' }}
         run: |
           if [ "$EVENT_NAME" = schedule ]; then
             echo 'mode=cleanup' >> "$GITHUB_OUTPUT"
           else
             case "$REQUESTED_MODE" in
-              plan|migrate|activate|rollback|abort-staging|cleanup) echo "mode=$REQUESTED_MODE" >> "$GITHUB_OUTPUT" ;;
+              plan|migrate|activate|rollback|abort-staging|cleanup|diagnose-cleanup) echo "mode=$REQUESTED_MODE" >> "$GITHUB_OUTPUT" ;;
               *) echo 'Invalid operation.' >&2; exit 1 ;;
             esac
           fi
       - name: Configure bounded downloads
-        if: steps.operation.outputs.mode != 'plan' && steps.operation.outputs.mode != 'cleanup'
+        if: steps.operation.outputs.mode != 'plan' && steps.operation.outputs.mode != 'cleanup' && steps.operation.outputs.mode != 'diagnose-cleanup'
         uses: ./.github/actions/configure-apt
       - name: Install receipt encryption
-        if: steps.operation.outputs.mode != 'plan' && steps.operation.outputs.mode != 'cleanup'
+        if: steps.operation.outputs.mode != 'plan' && steps.operation.outputs.mode != 'cleanup' && steps.operation.outputs.mode != 'diagnose-cleanup'
         timeout-minutes: 5
         run: sudo apt-get update && sudo apt-get install -y age
       - id: auth
-        if: steps.operation.outputs.mode != 'plan'
+        if: steps.operation.outputs.mode != 'plan' && steps.operation.outputs.mode != 'diagnose-cleanup'
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_STORAGE_WIF_PROVIDER }}
@@ -84,7 +84,7 @@ jobs:
           GCP_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: node scripts/gcp/storage-migration.mjs "$OPERATION"
       - uses: actions/upload-artifact@v4
-        if: always() && steps.operation.outputs.mode != 'plan' && steps.operation.outputs.mode != 'cleanup'
+        if: always() && steps.operation.outputs.mode != 'plan' && steps.operation.outputs.mode != 'cleanup' && steps.operation.outputs.mode != 'diagnose-cleanup'
         with:
           name: storage-migration-encrypted-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

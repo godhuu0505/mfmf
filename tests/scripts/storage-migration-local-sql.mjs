@@ -7,6 +7,7 @@ import pg from "pg";
 import assert from "node:assert/strict";
 import { MIGRATION_SNAPSHOT_SQL, COMMIT_MIGRATION_SQL, ACTIVATE_MIGRATION_SQL, ROLLBACK_MIGRATION_SQL,
   CANCEL_STAGED_SQL, createMigrationPlan, committedAssets } from "../../scripts/gcp/storage-migration-plan.mjs";
+import { EXPIRE_RESERVATIONS_SQL, DELETED_ASSETS_SQL } from "../../scripts/gcp/storage-migration-cleanup.mjs";
 
 const name = `mfmf_storage_fixture_${randomUUID().replaceAll("-", "")}`;
 const config = { host: "127.0.0.1", port: 54322, user: "postgres", password: "postgres", database: "postgres", connectionTimeoutMillis: 5000 };
@@ -28,6 +29,10 @@ try {
   await client.query("BEGIN");
   await client.query("SET LOCAL statement_timeout = '10s'");
   await client.query("INSERT INTO public.media_storage_state(singleton,mode,read_backend) VALUES(true,'supabase','supabase')");
+  stage = "empty-cleanup";
+  assert.deepEqual((await client.query(EXPIRE_RESERVATIONS_SQL)).rows, [{ expired: 0, guard: 1 }]);
+  assert.deepEqual((await client.query(DELETED_ASSETS_SQL, [null])).rows, []);
+  stage = "seed-fixture";
   await client.query("INSERT INTO storage.buckets(id,name,public) VALUES('avatars','avatars',false),('daycare-photos','daycare-photos',false)");
   const owner = randomUUID(), household = randomUUID(), pet = randomUUID(), record = randomUUID(), photo = randomUUID();
   await client.query("INSERT INTO auth.users(id,email) VALUES($1,'storage-fixture@example.invalid')", [owner]);
@@ -86,7 +91,7 @@ try {
   assert.equal(cancel.rows[0].result.rolledBack, 4); assert.deepEqual((await snapshot()).references, originalRefs);
   assert.equal((await snapshot()).readBackend, "supabase");
   await client.query("ROLLBACK");
-  process.stdout.write("Local isolated Storage SQL passed: staging, stale CAS rejection, atomic activation, inverse rollback, and staged cancellation.\n");
+  process.stdout.write("Local isolated Storage SQL passed: empty cleanup, staging, stale CAS rejection, atomic activation, inverse rollback, and staged cancellation.\n");
 } catch {
   // Only the fixed phase name, never SQL text, row values, URLs or PG diagnostics.
   process.stderr.write(`Local isolated Storage SQL failed at ${stage}; details withheld.\n`); process.exitCode = 1;
