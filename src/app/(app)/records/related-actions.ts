@@ -27,7 +27,7 @@ export async function searchRelatedRecords(formData: FormData): Promise<RelatedS
     const result = await findRelatedRecords({ query: query!, source: source!, from: from!, to: to!, tagId: tagId! }, { supabase });
     return {
       status: result.status, candidateCount: result.candidateCount, truncated: result.truncated,
-      records: result.records.map((row) => ({ id: row.id, recordDate: row.record_date, source: row.source, body: row.body })),
+      records: result.records.map((row) => ({ id: row.id, recordDate: row.record_date, source: row.source, body: row.body.slice(0, 600) })),
     };
   } catch { return invalid; }
 }

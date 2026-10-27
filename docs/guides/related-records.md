@@ -61,4 +61,8 @@ API成功や残高表示だけで割引適用と判定しない。枠は使用�
 既存のローカルSupabase DBをresetしたり実データへ接続したりしない。
 専用実行は`npm run test:ranking-budget`。通常のintegration suite/CIでも同じSQLテストを実行する。
 
-画面の先行案は`proto/related-records/`。架空データだけで動き、アプリやAPIには通信しない。
+画面の先行案は`docs/archive/related-records/`。2026-10-28に利用者が了承し、受け入れ条件を同フォルダの`spec.md`へ記録した。
+プロトは架空データだけで動き、アプリやAPIには通信しない。
+実際の画面では入力や条件変更・パネルを閉じる操作で未完了処理と結果を無効にし、遅い応答で新しい入力を上書きしない。
+E2Eはローカルの実認証を使い、ブラウザ側でServer Action応答だけを差し替える。
+ローカルtest server限定のNode loaderがGoogleのmetadata/Rankingへの通信を拒否するため、APIキー・認証回避・本番用のfake設定は不要。

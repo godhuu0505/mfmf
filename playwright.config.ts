@@ -1,10 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 // System 層（D25 / D30 / D31）: next start ＋ ローカル Supabase に対して実行する。
 // 前提: `npx supabase start` が済んでいて、以下の env が設定されていること
 //   NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY（ローカル値）
 // `npm run build` してから `npm run test:e2e`（webServer が next start を起動する）。
-const PORT = 3100;
+const PORT = Number(process.env.MFMF_E2E_PORT ?? 3100);
+if (!Number.isInteger(PORT) || PORT < 1024 || PORT > 65535) throw new Error("Invalid local E2E port");
 
 // Service Worker が発行する fetch を Playwright のルーティング/ネットワーク制御の
 // 対象にする（既定では SW のリクエストは素通しになり、オフライン遮断が SW に効かない）。
@@ -40,7 +43,14 @@ export default defineConfig({
   webServer: {
     command: `npm run start -- -p ${PORT}`,
     url: `http://localhost:${PORT}/login`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && !process.env.MFMF_E2E_PORT,
+    env: {
+      // Regular feature flags on the local test server, never an app auth bypass.
+      // The test-only loader forbids Google credentials/Ranking before network I/O.
+      MFMF_RANKING_ENABLED: "true",
+      MFMF_RANKING_EXPIRES_AT: "2027-06-24T00:00:00+09:00",
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${pathToFileURL(resolve(__dirname, "tests/e2e/ranking-network-guard.mjs")).href}`.trim(),
+    },
     timeout: 60_000,
   },
 });
