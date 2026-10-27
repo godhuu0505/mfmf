@@ -18,7 +18,9 @@ export async function cleanupStorage({ query, gcs }) {
   const result = { operation: "storage-cleanup", expiredReservations: expired[0].expired, checkedAssets: 0, deletedGenerations: 0, absentObjects: 0, failures: 0 };
   let cursor = null;
   for (;;) {
-    const rows = await cleanupStage("list-deleted", () => query(DELETED_ASSETS_SQL, { parameters: [cursor] }));
+    // The Management read_only route rejects this operator-guarded SELECT.
+    // Use the normal operator route, preserving the fixed query and bound cursor.
+    const rows = await cleanupStage("list-deleted", () => query(DELETED_ASSETS_SQL, { parameters: [cursor], write: true }));
     await cleanupStage("validate-deleted-page", () => requireValue(Array.isArray(rows) && rows.length <= 200));
     if (!rows.length) break;
     for (const asset of rows) {

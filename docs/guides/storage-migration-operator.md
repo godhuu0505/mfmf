@@ -97,6 +97,11 @@ expired reservedはまずDB terminal化する。final generationがledgerにあ�
 final metadataのserver binding全項目一致を確認し、現generationを特定して削除する。
 不明binding/別generationは削除しない。失敗件数があればjobを失敗させ、terminal状態のまま次回再試行する。
 件数はkeysetで200件ずつ、1run最大10,000 assets/20分に制限する。active/ready assetは対象外。
+削除済み台帳の固定SELECTは通常のManagement API経路（`read_only:false`）で実行する。
+本番診断ではoperator関数を含む`read_only:true`経路だけHTTP 400となり、同じSELECTとnullパラメーターの
+通常経路は成功した。内部理由は断定せず、DB権限や関数公開範囲は変更しない。
+先行の期限切れ処理は対象0件でもoperator判定失敗ならSQL例外にし、返却guard=1も検証する。
+ガード失敗時は一覧読取・GCS削除へ進まない。固定SELECTのoperator条件、bind cursor、200件上限は維持する。
 cleanupには暗号化receiptを作らない。準備・SQL・結果検証で止まった場合は固定stageと、
 HTTPエラーなら数値statusだけを出す。API本文・SQL本文・行・例外文は出さず、modeや参照を変更しない。
 一時的な失敗を調査してからcleanupだけを再試行し、移送/activateを代わりに再実行しない。

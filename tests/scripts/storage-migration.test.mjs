@@ -257,8 +257,32 @@ test("empty cleanup accepts zero counts and a null initial cursor without any ob
     requests.push({ sql, options });
     return sql === EXPIRE_RESERVATIONS_SQL ? [{ expired: 0, guard: 1 }] : [];
   }, gcs: new Proxy({}, { get: () => assert.fail("empty cleanup must not touch objects") }) });
-  assert.deepEqual(requests, [{ sql: EXPIRE_RESERVATIONS_SQL, options: { write: true } }, { sql: DELETED_ASSETS_SQL, options: { parameters: [null] } }]);
+  assert.deepEqual(requests, [{ sql: EXPIRE_RESERVATIONS_SQL, options: { write: true } }, { sql: DELETED_ASSETS_SQL, options: { parameters: [null], write: true } }]);
   assert.deepEqual(result, { operation: "storage-cleanup", expiredReservations: 0, checkedAssets: 0, deletedGenerations: 0, absentObjects: 0, failures: 0 });
+});
+test("cleanup uses the normal operator route for its fixed SELECT when the read_only route rejects it", async () => {
+  const c = cloud(); const queries = [];
+  const fetchImpl = async (url, options) => {
+    if (new URL(url).origin !== "https://api.supabase.com") return c.fetchImpl(url, options);
+    const request = JSON.parse(options.body); queries.push(request);
+    if (request.query === EXPIRE_RESERVATIONS_SQL) {
+      assert.equal(request.read_only, false); return Response.json([{ expired: 0, guard: 1 }]);
+    }
+    assert.equal(request.query, DELETED_ASSETS_SQL); assert.deepEqual(request.parameters, [null]);
+    return request.read_only ? new Response(PRIVATE, { status: 400 }) : Response.json([]);
+  };
+  const result = await runMigration({ mode: "cleanup", env, fetchImpl });
+  assert.equal(result.failures, 0); assert.equal(result.checkedAssets, 0);
+  assert.deepEqual(queries.map((query) => query.read_only), [false, false]);
+  assert.ok(c.calls.every((call) => !["POST", "PUT", "DELETE"].includes(call.options.method)));
+});
+test("cleanup never treats failed operator guards as an empty successful scan", async () => {
+  for (const response of [[{ expired: 0, guard: 0 }], [{ expired: 0, guard: null }], []]) {
+    const queries = [];
+    await assert.rejects(cleanupStorage({ query: async (sql) => { queries.push(sql); return response; },
+      gcs: new Proxy({}, { get: () => assert.fail("failed guard must not touch objects") }) }));
+    assert.deepEqual(queries, [EXPIRE_RESERVATIONS_SQL]);
+  }
 });
 test("cleanup reports only fixed stages and numeric HTTP status, never provider bodies", async () => {
   for (const stage of ["verify-buckets", "expire-reservations", "list-deleted"]) {

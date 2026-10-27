@@ -32,6 +32,14 @@ try {
   stage = "empty-cleanup";
   assert.deepEqual((await client.query(EXPIRE_RESERVATIONS_SQL)).rows, [{ expired: 0, guard: 1 }]);
   assert.deepEqual((await client.query(DELETED_ASSETS_SQL, [null])).rows, []);
+  stage = "cleanup-operator-guard";
+  await client.query("SAVEPOINT cleanup_guard");
+  await client.query("SELECT set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claims', $2, true)",
+    ["00000000-0000-4000-8000-000000000001", JSON.stringify({ sub: "00000000-0000-4000-8000-000000000001" })]);
+  assert.equal((await client.query("SELECT public.media_is_operator() AS operator")).rows[0].operator, false);
+  await assert.rejects(client.query(EXPIRE_RESERVATIONS_SQL), (error) => error.code === "22012");
+  await client.query("ROLLBACK TO SAVEPOINT cleanup_guard");
+  assert.equal((await client.query("SELECT public.media_is_operator() AS operator")).rows[0].operator, true);
   stage = "seed-fixture";
   await client.query("INSERT INTO storage.buckets(id,name,public) VALUES('avatars','avatars',false),('daycare-photos','daycare-photos',false)");
   const owner = randomUUID(), household = randomUUID(), pet = randomUUID(), record = randomUUID(), photo = randomUUID();
@@ -91,7 +99,7 @@ try {
   assert.equal(cancel.rows[0].result.rolledBack, 4); assert.deepEqual((await snapshot()).references, originalRefs);
   assert.equal((await snapshot()).readBackend, "supabase");
   await client.query("ROLLBACK");
-  process.stdout.write("Local isolated Storage SQL passed: empty cleanup, staging, stale CAS rejection, atomic activation, inverse rollback, and staged cancellation.\n");
+  process.stdout.write("Local isolated Storage SQL passed: empty cleanup, operator guard rejection, staging, stale CAS rejection, atomic activation, inverse rollback, and staged cancellation.\n");
 } catch {
   // Only the fixed phase name, never SQL text, row values, URLs or PG diagnostics.
   process.stderr.write(`Local isolated Storage SQL failed at ${stage}; details withheld.\n`); process.exitCode = 1;
