@@ -4,7 +4,8 @@ import { open, mkdir, lstat, rename, rm } from "node:fs/promises";
 import { join, isAbsolute } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { SOURCE_REF, requireValue, fail, json, MAX_JSON_BYTES } from "./storage-backup-format.mjs";
+import { SOURCE_REF, requireValue, json, MAX_JSON_BYTES } from "./storage-backup-format.mjs";
+import { failStorageHttp } from "./storage-migration-diagnostics.mjs";
 import { MIGRATION_PROJECT, MIGRATION_PROJECT_NUMBER, OPERATOR_SA, STORAGE_WIF, responseBytes } from "./storage-migration-gcs.mjs";
 
 export function requireMigrationContext(env) {
@@ -23,7 +24,7 @@ export function managementQuery({ env, fetchImpl = fetch, signal }) {
       body: JSON.stringify({ query, parameters, read_only: !write }), redirect: "error",
       signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
     });
-    if (response.status !== 200 && response.status !== 201) { await response.body?.cancel().catch(() => {}); fail(); }
+    if (response.status !== 200 && response.status !== 201) { await response.body?.cancel().catch(() => {}); failStorageHttp(response.status); }
     return json(await responseBytes(response, MAX_JSON_BYTES));
   };
 }

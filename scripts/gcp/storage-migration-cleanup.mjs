@@ -1,5 +1,6 @@
 import { canonical, exact, requireValue } from "./storage-backup-format.mjs";
 import { bindingFor, finalKey, UUID, isGeneration } from "./storage-migration-gcs.mjs";
+import { cleanupStage } from "./storage-migration-diagnostics.mjs";
 
 export const EXPIRE_RESERVATIONS_SQL = `WITH expired AS (
   UPDATE public.media_assets SET state = 'deleted', deleted_at = now()
@@ -12,20 +13,22 @@ export const DELETED_ASSETS_SQL = `SELECT id,kind,entity_id AS "entityId",househ
 
 export async function cleanupStorage({ query, gcs }) {
   // Terminal state is committed first. A failed GCS delete never revives access.
-  const expired = await query(EXPIRE_RESERVATIONS_SQL, { write: true });
-  requireValue(expired?.length === 1 && expired[0].guard === 1 && Number.isSafeInteger(expired[0].expired) && expired[0].expired >= 0);
+  const expired = await cleanupStage("expire-reservations", () => query(EXPIRE_RESERVATIONS_SQL, { write: true }));
+  await cleanupStage("validate-expired-count", () => requireValue(expired?.length === 1 && expired[0].guard === 1 && Number.isSafeInteger(expired[0].expired) && expired[0].expired >= 0));
   const result = { operation: "storage-cleanup", expiredReservations: expired[0].expired, checkedAssets: 0, deletedGenerations: 0, absentObjects: 0, failures: 0 };
   let cursor = null;
   for (;;) {
-    const rows = await query(DELETED_ASSETS_SQL, { parameters: [cursor] });
-    requireValue(Array.isArray(rows) && rows.length <= 200);
+    const rows = await cleanupStage("list-deleted", () => query(DELETED_ASSETS_SQL, { parameters: [cursor] }));
+    await cleanupStage("validate-deleted-page", () => requireValue(Array.isArray(rows) && rows.length <= 200));
     if (!rows.length) break;
     for (const asset of rows) {
-      exact(asset, ["id", "kind", "entityId", "householdId", "ownerId", "incomingKey", "finalKey", "generation"]);
-      requireValue(UUID.test(asset.id) && (cursor === null || asset.id > cursor));
-      requireValue(asset.incomingKey === `_incoming/${asset.id}` && asset.finalKey === finalKey(asset));
-      requireValue(asset.generation === null || isGeneration(asset.generation));
-      requireValue(++result.checkedAssets <= 10000);
+      await cleanupStage("validate-deleted-asset", () => {
+        exact(asset, ["id", "kind", "entityId", "householdId", "ownerId", "incomingKey", "finalKey", "generation"]);
+        requireValue(UUID.test(asset.id) && (cursor === null || asset.id > cursor));
+        requireValue(asset.incomingKey === `_incoming/${asset.id}` && asset.finalKey === finalKey(asset));
+        requireValue(asset.generation === null || isGeneration(asset.generation));
+        requireValue(++result.checkedAssets <= 10000);
+      });
       const bucket = asset.kind === "photo" ? "photos" : "avatars";
       try {
         const final = await gcs.stat(bucket, asset.finalKey, undefined, true);

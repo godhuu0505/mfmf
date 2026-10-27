@@ -9,6 +9,7 @@ import { runMigration, RELEASE_SOURCE_SQL } from "../../scripts/gcp/storage-migr
 import { restoreBackup } from "../../scripts/gcp/restore-storage-backup.mjs";
 import { probeSoftDelete } from "../../scripts/gcp/probe-storage-soft-delete.mjs";
 import { cleanupStorage, EXPIRE_RESERVATIONS_SQL, DELETED_ASSETS_SQL } from "../../scripts/gcp/storage-migration-cleanup.mjs";
+import { cleanupDiagnostic } from "../../scripts/gcp/storage-migration-diagnostics.mjs";
 
 const PRIVATE = "PRIVATE_SYNTHETIC_VALUE";
 const uid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -198,7 +199,7 @@ test("changed bytes prevent activation and retain frozen mode; failed backup pre
   assert.equal(other.state.mode, "frozen"); assert.equal(other.live.size, 0); assert.equal(other.state.assets.length, 0);
 });
 test("scheduled event cannot plan, migrate, activate or rollback", async () => {
-  for (const mode of ["plan", "migrate", "activate", "rollback", "abort-staging"]) {
+  for (const mode of ["plan", "migrate", "activate", "rollback", "abort-staging", "diagnose-cleanup"]) {
     let calls = 0;
     await assert.rejects(runMigration({ mode, env: { ...env, GITHUB_EVENT_NAME: "schedule" }, fetchImpl: async () => { calls++; } }));
     assert.equal(calls, 0);
@@ -250,10 +251,105 @@ test("generation validation rejects numeric, zero and out-of-uint64 values", () 
   for (const value of [0, 1, "0", "-1", "18446744073709551616", "1x"]) assert.equal(isGeneration(value), false);
   assert.equal(isGeneration("18446744073709551615"), true);
 });
+test("empty cleanup accepts zero counts and a null initial cursor without any object operation", async () => {
+  const requests = [];
+  const result = await cleanupStorage({ query: async (sql, options) => {
+    requests.push({ sql, options });
+    return sql === EXPIRE_RESERVATIONS_SQL ? [{ expired: 0, guard: 1 }] : [];
+  }, gcs: new Proxy({}, { get: () => assert.fail("empty cleanup must not touch objects") }) });
+  assert.deepEqual(requests, [{ sql: EXPIRE_RESERVATIONS_SQL, options: { write: true } }, { sql: DELETED_ASSETS_SQL, options: { parameters: [null] } }]);
+  assert.deepEqual(result, { operation: "storage-cleanup", expiredReservations: 0, checkedAssets: 0, deletedGenerations: 0, absentObjects: 0, failures: 0 });
+});
+test("cleanup reports only fixed stages and numeric HTTP status, never provider bodies", async () => {
+  for (const stage of ["verify-buckets", "expire-reservations", "list-deleted"]) {
+    const c = cloud(); let cancelled = 0;
+    const fetchImpl = async (url, options) => {
+      const isQuery = new URL(url).origin === "https://api.supabase.com";
+      const sql = isQuery ? JSON.parse(options.body).query : null;
+      const fails = stage === "verify-buckets" ? !isQuery : sql === (stage === "expire-reservations" ? EXPIRE_RESERVATIONS_SQL : DELETED_ASSETS_SQL);
+      if (fails) return { ok: false, status: 503, body: { cancel: async () => { cancelled++; }, getReader: () => assert.fail("error body must not be read") }, json: () => assert.fail(PRIVATE) };
+      if (isQuery) return Response.json([{ expired: 0, guard: 1 }]);
+      return c.fetchImpl(url, options);
+    };
+    await assert.rejects(runMigration({ mode: "cleanup", env, fetchImpl }), (error) => {
+      assert.equal(cleanupDiagnostic(error), `Storage cleanup stopped at ${stage} (HTTP 503); details withheld.\n`);
+      assert.ok(!String(error).includes(PRIVATE)); return true;
+    });
+    assert.equal(cancelled, 1);
+  }
+});
+test("cleanup validation diagnostics withhold malformed rows and arbitrary exception text", async () => {
+  for (const [stage, query] of [
+    ["validate-expired-count", async () => [{ expired: PRIVATE, guard: 1 }]],
+    ["validate-deleted-page", async (sql) => sql === EXPIRE_RESERVATIONS_SQL ? [{ expired: 0, guard: 1 }] : { [PRIVATE]: true }],
+    ["validate-deleted-asset", async (sql) => sql === EXPIRE_RESERVATIONS_SQL ? [{ expired: 0, guard: 1 }] : [{ id: PRIVATE }]],
+    ["expire-reservations", async () => { throw new Error(PRIVATE); }],
+  ]) {
+    await assert.rejects(cleanupStorage({ query, gcs: {} }), (error) => {
+      assert.equal(cleanupDiagnostic(error), `Storage cleanup stopped at ${stage}; details withheld.\n`);
+      assert.ok(!String(error).includes(PRIVATE)); return true;
+    });
+  }
+  assert.equal(cleanupDiagnostic({ stage: PRIVATE, status: PRIVATE }), null);
+});
+test("cleanup diagnosis makes only seven fixed SELECT probes without GCS, expiry or receipts", async () => {
+  const requests = [];
+  const fetchImpl = async (url, options) => {
+    assert.equal(url, `https://api.supabase.com/v1/projects/${SOURCE_REF}/database/query`);
+    const request = JSON.parse(options.body); requests.push(request);
+    assert.match(request.query, /^SELECT /);
+    assert.doesNotMatch(request.query, /\b(?:UPDATE|INSERT|DELETE|ALTER|CREATE|DROP|CALL)\b/i);
+    if (request.query.includes("AS operator")) return Response.json([{ operator: true }]);
+    if (request.query.includes("AS is_null")) return Response.json([{ is_null: true }]);
+    if (request.query.includes("AS matches")) return Response.json([{ matches: true }]);
+    return Response.json([{ id: PRIVATE }]); // Read rows must never reach diagnostic output.
+  };
+  const result = await runMigration({ mode: "diagnose-cleanup", env: { ...env, GCP_ACCESS_TOKEN: undefined }, fetchImpl,
+    journalFactory: () => assert.fail("diagnosis must not encrypt or create receipts"),
+    archiveFactory: () => assert.fail("diagnosis must not read source objects or make backups") });
+  assert.equal(result.failures, 0); assert.equal(result.probes.length, 7);
+  assert.deepEqual(requests.map((r) => r.read_only), [true, true, false, true, true, false, true]);
+  assert.deepEqual(requests.map((r) => r.parameters), [[], [null], [null], ["mfmf-probe"], [null], [null], []]);
+  assert.equal(requests.at(-1).query, DELETED_ASSETS_SQL.replaceAll("$1::uuid", "NULL::uuid"));
+  assert.ok(result.probes.every((p) => p.outcome === "pass" && p.resultType === "array" && p.rowCount === 1));
+  assert.ok(!JSON.stringify(result).includes(PRIVATE));
+});
+test("cleanup diagnosis continues after read-only parameter failures and withholds error bodies", async () => {
+  const fetchImpl = async (_url, options) => {
+    const { query, read_only, parameters } = JSON.parse(options.body);
+    if (read_only && parameters.length) return { status: 400, body: { cancel: async () => {}, getReader: () => assert.fail("error body must not be read") } };
+    if (query.includes("AS operator")) return Response.json([{ operator: true }]);
+    if (query.includes("AS is_null")) return Response.json([{ is_null: true }]);
+    return Response.json([]);
+  };
+  const result = await runMigration({ mode: "diagnose-cleanup", env, fetchImpl });
+  assert.equal(result.failures, 3);
+  assert.deepEqual(result.probes.filter((p) => p.outcome === "failed").map((p) => [p.stage, p.httpStatus]),
+    [["null-read-only", 400], ["string-read-only", 400], ["deleted-read-only", 400]]);
+  assert.equal(result.probes.at(-1).outcome, "pass");
+});
+test("cleanup diagnosis never copies unexpected response values or thrown messages", async () => {
+  let calls = 0;
+  const result = await runMigration({ mode: "diagnose-cleanup", env, fetchImpl: async () => {
+    calls++;
+    if (calls === 1) return Response.json({ [PRIVATE]: PRIVATE });
+    if (calls === 2) throw new Error(PRIVATE);
+    return Response.json([{ [PRIVATE]: PRIVATE }]);
+  } });
+  assert.equal(calls, 7);
+  assert.deepEqual(result.probes[0], { stage: "operator", outcome: "unexpected-result", resultType: "object" });
+  assert.deepEqual(result.probes[1], { stage: "null-read-only", outcome: "failed" });
+  assert.ok(!JSON.stringify(result).includes(PRIVATE));
+});
 test("workflow schedule chooses cleanup independently of manual inputs and stores only encrypted outputs", async () => {
   const source = await readFile(new URL("../../.github/workflows/storage-migration.yml", import.meta.url), "utf8");
   assert.match(source, /cron: '0 18 \* \* \*'/); assert.match(source, /if \[ "\$EVENT_NAME" = schedule \]; then\n\s+echo 'mode=cleanup'/);
   assert.match(source, /default: plan/); assert.match(source, /create_credentials_file: false/);
   assert.doesNotMatch(source, /SUPABASE_DB_PASSWORD|VERCEL_TOKEN|GCP_DEPLOY_SERVICE_ACCOUNT/);
   assert.match(source, /storage-migration-encrypted\/receipt.age/);
+  for (const step of ["Configure bounded downloads", "Install receipt encryption", "Operate fixed Storage targets"]) assert.ok(source.includes(step));
+  const parts = source.split(/\n      - /);
+  for (const marker of ["name: Configure bounded downloads", "name: Install receipt encryption", "id: auth", "uses: actions/upload-artifact@v4"]) {
+    assert.ok(parts.find((part) => part.startsWith(marker))?.includes("steps.operation.outputs.mode != 'diagnose-cleanup'"));
+  }
 });

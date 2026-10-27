@@ -36,6 +36,7 @@ SQL内のrow lockとCASは個々の競合を拒否するが、lock待機前のMV
 | `rollback` | stagedまたは初回activate後に限定。全legacy source SHA256を確認し、必要なら4参照元inverse CASとmode/read_backend=supabaseを同じstatementで反映。旧画像は残す |
 | `abort-staging` | ledger commit前の失敗からの明示復帰。frozen/read_backend=supabase、ready/reservedゼロ、参照asset IDすべてnull、欠落ゼロ、fresh完全backup・snapshot不変を確認してsourceへ戻す。**GCS orphan回収は未評価のまま残る** |
 | `cleanup` | expired reservedをDBでterminalにし、deleted ledgerのfinal/incomingだけをgeneration指定で回収。mode/read_backendを変えない |
+| `diagnose-cleanup` | 固定SELECT 7件でoperator判定・null/文字列パラメーター・削除済み行の読取を診断。age/receipt/GCS/expiry UPDATEは実行しない |
 
 `migrate`は1プロセス内で完結する。age復号鍵をCIへ置かないため、暗号化planを後続CIで復号して
 無条件再開する設計にはしない。1件10MiB/アバター2MiB・5画像MIMEを超える既存objectは停止する。
@@ -96,6 +97,13 @@ expired reservedはまずDB terminal化する。final generationがledgerにあ�
 final metadataのserver binding全項目一致を確認し、現generationを特定して削除する。
 不明binding/別generationは削除しない。失敗件数があればjobを失敗させ、terminal状態のまま次回再試行する。
 件数はkeysetで200件ずつ、1run最大10,000 assets/20分に制限する。active/ready assetは対象外。
+cleanupには暗号化receiptを作らない。準備・SQL・結果検証で止まった場合は固定stageと、
+HTTPエラーなら数値statusだけを出す。API本文・SQL本文・行・例外文は出さず、modeや参照を変更しない。
+一時的な失敗を調査してからcleanupだけを再試行し、移送/activateを代わりに再実行しない。
+`diagnose-cleanup`は手動専用。Management APIの`read_only`有無でnullパラメーター読取を比較し、
+固定literal NULLの読取とも比較する。`read_only:false`のprobeもSQL自体は固定SELECTだけである。
+全probeを試し、固定stage・結果・HTTP数値・返却型と行数のみを出す。行内容・SQL・API本文は出さず、
+異常probeがあればexit 1にする。診断が成功してもcleanupの更新/削除成功を証明しない。
 
 架空API fixturesに加え、CIはlocal Supabaseから**schemaだけ**を一時DBへ複製し、実ledger trigger上で
 stage・stale CAS拒否・同時activate・inverse rollback・staged cancellationを検証する。
