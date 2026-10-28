@@ -179,8 +179,15 @@ GCP 側が追いついていない場合に、Cloud SQL の更新を黙って省
 過去の checksum / 適用順序が違う場合は拒否します。private ledger と advisory transaction lock を用い、
 未適用が 0 件なら backup 作成も DDL もありません。
 
-未適用があれば固定 Cloud SQL の backup API で TTL 14 日を要求し、SUCCESSFUL / expiry / 作成時刻を実確認します。
-同じ main SHA の backup 再利用は 15 分以内だけです。TTL 未対応・古い backup・重複・不明な作成結果では SQL を始めません。
+未適用があれば固定 Cloud SQL の backup API で TTL 14 日を要求し、SUCCESSFUL / expiry / 開始・完了時刻を実確認します。
+同じ main SHA の再利用は開始から15分以内だけ、新規は今回request以降の開始だけを許可します（時計ずれ30秒）。
+全 ON_DEMAND の完全一覧で8件 / 最大課金bytes合計1 GiBを上限にし、不明な容量や空き不足でも停止します。
+新backupの容量は作成後に判明するため請求上限の保証ではなく、超過時も自動削除しません。
+Standard の実APIは TTL 指定後も expiry が NULL でした。そのため現構成で未適用SQLがある通常配信は停止し、
+SQLが0件の配信は従来通りです。手動backupは明示削除まで無期限で、自動backupの保持14件とは別です。
+期限を緩和するfallbackはなく、通常SQL更新を開放するには専用の保持/削除手順と実検証が別途必要です。
+初回切替用の手動backup整理も、復元・全行照合と後続復旧点を確認する個別操作です。
+詳細と公式仕様は [通常配信のバックアップ契約](../../docs/guides/gcp-database-deployment.md#更新直前バックアップと保持期限) を参照してください。
 `verify-import` は固定 session advisory lock を snapshot 作成前に取り、REPEATABLE READ READ ONLY transaction で検証します。
 変更セルが1つでもあれば、件数が同じでも失敗します。lock は成功・失敗の両方で解放します。
 この操作自体は backup / restore を開始しません。managed backup から固定対象へ復元した後の比較用です。
