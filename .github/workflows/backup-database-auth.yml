@@ -1,0 +1,54 @@
+name: Back up database and Auth
+
+# Preservation only: a single public + auth snapshot, encrypted before disk.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize with production migrations; application writes are NOT frozen.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.repository == 'godhuu0505/mfmf' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test exporter without credentials or network
+        run: node --test tests/scripts/backup-database-auth.test.mjs
+      - name: Configure bounded package downloads
+        uses: ./.github/actions/configure-apt
+      - name: Install PostgreSQL 17 client and encryption
+        timeout-minutes: 5
+        # Ubuntu hosted runners configure the signed PostgreSQL APT repository.
+        # Pin the major; accept its security patch updates. The exporter uses the
+        # absolute 17/bin paths and checks both client and source major versions.
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client-17 age
+      - name: Encrypt one consistent public and Auth archive
+        timeout-minutes: 22
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_BACKUP_AGE_RECIPIENT: ${{ vars.SUPABASE_BACKUP_AGE_RECIPIENT }}
+        run: node scripts/gcp/backup-database-auth.mjs
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: database-auth-backup-encrypted-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/database-auth-backup-encrypted/database-auth.pgdump.age
+          retention-days: 90
+          if-no-files-found: error
+      - name: Remove runner ciphertext
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/database-auth-backup-encrypted"
