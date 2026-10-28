@@ -125,11 +125,15 @@ IdP 自体や GCS 本体の操作はこの DB guard の対象外なので、切�
 
 `bootstrap` は public 以外の独自 schema、public の表・sequence・view・関数・型、plpgsql 以外の extension、
 event trigger、固定 app role の既存を拒否します。既存 object / role / data の削除や再利用はしません。
+SQLAdmin が作った空 DB の所有者が `cloudsqlsuperuser` の場合だけ、他の空状態条件すべてと固定 DB / admin / UTF8、
+既存 owner の MEMBER / USAGE と CREATEDB を確認し、固定 `mfmf` の所有者を `postgres` にそろえます。
+同一 transaction 内で元の全条件を再確認してから roles / baseline を作り、後続の失敗では所有者変更も rollback します。
+他 owner、権限不足、既存 object がある場合は変更しません。system role の変更や追加 grant は行いません。
 途中停止した初期化先が残る場合は、状態を調査してから明示的に復旧し、汎用 reset で自動的に進めません。
 失敗時の診断は固定工程名（catalog / roles / baseline / ledger / password / commit）と、存在すれば
 5文字の SQLSTATE だけです。空 DB 条件の不一致は固定の理由名だけを出し、DB object 名・SQL・例外本文は出しません。
 DB 所有者条件の診断は固定名との一致を boolean で、所有者を既知の管理 role 分類または other / missing で示します。
-任意の所有者名をログへ出さず、postgres 所有を必須とする許可条件は診断追加によって変わりません。
+任意の所有者名をログへ出さず、roles 作成前には postgres 所有を含む元の全許可条件を満たすことが必要です。
 工程の特定は自動再実行や空 DB 条件の緩和を許可するものではありません。
 
 ### Job の環境と秘密
@@ -191,6 +195,9 @@ python3 tests/gcp/run-operator-tests.py
 
 後者は既存 DB / 本番 env に触れず、専用 image と network-none の一時 PostgreSQL を用います。
 8 操作と再 import 拒否、全列復元、最大 2 接続、試験 DB / role の撤去を検査します。
+別の新品 container では、通常 OID の postgres を NOSUPERUSER / NOBYPASSRLS / CREATEDB / CREATEROLE として用い、
+cloudsqlsuperuser 所有の空 DB から初期化、後続故障時の所有者 rollback、runtime role の非昇格を実 SQL で検査します。
+この fixture は Cloud SQL 固有の extension 処理などを再現するものではなく、実 managed DB の検証も別途必要です。
 実 authenticator 接続で frozen 時の read / 同値 identity sync 許可と DML / identity変更 / SECURITY DEFINER 書込拒否、
 activate 後の書込許可、state 変更の故障注入時の atomic rollback、旧 repeatable-read snapshot の拒否も検査します。
 `--skip-build` は同じ source で作成した test image の再試験専用です。

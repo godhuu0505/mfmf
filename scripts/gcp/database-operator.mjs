@@ -427,13 +427,13 @@ export async function setMediaMode(client,contract,sha,desired) {
 }
 
 export async function applyBaseline(admin,contract,root,credentials,runtimePassword) {
-  let substage="catalog";
+  let substage="catalog",databaseOwnerNormalized=false;
   try {
     await admin.query("BEGIN; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='60s';");
     await admin.query(LOCK);
-    // SQLAdmin may have provisioned the fixed database already. Accept only a
-    // pristine postgres-owned database, never reset existing objects or roles.
-    const catalog=(await admin.query(`WITH checks AS (SELECT
+    // Recheck the complete original gate after any narrowly authorized owner
+    // normalization. Never reset or reuse existing application objects/roles.
+    const readCatalog=async()=>(await admin.query(`WITH checks AS (SELECT
       current_database()='mfmf' AS target_database_matches,
       current_user='postgres' AS admin_user_matches,
       EXISTS (SELECT 1 FROM pg_database WHERE datname=current_database()
@@ -457,6 +457,21 @@ export async function applyBaseline(admin,contract,root,credentials,runtimePassw
       NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN
         ('mfmf_owner','anon','authenticated','identity_sync','media_operator','authenticator','mfmf_migrator','mfmf_operator')) AS existing_app_roles
     ) SELECT *, (database_owner AND public_owner AND schemas AND public_objects AND extensions AND event_triggers AND existing_app_roles) AS pristine FROM checks`)).rows;
+    let catalog=await readCatalog();
+    const managed=catalog.length===1&&catalog[0].pristine===false&&catalog[0].database_owner===false
+      &&catalog[0].target_database_matches===true&&catalog[0].admin_user_matches===true&&catalog[0].encoding_utf8===true
+      &&catalog[0].database_owner_class==="cloudsqlsuperuser"
+      &&Object.keys(CATALOG_REASONS).filter(key=>key!=="database_owner").every(key=>catalog[0][key]===true);
+    if(managed) {
+      const privileges=(await admin.query(`SELECT pg_has_role(current_user,'cloudsqlsuperuser','MEMBER') AS owner_member,
+        pg_has_role(current_user,'cloudsqlsuperuser','USAGE') AS owner_usage,
+        EXISTS(SELECT 1 FROM pg_roles WHERE rolname=current_user AND rolcreatedb) AS can_create_database`)).rows;
+      if(privileges.length===1&&privileges[0].owner_member===true&&privileges[0].owner_usage===true
+        &&privileges[0].can_create_database===true) {
+        await admin.query("ALTER DATABASE mfmf OWNER TO postgres");
+        databaseOwnerNormalized=true;catalog=await readCatalog();
+      }
+    }
     if(catalog.length!==1 || catalog[0].pristine!==true
       || Object.keys(CATALOG_REASONS).some(key=>catalog[0][key]!==true)) {
       throw new OperatorError("bootstrap",{substage,reasons:catalog.length===1
@@ -482,6 +497,7 @@ export async function applyBaseline(admin,contract,root,credentials,runtimePassw
     }
     substage="commit";
     await admin.query("COMMIT");
+    return {databaseOwnerNormalized};
   } catch(error) {
     await admin.query("ROLLBACK").catch(()=>{});
     if(error instanceof OperatorError)throw error;
@@ -591,8 +607,8 @@ export async function runOperator({env=process.env,fetchImpl=fetch,spawnImpl=spa
       if(databases===0)await client.query("CREATE DATABASE mfmf");
       await client.end();clients=clients.filter(item=>item!==client);
       client=await connect("postgres");
-      await applyBaseline(client,contract,root,credentials,env.MFMF_DATABASE_PASSWORD);
-      result={baseline:"applied",mediaWrites:"frozen",readBackend:"gcs"};
+      const owner=await applyBaseline(client,contract,root,credentials,env.MFMF_DATABASE_PASSWORD);
+      result={baseline:"applied",mediaWrites:"frozen",readBackend:"gcs",...owner};
     }else if(operation==="inspect")result=await inspect(client,contract);
     else if(operation==="activate"||operation==="freeze")result=await setMediaMode(client,contract,env.MFMF_DB_BUNDLE_SHA256,operation==="activate"?"gcs":"frozen");
     else if(operation==="upgrade") {
