@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deployDatabaseJob, OPERATOR_IMAGE, OPERATOR_JOB } from "../../scripts/gcp/deploy-database-job.mjs";
+import { deployDatabaseJob, DatabaseJobError, databaseJobDiagnostic, OPERATOR_IMAGE, OPERATOR_JOB } from "../../scripts/gcp/deploy-database-job.mjs";
+import { deploymentErrorMessage } from "../../scripts/gcp/deploy-existing-service.mjs";
 import { DATABASE_VPC } from "../../scripts/gcp/database-deployment-config.mjs";
 const API = `https://run.googleapis.com/v2/${OPERATOR_JOB}`;
 const env = { GITHUB_ACTIONS: "true", GITHUB_REF: "refs/heads/main", GITHUB_EVENT_NAME: "push",
@@ -14,13 +15,15 @@ const task = () => ({ serviceAccount: "mfmf-db-operator@mfmf-499612.iam.gservice
       { name: "MFMF_DB_OPERATION", value: "upgrade" }, { name: "MFMF_DB_DEPLOY_SHA", value: "d".repeat(40) },
       { name: "MFMF_DB_OPERATOR_CREDENTIALS", valueSource: { secretKeyRef: { secret: "mfmf-db-operator-credentials", version: "1" } } },
     ] }] });
-function fixture({ change, failure, shortReferences = false, omittedVpc = false, legacyChange, legacyResponse } = {}) {
+function fixture({ change, failure, shortReferences = false, omittedVpc = false, legacyChange, legacyResponse, intercept } = {}) {
   let job = { name: OPERATOR_JOB, uid: "fixed-job", etag: "etag-before", generation: "1", observedGeneration: "1",
     terminalCondition: { state: "CONDITION_SUCCEEDED" }, template: { parallelism: 1, taskCount: 1, template: task() } };
   change?.(job); const calls = []; let execution;
   const op = (response) => Response.json({ name: "projects/mfmf-499612/locations/asia-northeast1/operations/fixed-operation", done: true, response });
   const fetchImpl = async (url, init) => {
     calls.push({ url, init }); assert.equal(init.redirect, "error");
+    const intercepted = await intercept?.(url, init);
+    if (intercepted) return intercepted;
     if (init.method === "PATCH") {
       const patch = JSON.parse(init.body); assert.equal(patch.etag, job.etag); assert.equal(patch.name, OPERATOR_JOB);
       job = { ...job, template: patch.template, etag: "etag-after" }; return op(job);
@@ -127,4 +130,84 @@ for (const failure of ["image", "failed", "retry", "foreign-job"]) test(`never s
 test("disabled mode and PR context cannot access the job", async () => {
   const f = fixture(); await assert.rejects(f.run({ env: { ...env, GCP_AUTH_ENABLED: "false" } }));
   await assert.rejects(f.run({ env: { ...env, GITHUB_EVENT_NAME: "pull_request" } })); assert.equal(f.calls.length, 0);
+});
+
+function checkDiagnostic(expected) {
+  return (error) => {
+    assert.ok(error instanceof DatabaseJobError);
+    const diagnostic = databaseJobDiagnostic(error);
+    assert.deepEqual(diagnostic, { status: "failed", component: "database-upgrade", ...expected });
+    assert.deepEqual(JSON.parse(deploymentErrorMessage(error)), diagnostic);
+    assert.doesNotMatch(`${error.message}${deploymentErrorMessage(error)}`, /PRIVATE/);
+    return true;
+  };
+}
+test("a read-only Job denial survives the CLI boundary without exposing the response", async () => {
+  const f = fixture({ intercept: () => new Response("PRIVATE_BODY", { status: 403 }) });
+  await assert.rejects(f.run(), checkDiagnostic({ stage: "read-job", httpStatus: 403, mutationBoundary: "none" }));
+  assert.equal(f.calls.length, 1); assert.equal(f.calls[0].init.method, "GET");
+});
+test("body cancellation errors cannot replace a bounded HTTP failure", async () => {
+  const f = fixture({ intercept: () => ({ ok: false, status: 403, body: { cancel: async () => { throw Error("PRIVATE_CANCEL"); } } }) });
+  await assert.rejects(f.run(), checkDiagnostic({ stage: "read-job", httpStatus: 403, mutationBoundary: "none" }));
+  assert.equal(f.calls.length, 1);
+});
+for (const method of ["PATCH", "POST"]) for (const failure of ["http", "network", "json", "operation"]) {
+  test(`${method} ${failure} failure records the attempted boundary and never resends`, async () => {
+    const stage = method === "PATCH" ? "update-job" : "run-job";
+    const f = fixture({ intercept: (_url, init) => {
+      if (init.method !== method) return;
+      if (failure === "network") throw new Error("PRIVATE_NETWORK");
+      if (failure === "http") return new Response("PRIVATE_BODY", { status: 403 });
+      if (failure === "json") return new Response("PRIVATE_INVALID_JSON");
+      return Response.json({ name: "projects/mfmf-499612/locations/asia-northeast1/operations/fixed-operation",
+        done: true, error: { code: 7, message: "PRIVATE_OPERATION", details: ["PRIVATE_DETAIL"] } });
+    } });
+    await assert.rejects(f.run(), checkDiagnostic({ stage: failure === "operation" ? stage.replace("-job", "-operation") : stage,
+      ...(failure === "http" ? { httpStatus: 403 } : {}), mutationBoundary: method === "PATCH" ? "update-requested" : "run-requested" }));
+    assert.equal(f.calls.filter(({ init }) => init.method === "PATCH").length, 1);
+    assert.equal(f.calls.filter(({ init }) => init.method === "POST").length, method === "PATCH" ? 0 : 1);
+  });
+}
+test("validation failures distinguish before and after Job update", async () => {
+  const before = fixture({ change: (job) => { job.template.template.containers[0].env[0].value = "import"; } });
+  await assert.rejects(before.run(), checkDiagnostic({ stage: "job-environment", mutationBoundary: "none" }));
+  assert.ok(before.calls.every(({ init }) => init.method === "GET"));
+  let gets = 0;
+  const after = fixture({ intercept: (url, init) => {
+    if (url === API && init.method === "GET" && ++gets === 2) return Response.json({ uid: "PRIVATE_INVALID_JOB" });
+  } });
+  await assert.rejects(after.run(), checkDiagnostic({ stage: "job-identity", mutationBoundary: "update-requested" }));
+  assert.equal(after.calls.filter(({ init }) => init.method === "PATCH").length, 1);
+  assert.equal(after.calls.filter(({ init }) => init.method === "POST").length, 0);
+});
+test("completed failed execution retains the run-attempted boundary", async () => {
+  const f = fixture({ failure: "failed" });
+  await assert.rejects(f.run(), checkDiagnostic({ stage: "execution-result", mutationBoundary: "run-requested" }));
+  assert.equal(f.calls.filter(({ init }) => init.method === "POST").length, 1);
+});
+test("unexpected local failure after mutation stays redacted and does not resend", async () => {
+  const f = fixture({ intercept: (_url, init) => init.method === "PATCH" ? Response.json({
+    name: "projects/mfmf-499612/locations/asia-northeast1/operations/fixed-operation", done: false,
+  }) : undefined });
+  await assert.rejects(f.run({ wait: async () => { throw Error("PRIVATE_WAIT"); } }),
+    checkDiagnostic({ stage: "unexpected", mutationBoundary: "update-requested" }));
+  assert.equal(f.calls.filter(({ init }) => init.method === "PATCH").length, 1);
+  assert.equal(f.calls.filter(({ init }) => init.method === "POST").length, 0);
+});
+test("typed diagnostics use private fixed fields, never mutable error properties", () => {
+  const error = new DatabaseJobError("PRIVATE_STAGE", "PRIVATE_STATUS", "PRIVATE_BOUNDARY");
+  error.message = "PRIVATE_MESSAGE"; error.stage = "PRIVATE_STAGE"; error.httpStatus = "PRIVATE_STATUS";
+  assert.deepEqual(databaseJobDiagnostic(error), { status: "failed", component: "database-upgrade", stage: "unexpected", mutationBoundary: "unknown" });
+  assert.doesNotMatch(deploymentErrorMessage(error), /PRIVATE/);
+  const copy = databaseJobDiagnostic(error); copy.stage = "PRIVATE_COPY";
+  assert.doesNotMatch(deploymentErrorMessage(error), /PRIVATE/);
+});
+test("unknown errors and forged typed prototypes keep the generic CLI message", () => {
+  const generic = "Continuous deployment failed; credentials, input and API details withheld.";
+  for (const error of [new Error("PRIVATE_ERROR"), { stage: "read-job", httpStatus: 403, message: "PRIVATE_MESSAGE" },
+    Object.assign(Object.create(DatabaseJobError.prototype), { message: "PRIVATE_FORGED" }), null, "PRIVATE_STRING"]) {
+    assert.equal(databaseJobDiagnostic(error), null);
+    assert.equal(deploymentErrorMessage(error), generic);
+  }
 });

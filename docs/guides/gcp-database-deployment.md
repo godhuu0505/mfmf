@@ -25,11 +25,21 @@ Direct VPCは `mfmf-db-network` / `mfmf-app-tokyo` / `PRIVATE_RANGES_ONLY` 固�
 既存の `mfmf-db-operator` Jobだけを取得・検査し、ETag付きでimageとdeploy SHAを更新して実行します。
 Jobの作成、IAM変更、任意command/SQL/override、import、restore、初期baseline適用は通常配信に含めません。
 
+配信主体 `mfmf-deploy` には、固定Jobだけでcustom role `mfmfDatabaseDeployer` を付与します。
+権限は `run.jobs.get/update/run`・`run.executions.get`・`run.operations.get` の5つです。
+operator SAだけに既存の `roles/iam.serviceAccountUser` を使い、project全体のRun管理者権限は付けません。
+この組合せはJobを通じてoperator権限を使用できるため、main限定WIFとレビュー済みworkflow・固定Job検査が信頼境界です。
+権限不足時に未更新のJobを確認せず、無条件で再実行しないでください。
+
 Jobは専用SA、single task/parallel1、retry0、timeout1800秒、1CPU/1GiB、GEN2、固定Direct VPC、
 `args=["--execute"]`、`MFMF_DB_OPERATION=upgrade` に固定します。
 資格情報は `mfmf-db-operator-credentials` version1への参照だけです。
 実行結果のJob名・image digest・main SHA・単一成功・再試行なしを確認した後だけ、新appをtag付き0%でstageします。
 その後は既存の匿名smokeとETag/traffic所有確認を通して100%へpromoteします。
+
+DB Jobの失敗は固定stage・HTTP status・`mutationBoundary`だけをログに残し、API本文や資格情報を出力しません。
+`none`はJobへの変更リクエスト送信前、`update-requested` / `run-requested`はそれぞれ送信直前まで進んだ意味です。
+送信済みでも適用成功は保証しません。失敗・通信不明時はJob・Execution・operationを確認し、診断値だけで再送しません。
 
 operatorはsource migration集合とchecksum ledgerを確認し、advisory transaction lockの内側でSQLを適用します。
 baselineが無い、既適用SQLのhashが違う、元Supabase migrationへの対応が未確認なら停止します。
