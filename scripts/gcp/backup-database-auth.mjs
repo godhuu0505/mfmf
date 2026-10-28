@@ -8,7 +8,7 @@ import { isAbsolute, join } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { pathToFileURL } from "node:url";
-import { FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_SCHEMA_SQL, INSPECT_CUTOVER_STATE_SQL, parseBackupOperation } from "./source-database-cutover.mjs";
+import { FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_SCHEMA_SQL, INSPECT_CUTOVER_STATE_SQL, parseBackupOperation, SOURCE_GUARD_COUNT } from "./source-database-cutover.mjs";
 
 export const SOURCE_REF = "aqvmuhqkaqedtxuqwhoq";
 export const POOLER_URL = `https://api.supabase.com/v1/projects/${SOURCE_REF}/config/database/pooler`;
@@ -207,7 +207,7 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
       stage = operation === "freeze-and-backup" ? "source-freeze" : "source-unfreeze";
       const result = await capture(`${PG_BIN}/psql`, sqlArgs(operation === "freeze-and-backup" ? FREEZE_SOURCE_SQL : UNFREEZE_SOURCE_SQL),
         { ...pgEnv, PGOPTIONS: "-c default_transaction_read_only=off -c statement_timeout=60000 -c lock_timeout=10000" });
-      requireValue(result === (operation === "freeze-and-backup" ? "t|22" : "f|22"), stage);
+      requireValue(result === (operation === "freeze-and-backup" ? `t|${SOURCE_GUARD_COUNT}` : `f|${SOURCE_GUARD_COUNT}`), stage);
       if (operation === "unfreeze") {
         succeeded = true;
         return { status: "unfrozen", sourceWrites: "enabled", archive: "not-created" };
@@ -219,8 +219,8 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
     let frozen = false;
     if (schema === "t") {
       const state = await capture(`${PG_BIN}/psql`, sqlArgs(INSPECT_CUTOVER_STATE_SQL), pgEnv);
-      requireValue(["t|22", "f|22"].includes(state), stage);
-      frozen = state === "t|22";
+      requireValue([`t|${SOURCE_GUARD_COUNT}`, `f|${SOURCE_GUARD_COUNT}`].includes(state), stage);
+      frozen = state === `t|${SOURCE_GUARD_COUNT}`;
     }
     requireValue(operation !== "freeze-and-backup" || frozen, stage);
     stage = "dump-encrypt";

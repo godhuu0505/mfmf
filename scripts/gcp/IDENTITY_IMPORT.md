@@ -10,8 +10,11 @@
 
 ```js
 import { convertIdentityImport, toRestBatch } from "./identity-import.mjs";
+import { parseSourceArchiveData } from "./source-archive-data.mjs";
 
-// いずれも実際に抽出した全件。原本 archive を隔離 DB に復元して取得する。
+// pg_restore の固定 data-only テキスト出力をメモリ内で解釈する。SQL は実行しない。
+const { users, identities, mfaFactors } = parseSourceArchiveData(restoreStdoutBuffer);
+// targetUsers は移行先の全件 read-only snapshot。
 const converted = convertIdentityImport({ users, identities, mfaFactors, targetUsers }, { now: Date.now() });
 // converted.batches: Admin importUsers(users, options) に渡せるメモリ上の payload。
 // converted.authMirror: DB operator bundle の authMirror に渡す6列の行。
@@ -27,6 +30,20 @@ for (const batch of converted.batches) {
 最大10,000ユーザー、20,000 identities を受け付けます。入力が空・途中ページ・
 欠落テーブルでないことの責任は抽出 operator にあります。converter が API を呼ばないため、
 全件性を自己申告 boolean で証明する仕組みはありません。
+
+抽出は `pg_dump --quote-all-identifiers` で作成した暗号化 custom-format 原本を復号し、
+固定引数 `pg_restore --data-only --schema=public --schema=auth --no-owner --no-privileges --file=-`
+の標準出力を `source-archive-data.mjs` へ渡します。**`--dbname` を指定せず、`psql` へ渡さず、
+原本 SQL・関数・trigger を実行しません。** 復号バイトとテキストはメモリ内に限り、
+標準出力をユーザー向けログや平文ファイルへ接続しません。
+parser は固定 COPY 形式・全必須テーブル/列・UTF-8・escape・行数/バイト上限を検査し、
+認証日時を最大6桁の UTC ISO に変換します。認証の JSON 数値は精度が失われるなら拒否します。
+凍結後の原本 archive には保全用の `mfmf_cutover` schema も含まれますが、
+この抽出では `--schema=public --schema=auth` で対象を限定し、原本 archive 自体は完全なまま保持します。
+フィルタを外して任意 schema や SQL を受け入れる変更はしません。
+
+これは import 用のデータ抽出です。別工程の隔離 DB restore-test・全行 readback 比較の
+代わりにはならず、両方の成功が切替 gate です。
 
 - `users`: **SQL `auth.users` の行**。`id`, `email`, `aud`, `role`, `is_anonymous`,
   `is_sso_user`, `is_super_admin`, `deleted_at`, `phone`, `phone_confirmed_at`,

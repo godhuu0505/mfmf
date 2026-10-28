@@ -30,7 +30,8 @@ snapshot に属します。既定の `preserve` は読取だけです。`freeze-
   read-only設定を検証します。サーバーmajorがクライアントより新しければdump前に停止します。
 - DBパスワードは `PGPASSWORD` としてDB子プロセスの環境メモリだけに渡します。
   argv、URI、ファイル、age子プロセスには渡しません。PATも子プロセスへ渡しません。
-  全子プロセスのstderrを破棄し、例外本文・DB行・ユーザーID・メール・ファイル名をログに出しません。
+  子プロセスのstderrは先頭4096bytesだけメモリで固定分類し、原文をログやファイルへ出しません。
+  例外本文・DB行・ユーザーID・メール・ファイル名も出力しません。
 
 ## 成功・失敗の扱い
 
@@ -45,7 +46,7 @@ snapshot に属します。既定の `preserve` は読取だけです。`freeze-
 
 平文dumpをディスクへ保存しません。一時ディレクトリは0700、暗号化ファイルは0600です。
 失敗、途中切断、ageエラー、上限超過では完成ファイルを公開せず非0終了します。
-ログは固定stage / HTTP status数値、成功時はmajor・byte数などの集計だけです。
+ログは固定stage / reason enum / HTTP status数値、成功時はmajor・byte数などの集計だけです。
 既存の出力ディレクトリがあれば上書きせず停止します。失敗時に手動でpartialをArtifact化しないでください。
 
 既定の `preserve` は`deploy-production`と直列化しますが、**アプリ・直接API・Auth操作を凍結しません**。snapshot以後の更新は含まれません。Auth/session・publicのtable dataは同一snapshotですが、
@@ -55,9 +56,9 @@ DB/Auth切替直前は下記の明示freezeとfresh snapshotに続けて、GCS�
 
 ## 明示的な source 凍結と解除
 
-`freeze-and-backup` は公開schemaの固定20テーブル集合を照合し、`auth.users` / `auth.identities` を加えた22表を
+`freeze-and-backup` は公開schemaの固定20テーブル集合を照合し、`auth.users` / `auth.identities` / `auth.mfa_factors` を加えた23表を
 `SHARE ROW EXCLUSIVE` でlockします。進行中DMLの終了後、private `mfmf_cutover` schema/state/guard と
-22個の `BEFORE INSERT/UPDATE/DELETE/TRUNCATE` statement triggerを同じtransactionで設定します。
+23個の `BEFORE INSERT/UPDATE/DELETE/TRUNCATE` statement triggerを同じtransactionで設定します。
 ロック待ちは10秒で停止し、対象tableの増減も拒否します。triggerは `ENABLE ALWAYS` です。
 
 例外は `session_user` が `postgres` / `supabase_admin` のoperator接続だけです。
@@ -65,7 +66,7 @@ DB/Auth切替直前は下記の明示freezeとfresh snapshotに続けて、GCS�
 Auth管理接続の `supabase_auth_admin` も例外にしません。guardはprivate stateを `FOR SHARE` で読み、
 旧repeatable-read snapshotが凍結前のfalse状態を使う場合もserialization失敗にします。
 読取とoperatorの原本dumpは維持されます。Authのログインや更新がエラーになることは、切替作業中の想定動作です。
-凍結対象のAuth表は `users` / `identities` だけです。password/provider mappingとpublicの最終データを守りますが、
+凍結対象のAuth表は `users` / `identities` / `mfa_factors` です。password/provider mapping・MFA要素の登録/更新/削除とpublicの最終データを守りますが、
 `auth.sessions` / `auth.refresh_tokens` などへの独立した内部更新まで止めません。全Auth状態が移行中ずっと固定される保証ではありません。
 
 成功後は3schemaを一回のdumpで保全します。**freeze後にdumpや暗号化が失敗しても自動解除しません。**
@@ -85,6 +86,8 @@ archiveも作りません。GCP側で新しい書込が始まった後に、sour
 `pg_restore --list` は内容目録を読める確認にすぎず、データの全件読み取り・restore成功ではありません。
 目録やSQLをログに出さず、全archiveの読取・Auth users/identities/password hashの変換確認、
 隔離DBでの許可したデータ復元、FK・RLS・認可・Google/email/passwordログインの試験が必要です。
+COPY変換器へ渡す `pg_restore --data-only` 出力は `--schema=public --schema=auth` を明示し、
+凍結管理schema `mfmf_cutover` を実行も変換もせず除外します。MFA要素が1件でもあれば現行のIdP変換は停止します。
 復号済み原本をCloud SQL本番や稼働Supabaseへ直接実行しないでください。
 
 ## オフライン検証

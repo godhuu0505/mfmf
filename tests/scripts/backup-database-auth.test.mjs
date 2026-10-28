@@ -78,10 +78,10 @@ async function fixture(t, overrides = {}) {
         const sql = args.at(-1);
         let result;
         if (sql === PROBE_SQL) result = overrides.probe ?? "170011|t|t|t|t|t";
-        else if (sql === FREEZE_SOURCE_SQL) { schema = true; frozen = true; result = "t|22"; }
-        else if (sql === UNFREEZE_SOURCE_SQL) { frozen = false; result = "f|22"; }
+        else if (sql === FREEZE_SOURCE_SQL) { schema = true; frozen = true; result = "t|23"; }
+        else if (sql === UNFREEZE_SOURCE_SQL) { frozen = false; result = "f|23"; }
         else if (sql === INSPECT_CUTOVER_SCHEMA_SQL) result = schema ? "t" : "f";
-        else if (sql === INSPECT_CUTOVER_STATE_SQL) result = `${frozen ? "t" : "f"}|${overrides.triggerCount ?? 22}`;
+        else if (sql === INSPECT_CUTOVER_STATE_SQL) result = `${frozen ? "t" : "f"}|${overrides.triggerCount ?? 23}`;
         else throw new Error("Unexpected SQL");
         source = sql === PROBE_SQL && overrides.probeError
           ? `process.stderr.write(${JSON.stringify(overrides.probeError)}); process.exitCode=1;`
@@ -266,7 +266,7 @@ test("unfreeze changes state only and does not run a dump or publish an archive"
   assert.equal(f.calls.filter((call) => call.command.endsWith("pg_dump") && call.args[0] !== "--version").length, 0);
   assert.deepEqual(await readdir(f.root), []); assert.equal(f.frozen(), false);
 });
-test("preserve of a previously frozen source includes guards and requires all 22 triggers", async (t) => {
+test("preserve of a previously frozen source includes guards and requires all 23 triggers", async (t) => {
   const f = await fixture(t, { schema: true, frozen: true }); assert.equal((await f.run()).schemas, 3);
   await failsClean(await fixture(t, { schema: true, frozen: true, triggerCount: 21 }), {}, "cutover-inspect");
 });
@@ -276,4 +276,15 @@ test("event metadata permits only the three fixed operations", () => {
   for (const value of [PRIVATE, JSON.stringify({ inputs: { operation: PRIVATE } }), "x".repeat(65537)]) {
     assert.throws(() => parseBackupOperation(value), (error) => !error.message.includes(PRIVATE));
   }
+});
+
+test("source freeze includes MFA factor enrollment, mutation and removal in its fixed drain and ALWAYS guards",()=>{
+  assert.match(FREEZE_SOURCE_SQL,/LOCK TABLE [^;]*auth\.mfa_factors IN SHARE ROW EXCLUSIVE MODE/);
+  assert.match(FREEZE_SOURCE_SQL,/CREATE OR REPLACE TRIGGER mfmf_cutover_write_guard BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON auth\.mfa_factors/);
+  assert.match(FREEZE_SOURCE_SQL,/ALTER TABLE auth\.mfa_factors ENABLE ALWAYS TRIGGER mfmf_cutover_write_guard/);
+  assert.match(UNFREEZE_SOURCE_SQL,/\)\) <> 23 THEN/);
+});
+test("preserve rejects a legacy 22-guard freeze missing MFA coverage",async(t)=>{
+ const f=await fixture(t,{schema:true,frozen:true,triggerCount:22});
+ await failsClean(f,{},"cutover-inspect");
 });

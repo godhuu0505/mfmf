@@ -85,6 +85,12 @@ and used-code rejection, old-session revocation and re-login, same-value setting
 first/repeated attempts against the private candidate before enabling production.
 Keep the existing auth/database backup and explicit rollback gate intact.
 
+`node tests/gcp/postgrest-proof.mjs` exercises the real PostgREST 16.5 binary and
+data-client bridge against a disposable PostgreSQL container with no external
+network or published host ports. Its startup probe uses container-local TCP,
+which becomes available only after PostgreSQL's temporary initialization server
+has shut down; a Unix-socket readiness response alone is insufficient.
+
 Official contracts:
 - https://docs.cloud.google.com/identity-platform/docs/reference/rest/v1/accounts/createAuthUri
 - https://docs.cloud.google.com/identity-platform/docs/reference/rest/v1/accounts/signInWithIdp

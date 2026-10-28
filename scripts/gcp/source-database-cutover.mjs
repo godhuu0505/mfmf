@@ -5,7 +5,9 @@ export const SOURCE_TABLES = Object.freeze([
   "households", "media_assets", "media_storage_state", "pets", "profiles", "record_assignees", "record_photos",
   "record_ranking_project_budget", "record_ranking_user_budget", "record_tags", "schedule_rule_assignees", "schedule_rule_skips", "schedule_rules", "tags",
 ]);
-const TABLES = [...SOURCE_TABLES.map((name) => `public.${name}`), "auth.users", "auth.identities"];
+export const SOURCE_AUTH_TABLES = Object.freeze(["auth.users", "auth.identities", "auth.mfa_factors"]);
+const TABLES = [...SOURCE_TABLES.map((name) => `public.${name}`), ...SOURCE_AUTH_TABLES];
+export const SOURCE_GUARD_COUNT = TABLES.length;
 const LOCK = `LOCK TABLE ${TABLES.join(",")} IN SHARE ROW EXCLUSIVE MODE;`;
 const EXPECTED = `ARRAY[${SOURCE_TABLES.map((name) => `'${name}'`).join(",")}]::text[]`;
 const CHECK = `DO $check$ BEGIN
@@ -69,7 +71,7 @@ DO $state$ BEGIN
   IF (SELECT count(*) FROM mfmf_cutover.state WHERE singleton=true) <> 1 OR
     (SELECT count(*) FROM pg_catalog.pg_trigger WHERE tgname='mfmf_cutover_write_guard' AND NOT tgisinternal
       AND tgenabled='A' AND tgfoid='mfmf_cutover.guard_source_write()'::regprocedure
-      AND tgrelid IN (${TABLES.map((name) => `'${name}'::regclass`).join(",")})) <> 22 THEN
+      AND tgrelid IN (${TABLES.map((name) => `'${name}'::regclass`).join(",")})) <> ${SOURCE_GUARD_COUNT} THEN
     RAISE EXCEPTION 'Source cutover state differs' USING ERRCODE='55000';
   END IF;
 END $state$;

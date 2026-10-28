@@ -83,8 +83,10 @@ def main():
         command(["docker", "run", "--detach", "--rm", "--name", name, "--network", "none",
                  "--tmpfs", "/var/lib/postgresql/data:rw", "-e", "POSTGRES_HOST_AUTH_METHOD=trust", IMAGE])
         started = True
+        # The entrypoint temporary init server has a Unix socket but no TCP.
+        # Wait for the final server, not the socket that disappears on restart.
         for _ in range(60):
-            if command(["docker", "exec", name, "pg_isready", "-U", "postgres"], check=False).returncode == 0:
+            if command(["docker", "exec", name, "pg_isready", "-h", "127.0.0.1", "-U", "postgres"], check=False).returncode == 0:
                 break
             time.sleep(0.5)
         else:

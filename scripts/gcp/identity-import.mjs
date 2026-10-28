@@ -95,7 +95,8 @@ function validateTarget(rows) {
 }
 
 /**
- * Convert complete SQL row snapshots and a complete Admin listUsers snapshot.
+ * Convert complete source table rows decoded by the fixed pg_restore text parser
+ * (no source SQL execution) and a complete Admin listUsers snapshot.
  * All returned batches contain secrets/PII and must remain in operator memory.
  * No external mutation is performed; all rows validate before any batch returns.
  */

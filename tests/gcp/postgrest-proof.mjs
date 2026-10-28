@@ -50,7 +50,9 @@ async function main() {
     docker(["run", "--detach", "--rm", "--name", NAME, "--network", "none", "--tmpfs", "/var/lib/postgresql/data:rw",
       "-e", "POSTGRES_HOST_AUTH_METHOD=trust", IMAGE]); created = true;
     for (let attempt = 0; attempt < 80; attempt++) {
-      try { docker(["exec", NAME, "pg_isready", "-U", "postgres"]); break; }
+      // The entrypoint's temporary init server accepts Unix sockets but no TCP.
+      // Wait for the final server so init's shutdown cannot race the first SQL.
+      try { docker(["exec", NAME, "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]); break; }
       catch { if (attempt === 79) throw new Error("Synthetic database did not become ready."); await delay(250); }
     }
     stage = "binary version";
