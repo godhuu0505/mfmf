@@ -77,7 +77,13 @@ async function fixture(t, overrides = {}) {
       } else if (command.endsWith("psql")) {
         const sql = args.at(-1);
         let result;
-        if (sql === PROBE_SQL) result = overrides.probe ?? "170011|t|t|t|t|t";
+        if (sql === PROBE_SQL) {
+          assert.ok(args.includes("--quiet"));
+          assert.match(sql, /^BEGIN READ ONLY;/);
+          assert.match(sql, /SET LOCAL statement_timeout='10000';/);
+          assert.match(sql, /COMMIT;$/);
+          result = overrides.probe ?? "170011|t|t|t|t|t";
+        }
         else if (sql === FREEZE_SOURCE_SQL) { schema = true; frozen = true; result = "t|23"; }
         else if (sql === UNFREEZE_SOURCE_SQL) { frozen = false; result = "f|23"; }
         else if (sql === INSPECT_CUTOVER_SCHEMA_SQL) result = schema ? "t" : "f";

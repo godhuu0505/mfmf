@@ -27,7 +27,10 @@ snapshot に属します。既定の `preserve` は読取だけです。`freeze-
 - Ubuntu 24.04で `postgresql-client-17` を明示導入し、`/usr/lib/postgresql/17/bin/` の
   `psql` / `pg_dump` のmajorを検証します。17系の修正パッチは追従します。
   接続後にサーバーmajorが15〜17、接続roleがpostgresかつRLS bypass、DB名、Auth表の存在と
-  read-only設定を検証します。サーバーmajorがクライアントより新しければdump前に停止します。
+  read-only設定を検証します。poolerが起動時の `PGOPTIONS` を渡さない場合に備え、probeは
+  SQLで `BEGIN READ ONLY` を明示し、サーバーの実transaction状態を確認します。
+  `pg_dump` 自身も [READ ONLYのsnapshot transaction](https://github.com/postgres/postgres/blob/REL_17_STABLE/src/bin/pg_dump/pg_dump.c) を開始します。
+  サーバーmajorがクライアントより新しければdump前に停止します。
 - DBパスワードは `PGPASSWORD` としてDB子プロセスの環境メモリだけに渡します。
   argv、URI、ファイル、age子プロセスには渡しません。PATも子プロセスへ渡しません。
   子プロセスのstderrは先頭4096bytesだけメモリで固定分類し、原文をログやファイルへ出しません。
@@ -38,7 +41,8 @@ snapshot に属します。既定の `preserve` は読取だけです。`freeze-
 1. 公開recipientの検証、接続構成とCAの検証、バージョン/read-only probeを行います。
 2. 初回 `preserve` は schema指定2件と `--strict-names` を付けた一回のcustom dumpをageへpipeします。
    凍結管理schemaが存在する場合は、固定の3件目 `mfmf_cutover` も同じdumpに含めます。
-   パイプで流すdumpは最大1GiB、DB接続は15秒、各statementは10分、全体は20分で制限します。
+   パイプで流すdumpは最大1GiB、DB接続は15秒、probeのstatementは10秒、dumpのlock待ちは10秒、
+   全体は20分で制限します。pg_dumpがstatement timeoutを解除するため、dump中は外側の全体期限で停止します。
 3. dump/age両方の終了コード0、stream完了、custom/age header、出力サイズ・0600 permissionを
    確認後のみ、完成したciphertextを公開用ディレクトリへ排他的に作ります。
 4. 成功した場合だけ `database-auth-backup-encrypted-<run id>-<attempt>` Artifactへ

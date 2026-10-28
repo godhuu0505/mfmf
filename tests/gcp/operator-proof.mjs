@@ -82,12 +82,21 @@ try {
  assert.equal((await run("inspect")).imported,false);
  assert.equal((await run("restore-test")).restore,"all-rows-compared");
  assert.equal((await run("migrate")).counts.auth_users,2);
+ assert.equal((await run("verify-import")).comparison,"all-rows-compared");
+ const alteration=await connectImpl({user:"postgres",database:"mfmf"});
+ try {
+  await alteration.query("UPDATE public.record_ranking_project_budget SET lifetime_count=$1 WHERE singleton",[43]);
+  await assert.rejects(run("verify-import"));
+  await alteration.query("UPDATE public.record_ranking_project_budget SET lifetime_count=$1 WHERE singleton",[42]);
+ }finally{await alteration.end();}
+ assert.equal((await run("verify-import")).comparison,"all-rows-compared");
  const result=await run("inspect");assert.equal(result.imported,true);assert.equal(result.mediaWrites,"frozen");assert.equal(result.databaseWrites,"frozen");
  await frozenProof();
  await assert.rejects(run("migrate"));
  assert.equal((await run("upgrade")).applied,0);
  await failedActivationProof();
  assert.equal((await run("activate")).databaseWrites,"enabled");
+ await assert.rejects(run("verify-import"));
  await runtime("authenticated","UPDATE public.daycare_records SET body=body WHERE id=$1",[id(21)]);
  await runtime("identity_sync","SELECT public.sync_identity($1,$2,true,false)",[id(1),"changed@example.test"]);
  await staleSnapshotFreezeProof();
@@ -95,5 +104,5 @@ try {
  const admin=await connectImpl({user:"postgres",database:"postgres"});
  assert.equal((await admin.query("SELECT count(*)::int n FROM pg_database WHERE datname='mfmf_restore_probe'")).rows[0].n,0);
  assert.equal((await admin.query("SELECT count(*)::int n FROM pg_roles WHERE rolname='mfmf_restore_proof'")).rows[0].n,0);await admin.end();
- console.log(JSON.stringify({operatorProof:"passed",operations:7,peakConnections:peak,temporaryResourcesRemoved:true}));
+ console.log(JSON.stringify({operatorProof:"passed",operations:8,peakConnections:peak,temporaryResourcesRemoved:true}));
 }catch(error){console.error(JSON.stringify({operatorProof:"failed",stage:error?.stage??"assertion"}));process.exitCode=1;}

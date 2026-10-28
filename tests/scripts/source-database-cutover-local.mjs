@@ -5,6 +5,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { SOURCE_TABLES, FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_STATE_SQL } from "../../scripts/gcp/source-database-cutover.mjs";
+import { PROBE_SQL } from "../../scripts/gcp/backup-database-auth.mjs";
 const IMAGE = "mfmf-gcp-postgres-test:17";
 const NAME = `mfmf-cutover-proof-${randomUUID().slice(0, 12)}`;
 const docker = (args, input) => execFileSync("docker", args, { input, encoding: "utf8", timeout: 120_000,
@@ -31,6 +32,10 @@ try {
       UPDATE public.daycare_records SET value='definer' WHERE id=1 $$;
     GRANT EXECUTE ON FUNCTION public.synthetic_definer_write() TO authenticator;`);
   check(sql("SELECT count(*) FROM public.daycare_records", "authenticator") === "1");
+  // A session pooler may discard PGOPTIONS. The fixed probe must still enter
+  // READ ONLY even when this server's default is writable.
+  check(sql("SHOW default_transaction_read_only") === "off");
+  check(/^17[0-9]{4}\|t\|t\|t\|t\|t$/.test(sql(PROBE_SQL)));
   sql("SELECT public.synthetic_definer_write()", "authenticator"); checks++;
   stage = "table drift";
   sql("CREATE TABLE public.unreviewed(id integer)"); denied(FREEZE_SOURCE_SQL, "postgres");
