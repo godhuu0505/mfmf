@@ -50,8 +50,21 @@ snapshot に属します。既定の `preserve` は読取だけです。`freeze-
 
 平文dumpをディスクへ保存しません。一時ディレクトリは0700、暗号化ファイルは0600です。
 失敗、途中切断、ageエラー、上限超過では完成ファイルを公開せず非0終了します。
-ログは固定stage / reason enum / HTTP status数値、成功時はmajor・byte数などの集計だけです。
+ログは固定stage / substage / reason enum / 許可したSQLSTATE / HTTP status数値、成功時はmajor・byte数などの集計だけです。
 既存の出力ディレクトリがあれば上書きせず停止します。失敗時に手動でpartialをArtifact化しないでください。
+
+各操作は `BEGIN READ ONLY` 内の固定catalog SELECTで、公開20表の存在・owner権限・TRIGGER権限・lock権限の件数と、
+Auth3表それぞれの同じboolean、固定5ロールの `session_replication_role` SET権限を診断します。
+ユーザーデータ、実所有者名、任意のrole名は出しません。`sourceCapabilities` はカタログ上の権限の報告であり、
+Supabaseの管理拡張による追加許可・制限までは証明しません。owner membershipがfalseでも、この診断だけで
+DDLを禁止・許可する新しい判定は行いません。既定 `preserve` で書込なしに確認できます。
+
+凍結・解除はSQLで `BEGIN READ WRITE` を明示します。失敗時はpsqlの `VERBOSITY=sqlstate` と
+固定SELECTの進捗マーカーから、例として `enable-auth-users` / `42501` のような固定段階・コードだけを返します。
+接続先の権限や23個の `ENABLE ALWAYS` 条件を緩めることはありません。コード `25006` はread-only transaction、
+`42501` は権限、`55P03` はlock待ち失敗の切り分けに使えます。エラー本文・元のstdoutは出しません。
+進捗の `commit` 表示はcommit成功の証拠ではありません。結果不明時は `preserve` のschema数とfrozen状態を確認し、
+自動freeze再試行・自動unfreezeを行わないでください。
 
 既定の `preserve` は`deploy-production`と直列化しますが、**アプリ・直接API・Auth操作を凍結しません**。snapshot以後の更新は含まれません。Auth/session・publicのtable dataは同一snapshotですが、
 PostgreSQL sequenceの進行、別時点のStorage/GCS本体、外部OAuth設定、SMTP設定、署名鍵、
@@ -111,6 +124,8 @@ node tests/scripts/source-database-cutover-local.mjs
 一次資料:
 
 - [PostgreSQL 17 pg_dump — consistent snapshot / client compatibility / schema selection](https://www.postgresql.org/docs/17/app-pgdump.html)
+- [PostgreSQL 17 CREATE TRIGGER privileges](https://www.postgresql.org/docs/17/sql-createtrigger.html)
+- [PostgreSQL 17 ALTER TABLE ownership](https://www.postgresql.org/docs/17/sql-altertable.html)
 - [Supabase session poolerでのbackup](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
 - [Supabase Pooler Management API](https://supabase.com/docs/reference/api/v1-get-pooler-config)
 - [Supabase session modeは5432](https://supabase.com/kb/troubleshooting/how-do-i-update-connection-pool-settings-in-my-dashboard-wAxTJ_)
