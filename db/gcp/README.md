@@ -109,6 +109,7 @@ Job は task 1・parallelism 1・retry 0 とし、script 自体も task index/co
 | `inspect` | baseline hash、runtime role、行数、media state / binding 整合だけを検査 |
 | `restore-test` | 別の一時 DB で baseline + RLS 負例を実行し、bundle を復元して全行・全列を typed comparison。その DB / 一時 role を撤去 |
 | `migrate` | frozen/gcs の未 import・空 DB に、固定列の parameterized INSERT を一つの transaction で実行 |
+| `verify-import` | 同じ generation 固定 bundle を取得し、既存固定 DB の baseline / import SHA / frozen 状態を確認。読取専用 snapshot で全行・全列を照合。DML / DDL / 試験 DB 作成なし |
 | `upgrade` | image 内の `db/gcp/migrations/` と適用履歴を比較。未適用 SQL がある場合だけ TTL 検証済み backup を先行し、SQL と checksum を atomic 適用 |
 | `activate` | baseline / import SHA / 全 media 参照 / 21 表 guard を検査後、全体書込を有効にし media state を gcs に同 transaction で切替 |
 | `freeze` | 同じ固定対象と import SHA を確認し、全体書込と media write を同 transaction で frozen にする。read backend は gcs のまま |
@@ -133,7 +134,7 @@ event trigger、固定 app role の既存を拒否します。既存 object / ro
 各 password は 32〜128 文字の base64url 形式とし、コードや引数には入れません。
 
 - bootstrap のみ `MFMF_DATABASE_PASSWORD`（別 secret `mfmf-database-password`）。runtime の authenticator に設定する値です。
-- migrate / restore-test は `MFMF_DB_BUNDLE_SHA256`、`MFMF_DB_BUNDLE_GENERATION`、`MFMF_DB_IMPORT_IDENTITY`。
+- migrate / restore-test / verify-import は `MFMF_DB_BUNDLE_SHA256`、`MFMF_DB_BUNDLE_GENERATION`、`MFMF_DB_IMPORT_IDENTITY`。
   最後の値は operator 専用 `mfmf-db-import-identity` から渡します。既存の長期 backup identity を共有しません。
 - activate / freeze は期待する `MFMF_DB_BUNDLE_SHA256` のみ。generation や復号鍵は不要です。
 - upgrade は `MFMF_DB_DEPLOY_SHA`（main commit の 40 桁 SHA）のみを追加します。
@@ -171,6 +172,10 @@ GCP 側が追いついていない場合に、Cloud SQL の更新を黙って省
 
 未適用があれば固定 Cloud SQL の backup API で TTL 14 日を要求し、SUCCESSFUL / expiry / 作成時刻を実確認します。
 同じ main SHA の backup 再利用は 15 分以内だけです。TTL 未対応・古い backup・重複・不明な作成結果では SQL を始めません。
+`verify-import` は固定 session advisory lock を snapshot 作成前に取り、REPEATABLE READ READ ONLY transaction で検証します。
+変更セルが1つでもあれば、件数が同じでも失敗します。lock は成功・失敗の両方で解放します。
+この操作自体は backup / restore を開始しません。実 managed backup / PITR から固定対象へ復元した後の比較用です。
+
 backup は DB のみです。IdP と GCS 本体の巻戻しや、破壊的 migration 後の旧アプリ互換性を保証しません。
 
 ```sh
@@ -179,7 +184,7 @@ python3 tests/gcp/run-operator-tests.py
 ```
 
 後者は既存 DB / 本番 env に触れず、専用 image と network-none の一時 PostgreSQL を用います。
-7 操作と再 import 拒否、全列復元、最大 2 接続、試験 DB / role の撤去を検査します。
+8 操作と再 import 拒否、全列復元、最大 2 接続、試験 DB / role の撤去を検査します。
 実 authenticator 接続で frozen 時の read / 同値 identity sync 許可と DML / identity変更 / SECURITY DEFINER 書込拒否、
 activate 後の書込許可、state 変更の故障注入時の atomic rollback、旧 repeatable-read snapshot の拒否も検査します。
 `--skip-build` は同じ source で作成した test image の再試験専用です。

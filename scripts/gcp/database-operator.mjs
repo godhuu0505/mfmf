@@ -15,7 +15,7 @@ export const INSTANCE = `${PROJECT}:asia-northeast1:mfmf-db`;
 export const BUCKET = `${PROJECT}-db-migration`;
 export const SOURCE = "aqvmuhqkaqedtxuqwhoq";
 export const FORMAT = "mfmf-gcp-import-v1";
-export const OPERATIONS = Object.freeze(["bootstrap", "inspect", "migrate", "restore-test", "upgrade", "activate", "freeze"]);
+export const OPERATIONS = Object.freeze(["bootstrap", "inspect", "migrate", "restore-test", "verify-import", "upgrade", "activate", "freeze"]);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SOCKETS = "/tmp/mfmf-db-operator-sockets";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -24,7 +24,7 @@ const GENERATION = /^[1-9][0-9]{0,19}$/;
 const PASSWORD = /^[A-Za-z0-9_-]{32,128}$/;
 const LIMIT = 64 * 1024 * 1024;
 const BASE = Object.freeze({ PATH: "/usr/local/bin:/usr/bin:/bin", LANG: "C.UTF-8" });
-const STAGES = new Set(["context", "metadata", "source-contract", "connector", "credentials", "connect", "bootstrap", "bundle", "import", "inspect", "upgrade", "restore-test", "activate", "freeze", "cleanup"]);
+const STAGES = new Set(["context", "metadata", "source-contract", "connector", "credentials", "connect", "bootstrap", "bundle", "import", "inspect", "upgrade", "restore-test", "verify-import", "activate", "freeze", "cleanup"]);
 export class OperatorError extends Error {
   constructor(stage) { super("Database operator failed; details withheld."); this.stage = STAGES.has(stage) ? stage : "context"; }
 }
@@ -87,7 +87,7 @@ export function validateContext(env) {
   if (env.MFMF_DB_OPERATION === "bootstrap") requireValue(PASSWORD.test(env.MFMF_DATABASE_PASSWORD ?? ""), "credentials");
   if (env.MFMF_DB_OPERATION === "upgrade") requireValue(/^[0-9a-f]{40}$/.test(env.MFMF_DB_DEPLOY_SHA ?? ""), "context");
   if (["activate","freeze"].includes(env.MFMF_DB_OPERATION)) requireValue(SHA.test(env.MFMF_DB_BUNDLE_SHA256 ?? ""),"context");
-  if (["migrate", "restore-test"].includes(env.MFMF_DB_OPERATION)) {
+  if (["migrate", "restore-test", "verify-import"].includes(env.MFMF_DB_OPERATION)) {
     requireValue(SHA.test(env.MFMF_DB_BUNDLE_SHA256 ?? "") && GENERATION.test(env.MFMF_DB_BUNDLE_GENERATION ?? ""), "bundle");
     parseImportIdentity(env.MFMF_DB_IMPORT_IDENTITY);
   }
@@ -259,6 +259,44 @@ export async function importBundle(client,bundle,sha,contract) {
     await client.query("INSERT INTO migration_admin.imports(singleton,sha256,counts) VALUES(true,$1,$2)",[sha,actual]);
     return {counts:actual,mediaWrites:"frozen",readBackend:"gcs"};
   });
+}
+
+// Counts reject missing/extra rows; typed equality catches changed cells even
+// when the row count and key remain unchanged. No row values are returned.
+async function compareBundleRows(client,bundle,stage) {
+  const actual=await counts(client);
+  requireValue(Object.keys(actual).every(name=>actual[name]===bundle.expected.counts[name]),stage);
+  for(const [name,columns,rows] of [["auth.users",AUTH_COLUMNS,bundle.authMirror],...TABLES.map(name=>[`public.${name}`,COLUMNS[name],bundle.tables[name]])]) {
+    for(const row of rows) {
+      const conditions=columns.map((column,index)=>`${column} IS NOT DISTINCT FROM $${index+1}`).join(" AND ");
+      const found=(await client.query(`SELECT count(*)::int n FROM ${name} WHERE ${conditions}`,columns.map(column=>row[column]))).rows[0].n;
+      requireValue(found===1,stage);
+    }
+  }
+  return actual;
+}
+
+export async function verifyImport(client,bundle,sha,contract) {
+  validateBundle(bundle);requireValue(SHA.test(sha),"bundle");
+  let locked=false;
+  try {
+    // Acquire before taking the repeatable-read snapshot. Otherwise a wait on
+    // another operation could leave verification using a pre-lock snapshot.
+    await client.query("SELECT pg_advisory_lock(1296451151,1)");locked=true;
+    await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL ROLE mfmf_owner; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='60s';");
+    try {
+      await baselineGate(client,contract);
+      const imports=(await client.query("SELECT sha256 FROM migration_admin.imports WHERE singleton")).rows;
+      requireValue(imports.length===1 && imports[0].sha256===sha,"verify-import");
+      const state=(await client.query("SELECT mode,read_backend FROM public.media_storage_state WHERE singleton")).rows;
+      requireValue(state.length===1 && state[0].mode==="frozen" && state[0].read_backend==="gcs" && (await writeGate(client)).frozen,"verify-import");
+      await verifyMedia(client);
+      const actual=await compareBundleRows(client,bundle,"verify-import");
+      await client.query("COMMIT");
+      return {comparison:"all-rows-compared",counts:actual,databaseWrites:"frozen",mediaWrites:"frozen",readBackend:"gcs",readOnly:true};
+    }catch(error){await client.query("ROLLBACK").catch(()=>{});throw error;}
+  }catch(error){throw error instanceof OperatorError?error:new OperatorError("verify-import");}
+  finally{if(locked){try{await client.query("SELECT pg_advisory_unlock(1296451151,1)");}catch{throw new OperatorError("verify-import");}}}
 }
 
 async function verifyMedia(client,allowPending=false) {
@@ -448,17 +486,7 @@ async function restoredDatabase(admin,connect,contract,bundle,sha,root) {
     client=await connect("mfmf_migrator",database);
     await transaction(client,async()=>client.query("UPDATE migration_admin.write_state SET frozen=true WHERE singleton"));
     const restored=await importBundle(client,bundle,sha,contract);
-    // Compare source-preserving JSON values, not only row counts. PostgreSQL
-    // typed normalization is checked against the same input by IS NOT DISTINCT.
-    await transaction(client,async()=> {
-      for(const [name,columns,rows] of [["auth.users",AUTH_COLUMNS,bundle.authMirror],...TABLES.map(name=>[`public.${name}`,COLUMNS[name],bundle.tables[name]])]) {
-        for(const row of rows) {
-          const conditions=columns.map((column,index)=>`${column} IS NOT DISTINCT FROM $${index+1}`).join(" AND ");
-          const found=(await client.query(`SELECT count(*)::int n FROM ${name} WHERE ${conditions}`,columns.map(column=>row[column]))).rows[0].n;
-          requireValue(found===1,"restore-test");
-        }
-      }
-    });
+    await transaction(client,async()=>compareBundleRows(client,bundle,"restore-test"));
     await client.end();client=null;
     return {...restored,restore:"all-rows-compared",assertions,temporaryDatabaseRemoved:true};
   } finally {
@@ -521,6 +549,7 @@ export async function runOperator({env=process.env,fetchImpl=fetch,spawnImpl=spa
       stage="bundle";const bundle=await bundleImpl(env,token,fetchImpl,spawnImpl);
       stage=operation;
       result=operation==="migrate"?await importBundle(client,bundle,env.MFMF_DB_BUNDLE_SHA256,contract)
+        :operation==="verify-import"?await verifyImport(client,bundle,env.MFMF_DB_BUNDLE_SHA256,contract)
         :await restoredDatabase(client,connect,contract,bundle,env.MFMF_DB_BUNDLE_SHA256,root);
     }
     return {status:"verified",operation,...result};

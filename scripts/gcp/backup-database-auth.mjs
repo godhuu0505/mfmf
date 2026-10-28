@@ -16,11 +16,17 @@ export const CA_URL = "https://supabase-downloads.s3-ap-southeast-1.amazonaws.co
 export const CA_SHA256 = "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7";
 export const CLIENT_MAJOR = 17;
 export const ARCHIVE_NAME = "database-auth.pgdump.age";
-export const PROBE_SQL = `SELECT current_setting('server_version_num')::integer,
+// Supavisor may not forward startup PGOPTIONS. Establish the transaction mode
+// in SQL and verify it on the server; pg_dump likewise opens its own READ ONLY
+// snapshot transaction rather than relying on the startup default.
+export const PROBE_SQL = `BEGIN READ ONLY;
+SET LOCAL statement_timeout='10000';
+SELECT current_setting('server_version_num')::integer,
   current_setting('transaction_read_only') = 'on',
   (rolsuper OR rolbypassrls), current_user = 'postgres',
   current_database() = 'postgres', to_regclass('auth.users') IS NOT NULL
-FROM pg_catalog.pg_roles WHERE rolname = current_user;`;
+FROM pg_catalog.pg_roles WHERE rolname = current_user;
+COMMIT;`;
 export const DUMP_ARGS = Object.freeze([
   "--format=custom", "--schema=public", "--schema=auth", "--strict-names",
   "--no-password", "--lock-wait-timeout=10000", "--quote-all-identifiers",
@@ -192,7 +198,7 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
       PGCONNECT_TIMEOUT: "15", PGAPPNAME: "mfmf-auth-backup",
       PGOPTIONS: "-c default_transaction_read_only=on -c statement_timeout=600000 -c lock_timeout=10000" };
     stage = "source-version";
-    const probe = await capture(`${PG_BIN}/psql`, ["--no-psqlrc", "--no-password", "--tuples-only",
+    const probe = await capture(`${PG_BIN}/psql`, ["--no-psqlrc", "--no-password", "--quiet", "--tuples-only",
       "--no-align", "--set=ON_ERROR_STOP=1", "--command", PROBE_SQL], pgEnv);
     const match = /^([0-9]{6})\|([tf])\|([tf])\|([tf])\|([tf])\|([tf])$/.exec(probe);
     if (!match) throw new BackupError(stage, undefined, "source-shape");

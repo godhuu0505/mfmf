@@ -8,7 +8,7 @@ import { PassThrough } from "node:stream";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { COLUMNS, SOURCE, FORMAT, BUCKET, ACCOUNT, validateContext, validateBundle,
-  diagnostic, sourceContract, importBundle, upgrade, loadBundle, runOperator, setMediaMode, parseImportIdentity, applyBaseline } from "../../scripts/gcp/database-operator.mjs";
+  diagnostic, sourceContract, importBundle, upgrade, loadBundle, runOperator, setMediaMode, parseImportIdentity, applyBaseline, verifyImport } from "../../scripts/gcp/database-operator.mjs";
 
 const hash=(value)=>createHash("sha256").update(value).digest("hex");
 const marker="SENSITIVE_FIXTURE_NEVER_PRINT";
@@ -23,9 +23,9 @@ function bundle(){
   return {format:FORMAT,source:{projectRef:SOURCE},authMirror:[{id:"80000000-0000-4000-8000-000000000001",provider_subject:"80000000-0000-4000-8000-000000000001",email:"fixture@example.test",email_verified:true,created_at:"2026-01-01T00:00:00.123456Z",updated_at:"2026-10-28T00:00:00+00:00"}],
     tables,expected:{counts:{auth_users:1,...Object.fromEntries(Object.entries(tables).map(([name,rows])=>[name,rows.length]))}}};
 }
-function db({mode="frozen",imported=0,badCounts=false,history=[],baselineHash=contract.baselineHash,importHash="b".repeat(64),mediaProblems=0,writeFrozen=mode==="frozen",triggerCount=21,failWriteGate=false}={}){
+function db({mode="frozen",imported=0,badCounts=false,history=[],baselineHash=contract.baselineHash,importHash="b".repeat(64),mediaProblems=0,writeFrozen=mode==="frozen",triggerCount=21,failWriteGate=false,loaded=false,changedCell=false}={}){
   const calls=[];
-  const rows={auth_users:0,...Object.fromEntries(Object.keys(COLUMNS).map(name=>[name,name==="record_ranking_project_budget"?1:0]))};
+  const rows={auth_users:loaded?1:0,...Object.fromEntries(Object.keys(COLUMNS).map(name=>[name,name==="record_ranking_project_budget"?1:0]))};
   return {calls,async end(){},async query(sql,params){
     calls.push({sql,params});
     if(sql.startsWith("SELECT name,sha256") && sql.includes("name='baseline'"))return {rows:[{name:"baseline",sha256:baselineHash}]};
@@ -38,6 +38,7 @@ function db({mode="frozen",imported=0,badCounts=false,history=[],baselineHash=co
     if(sql.startsWith("UPDATE migration_admin.write_state") && failWriteGate)throw new Error(marker);
     if(sql.startsWith("SELECT count(*)::int n FROM migration_admin.imports"))return {rows:[{n:imported}]};
     if(sql.startsWith("SELECT sha256 FROM migration_admin.imports"))return {rows:imported?[{sha256:importHash}]:[]};
+    if(sql.includes(" IS NOT DISTINCT FROM "))return {rows:[{n:changedCell?0:1}]};
     if(sql.startsWith("SELECT count(*)::int n FROM auth.users"))return {rows:[{n:rows.auth_users}]};
     const count=/^SELECT count\(\*\)::int n FROM public\.(\w+)/.exec(sql);
     if(count)return {rows:[{n:badCounts?9:rows[count[1]]}]};
@@ -209,3 +210,31 @@ test("whole-database freeze and media switch commit together or roll back togeth
   assert.ok(failed.calls.some(call=>call.sql.startsWith("SELECT public.set_media_storage_mode")));
   assert.ok(failed.calls.some(call=>call.sql==="ROLLBACK"));assert.ok(failed.calls.every(call=>call.sql!=="COMMIT"));
 });
+
+test("verify-import requires a pinned generation and identity just like restore-test",()=>{
+ const valid={...env,MFMF_DB_OPERATION:"verify-import",MFMF_DB_BUNDLE_SHA256:"b".repeat(64),MFMF_DB_BUNDLE_GENERATION:"1",MFMF_DB_IMPORT_IDENTITY:ageKey};
+ assert.equal(validateContext(valid).operation,"verify-import");
+ for(const key of ["MFMF_DB_BUNDLE_SHA256","MFMF_DB_BUNDLE_GENERATION","MFMF_DB_IMPORT_IDENTITY"]){const changed={...valid};delete changed[key];assert.throws(()=>validateContext(changed));}
+});
+test("verify-import reads a stable snapshot and compares every column without DML or DDL",async()=>{
+ const client=db({loaded:true,imported:1});const result=await verifyImport(client,bundle(),"b".repeat(64),contract);
+ assert.equal(result.comparison,"all-rows-compared");assert.equal(result.readOnly,true);
+ assert.ok(client.calls.some(call=>call.sql.startsWith("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")));
+ assert.ok(client.calls.findIndex(call=>call.sql.includes("pg_advisory_lock("))<client.calls.findIndex(call=>call.sql.startsWith("BEGIN")));
+ const compared=client.calls.filter(call=>call.sql.includes(" IS NOT DISTINCT FROM "));
+ assert.equal(compared.length,2);assert.ok(compared[0].sql.includes("created_at IS NOT DISTINCT FROM")&&compared[0].sql.includes("updated_at IS NOT DISTINCT FROM"));
+ assert.deepEqual(compared[0].params,Object.values(bundle().authMirror[0]));
+ assert.ok(client.calls.every(call=>/^(SELECT|BEGIN|COMMIT)/.test(call.sql)));
+ assert.ok(client.calls.at(-1).sql.includes("pg_advisory_unlock("));
+});
+for(const [name,options] of [["changed cell at equal counts",{changedCell:true}],["extra/missing rows",{badCounts:true}],
+ ["missing import ledger",{imported:0}],["wrong import hash",{importHash:"c".repeat(64)}],["wrong baseline",{baselineHash:"d".repeat(64)}],
+ ["active database",{mode:"gcs"}],["unfrozen private state",{writeFrozen:false}],["missing write guard",{triggerCount:20}]]){
+ test(`verify-import refuses ${name} and releases lock without mutation`,async()=>{
+  const client=db({loaded:true,imported:1,...options});
+  await assert.rejects(verifyImport(client,bundle(),"b".repeat(64),contract),error=>!String(error).includes(marker));
+  assert.ok(client.calls.some(call=>call.sql==="ROLLBACK"));assert.ok(client.calls.every(call=>call.sql!=="COMMIT"));
+  assert.ok(client.calls.every(call=>/^(SELECT|BEGIN|ROLLBACK)/.test(call.sql)));
+  assert.ok(client.calls.at(-1).sql.includes("pg_advisory_unlock("));
+ });
+}
