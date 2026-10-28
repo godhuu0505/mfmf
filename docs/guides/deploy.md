@@ -1,10 +1,10 @@
 # デプロイ・リリース手順
 
 本番は **GitHub ActionsからCloud Runへ配信**します。認証はIdentity Platform、DBはCloud SQL、画像はGCSです。
-**今回の文書PRのCI・次のmain配信の実行結果: pending。** GCP候補100%でGoogleログイン、既存のprofile/世帯owner/pet/home一致、軽量2並行GET、frozen/gcsでの全行全列再照合を確認しました。
+**DB・認証の切替と本人の書込を確認済み。** GCP候補100%でGoogleログイン、既存のprofile/世帯owner/pet/home一致、軽量2並行GET、frozen/gcsでの全行全列再照合を確認しました。切替記録の[PR193](https://github.com/godhuu0505/mfmf/pull/193)は[全7 CI](https://github.com/godhuu0505/mfmf/actions/runs/40742163316)成功後にmainへmerge済みです。
 2026-10-28 18:03:33.456726 UTCにactivationが成功し、DB書込enabled・media gcsへ切り替わりました。18:04:29 UTCに本人プロフィールの同値保存と成功表示も確認済みです。事後inspectでDB enabled・media writes gcs・read backend gcs・imported=trueと全件数維持を確認しました。
 固定Jobの通常3項目envへの復帰とupgradeのapplied=0・sourceManifestVerified=trueを確認済みです。workflowを再開し、GETでstate=active、GCP_AUTH_ENABLED/GCP_DEPLOY_ENABLEDともtrueを確認しました。
-今回の文書PRの全CI成功・merge後、次のmain配信の結果を [移行記録](../explanation/gcp-migration.md#現在の実装と切替記録)へ追記します。workflow再開だけで通常配信が成功したとは扱いません。
+main `2a37a40` の通常配信は [Deploy Production run40743471560](https://github.com/godhuu0505/mfmf/actions/runs/40743471560)の実行結果を参照してください。[移行記録](../explanation/gcp-migration.md#現在の実装と切替記録)と配信結果を分け、workflow再開やCI成功だけで配信成功と扱いません。
 旧Supabase/Vercel経路はローカル開発・履歴・個別の復旧判断のために残し、通常配信では使用しません。
 VercelのGit自動配信は引き続き無効です（D22）。
 
