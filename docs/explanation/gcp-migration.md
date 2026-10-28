@@ -6,9 +6,9 @@ D18からD38への判断の経緯や検討段階のコード例は履歴とし�
 
 ## 現在の実装と切替記録
 
-**切替後の確認: 今回の文書PRのCI・通常配信はpending。** managed restoreと全行全列一致、新しいbackup、GCP候補100%へのpromote、実Googleログイン・画面一致・軽量並行GETを確認済みです。
+**DB・認証の切替と本人の書込を確認済み。** managed restoreと全行全列一致、新しいbackup、GCP候補100%へのpromote、実Googleログイン・画面一致・軽量並行GETを確認しました。
 ログイン後の再照合でfrozen/gcsの全行全列一致を確認してから、2026-10-28 18:03:33.456726 UTCにactivationが成功し、DB書込enabled・media gcsへ切り替わりました。
-同じ本人プロフィールを同値で保存できたことも確認済みです。事後inspectでDB enabled・media writes gcs・read backend gcs・imported=trueと全件数の維持を確認しました。残るCI・通常配信の証跡は実行後に追記します。
+同じ本人プロフィールを同値で保存できたことも確認済みです。事後inspectでDB enabled・media writes gcs・read backend gcs・imported=trueと全件数の維持を確認しました。切替記録を確定した[PR193](https://github.com/godhuu0505/mfmf/pull/193)の[全7 CI](https://github.com/godhuu0505/mfmf/actions/runs/40742163316)は成功済みで、通常配信の結果は下表の実行記録を参照します。
 
 | 層 | 実装と正 |
 | --- | --- |
@@ -36,9 +36,9 @@ Auth session等の一時データを含む「全Auth状態の凍結」を意味�
 | ログイン後のDB再照合 | verify-importで全行全列一致、frozen/gcsを再確認。画面一致だけでDBの同一性を判断していない |
 | activation・本人の書込確認 | 2026-10-28 18:03:33.456726 UTC成功、changed=true・DB enabled・media gcs。18:04:29 UTCに既存profileの同値保存と成功表示を確認 |
 | activation後inspect | 確認済み。DB enabled・media writes gcs・read backend gcs・imported=true、全件数維持 |
-| 今回の文書PRのCI | pending |
+| 切替記録PR193のCI | [run40742163316](https://github.com/godhuu0505/mfmf/actions/runs/40742163316)：全7 checks成功。main `2a37a40` へmerge済み |
 | Job通常形への復帰・workflow再開 | 確認済み。通常3項目のenvを検証し、upgradeはapplied=0・sourceManifestVerified=true。workflow state=active、GCP_AUTH_ENABLED/GCP_DEPLOY_ENABLEDともtrue |
-| 次のmainへのpushによる通常配信 | pending（今回の文書PRの全CI成功・merge後に実行結果を確認） |
+| main `2a37a40` の通常配信 | [Deploy Production run40743471560](https://github.com/godhuu0505/mfmf/actions/runs/40743471560)の実行結果を参照。CI成功と配信成功は別に確認する |
 
 source凍結からactivationまでは47分21.116秒でした。この一回の実測であり、次回の停止時間や復旧時間を保証するものではありません。
 復旧の限界は [デプロイ手順](../guides/deploy.md#バックアップと復旧範囲)を参照します。

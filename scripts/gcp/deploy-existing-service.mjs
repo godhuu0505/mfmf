@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { parsePreseededSecretVersions, prepareWithDocker, selectProductionConfig, SECRET_NAMES } from "./prepare-candidate.mjs";
 import { DATABASE_ENV_KEYS, DATABASE_SECRETS, databaseMode, databasePins, databaseSourceConfig, isDatabaseVpc } from "./database-deployment-config.mjs";
-import { deployDatabaseJob, operatorDigest } from "./deploy-database-job.mjs";
+import { deployDatabaseJob, operatorDigest, databaseJobDiagnostic } from "./deploy-database-job.mjs";
 import { PROJECT, PROJECT_NUMBER, REGION, SERVICE, RUNTIME, SERVICE_NAME, PUBLIC_ORIGIN, IMAGE_BASE, requireContinuousContext } from "./production-config.mjs";
 
 const API = `https://run.googleapis.com/v2/${SERVICE_NAME}`;
@@ -369,9 +369,15 @@ async function main() {
   if (env.CANDIDATE_PUBLIC_CONFIG) await writeFile(env.CANDIDATE_PUBLIC_CONFIG, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
 }
 
+export function deploymentErrorMessage(error) {
+  const database = databaseJobDiagnostic(error);
+  if (database) return JSON.stringify(database);
+  return error instanceof DeploymentError ? error.message : "Continuous deployment failed; credentials, input and API details withheld.";
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
-    console.error(error instanceof DeploymentError ? error.message : "Continuous deployment failed; credentials, input and API details withheld.");
+    console.error(deploymentErrorMessage(error));
     process.exitCode = 1;
   });
 }

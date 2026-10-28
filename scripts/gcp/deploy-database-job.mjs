@@ -15,7 +15,29 @@ function executionName(value) {
   if (/^mfmf-db-operator-[a-z0-9-]+$/.test(normalized)) return `${OPERATOR_JOB}/executions/${normalized}`;
   return new RegExp(`^${OPERATOR_JOB}/executions/mfmf-db-operator-[a-z0-9-]+$`).test(normalized) ? normalized : null;
 }
-const fail = (stage, status) => { throw new Error(`Database upgrade job failed: stage=${stage}${status ? ` http=${status}` : ""}; details withheld.`); };
+const ERROR_STAGES = new Set(["context", "task-constraints", "container-constraints", "job-environment", "job-secret-reference",
+  "read-job", "job-identity", "prior-execution", "update-job", "update-operation", "read-updated-job", "job-replaced",
+  "job-changed", "run-job", "run-operation", "verify-execution", "execution-identity", "execution-vpc",
+  "execution-result", "verify-job", "operation-timeout", "unexpected"]);
+const MUTATION_BOUNDARIES = new Set(["none", "update-requested", "run-requested"]);
+const errorDetails = new WeakMap();
+
+export class DatabaseJobError extends Error {
+  constructor(stage, status, mutationBoundary = "none") {
+    const safeStage = ERROR_STAGES.has(stage) ? stage : "unexpected";
+    const httpStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined;
+    super(`Database upgrade job failed: stage=${safeStage}${httpStatus ? ` http=${httpStatus}` : ""}; details withheld.`);
+    errorDetails.set(this, Object.freeze({ status: "failed", component: "database-upgrade", stage: safeStage,
+      ...(httpStatus ? { httpStatus } : {}), mutationBoundary: MUTATION_BOUNDARIES.has(mutationBoundary) ? mutationBoundary : "unknown" }));
+  }
+}
+
+// Never print Error.message, API bodies, or caller-supplied diagnostic properties.
+export function databaseJobDiagnostic(error) {
+  const details = errorDetails.get(error);
+  return details ? { ...details } : null;
+}
+const fail = (stage, status) => { throw new DatabaseJobError(stage, status); };
 const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 export const operatorDigest = (value) => typeof value === "string" && value.startsWith(`${OPERATOR_IMAGE}@sha256:`)
@@ -44,17 +66,21 @@ export function validateOperatorTask(task, image, sha) {
     || ref.version !== "1") fail("job-secret-reference");
 }
 
-export async function deployDatabaseJob({ env, image, fetchImpl = fetch,
-  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), maxPolls = 360 }) {
-  requireContinuousContext(env);
+async function runDatabaseJob({ env, image, fetchImpl = fetch,
+  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), maxPolls = 360 }, recordMutation) {
+  try { requireContinuousContext(env); } catch { fail("context"); }
   if (env.GCP_AUTH_ENABLED !== "true" || !operatorDigest(image) || !env.GCP_ACCESS_TOKEN || /[\r\n]/.test(env.GCP_ACCESS_TOKEN)) fail("context");
   const request = async (url, stage, method = "GET", body) => {
+    // Mark before dispatch: a failed/timeout request can still have been applied.
+    // This is an observation boundary, never permission to retry a mutation.
+    if (method === "PATCH") recordMutation("update-requested");
+    if (method === "POST") recordMutation("run-requested");
     let response;
     try { response = await fetchImpl(url, { method, redirect: "error", signal: AbortSignal.timeout(30_000),
       headers: { Authorization: `Bearer ${env.GCP_ACCESS_TOKEN}`, "X-Goog-User-Project": PROJECT,
         ...(body ? { "Content-Type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) }); }
     catch { fail(stage); }
-    if (!response.ok) { await response.body?.cancel(); fail(stage, response.status); }
+    if (!response.ok) { try { await response.body?.cancel(); } catch { /* Preserve only the fixed HTTP diagnostic. */ } fail(stage, response.status); }
     try { const parts = []; let size = 0;
       for await (const part of response.body) { size += part.length; if (size > 1_048_576) throw new Error(); parts.push(Buffer.from(part)); }
       return JSON.parse(Buffer.concat(parts).toString("utf8"));
@@ -142,4 +168,13 @@ export async function deployDatabaseJob({ env, image, fetchImpl = fetch,
   const final = await request(API, "verify-job"); validateJob(final, image, env.GITHUB_SHA);
   if (final.uid !== initial.uid || executionName(final.latestCreatedExecution?.name) !== name) fail("job-changed");
   return { upgradeVerified: true };
+}
+
+export async function deployDatabaseJob(options) {
+  let mutationBoundary = "none";
+  try { return await runDatabaseJob(options, (boundary) => { mutationBoundary = boundary; }); }
+  catch (error) {
+    const details = databaseJobDiagnostic(error);
+    throw new DatabaseJobError(details?.stage ?? "unexpected", details?.httpStatus, mutationBoundary);
+  }
 }
