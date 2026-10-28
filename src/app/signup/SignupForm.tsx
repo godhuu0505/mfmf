@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createAuthClient } from "@/lib/identity/client";
 import { sanitizeNextPath, withNext } from "@/lib/nextPath";
 import { keepPostLoginNext } from "@/lib/keepPostLoginNext";
 
@@ -65,7 +65,7 @@ export default function SignupForm() {
     // 寿命の起点を「登録した時刻」にして確認リンクの有効期限と揃える）。
     await keepPostLoginNext(next);
 
-    const supabase = createClient();
+    const supabase = createAuthClient();
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,

@@ -1,0 +1,55 @@
+begin;
+set local role mfmf_owner;
+set local search_path=public,extensions;
+select set_config('request.jwt.claims','{}',true);
+select no_plan();
+insert into auth.users(id,provider_subject,email,email_verified) values
+ ('10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','legacy@example.test',true),
+ ('10000000-0000-4000-8000-000000000002',null,'unbound@example.test',true);
+create temp table identities(subject text primary key,id uuid);
+grant all on identities to identity_sync;
+set local role identity_sync;
+select is(public.sync_identity('10000000-0000-4000-8000-000000000001','LEGACY@example.test',true),
+ '10000000-0000-4000-8000-000000000001'::uuid,'explicit import preserves internal UUID');
+select throws_ok($$select public.sync_identity('10000000-0000-4000-8000-000000000002','unbound@example.test',true)$$,
+ '55000',null,'missing import mapping fails closed');
+select throws_ok($$select public.sync_identity('new-google-uid','new@example.test',true)$$,'42501',null,'unknown provider account rejected when signup closed');
+select throws_ok($$select public.sync_identity('new-google-uid','new@example.test',true)$$,'42501',null,'second provider login cannot bypass closed registration');
+select throws_ok($$select public.sync_identity('new-google-uid','new@example.test',true,null)$$,'22023',null,'null registration policy fails closed');
+insert into identities values ('opaque-uid',public.sync_identity('opaque-uid','unverified@example.test',false,true));
+select is(public.sync_identity('opaque-uid','verified@example.test',true),(select id from identities where subject='opaque-uid'),'UID stable after email verification');
+insert into identities values ('different-uid',public.sync_identity('different-uid','verified@example.test',true,true));
+select isnt((select id from identities where subject='opaque-uid'),(select id from identities where subject='different-uid'),'same email never links two subjects');
+select lives_ok($$select public.sync_identity('opaque-uid','SHOULD_NOT_BE_STORED',false)$$,'unverified email ignored');
+select throws_ok($$select public.sync_identity('',null,false)$$,'22023',null,'empty subject rejected');
+select throws_ok($$select public.sync_identity(repeat('x',129),null,false)$$,'22023',null,'oversized subject rejected');
+select throws_ok($$select public.sync_identity(E'bad\nsubject',null,false)$$,'22023',null,'control subject rejected');
+select throws_ok($$select public.sync_identity('space ',null,false)$$,'22023',null,'ambiguous subject rejected');
+select throws_ok($$select public.sync_identity('verified',null,true)$$,'22023',null,'verified identity requires email');
+select throws_ok($$select public.sync_identity('verified',' space@example.test',true)$$,'22023',null,'noncanonical email rejected');
+select throws_ok($$select public.sync_identity('verified','a@example.test',null)$$,'22023',null,'missing verification state rejected');
+select throws_ok($$select * from auth.users$$,'42501',null,'sync role cannot read identities directly');
+set local role mfmf_owner;
+select is((select email from auth.users where provider_subject='opaque-uid'),null,'unverified email is NULL in mirror');
+select is((select email from auth.users where provider_subject='10000000-0000-4000-8000-000000000001'),'legacy@example.test','verified email normalized');
+select throws_ok($$update auth.users set provider_subject='attacker' where id='10000000-0000-4000-8000-000000000001'$$,'55000',null,'subject immutable even for schema owner');
+select throws_ok($$update auth.users set id=gen_random_uuid() where id='10000000-0000-4000-8000-000000000001'$$,'55000',null,'internal UUID immutable');
+select ok(not exists(select 1 from pg_roles where rolname in ('mfmf_owner','authenticator','mfmf_migrator','mfmf_operator','anon','authenticated','identity_sync','media_operator') and (rolsuper or rolbypassrls)),'all GCP roles lack superuser/RLS bypass');
+select ok(not has_schema_privilege('authenticated','public','CREATE'),'authenticated cannot replace definer dependencies');
+select ok(not pg_has_role('authenticator','mfmf_owner','MEMBER'),'authenticator cannot become owner');
+select ok(not pg_has_role('authenticator','media_operator','MEMBER'),'authenticator cannot become operator');
+select ok(not has_function_privilege('authenticated','public.sync_identity(text,text,boolean,boolean)','EXECUTE'),'identity RPC not exposed to user role');
+select ok(not has_function_privilege('anon','public.sync_identity(text,text,boolean,boolean)','EXECUTE'),'identity RPC not exposed anonymously');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+select is(auth.uid(),null,'legacy scalar claim cannot override empty transaction claims');
+select set_config('request.jwt.claims','{"sub":"10000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
+select is(auth.uid(),'10000000-0000-4000-8000-000000000001'::uuid,'UUID comes from verified transaction claims');
+select throws_ok($$select public.sync_identity('attacker','a@example.test',true)$$,'42501',null,'authenticated cannot invoke identity sync');
+select throws_ok($$select public.media_is_operator()$$,'42501',null,'operator helper private to application role');
+select throws_ok($$select public.set_media_storage_mode('gcs')$$,'42501',null,'mode change not a user RPC');
+select throws_ok($$truncate public.household_members$$,'42501',null,'row DML grant excludes TRUNCATE');
+select throws_ok($$select * from public.record_ranking_project_budget$$,'42501',null,'global ranking budget hidden');
+select throws_ok($$select * from auth.users$$,'42501',null,'auth mirror hidden');
+select * from finish();
+rollback;

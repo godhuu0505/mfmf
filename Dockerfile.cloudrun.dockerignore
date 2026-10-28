@@ -14,6 +14,7 @@
 !scripts/
 !scripts/gcp/
 !scripts/gcp/verify-server-actions-build.mjs
+!scripts/gcp/runtime.mjs
 # Keep secrets excluded even if accidentally placed below an allowed directory.
 **/.env
 **/.env.*

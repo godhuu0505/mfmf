@@ -2,6 +2,7 @@ import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { saveGoogleRefreshToken } from "@/lib/google/token";
 import { siteRedirect } from "@/lib/siteRedirect";
+import { isGcpAuthEnabled } from "@/lib/identity/config";
 import {
   POST_LOGIN_NEXT_COOKIE,
   callbackRetryNext,
@@ -13,6 +14,41 @@ import {
 // 初回同意で得られる refresh token を暗号化保存する。
 // （CLAUDE.md の「API Route は基本作らない」例外。OAuth コールバックは Route Handler 必須）
 export async function GET(request: NextRequest) {
+  if (isGcpAuthEnabled()) {
+    const { getIdentityProtocol } = await import("@/lib/identity/server");
+    const { createGcpDataClient } = await import("@/lib/gcp/dataClient");
+    const next = sanitizeNextPath(request.cookies.get(POST_LOGIN_NEXT_COOKIE)?.value);
+    let protocol: Awaited<ReturnType<typeof getIdentityProtocol>> | undefined;
+    let reason = "oauth";
+    try {
+      protocol = await getIdentityProtocol();
+      const result = await protocol.finishGoogle(request.nextUrl.searchParams);
+      const { client, user } = await createGcpDataClient(result.identity);
+      if (!user) throw new Error();
+      if (result.refreshToken) {
+        reason = "drive";
+        // The isolated migration candidate permits read-only sign-in while its
+        // database is frozen. Keep the restored ciphertext in that state only.
+        // The operator changes this mode and the full DB write gate atomically.
+        const { data: mode, error } = await client.rpc("get_media_storage_mode");
+        if (error || (mode !== "frozen" && mode !== "gcs")) throw new Error();
+        if (mode === "gcs") await saveGoogleRefreshToken(client, user.id, result.refreshToken);
+      }
+      const response = siteRedirect(next);
+      response.cookies.delete(POST_LOGIN_NEXT_COOKIE);
+      response.headers.set("Cache-Control", "private, no-store");
+      response.headers.set("Referrer-Policy", "no-referrer");
+      return response;
+    } catch {
+      // Do not let middleware bypass the retry screen after a partial sign-in.
+      protocol?.clearSession();
+      const path = withNext("/login", next);
+      const response = siteRedirect(`${path}${path.includes("?") ? "&" : "?"}error=${reason}`);
+      response.headers.set("Cache-Control", "private, no-store");
+      response.headers.set("Referrer-Policy", "no-referrer");
+      return response;
+    }
+  }
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   // 戻り先は ?next=（パスワード再設定リンク等）を優先し、無ければ middleware が

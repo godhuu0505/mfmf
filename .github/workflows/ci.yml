@@ -50,6 +50,51 @@ jobs:
         if: always()
         run: docker rm -f mfmf-cloudrun-smoke || true
 
+  gcp-database:
+    name: GCP database isolation / PostgREST
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build pinned local database tools
+        run: docker build --target database-tools -t mfmf-db-tools:20261028 -f Dockerfile.cloudrun .
+      - name: Validate isolated PostgreSQL baseline and restore
+        run: python3 tests/gcp/run-db-tests.py
+      - name: Validate source cutover freeze in isolated PostgreSQL
+        run: node tests/scripts/source-database-cutover-local.mjs
+      - name: Validate database operator operations and restore with pool two
+        run: python3 tests/gcp/run-operator-tests.py
+      - name: Validate real PostgREST requests and pooled tenant isolation
+        run: node tests/gcp/postgrest-proof.mjs
+      - name: Verify operator defaults to offline plan
+        run: docker run --rm --network none mfmf-db-operator-test:local
+
+  gcp-auth-build:
+    name: GCP authentication container build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with matching public and server GCP flags
+        env:
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=
+        run: |
+          docker build --platform linux/amd64 -f Dockerfile.cloudrun \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=disabled-supabase-client \
+            --build-arg NEXT_PUBLIC_GCP_AUTH_ENABLED=true \
+            --build-arg NEXT_SERVER_ACTIONS_KEY_VERSION=ci-fixture-v1 \
+            --secret id=next-server-actions-key,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY \
+            -t mfmf-cloudrun-gcp:ci .
+          test "$(docker run --rm --network none --entrypoint id mfmf-cloudrun-gcp:ci -u)" = "1000"
+          docker run --rm --network none --entrypoint node mfmf-cloudrun-gcp:ci -e \
+            'if(process.env.GCP_AUTH_ENABLED !== "true" || process.env.NEXT_PUBLIC_GCP_AUTH_ENABLED !== "true") process.exit(1)'
+
   verify:
     name: lint / typecheck / build
     runs-on: ubuntu-latest
