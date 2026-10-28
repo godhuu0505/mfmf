@@ -13,6 +13,20 @@ const AUTH_REQUIRED = Object.freeze({
   identities: ["id","user_id","provider","provider_id","identity_data"],
   mfa_factors: ["id","user_id","factor_type","status"],
 });
+// Fixed Supabase Auth v2.197.0 inventory. Unsupported credentials/configuration
+// must be absent, not silently dropped; all COPY blocks must still be present.
+const AUTH_EMPTY_REQUIRED = new Set([
+  "mfa_factors", "mfa_challenges", "mfa_recovery_code_sets", "mfa_recovery_codes",
+  "webauthn_credentials", "webauthn_challenges", "custom_oauth_providers", "oauth_clients",
+  "oauth_authorizations", "oauth_consents", "oauth_client_states", "scim_users", "scim_tokens",
+  "sso_providers", "sso_domains", "saml_providers", "saml_relay_states", "instances",
+]);
+// These sessions and pending actions expire at migration: users sign in again
+// and request fresh confirmation/reset links. The encrypted source retains them.
+const AUTH_TRANSIENT = new Set(["sessions", "refresh_tokens", "flow_state", "mfa_amr_claims", "one_time_tokens"]);
+// History is preserved in the source archive, not imported into Identity Platform.
+const AUTH_ARCHIVE_ONLY = new Set(["audit_log_entries", "schema_migrations"]);
+const AUTH_TABLES = new Set([...Object.keys(AUTH_REQUIRED), ...AUTH_EMPTY_REQUIRED, ...AUTH_TRANSIENT, ...AUTH_ARCHIVE_ONLY]);
 const PUBLIC_BOOLEANS = new Set(["daycare_records.guest_visible","daycare_records.overrides_rule","media_assets.is_legacy",
   "record_ranking_project_budget.singleton","media_storage_state.singleton"]);
 const AUTH_BOOLEANS = new Set(["is_super_admin","is_anonymous","is_sso_user","disabled"]);
@@ -124,6 +138,7 @@ export function parseSourceArchiveData(input) {
     for (const line of sql.split("\n")) {
       if (current) {
         if (line === "\\.") { current = undefined; continue; }
+        requireValue(!current.emptyRequired);
         const raw = line.split("\t");
         requireValue(raw.length === current.columns.length && ++rowCount <= MAX_ROWS);
         const values = raw.map(decodeCopyField);
@@ -157,14 +172,17 @@ export function parseSourceArchiveData(input) {
         requireValue(Object.hasOwn(PUBLIC,table) && columns.length === PUBLIC[table].length
           && PUBLIC[table].every(column => columns.includes(column)));
         destination = table === "media_storage_state" ? states : tables[table];
-      } else if (Object.hasOwn(AUTH_REQUIRED,table)) {
-        requireValue(AUTH_REQUIRED[table].every(column => columns.includes(column)));
-        destination = retained[table === "mfa_factors" ? "mfaFactors" : table];
+      } else {
+        requireValue(AUTH_TABLES.has(table));
+        if (Object.hasOwn(AUTH_REQUIRED,table)) {
+          requireValue(AUTH_REQUIRED[table].every(column => columns.includes(column)));
+          destination = retained[table === "mfa_factors" ? "mfaFactors" : table];
+        }
       }
-      current = { schema,table,columns,destination };
+      current = { schema,table,columns,destination,emptyRequired: schema === "auth" && AUTH_EMPTY_REQUIRED.has(table) };
     }
     requireValue(!current && restrict === undefined && Object.keys(PUBLIC).every(name => seen.has(`public.${name}`))
-      && Object.keys(AUTH_REQUIRED).every(name => seen.has(`auth.${name}`)));
+      && [...AUTH_TABLES].every(name => seen.has(`auth.${name}`)));
     requireValue(states.length === 1 && states[0].singleton === true && ["supabase","frozen","gcs"].includes(states[0].mode)
       && ["supabase","gcs"].includes(states[0].read_backend));
     return { ...retained,tables,sourceMediaState: states[0] };

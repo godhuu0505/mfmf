@@ -38,6 +38,23 @@ for (const batch of converted.batches) {
 標準出力をユーザー向けログや平文ファイルへ接続しません。
 parser は固定 COPY 形式・全必須テーブル/列・UTF-8・escape・行数/バイト上限を検査し、
 認証日時を最大6桁の UTC ISO に変換します。認証の JSON 数値は精度が失われるなら拒否します。
+Auth は実稼働版 `v2.197.0` の次の **27表すべての COPY ブロック**を必要とします。
+空の表も省略できず、未知の表・重複・欠落を拒否します。実行途中の要求やサービス更新が
+未対応の認証情報を作った場合も、件数だけを見て黙って捨てることはありません。
+
+| 扱い | Auth の表 |
+| --- | --- |
+| 既存 converter へ保持 | `users`, `identities` |
+| 1行でもあれば parser で停止（18表） | `mfa_factors`, `mfa_challenges`, `mfa_recovery_code_sets`, `mfa_recovery_codes`, `webauthn_credentials`, `webauthn_challenges`, `custom_oauth_providers`, `oauth_clients`, `oauth_authorizations`, `oauth_consents`, `oauth_client_states`, `scim_users`, `scim_tokens`, `sso_providers`, `sso_domains`, `saml_providers`, `saml_relay_states`, `instances` |
+| 非空を許容し、移行先では新しく作る一時状態 | `sessions`, `refresh_tokens`, `flow_state`, `mfa_amr_claims`, `one_time_tokens` |
+| 非空を許容し、暗号化原本だけに保全する履歴・管理状態 | `audit_log_entries`, `schema_migrations` |
+
+MFA の入力契約は維持し、成功時には `mfaFactors: []` を返します。その他の除外表は
+行内容を返しませんが、COPY の列数・escape・全体行数上限を検査します。旧ログイン状態や
+進行中の OAuth・確認・再設定は継続せず、移行後は再ログインと新しいリンクが必要です。
+これは取込時の欠落防止であり、source の書き込み停止を証明する仕組みではありません。
+最終凍結、同一 archive の検証、移行直前までの停止維持は別の operator gate です。
+
 凍結後の原本 archive には保全用の `mfmf_cutover` schema も含まれますが、
 この抽出では `--schema=public --schema=auth` で対象を限定し、原本 archive 自体は完全なまま保持します。
 フィルタを外して任意 schema や SQL を受け入れる変更はしません。
@@ -59,7 +76,8 @@ parser は固定 COPY 形式・全必須テーブル/列・UTF-8・escape・行�
   `identity_data.sub` と `provider_id` の一致を検査します。
   Google は `identity_data.email`, boolean `email_verified` も必要です。
 - `mfaFactors`: **SQL `auth.mfa_factors` の全行**。空配列が必要です。
-  verified / unverified、方式を問わず1行でもあれば移行を停止します。
+  verified / unverified、方式を問わず1行でもあれば archive parser で停止し、
+  parser を使わない直接入力も converter が拒否します。
   「MFA 調査済み」の自己申告や集計値への置換はできません。
 - `targetUsers`: **移行先の全 `listUsers` ページ**を結合した Admin UserRecord 形式。
   各行は `uid`, 任意 `email`, 必須 `providerData` 配列（空でも可）。provider は

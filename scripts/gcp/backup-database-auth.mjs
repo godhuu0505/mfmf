@@ -9,7 +9,7 @@ import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { pathToFileURL } from "node:url";
 import { FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_SCHEMA_SQL, INSPECT_CUTOVER_STATE_SQL,
-  INSPECT_SOURCE_CAPABILITIES_SQL, parseSourceCapabilities, parseCutoverProgress, CUTOVER_STEPS, parseBackupOperation, SOURCE_GUARD_COUNT } from "./source-database-cutover.mjs";
+  INSPECT_SOURCE_CAPABILITIES_SQL, parseSourceCapabilities, parseCutoverProgress, CUTOVER_STEPS, parseBackupOperation, SOURCE_GUARD_COUNT, SOURCE_TABLES, SOURCE_AUTH_TABLES } from "./source-database-cutover.mjs";
 
 export const SOURCE_REF = "aqvmuhqkaqedtxuqwhoq";
 export const POOLER_URL = `https://api.supabase.com/v1/projects/${SOURCE_REF}/config/database/pooler`;
@@ -17,6 +17,7 @@ export const CA_URL = "https://supabase-downloads.s3-ap-southeast-1.amazonaws.co
 export const CA_SHA256 = "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7";
 export const CLIENT_MAJOR = 17;
 export const ARCHIVE_NAME = "database-auth.pgdump.age";
+const GUARD_SHAPE = `${SOURCE_GUARD_COUNT}|${SOURCE_TABLES.length}|${SOURCE_AUTH_TABLES.length}`;
 // Supavisor may not forward startup PGOPTIONS. Establish the transaction mode
 // in SQL and verify it on the server; pg_dump likewise opens its own READ ONLY
 // snapshot transaction rather than relying on the startup default.
@@ -238,7 +239,7 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
       stage = operation === "freeze-and-backup" ? "source-freeze" : "source-unfreeze";
       const result = await capture(`${PG_BIN}/psql`, sqlArgs(operation === "freeze-and-backup" ? FREEZE_SOURCE_SQL : UNFREEZE_SOURCE_SQL),
         { ...pgEnv, PGOPTIONS: "-c default_transaction_read_only=off -c statement_timeout=60000 -c lock_timeout=10000" });
-      requireValue(result === (operation === "freeze-and-backup" ? `t|${SOURCE_GUARD_COUNT}` : `f|${SOURCE_GUARD_COUNT}`), stage);
+      requireValue(result === (operation === "freeze-and-backup" ? `t|${GUARD_SHAPE}` : `f|${GUARD_SHAPE}`), stage);
       if (operation === "unfreeze") {
         succeeded = true;
         return { status: "unfrozen", sourceWrites: "enabled", archive: "not-created" };
@@ -250,8 +251,8 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
     let frozen = false;
     if (schema === "t") {
       const state = await capture(`${PG_BIN}/psql`, sqlArgs(INSPECT_CUTOVER_STATE_SQL), pgEnv);
-      requireValue([`t|${SOURCE_GUARD_COUNT}`, `f|${SOURCE_GUARD_COUNT}`].includes(state), stage);
-      frozen = state === `t|${SOURCE_GUARD_COUNT}`;
+      requireValue([`t|${GUARD_SHAPE}`, `f|${GUARD_SHAPE}`].includes(state), stage);
+      frozen = state === `t|${GUARD_SHAPE}`;
     }
     requireValue(operation !== "freeze-and-backup" || frozen, stage);
     stage = "dump-encrypt";
@@ -277,6 +278,14 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
     requireValue(results.every((result) => result.status === "fulfilled")
       && results[2].value === true && results[3].value === true
       && plaintextBytes >= 5 && prefix.equals(Buffer.from("PGDMP")), stage);
+    // Conditional Auth ORIGIN safety must still hold after the snapshot. Reuse
+    // the complete READ ONLY SQL proof, not just a cached mode or guard count.
+    // A changed state or failed proof leaves only an unpublished partial file.
+    if (schema === "t") {
+      stage = "cutover-inspect";
+      const finalState = await capture(`${PG_BIN}/psql`, sqlArgs(INSPECT_CUTOVER_STATE_SQL), pgEnv);
+      requireValue(finalState === `${frozen ? "t" : "f"}|${GUARD_SHAPE}`, stage);
+    }
     stage = "publish";
     const file = await open(partialPath, "r+");
     let ciphertextBytes;
@@ -294,7 +303,7 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
     await link(partialPath, join(outputDir, ARCHIVE_NAME)); // Exclusive publish; never replace an archive.
     succeeded = true;
     return { status: "encrypted", schemas: schema === "t" ? 3 : 2, frozen, clientMajor: CLIENT_MAJOR, sourceMajor,
-      plaintextBytes, ciphertextBytes, consistency: "single-pg-dump-snapshot", restore: "not-verified", sourceCapabilities };
+      plaintextBytes, ciphertextBytes, ...(schema === "t" ? { sourceGuardCounts: { total: SOURCE_GUARD_COUNT, publicAlways: SOURCE_TABLES.length, authOrigin: SOURCE_AUTH_TABLES.length } } : {}), consistency: "single-pg-dump-snapshot", restore: "not-verified", sourceCapabilities };
   } catch (error) {
     if (error instanceof BackupError) {
       if (sourceCapabilities) error.sourceCapabilities = sourceCapabilities;
