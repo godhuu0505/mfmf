@@ -79,11 +79,39 @@ export async function deployDatabaseJob({ env, image, fetchImpl = fetch,
       || job.startExecutionToken || job.runExecutionToken) fail("job-identity");
     validateOperatorTask(job.template.template, expectedImage, sha);
   };
-  const validateExecution = (value, expectedName) => {
+  const validateExecution = async (value, expectedName, expectedUid) => {
     if (!value || !executionName(value.name)
       || (expectedName && executionName(value.name) !== expectedName) || !fixedJob(value.job) || value.deleteTime
+      || typeof value.uid !== "string" || !value.uid || value.uid.length > 128
+      || (expectedUid && value.uid !== expectedUid)
       || value.taskCount !== 1 || value.parallelism !== 1) fail("execution-identity");
-    validateOperatorTask(value.template, image, env.GITHUB_SHA);
+    let task = value.template;
+    // The observed v2 Execution omits Direct VPC, although Job includes it.
+    // Read the immutable v1 Execution with the same UID; never assume Job's
+    // current network was also the network used by this execution.
+    if (task && !Object.hasOwn(task, "vpcAccess")) {
+      const shortName = executionName(value.name).split("/").pop();
+      const legacy = await request(`https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT}/executions/${shortName}`, "execution-vpc");
+      if (legacy?.kind !== "Execution" || legacy.metadata?.name !== shortName || legacy.metadata?.uid !== value.uid
+        || ![PROJECT, PROJECT_NUMBER].includes(legacy.metadata?.namespace) || legacy.metadata?.deletionTimestamp) fail("execution-vpc");
+      const annotations = [legacy.metadata?.annotations, legacy.spec?.template?.metadata?.annotations];
+      if (annotations.some((a) => a !== undefined && (!a || typeof a !== "object" || Array.isArray(a)))) fail("execution-vpc");
+      const annotation = (key) => {
+        const values = annotations.map((a) => a?.[key]).filter((v) => v !== undefined);
+        if (values.some((v) => typeof v !== "string" || v.length > 4096) || new Set(values).size > 1) fail("execution-vpc");
+        return values[0];
+      };
+      if (annotation("run.googleapis.com/vpc-access-egress") !== "private-ranges-only"
+        || annotation("run.googleapis.com/vpc-access-connector") !== undefined) fail("execution-vpc");
+      let networkInterfaces;
+      try { networkInterfaces = JSON.parse(annotation("run.googleapis.com/network-interfaces")); } catch { fail("execution-vpc"); }
+      if (!Array.isArray(networkInterfaces) || networkInterfaces.length !== 1
+        || !exact(networkInterfaces[0], ["network", "subnetwork"])) fail("execution-vpc");
+      const vpcAccess = { egress: "PRIVATE_RANGES_ONLY", networkInterfaces };
+      if (!isDatabaseVpc(vpcAccess)) fail("execution-vpc");
+      task = { ...task, vpcAccess };
+    }
+    validateOperatorTask(task, image, env.GITHUB_SHA);
     return executionName(value.name);
   };
   const initial = await request(API, "read-job"); validateJob(initial);
@@ -106,8 +134,8 @@ export async function deployDatabaseJob({ env, image, fetchImpl = fetch,
   const ready = await request(API, "read-updated-job"); validateJob(ready, image, env.GITHUB_SHA);
   if (ready.uid !== initial.uid || ready.etag !== updated.etag) fail("job-changed");
   const executed = await operation(await request(`${API}:run`, "run-job", "POST", { etag: ready.etag }), "run-operation");
-  const name = validateExecution(executed);
-  const finished = await request(`https://run.googleapis.com/v2/${name}`, "verify-execution"); validateExecution(finished, name);
+  const name = await validateExecution(executed);
+  const finished = await request(`https://run.googleapis.com/v2/${name}`, "verify-execution"); await validateExecution(finished, name, executed.uid);
   if (!finished.completionTime || finished.reconciling === true || finished.succeededCount !== 1
     || (finished.failedCount ?? 0) !== 0 || (finished.cancelledCount ?? 0) !== 0 || (finished.runningCount ?? 0) !== 0
     || (finished.retriedCount ?? 0) !== 0 || !finished.conditions?.some((c) => c.type === "Completed" && c.state === "CONDITION_SUCCEEDED")) fail("execution-result");

@@ -28,7 +28,13 @@ const STAGES = new Set(["context", "metadata", "source-contract", "connector", "
 const BOOTSTRAP_SUBSTAGES = new Set(["catalog", "roles", "baseline", "ledger", "password", "commit"]);
 const CATALOG_REASONS = Object.freeze({database_owner:"database-owner",public_owner:"public-owner",schemas:"schemas",
   public_objects:"public-objects",extensions:"extensions",event_triggers:"event-triggers",existing_app_roles:"existing-app-roles"});
+const DATABASE_OWNER_CLASSES = new Set(["postgres","cloudsqladmin","cloudsqlsuperuser","pg_database_owner","other","missing"]);
 const SQLSTATE = /^[0-9A-Z]{5}$/;
+function databaseDiagnostic(value) {
+  return value && typeof value==="object" && ["targetDatabase","adminUser","utf8"].every(key=>typeof value[key]==="boolean")
+    && DATABASE_OWNER_CLASSES.has(value.owner)
+    ? {targetDatabase:value.targetDatabase,adminUser:value.adminUser,owner:value.owner,utf8:value.utf8}:undefined;
+}
 export class OperatorError extends Error {
   constructor(stage,details={}) {
     super("Database operator failed; details withheld."); this.stage = STAGES.has(stage) ? stage : "context";
@@ -36,6 +42,7 @@ export class OperatorError extends Error {
       if(BOOTSTRAP_SUBSTAGES.has(details.substage))this.substage=details.substage;
       if(typeof details.sqlstate==="string" && SQLSTATE.test(details.sqlstate))this.sqlstate=details.sqlstate;
       if(Array.isArray(details.reasons))this.reasons=Object.values(CATALOG_REASONS).filter(reason=>details.reasons.includes(reason));
+      if(this.substage==="catalog") {const database=databaseDiagnostic(details.database);if(database)this.database=database;}
     }
   }
 }
@@ -54,6 +61,7 @@ export function diagnostic(error) {
       const reasons=Object.values(CATALOG_REASONS).filter(reason=>error.reasons.includes(reason));
       if(reasons.length)result.reasons=reasons;
     }
+    if(error.substage==="catalog") {const database=databaseDiagnostic(error.database);if(database)result.database=database;}
   }
   return result;
 }
@@ -425,7 +433,15 @@ export async function applyBaseline(admin,contract,root,credentials,runtimePassw
     await admin.query(LOCK);
     // SQLAdmin may have provisioned the fixed database already. Accept only a
     // pristine postgres-owned database, never reset existing objects or roles.
-    const catalog=(await admin.query(`WITH checks AS (SELECT (
+    const catalog=(await admin.query(`WITH checks AS (SELECT
+      current_database()='mfmf' AS target_database_matches,
+      current_user='postgres' AS admin_user_matches,
+      EXISTS (SELECT 1 FROM pg_database WHERE datname=current_database()
+        AND pg_encoding_to_char(encoding)='UTF8') AS encoding_utf8,
+      COALESCE((SELECT CASE r.rolname WHEN 'postgres' THEN 'postgres' WHEN 'cloudsqladmin' THEN 'cloudsqladmin'
+        WHEN 'cloudsqlsuperuser' THEN 'cloudsqlsuperuser' WHEN 'pg_database_owner' THEN 'pg_database_owner' ELSE 'other' END
+        FROM pg_database d JOIN pg_roles r ON r.oid=d.datdba WHERE d.datname=current_database()),'missing') AS database_owner_class,
+      (
       current_database()='mfmf' AND current_user='postgres'
       AND EXISTS (SELECT 1 FROM pg_database d JOIN pg_roles r ON r.oid=d.datdba
         WHERE d.datname=current_database() AND r.rolname='postgres' AND pg_encoding_to_char(d.encoding)='UTF8')
@@ -444,7 +460,9 @@ export async function applyBaseline(admin,contract,root,credentials,runtimePassw
     if(catalog.length!==1 || catalog[0].pristine!==true
       || Object.keys(CATALOG_REASONS).some(key=>catalog[0][key]!==true)) {
       throw new OperatorError("bootstrap",{substage,reasons:catalog.length===1
-        ? Object.entries(CATALOG_REASONS).filter(([key])=>catalog[0][key]===false).map(([,reason])=>reason):[]});
+        ? Object.entries(CATALOG_REASONS).filter(([key])=>catalog[0][key]===false).map(([,reason])=>reason):[],
+        database:catalog.length===1?{targetDatabase:catalog[0].target_database_matches,adminUser:catalog[0].admin_user_matches,
+          owner:catalog[0].database_owner_class,utf8:catalog[0].encoding_utf8}:undefined});
     }
     substage="roles";
     await admin.query(await readFile(join(root,"db/gcp/000_roles.sql"),"utf8"));

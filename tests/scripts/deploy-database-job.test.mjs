@@ -14,7 +14,7 @@ const task = () => ({ serviceAccount: "mfmf-db-operator@mfmf-499612.iam.gservice
       { name: "MFMF_DB_OPERATION", value: "upgrade" }, { name: "MFMF_DB_DEPLOY_SHA", value: "d".repeat(40) },
       { name: "MFMF_DB_OPERATOR_CREDENTIALS", valueSource: { secretKeyRef: { secret: "mfmf-db-operator-credentials", version: "1" } } },
     ] }] });
-function fixture({ change, failure, shortReferences = false } = {}) {
+function fixture({ change, failure, shortReferences = false, omittedVpc = false, legacyChange, legacyResponse } = {}) {
   let job = { name: OPERATOR_JOB, uid: "fixed-job", etag: "etag-before", generation: "1", observedGeneration: "1",
     terminalCondition: { state: "CONDITION_SUCCEEDED" }, template: { parallelism: 1, taskCount: 1, template: task() } };
   change?.(job); const calls = []; let execution;
@@ -27,15 +27,26 @@ function fixture({ change, failure, shortReferences = false } = {}) {
     }
     if (url === `${API}:run`) {
       assert.deepEqual(JSON.parse(init.body), { etag: "etag-after" });
-      execution = { name: `${OPERATOR_JOB}/executions/mfmf-db-operator-fixture`, job: OPERATOR_JOB, parallelism: 1, taskCount: 1,
+      execution = { name: `${OPERATOR_JOB}/executions/mfmf-db-operator-fixture`, uid: "fixed-execution", job: OPERATOR_JOB, parallelism: 1, taskCount: 1,
         template: structuredClone(job.template.template), completionTime: "2026-10-28T00:00:00Z", succeededCount: 1,
         conditions: [{ type: "Completed", state: "CONDITION_SUCCEEDED" }] };
       if (failure === "image") execution.template.containers[0].image = `${OPERATOR_IMAGE}@sha256:${"e".repeat(64)}`;
       if (failure === "failed") { execution.succeededCount = 0; execution.failedCount = 1; }
       if (failure === "retry") execution.retriedCount = 1;
       if (failure === "foreign-job") execution.job = "other-job";
+      if (failure === "vpc") execution.template.vpcAccess.egress = "ALL_TRAFFIC";
+      if (omittedVpc) delete execution.template.vpcAccess;
       if (shortReferences) execution.job = "mfmf-db-operator";
       job.latestCreatedExecution = { name: shortReferences ? execution.name.split("/").pop() : execution.name }; return op(execution);
+    }
+    if (url === "https://asia-northeast1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/mfmf-499612/executions/mfmf-db-operator-fixture") {
+      assert.equal(init.method, "GET");
+      if (legacyResponse) return legacyResponse();
+      const legacy = { kind: "Execution", metadata: { name: "mfmf-db-operator-fixture", uid: execution.uid, namespace: "92772745697", annotations: {
+        "run.googleapis.com/network-interfaces": JSON.stringify(DATABASE_VPC.networkInterfaces),
+        "run.googleapis.com/vpc-access-egress": "private-ranges-only",
+      } } };
+      legacyChange?.(legacy); return Response.json(legacy);
     }
     if (url === `https://run.googleapis.com/v2/${execution?.name}`) return Response.json(execution);
     if (url === API) return Response.json(job);
@@ -54,6 +65,47 @@ test("updates only an existing fixed job and verifies one successful exact-image
 test("accepts the observed API short execution reference and parent Job name", async () => {
   const f = fixture({ shortReferences: true }); assert.deepEqual(await f.run(), { upgradeVerified: true });
   assert.ok(f.calls.filter(({ url }) => url.includes("/executions/")).every(({ url }) => url.startsWith(`${API}/executions/mfmf-db-operator-`)));
+});
+test("proves omitted v2 VPC from the same immutable v1 Execution", async () => {
+  const f = fixture({ shortReferences: true, omittedVpc: true }); assert.deepEqual(await f.run(), { upgradeVerified: true });
+  assert.equal(f.calls.filter(({ url }) => url.includes("/apis/run.googleapis.com/v1/")).length, 2);
+  assert.equal(f.calls.filter(({ init }) => init.method !== "GET").length, 2);
+});
+test("accepts matching nested v1 network annotations", async () => {
+  const f = fixture({ omittedVpc: true, legacyChange: (v) => {
+    v.metadata.namespace = "mfmf-499612";
+    v.spec = { template: { metadata: { annotations: v.metadata.annotations } } }; delete v.metadata.annotations;
+  } });
+  assert.deepEqual(await f.run(), { upgradeVerified: true });
+});
+for (const [label, legacyChange] of [
+  ["different UID", (v) => { v.metadata.uid = "other-execution"; }],
+  ["different name", (v) => { v.metadata.name = "mfmf-db-operator-other"; }],
+  ["foreign project", (v) => { v.metadata.namespace = "other-project"; }],
+  ["different kind", (v) => { v.kind = "Job"; }],
+  ["deleting execution", (v) => { v.metadata.deletionTimestamp = "2026-10-29T00:00:00Z"; }],
+  ["absent network", (v) => { delete v.metadata.annotations; }],
+  ["network JSON", (v) => { v.metadata.annotations["run.googleapis.com/network-interfaces"] = "PRIVATE_INVALID"; }],
+  ["overlong network", (v) => { v.metadata.annotations["run.googleapis.com/network-interfaces"] = "PRIVATE".repeat(1000); }],
+  ["extra interface", (v) => { v.metadata.annotations["run.googleapis.com/network-interfaces"] = JSON.stringify([...DATABASE_VPC.networkInterfaces, ...DATABASE_VPC.networkInterfaces]); }],
+  ["foreign network", (v) => { v.metadata.annotations["run.googleapis.com/network-interfaces"] = '[{"network":"foreign","subnetwork":"mfmf-app-tokyo"}]'; }],
+  ["foreign subnet", (v) => { v.metadata.annotations["run.googleapis.com/network-interfaces"] = '[{"network":"mfmf-db-network","subnetwork":"foreign"}]'; }],
+  ["network tags", (v) => { v.metadata.annotations["run.googleapis.com/network-interfaces"] = '[{"network":"mfmf-db-network","subnetwork":"mfmf-app-tokyo","tags":["PRIVATE"]}]'; }],
+  ["all egress", (v) => { v.metadata.annotations["run.googleapis.com/vpc-access-egress"] = "all-traffic"; }],
+  ["connector", (v) => { v.metadata.annotations["run.googleapis.com/vpc-access-connector"] = "PRIVATE_CONNECTOR"; }],
+  ["conflicting annotation locations", (v) => { v.spec = { template: { metadata: { annotations: { "run.googleapis.com/vpc-access-egress": "all-traffic" } } } }; }],
+]) test(`rejects v1 ${label} without leaking metadata`, async () => {
+  await assert.rejects(fixture({ omittedVpc: true, legacyChange }).run(), (error) => {
+    assert.match(error.message, /stage=execution-vpc/); assert.doesNotMatch(error.message, /PRIVATE/); return true;
+  });
+});
+test("does not replace explicitly invalid v2 VPC using v1", async () => {
+  const f = fixture({ failure: "vpc" }); await assert.rejects(f.run());
+  assert.ok(f.calls.every(({ url }) => !url.includes("/apis/run.googleapis.com/v1/")));
+});
+test("v1 HTTP errors remain bounded and do not expose their body", async () => {
+  await assert.rejects(fixture({ omittedVpc: true, legacyResponse: () => new Response("PRIVATE_BODY", { status: 403 }) }).run(),
+    (error) => { assert.match(error.message, /execution-vpc http=403/); assert.doesNotMatch(error.message, /PRIVATE/); return true; });
 });
 for (const [label, change] of [
   ["foreign service account", (j) => { j.template.template.serviceAccount = "other"; }],

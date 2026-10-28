@@ -128,6 +128,8 @@ event trigger、固定 app role の既存を拒否します。既存 object / ro
 途中停止した初期化先が残る場合は、状態を調査してから明示的に復旧し、汎用 reset で自動的に進めません。
 失敗時の診断は固定工程名（catalog / roles / baseline / ledger / password / commit）と、存在すれば
 5文字の SQLSTATE だけです。空 DB 条件の不一致は固定の理由名だけを出し、DB object 名・SQL・例外本文は出しません。
+DB 所有者条件の診断は固定名との一致を boolean で、所有者を既知の管理 role 分類または other / missing で示します。
+任意の所有者名をログへ出さず、postgres 所有を必須とする許可条件は診断追加によって変わりません。
 工程の特定は自動再実行や空 DB 条件の緩和を許可するものではありません。
 
 ### Job の環境と秘密
