@@ -8,8 +8,8 @@ AI コーディングエージェント（Claude Code / Copilot / Cursor / Codex
 
 家族で保育園の日々の記録（テキスト＋写真）を残すミニマムな PWA。
 
-- フロント/配信: Next.js 15（App Router）+ React 19 + TypeScript(strict) + Tailwind CSS v4 / Vercel
-- 認証/DB/画像: Supabase（`@supabase/ssr`、Cookie ベースのセッション）
+- 本番配信: Next.js 15（App Router）+ React 19 + TypeScript(strict) + Tailwind CSS v4 / Cloud Run
+- 本番認証/DB/画像: Identity Platform / Cloud SQL PostgreSQL / Cloud Storage。ローカル開発はSupabaseを維持
 - 共有方針: 世帯（`households` / `household_members`）ベースのマルチテナント。
   role は owner / editor / viewer、外部ゲストは `guest_grants`（対象ペット・期間限定）
 
@@ -34,9 +34,9 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 ## やってよいこと / 規約
 
 - データ変更は **Server Action**（`src/app/(app)/records/actions.ts`）で行い、`redirect` / `revalidatePath` で反映する。
-- Supabase クライアントは用途別に使い分ける（Client: `src/lib/supabase/client.ts` / Server: `server.ts` / middleware: `middleware.ts`）。
+- 既存クライアント入口（`src/lib/supabase/`）を用途別に使う。server/middlewareはGCPモードでIdentity Platform・loopback PostgRESTへ分岐する。browser clientはSupabaseモード専用。詳細はCLAUDE.md。
 - Server Action 冒頭で `supabase.auth.getUser()` を確認し、未ログインは `redirect("/login")`。
-- DB スキーマ変更は `supabase/migrations/` に新しいタイムスタンプ付き SQL を追加する（`supabase migration new <name>` で生成、既存の `20260616130704_init.sql` は編集しない）。main マージ時に `deploy-production.yml` の `migrate` ジョブが `supabase db push` で本番 Supabase に自動適用し、続けて Vercel Production にデプロイされる（merge = 本番リリース）。破壊的変更は PR 段階でローカル `supabase db reset` 確認まで済ませること。
+- 本番DBの変更は `db/gcp/README.md` のbaseline・source manifest・checksum契約に従う。`supabase/migrations/` は互換元・ローカル開発の履歴として残し、既存initを編集しない。GCPモードのmain配信は固定operator Jobのupgrade成功後にCloud Runへ進み、Supabase migration/Vercel配信はskipする。未適用SQLのbackup gateと復元条件はCLAUDE.md・デプロイ手順を確認する。
 - パスエイリアスは `@/*` → `src/*`。
 - UI のある新機能は、仕様を文章で固める前に **静的 HTML/CSS/JS のプロトタイプ**を `proto/<slug>/` に作り、
   **Claude Artifact に publish してスマホで触って**合意する（D24。**実コードでプロトを作らない** ——
@@ -53,7 +53,7 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
   代用しない）。**対応表は持たない** —— 正は `src/lib/household.ts` と各 `actions.ts`。
   取り違えやすい点だけ: **更新/削除は「現在世帯」ではなく「対象行の `household_id`」で判定する。**
   `/onboarding` は世帯未所属で走るのが正常。詳細は CLAUDE.md。
-- **Service Worker（`public/sw.js`）は Supabase の API レスポンスや署名付き写真 URL をキャッシュしない。**
+- **Service Worker（`public/sw.js`）は認証済みAPIレスポンスや署名付き写真URLをキャッシュしない。**
 - `main` へ直接 push しない。強制 push（`--force`）禁止（ガードでブロック）。
 
 ## ドキュメント地図
@@ -62,4 +62,4 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 - 全体像: [README.md](./README.md) ／ ドキュメント索引: [docs/README.md](./docs/README.md)
 - 構成の地図: [docs/reference/architecture.md](./docs/reference/architecture.md)
 - 決定ログ（却下した案と理由）: [docs/explanation/decisions.md](./docs/explanation/decisions.md)
-- DB / RLS の正: [supabase/migrations/](./supabase/migrations/)
+- 本番DB / RLS の正: [db/gcp/](./db/gcp/README.md) ／ 互換元・ローカル: [supabase/migrations/](./supabase/migrations/)

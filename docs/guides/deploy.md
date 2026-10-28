@@ -1,33 +1,59 @@
 # デプロイ・リリース手順
 
-mfmf は **GitHub Actions から Vercel CLI で明示的にデプロイ**します。
-「いつ・どこへ出すか」を Actions に一本化するため、Vercel の Git 連携自動デプロイは
-`vercel.json` の `git.deploymentEnabled: false` で無効化しています
-（この方針の背景は [explanation/decisions.md](../explanation/decisions.md) の D22）。
+本番は **GitHub ActionsからCloud Runへ配信**します。認証はIdentity Platform、DBはCloud SQL、画像はGCSです。
+**今回の文書PRのCI・次のmain配信の実行結果: pending。** GCP候補100%でGoogleログイン、既存のprofile/世帯owner/pet/home一致、軽量2並行GET、frozen/gcsでの全行全列再照合を確認しました。
+2026-10-28 18:03:33.456726 UTCにactivationが成功し、DB書込enabled・media gcsへ切り替わりました。18:04:29 UTCに本人プロフィールの同値保存と成功表示も確認済みです。事後inspectでDB enabled・media writes gcs・read backend gcs・imported=trueと全件数維持を確認しました。
+固定Jobの通常3項目envへの復帰とupgradeのapplied=0・sourceManifestVerified=trueを確認済みです。workflowを再開し、GETでstate=active、GCP_AUTH_ENABLED/GCP_DEPLOY_ENABLEDともtrueを確認しました。
+今回の文書PRの全CI成功・merge後、次のmain配信の結果を [移行記録](../explanation/gcp-migration.md#現在の実装と切替記録)へ追記します。workflow再開だけで通常配信が成功したとは扱いません。
+旧Supabase/Vercel経路はローカル開発・履歴・個別の復旧判断のために残し、通常配信では使用しません。
+VercelのGit自動配信は引き続き無効です（D22）。
 
-## フロー
+## 本番フロー
 
-| トリガ | デプロイ先 | DB マイグレーション | ワークフロー |
+| トリガ | 配信先 | DB更新 | ワークフロー |
 | --- | --- | --- | --- |
-| PR | （CI のみ：lint / typecheck / build） | なし | `.github/workflows/ci.yml` |
-| main へマージ(push) | Vercel **Production** | `supabase db push`（production env） | `.github/workflows/deploy-production.yml` |
+| PR | CIのみ | 架空データの隔離試験 | `.github/workflows/ci.yml` |
+| mainへpush、GCPモード有効 | Cloud Run | 同SHAの固定operator Job `upgrade` | `.github/workflows/deploy-production.yml` |
 
-- **merge = 本番リリース**。main にマージした時点で migration 適用 → Vercel Production デプロイまで一気に走ります。
-- CI（`ci.yml` を `workflow_call` で再利用）が緑のときだけデプロイされます。
-- **DB スキーマも main マージ時点で本番 Supabase に進む**。`supabase db push` は冪等です。
-- `verify` と `check-secrets` の後に `migrate → deploy` が続きます。`migrate` の失敗・skip 時は `deploy` も停止します。
+1. PRで通常CIに加え、GCP baseline/RLS/復元・実PostgREST・operator・両モードbuildを通す。
+2. `GCP_AUTH_ENABLED=true` / `GCP_DEPLOY_ENABLED=true`、workflow有効、templateとserving revisionが同じGCPモードであることを確認する。
+3. mainへの新しいpushで、verify → WIF認証 → 同SHAのapp/operator image build → DB `upgrade` → tag付き0% stage → smoke →100% promoteを実行する。
+4. Supabase `migrate` とVercel `deploy` はskipする。既存DB・認証モードの初回切替、freeze解除、Job作成、IAM変更は行わない。
 
-## 本番（Production）へ出す手順
+設定・固定secret参照・Job検証の正は [GCP DB通常配信](./gcp-database-deployment.md)。
+固定Jobは事前に `upgrade`、レビュー済みmain SHA、operator資格情報だけの通常形へ戻し、前の実行完了を確認する。
+手動import/restore用の環境を通常配信が自動で取り除くことはない。
+workflowを有効化するだけでは配信されない。受入後の新しいmain実行を確認し、旧false-mode runはrerunしない。
+初回false→true切替を通常配信のmode検査緩和で代用しない。
 
-1. PR を出し、CI（lint / typecheck / build）を緑にする。
-2. **main にマージするだけ**。`deploy-production.yml` が起動し、CI 緑のあと migration を本番に適用してから Vercel Production へデプロイされる。
+## DB変更と失敗時の境界
 
-> ロールバックは Vercel ダッシュボードの過去デプロイから即時可能。
-> 本番への誤発射を防ぎたい場合は **Settings > Environments > `production`** に承認ルール（Required reviewers）を付ける。
->
-> ⚠️ Required reviewers を付けると、`production` を参照する **各ジョブ（`check-secrets` / `migrate` / `deploy`）で個別に承認**を求められる。`migrate`（破壊的・スキーマ前進）を承認したら**続けて `deploy` も必ず承認**すること。`deploy` だけ遅延／拒否すると、本番 DB は新スキーマなのにアプリは旧デプロイのまま、という不整合状態が続く。その場合は**同じ commit を re-run** すれば `migrate`（冪等で no-op）→ `deploy` の順で復旧できる。
+本番SQLと復元契約は [db/gcp/README.md](../../db/gcp/README.md)。元の `supabase/migrations/` は互換元・ローカル開発に残し、
+source manifestでGCP baselineとの対応を検証する。元migrationを増やすだけでは本番へ反映されない。
+追加GCP SQLは `db/gcp/migrations/` のchecksum ledgerとadvisory lockで適用し、未対応の元migrationや履歴差異は停止する。
 
-## 初回セットアップ（1回だけ）
+**現時点では、未適用SQLがある通常配信はprebackupの期限検査で停止する。**
+Standard on-demand backupの実 `expiryTime` がNULLのためで、14日を要求しただけでは期限付きと扱わない。
+SQLが0件ならbackup作成・DDLなしで配信できる。SQL更新を開放するには、保持・削除方針と実検証を別途完了させる。
+
+appのtraffic rollbackはDB、IdP、secret versionを戻さない。SQLは旧revisionとの互換を保つ。
+source Supabaseの凍結解除・逆同期やDB復元は、最新書込を失わないことを確認する別の運用判断であり、自動実行しない。
+
+## バックアップと復旧範囲
+
+- Cloud SQLは日次18:00 UTC（翌03:00 JST）・14件保持、PITRログ7日、削除保護と最終backup30日を設定する。設定の存在と実復元成功は別に記録する。
+- 初回の同instance managed backup復元は18分47.589秒で成功。復元後の全行全列比較・frozen/gcsのinspect、backup設定一致・修復不要、新しいpost-restore backupまで確認済み。証跡は [移行記録](../explanation/gcp-migration.md#現在の実装と切替記録)に残す。PITRは常に別instanceを作るため、この試験で実PITRまで証明したとは扱わない。
+- Standard on-demand backupは明示削除まで無期限。日次14件保持と手動backupは別枠。全件容量を観測し、復旧点を費用だけで自動削除しない。
+- Identity Platformのアカウント・provider link・password hash設定はSQL backupに含まれない。手動暗号化exportと独立した復号・restore plan検証が成功し、4ユーザー・Google link4件・BCRYPT1件を保全した。今回はパスワード再設定必須0件で、原本とのhash同値も確認済み。実アカウントの全件restoreと定期自動backupは未実施。将来APIでhashを取得できない場合は再設定が必要で、旧hashを無条件補完しない。復旧点は最後に成功・復号検証した手動export時点であり、SQLの日次backup/PITRと同じRPOではない。復元時は全セッション失効を別gateにする。
+- GCS本体はSQL backupと別に保護する。[画像移送・隔離復元](./storage-migration-operator.md)の世代・binding・hash検証、soft delete、terminal cleanupを使う。DB復元だけで画像やIdPも巻き戻ったとは扱わない。
+- 元Supabaseのpublic＋credential Authは凍結し、暗号化した最終原本とともに保全する。Authの全session状態を凍結したものではない。解除は [専用手順](./database-auth-backup.md)で明示的に行い、通常配信から触れない。
+
+## 旧Supabase/Vercelモードの手順（参照専用）
+
+以下は `GCP_AUTH_ENABLED=false` の旧構成だけに適用する。**凍結した移行元へ実行しない。**
+本番GCPの復旧に `supabase db push`、旧Deploy Productionのrerun、Vercel rollbackだけを使わない。
+
+### 旧構成の初回セットアップ
 
 ### 1. Vercel プロジェクト ID を取得
 
@@ -86,7 +112,7 @@ GitHub に登録するのは **公開鍵だけ**です。`identity.txt` は復�
 （GitHub Actions の CI ビルドはプレースホルダ値で通すだけで、実値は Vercel から取得する）。
 変数の一覧は [reference/configuration.md](../reference/configuration.md) を参照。
 
-## Supabase（DB）マイグレーション
+## Supabase（DB）マイグレーション（旧モード限定）
 
 `supabase/migrations/` の SQL は **GitHub Actions の `migrate` ジョブで自動適用**される
 （`supabase/setup-cli` → `supabase link` → `supabase db push` の 3 ステップ）。
@@ -124,7 +150,7 @@ main マージ = 本番反映のため、destructive 変更は **main マージ�
 これはマージ直前の退避であり、定期バックアップや写真のバックアップではありません。
 
 > ⚠️ **dump 対象は `public` スキーマのみ**。`auth.users`（Supabase Auth 管理）/ `storage.*`（Storage メタデータ）/ Storage バケット本体（`record_photos` の画像ファイル）は含まれない。
-> - `auth.users` は通常 Supabase Auth 側に残るが、Auth まで壊した場合は別途 `supabase auth export` で個別退避が必要。
+> - Authを含む原本保全は [public＋Auth暗号化バックアップ](./database-auth-backup.md) を使う。旧publicのみのArtifactでAuthまで復元できるとは扱わない。
 > - `record_photos` の画像本体は Storage バケットにあり、DB 復元しても画像は戻らない。Storage 自体の事故からの復旧手段は Free プランでは無い（rclone 等での日常的な同期が唯一の自衛策）。
 
 復元手順（ローカルから）：
@@ -168,8 +194,8 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f pre-migrate-data.sql
 
 #### 3. Storage（写真）の破損
 
-**DB backup には Storage は含まれない。** `record_photos` バケットを誤って空にした場合、Free プランでは復旧手段なし。
-日常的に `record_photos` を rclone / `supabase storage cp` で別ストレージへ同期しておくのが唯一の自衛策（cron 自動化は別タスク）。
+**DB backupに画像本体は含まれない。** 旧Supabaseの写真・アバターは [画像原本バックアップ](./storage-operator-backup.md)、
+現行GCSは [画像移送・隔離復元](./storage-migration-operator.md)を参照する。画像本体とDB参照を別々に巻き戻して整合を失わない。
 
 ### `supabase db push` 自体が失敗した時
 
