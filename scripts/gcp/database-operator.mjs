@@ -25,8 +25,19 @@ const PASSWORD = /^[A-Za-z0-9_-]{32,128}$/;
 const LIMIT = 64 * 1024 * 1024;
 const BASE = Object.freeze({ PATH: "/usr/local/bin:/usr/bin:/bin", LANG: "C.UTF-8" });
 const STAGES = new Set(["context", "metadata", "source-contract", "connector", "credentials", "connect", "bootstrap", "bundle", "import", "inspect", "upgrade", "restore-test", "verify-import", "activate", "freeze", "cleanup"]);
+const BOOTSTRAP_SUBSTAGES = new Set(["catalog", "roles", "baseline", "ledger", "password", "commit"]);
+const CATALOG_REASONS = Object.freeze({database_owner:"database-owner",public_owner:"public-owner",schemas:"schemas",
+  public_objects:"public-objects",extensions:"extensions",event_triggers:"event-triggers",existing_app_roles:"existing-app-roles"});
+const SQLSTATE = /^[0-9A-Z]{5}$/;
 export class OperatorError extends Error {
-  constructor(stage) { super("Database operator failed; details withheld."); this.stage = STAGES.has(stage) ? stage : "context"; }
+  constructor(stage,details={}) {
+    super("Database operator failed; details withheld."); this.stage = STAGES.has(stage) ? stage : "context";
+    if(this.stage==="bootstrap") {
+      if(BOOTSTRAP_SUBSTAGES.has(details.substage))this.substage=details.substage;
+      if(typeof details.sqlstate==="string" && SQLSTATE.test(details.sqlstate))this.sqlstate=details.sqlstate;
+      if(Array.isArray(details.reasons))this.reasons=Object.values(CATALOG_REASONS).filter(reason=>details.reasons.includes(reason));
+    }
+  }
 }
 const requireValue = (ok, stage) => { if (!ok) throw new OperatorError(stage); };
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -34,7 +45,18 @@ const object = (value) => value && typeof value === "object" && !Array.isArray(v
 function keys(value, expected) {
   return object(value) && Object.keys(value).sort().join("\0") === [...expected].sort().join("\0");
 }
-export function diagnostic(error) { return { status: "failed", stage: error instanceof OperatorError ? error.stage : "context" }; }
+export function diagnostic(error) {
+  const result={status:"failed",stage:error instanceof OperatorError && STAGES.has(error.stage)?error.stage:"context"};
+  if(result.stage==="bootstrap") {
+    if(BOOTSTRAP_SUBSTAGES.has(error.substage))result.substage=error.substage;
+    if(typeof error.sqlstate==="string" && SQLSTATE.test(error.sqlstate))result.sqlstate=error.sqlstate;
+    if(error.substage==="catalog" && Array.isArray(error.reasons)) {
+      const reasons=Object.values(CATALOG_REASONS).filter(reason=>error.reasons.includes(reason));
+      if(reasons.length)result.reasons=reasons;
+    }
+  }
+  return result;
+}
 
 // Every column must be present, including nulls. Missing columns cannot silently
 // receive a new timestamp/default. The runner compares this list to the baseline.
@@ -397,32 +419,42 @@ export async function setMediaMode(client,contract,sha,desired) {
 }
 
 export async function applyBaseline(admin,contract,root,credentials,runtimePassword) {
-  await admin.query("BEGIN; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='60s';");
+  let substage="catalog";
   try {
+    await admin.query("BEGIN; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='60s';");
     await admin.query(LOCK);
     // SQLAdmin may have provisioned the fixed database already. Accept only a
     // pristine postgres-owned database, never reset existing objects or roles.
-    const catalog=(await admin.query(`SELECT (
+    const catalog=(await admin.query(`WITH checks AS (SELECT (
       current_database()='mfmf' AND current_user='postgres'
       AND EXISTS (SELECT 1 FROM pg_database d JOIN pg_roles r ON r.oid=d.datdba
         WHERE d.datname=current_database() AND r.rolname='postgres' AND pg_encoding_to_char(d.encoding)='UTF8')
-      AND EXISTS (SELECT 1 FROM pg_namespace n JOIN pg_roles r ON r.oid=n.nspowner
-        WHERE n.nspname='public' AND r.rolname IN ('postgres','pg_database_owner'))
-      AND NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname NOT IN ('public','information_schema') AND nspname !~ '^pg_')
-      AND NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public')
+      ) AS database_owner,
+      EXISTS (SELECT 1 FROM pg_namespace n JOIN pg_roles r ON r.oid=n.nspowner
+        WHERE n.nspname='public' AND r.rolname IN ('postgres','pg_database_owner')) AS public_owner,
+      NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname NOT IN ('public','information_schema') AND nspname !~ '^pg_') AS schemas,
+      (NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public')
       AND NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public')
-      AND NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public')
-      AND NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname<>'plpgsql')
-      AND NOT EXISTS (SELECT 1 FROM pg_event_trigger)
-      AND NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN
-        ('mfmf_owner','anon','authenticated','identity_sync','media_operator','authenticator','mfmf_migrator','mfmf_operator'))
-    ) AS pristine`)).rows;
-    requireValue(catalog.length===1 && catalog[0].pristine===true,"bootstrap");
+      AND NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public')) AS public_objects,
+      NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname<>'plpgsql') AS extensions,
+      NOT EXISTS (SELECT 1 FROM pg_event_trigger) AS event_triggers,
+      NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN
+        ('mfmf_owner','anon','authenticated','identity_sync','media_operator','authenticator','mfmf_migrator','mfmf_operator')) AS existing_app_roles
+    ) SELECT *, (database_owner AND public_owner AND schemas AND public_objects AND extensions AND event_triggers AND existing_app_roles) AS pristine FROM checks`)).rows;
+    if(catalog.length!==1 || catalog[0].pristine!==true
+      || Object.keys(CATALOG_REASONS).some(key=>catalog[0][key]!==true)) {
+      throw new OperatorError("bootstrap",{substage,reasons:catalog.length===1
+        ? Object.entries(CATALOG_REASONS).filter(([key])=>catalog[0][key]===false).map(([,reason])=>reason):[]});
+    }
+    substage="roles";
     await admin.query(await readFile(join(root,"db/gcp/000_roles.sql"),"utf8"));
+    substage="baseline";
     await admin.query("SET LOCAL ROLE mfmf_owner");
     await admin.query(contract.baseline);
+    substage="ledger";
     await admin.query(LEDGER_SQL);
     await admin.query("INSERT INTO migration_admin.history(name,sha256) VALUES('baseline',$1)",[contract.baselineHash]);
+    substage="password";
     await admin.query("RESET ROLE");
     // Values travel as parameters and transaction-local settings, never argv,
     // files or application logs. SQL identifiers are fixed, not input strings.
@@ -430,8 +462,13 @@ export async function applyBaseline(admin,contract,root,credentials,runtimePassw
       await admin.query("SELECT set_config('mfmf.bootstrap_password',$1,true)",[password]);
       await admin.query(`DO $$ BEGIN EXECUTE format('ALTER ROLE ${role} PASSWORD %L',current_setting('mfmf.bootstrap_password')); END $$;`);
     }
+    substage="commit";
     await admin.query("COMMIT");
-  } catch {await admin.query("ROLLBACK").catch(()=>{});throw new OperatorError("bootstrap");}
+  } catch(error) {
+    await admin.query("ROLLBACK").catch(()=>{});
+    if(error instanceof OperatorError)throw error;
+    throw new OperatorError("bootstrap",{substage,sqlstate:error?.code});
+  }
 }
 
 async function restoredDatabase(admin,connect,contract,bundle,sha,root) {

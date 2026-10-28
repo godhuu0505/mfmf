@@ -126,6 +126,9 @@ IdP 自体や GCS 本体の操作はこの DB guard の対象外なので、切�
 `bootstrap` は public 以外の独自 schema、public の表・sequence・view・関数・型、plpgsql 以外の extension、
 event trigger、固定 app role の既存を拒否します。既存 object / role / data の削除や再利用はしません。
 途中停止した初期化先が残る場合は、状態を調査してから明示的に復旧し、汎用 reset で自動的に進めません。
+失敗時の診断は固定工程名（catalog / roles / baseline / ledger / password / commit）と、存在すれば
+5文字の SQLSTATE だけです。空 DB 条件の不一致は固定の理由名だけを出し、DB object 名・SQL・例外本文は出しません。
+工程の特定は自動再実行や空 DB 条件の緩和を許可するものではありません。
 
 ### Job の環境と秘密
 
@@ -174,7 +177,8 @@ GCP 側が追いついていない場合に、Cloud SQL の更新を黙って省
 同じ main SHA の backup 再利用は 15 分以内だけです。TTL 未対応・古い backup・重複・不明な作成結果では SQL を始めません。
 `verify-import` は固定 session advisory lock を snapshot 作成前に取り、REPEATABLE READ READ ONLY transaction で検証します。
 変更セルが1つでもあれば、件数が同じでも失敗します。lock は成功・失敗の両方で解放します。
-この操作自体は backup / restore を開始しません。実 managed backup / PITR から固定対象へ復元した後の比較用です。
+この操作自体は backup / restore を開始しません。managed backup から固定対象へ復元した後の比較用です。
+PITR は別 instance への復元が必要で、この固定対象の操作だけでは PITR の実復元を検証できません。
 
 backup は DB のみです。IdP と GCS 本体の巻戻しや、破壊的 migration 後の旧アプリ互換性を保証しません。
 
