@@ -56,18 +56,18 @@ test("UC-CW01: 週表示の空の日付から予定入力を開き、閉じる�
   await expect(sheet.locator('input[name="record_date"]')).toHaveValue(emptyDay);
   await expect(sheet.locator('input[name="record_id"]')).toHaveValue("");
   await expect(sheet.getByRole("button", { name: "予定を保存する", exact: true })).toBeVisible();
-  await page.screenshot({ path: "test-results/screenshots/calendar-week-empty-day.png", fullPage: true });
+  await page.screenshot({ path: "test-results/screenshots/calendar-week-empty-day.png", fullPage: true, animations: "disabled" });
   await page.emulateMedia({ colorScheme: "dark" });
-  await page.screenshot({ path: "test-results/screenshots/calendar-week-empty-day-dark.png", fullPage: true });
+  await page.screenshot({ path: "test-results/screenshots/calendar-week-empty-day-dark.png", fullPage: true, animations: "disabled" });
   await page.emulateMedia({ colorScheme: "light" });
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
   await expect(day).toBeFocused();
   await expect(page.getByRole("tab", { name: "週", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page).toHaveURL(new RegExp(`${weekUrl.replaceAll("?", "\\?")}$`));
-  await page.screenshot({ path: "test-results/screenshots/calendar-week-day-entry.png", fullPage: true });
+  await page.screenshot({ path: "test-results/screenshots/calendar-week-day-entry.png", fullPage: true, animations: "disabled" });
   await page.emulateMedia({ colorScheme: "dark" });
-  await page.screenshot({ path: "test-results/screenshots/calendar-week-day-entry-dark.png", fullPage: true });
+  await page.screenshot({ path: "test-results/screenshots/calendar-week-day-entry-dark.png", fullPage: true, animations: "disabled" });
 });
 
 test("UC-CW02: 月をまたぐ週の日付をEnterとSpaceで開ける", async ({ page }) => {
