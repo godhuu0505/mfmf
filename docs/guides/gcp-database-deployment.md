@@ -41,12 +41,31 @@ baselineが無い、既適用SQLのhashが違う、元Supabase migrationへの�
 新しい [Backups.CreateBackup API](https://docs.cloud.google.com/sql/docs/postgres/admin-api/rest/v1/Backups/CreateBackup) に
 固定instance・Tokyo・`ttlDays=14`・main SHAを含む固定markerを送ります。
 完了後のresourceでSUCCESSFUL、同一instance/marker、残存期限1〜14日以内を検査してからSQLへ進みます。
-TTLが未対応、無視された、期限が無い場合は停止します。実環境でのTTL確認は別gateです。
+TTLが未対応、無視された、期限が無い場合は停止します。
 
-同じSHAのmarkerを完全にlistし、一意かつ15分以内に完了したbackupだけ再利用します。
+**現在のStandard構成では、未適用SQLを含む通常配信は停止します。** 2026-10-29の実検証では
+`ttlDays=14` を送って作成に成功しても、取得したresourceの `expiryTime` はNULLでした。
+[Standard on-demandの保持仕様](https://docs.cloud.google.com/sql/docs/postgres/backup-recovery/backup-options#backup_retention_2)も、
+明示的な削除まで無期限です。`ttlDays` の送信だけで14日後の削除を保証しません。
+未適用SQLが0件の通常配信と、個別に復元・保持を確認する初回切替はこの制限の対象外です。
+
+同じSHAのmarkerを完全にlistし、一意かつ15分以内に**開始した**backupだけ再利用します。
 古い・重複・pending/failedのbackupがあれば、同じ名前のbackupを増やさずoperator確認へ止めます。
-完了時刻は必須で、時計ずれ許容は30秒です。新規作成時は今回のrequest開始以降であることも確認します。
-このhelperは他のbackupを更新・削除しません。標準の無期限on-demand backupへfallbackしません。
+開始・完了時刻は両方必須で順序も検査し、時計ずれ許容は30秒です。新規作成時は今回のrequest開始以降であることも確認します。
+[API仕様](https://docs.cloud.google.com/sql/docs/postgres/admin-api/rest/v1/Backups)では、開始時刻までの書込が収録されるため、
+完了が最近という条件だけで古いbackupを再利用しません。
+
+固定instanceの全ON_DEMAND backup（他markerを含む）は8件、`maxChargeableBytes` 合計1 GiBを上限にします。
+一覧不完全、未知の型・容量、上限超過で止め、新規作成には件数・容量の空きが必要です。
+作成後・再利用前にも取得したresourceの容量を検査します。AUTOMATED / FINALはこの手動backup枠に含めません。
+これは作成を抑止する検査であり、請求の厳密な上限ではありません。新規backupの容量は完了後に判明し、
+別operatorの同時操作や後の容量変化もあり得ます。超過時に復元点を自動削除しません。
+
+現在、このhelperはbackupを更新・削除しません。無期限backupを許可してSQLへ進むfallbackもありません。
+初回移行の手動backupは、復元・全行照合と後続の復旧点を確認してから、固定IDを指定した別の承認済み操作で整理します。
+容量を空ける目的だけで必要な復旧点を早期削除しません。自動backupの保持14件は手動backupの期限にはなりません。
+通常SQL更新の開放には、別変更で固定対象・専用marker・14日経過・新しい有効な復旧点の存在を確認する
+明示的な保持/削除手順と実環境検証が必要です。この変更では削除権限やcleanup schedulerを追加しません。
 
 必要IAMは `cloudsql.backupRuns.create/get/list` と `cloudsql.instances.get`（operation取得）です。
 専用operator SAにだけ付け、通常deployerへSQL管理者権限を付けません。
