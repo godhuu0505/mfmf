@@ -30,10 +30,17 @@ jobs:
         uses: ./.github/actions/configure-apt
       - name: Install PostgreSQL 17 client and encryption
         timeout-minutes: 5
-        # Ubuntu hosted runners configure the signed PostgreSQL APT repository.
-        # Pin the major; accept its security patch updates. The exporter uses the
-        # absolute 17/bin paths and checks both client and source major versions.
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client-17 age
+        # Ubuntu's default repository has PostgreSQL 16. Configure the official
+        # signed PGDG repository explicitly; verify its signing-key fingerprint.
+        # Pin major 17 and accept its security patch updates.
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl --fail --location --retry 2 --max-time 60 https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg.asc"
+          test "$(gpg --batch --show-keys --with-colons "$RUNNER_TEMP/pgdg.asc" | awk -F: '$1=="fpr" {print $10; exit}')" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+          sudo install -m 0644 "$RUNNER_TEMP/pgdg.asc" /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17 age
       - name: Encrypt one consistent public and Auth archive
         timeout-minutes: 22
         env:
