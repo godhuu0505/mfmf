@@ -1,13 +1,20 @@
 name: Back up database and Auth
 
-# Preservation only: a single public + auth snapshot, encrypted before disk.
+# A single public + auth snapshot, optionally preceded by an explicit cutover freeze.
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Preserve only, freeze all source writes then back up, or explicitly unfreeze'
+        required: true
+        type: choice
+        default: preserve
+        options: [preserve, freeze-and-backup, unfreeze]
 
 permissions:
   contents: read
 
-# Serialize with production migrations; application writes are NOT frozen.
+# Serialize with production migrations. Only freeze-and-backup blocks source writes.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -41,7 +48,7 @@ jobs:
           echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17 age
-      - name: Encrypt one consistent public and Auth archive
+      - name: Perform the fixed source operation and encrypted archive
         timeout-minutes: 22
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -50,7 +57,7 @@ jobs:
           SUPABASE_BACKUP_AGE_RECIPIENT: ${{ vars.SUPABASE_BACKUP_AGE_RECIPIENT }}
         run: node scripts/gcp/backup-database-auth.mjs
       - uses: actions/upload-artifact@v4
-        if: success()
+        if: success() && inputs.operation != 'unfreeze'
         with:
           name: database-auth-backup-encrypted-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/database-auth-backup-encrypted/database-auth.pgdump.age

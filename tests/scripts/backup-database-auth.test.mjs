@@ -6,7 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { ARCHIVE_NAME, CA_SHA256, CA_URL, DUMP_ARGS, POOLER_URL, PROBE_SQL, SOURCE_REF,
-  diagnostic, runBackup, selectPooler, validateContext } from "../../scripts/gcp/backup-database-auth.mjs";
+  classifyProcessError, diagnostic, runBackup, selectPooler, validateContext } from "../../scripts/gcp/backup-database-auth.mjs";
+import { FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_SCHEMA_SQL, INSPECT_CUTOVER_STATE_SQL, parseBackupOperation } from "../../scripts/gcp/source-database-cutover.mjs";
 
 // Public Supabase Root 2021 CA fixture, not a private key or project credential.
 const CA = `-----BEGIN CERTIFICATE-----
@@ -50,6 +51,8 @@ async function fixture(t, overrides = {}) {
   const calls = [];
   const requests = [];
   let ageCalls = 0;
+  let schema = overrides.schema ?? false;
+  let frozen = overrides.frozen ?? false;
   const deps = {
     env: { ...baseEnv, RUNNER_TEMP: root },
     fetchImpl: async (url, options) => {
@@ -63,7 +66,7 @@ async function fixture(t, overrides = {}) {
     spawnImpl: (command, args, options) => {
       calls.push({ command, args, options });
       assert.equal(options.shell, false);
-      assert.equal(options.stdio[2], "ignore");
+      assert.equal(options.stdio[2], "pipe");
       assert.equal(options.env.UNRELATED_SECRET, undefined);
       assert.equal(options.env.SUPABASE_ACCESS_TOKEN, undefined);
       assert.equal(JSON.stringify(args).includes(PRIVATE), false);
@@ -72,10 +75,19 @@ async function fixture(t, overrides = {}) {
         source = `console.log(${JSON.stringify(`${command.endsWith("pg_dump") ? "pg_dump" : "psql"} (PostgreSQL) ${overrides.clientMajor ?? 17}.11 (fixture)`)});`;
         assert.equal(options.env.PGPASSWORD, undefined);
       } else if (command.endsWith("psql")) {
-        assert.equal(args.at(-1), PROBE_SQL);
-        source = `console.log(${JSON.stringify(overrides.probe ?? "170011|t|t|t|t|t")});`;
+        const sql = args.at(-1);
+        let result;
+        if (sql === PROBE_SQL) result = overrides.probe ?? "170011|t|t|t|t|t";
+        else if (sql === FREEZE_SOURCE_SQL) { schema = true; frozen = true; result = "t|23"; }
+        else if (sql === UNFREEZE_SOURCE_SQL) { frozen = false; result = "f|23"; }
+        else if (sql === INSPECT_CUTOVER_SCHEMA_SQL) result = schema ? "t" : "f";
+        else if (sql === INSPECT_CUTOVER_STATE_SQL) result = `${frozen ? "t" : "f"}|${overrides.triggerCount ?? 23}`;
+        else throw new Error("Unexpected SQL");
+        source = sql === PROBE_SQL && overrides.probeError
+          ? `process.stderr.write(${JSON.stringify(overrides.probeError)}); process.exitCode=1;`
+          : `console.log(${JSON.stringify(result)});`;
       } else if (command.endsWith("pg_dump")) {
-        assert.deepEqual(args, DUMP_ARGS);
+        assert.deepEqual(args, [...DUMP_ARGS, ...(schema ? ["--schema=mfmf_cutover"] : [])]);
         source = overrides.dumpCode ?? `process.stdout.write('PGDMP${PRIVATE}'); process.stderr.write('${PRIVATE}'); process.exitCode=${overrides.dumpExit ?? 0};`;
       } else {
         assert.equal(command, "/usr/bin/age");
@@ -91,12 +103,13 @@ async function fixture(t, overrides = {}) {
         assert.equal(options.env.PGHOST, ROW.db_host);
         assert.equal(options.env.PGPORT, "5432");
         assert.equal(options.env.PGSSLMODE, "verify-full");
-        assert.match(options.env.PGOPTIONS, /default_transaction_read_only=on/);
+        assert.match(options.env.PGOPTIONS, [FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL].includes(args.at(-1))
+          ? /default_transaction_read_only=off/ : /default_transaction_read_only=on/);
       }
       return spawn(process.execPath, ["--input-type=module", "-e", source], options);
     },
   };
-  return { root, calls, requests, deps, run: (extra = {}) => runBackup({ ...deps, ...extra }) };
+  return { root, calls, requests, deps, frozen: () => frozen, run: (extra = {}) => runBackup({ ...deps, ...extra }) };
 }
 
 async function failsClean(f, extra = {}, stage) {
@@ -110,6 +123,26 @@ async function failsClean(f, extra = {}, stage) {
 
 test("public CA fixture matches pinned digest", () => {
   assert.equal(createHash("sha256").update(CA).digest("hex"), CA_SHA256);
+});
+test("process errors expose only fixed classifications", async (t) => {
+  const samples = [
+    ["certificate verify failed", "tls-certificate"],
+    ['server certificate for "private" does not match host name', "tls-hostname"],
+    ["password authentication failed", "authentication"],
+    ["unsupported startup parameter: options", "startup-option"],
+    ["connection refused", "connection"],
+    ["unknown private server output", "process"],
+  ];
+  for (const [message, reason] of samples) {
+    assert.equal(classifyProcessError(`${message} ${PRIVATE}`), reason);
+    const f = await fixture(t, { probeError: `${message} ${PRIVATE}` });
+    await assert.rejects(f.run(), (error) => {
+      assert.deepEqual(diagnostic(error), { status: "failed", stage: "source-version", reason });
+      assert.equal(JSON.stringify(error).includes(PRIVATE), false);
+      return true;
+    });
+    assert.deepEqual(await readdir(f.root), []);
+  }
 });
 test("single dump through isolated age subprocess publishes only private ciphertext", async (t) => {
   const f = await fixture(t);
@@ -215,4 +248,43 @@ test("workflow has manual/main/production gates, ciphertext-only artifact and no
   assert.match(workflow, /path: .*database-auth\.pgdump\.age/);
   assert.match(workflow, /if-no-files-found: error/);
   assert.match(workflow, /group: deploy-production/);
+  assert.match(workflow, /inputs\.operation != 'unfreeze'/);
+});
+test("freeze is explicit and includes the cutover schema in the single archive", async (t) => {
+  const f = await fixture(t); const result = await f.run({ operation: "freeze-and-backup" });
+  assert.equal(result.frozen, true); assert.equal(result.schemas, 3); assert.equal(f.frozen(), true);
+  assert.equal(f.calls.filter((call) => call.args.at(-1) === FREEZE_SOURCE_SQL).length, 1);
+  assert.equal(f.calls.filter((call) => call.args.at(-1) === UNFREEZE_SOURCE_SQL).length, 0);
+});
+test("a failed frozen backup never silently unfreezes the source", async (t) => {
+  const f = await fixture(t, { dumpExit: 1 }); await failsClean(f, { operation: "freeze-and-backup" }, "dump-encrypt");
+  assert.equal(f.frozen(), true); assert.equal(f.calls.filter((call) => call.args.at(-1) === UNFREEZE_SOURCE_SQL).length, 0);
+});
+test("unfreeze changes state only and does not run a dump or publish an archive", async (t) => {
+  const f = await fixture(t, { schema: true, frozen: true }); const result = await f.run({ operation: "unfreeze" });
+  assert.deepEqual(result, { status: "unfrozen", sourceWrites: "enabled", archive: "not-created" });
+  assert.equal(f.calls.filter((call) => call.command.endsWith("pg_dump") && call.args[0] !== "--version").length, 0);
+  assert.deepEqual(await readdir(f.root), []); assert.equal(f.frozen(), false);
+});
+test("preserve of a previously frozen source includes guards and requires all 23 triggers", async (t) => {
+  const f = await fixture(t, { schema: true, frozen: true }); assert.equal((await f.run()).schemas, 3);
+  await failsClean(await fixture(t, { schema: true, frozen: true, triggerCount: 21 }), {}, "cutover-inspect");
+});
+test("event metadata permits only the three fixed operations", () => {
+  assert.equal(parseBackupOperation("{}"), "preserve");
+  for (const operation of ["preserve", "freeze-and-backup", "unfreeze"]) assert.equal(parseBackupOperation(JSON.stringify({ inputs: { operation } })), operation);
+  for (const value of [PRIVATE, JSON.stringify({ inputs: { operation: PRIVATE } }), "x".repeat(65537)]) {
+    assert.throws(() => parseBackupOperation(value), (error) => !error.message.includes(PRIVATE));
+  }
+});
+
+test("source freeze includes MFA factor enrollment, mutation and removal in its fixed drain and ALWAYS guards",()=>{
+  assert.match(FREEZE_SOURCE_SQL,/LOCK TABLE [^;]*auth\.mfa_factors IN SHARE ROW EXCLUSIVE MODE/);
+  assert.match(FREEZE_SOURCE_SQL,/CREATE OR REPLACE TRIGGER mfmf_cutover_write_guard BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON auth\.mfa_factors/);
+  assert.match(FREEZE_SOURCE_SQL,/ALTER TABLE auth\.mfa_factors ENABLE ALWAYS TRIGGER mfmf_cutover_write_guard/);
+  assert.match(UNFREEZE_SOURCE_SQL,/\)\) <> 23 THEN/);
+});
+test("preserve rejects a legacy 22-guard freeze missing MFA coverage",async(t)=>{
+ const f=await fixture(t,{schema:true,frozen:true,triggerCount:22});
+ await failsClean(f,{},"cutover-inspect");
 });
