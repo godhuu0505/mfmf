@@ -8,7 +8,8 @@ import { isAbsolute, join } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { pathToFileURL } from "node:url";
-import { FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_SCHEMA_SQL, INSPECT_CUTOVER_STATE_SQL, parseBackupOperation, SOURCE_GUARD_COUNT } from "./source-database-cutover.mjs";
+import { FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_SCHEMA_SQL, INSPECT_CUTOVER_STATE_SQL,
+  INSPECT_SOURCE_CAPABILITIES_SQL, parseSourceCapabilities, parseCutoverProgress, CUTOVER_STEPS, parseBackupOperation, SOURCE_GUARD_COUNT } from "./source-database-cutover.mjs";
 
 export const SOURCE_REF = "aqvmuhqkaqedtxuqwhoq";
 export const POOLER_URL = `https://api.supabase.com/v1/projects/${SOURCE_REF}/config/database/pooler`;
@@ -33,12 +34,23 @@ export const DUMP_ARGS = Object.freeze([
 ]);
 const PG_BIN = `/usr/lib/postgresql/${CLIENT_MAJOR}/bin`;
 const BASE_ENV = Object.freeze({ PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" });
-const STAGES = new Set(["context", "prepare", "client-version", "recipient", "pooler", "certificate", "source-version", "cutover-inspect", "source-freeze", "source-unfreeze", "dump-encrypt", "publish", "interrupted"]);
-const REASONS = new Set(["tls-certificate", "tls-hostname", "authentication", "startup-option", "connection", "process", "source-shape", "source-readonly", "source-rls", "source-role", "source-database", "source-auth", "source-major"]);
+const STAGES = new Set(["context", "prepare", "client-version", "recipient", "pooler", "certificate", "source-version", "source-capabilities", "cutover-inspect", "source-freeze", "source-unfreeze", "dump-encrypt", "publish", "interrupted"]);
+const SQLSTATE_REASONS = Object.freeze({ "25006": "read-only-transaction", "42501": "insufficient-privilege",
+  "55P03": "lock-timeout", "57014": "query-canceled", "55000": "source-invariant", "42P01": "relation-missing",
+  "42883": "function-missing", "0A000": "unsupported-feature", "28000": "authentication", "28P01": "authentication" });
+const REASONS = new Set(["tls-certificate", "tls-hostname", "authentication", "startup-option", "connection", "process", "source-shape", "source-readonly", "source-rls", "source-role", "source-database", "source-auth", "source-major",
+  ...Object.values(SQLSTATE_REASONS)]);
+
+export function processSqlState(value) {
+  const code = /(?:ERROR|FATAL):\s+([0-9A-Z]{5})(?=[:\s]|$)/.exec(value)?.[1];
+  return code && Object.hasOwn(SQLSTATE_REASONS, code) ? code : undefined;
+}
 
 // Child errors may contain connection strings, SQL or row contents. Only these
 // fixed classifications cross the logging boundary; the original text never does.
 export function classifyProcessError(value) {
+  const code = processSqlState(value);
+  if (code) return SQLSTATE_REASONS[code];
   if (/server certificate.*does not match host name/i.test(value)) return "tls-hostname";
   if (/certificate verify failed|root certificate|SSL error.*certificate/i.test(value)) return "tls-certificate";
   if (/password authentication failed|SASL authentication failed|Tenant or user not found/i.test(value)) return "authentication";
@@ -48,17 +60,22 @@ export function classifyProcessError(value) {
 }
 
 export class BackupError extends Error {
-  constructor(stage, status, reason) {
+  constructor(stage, status, reason, sqlState, substage) {
     super("Database Auth backup failed.");
     this.stage = STAGES.has(stage) ? stage : "context";
     if (Number.isInteger(status) && status >= 100 && status <= 599) this.httpStatus = status;
     if (REASONS.has(reason)) this.reason = reason;
+    if (Object.hasOwn(SQLSTATE_REASONS, sqlState)) this.sqlState = sqlState;
+    if (CUTOVER_STEPS.includes(substage)) this.substage = substage;
   }
 }
 export function diagnostic(error) {
   return { status: "failed", stage: error instanceof BackupError ? error.stage : "context",
     ...(error instanceof BackupError && error.httpStatus ? { httpStatus: error.httpStatus } : {}),
-    ...(error instanceof BackupError && error.reason ? { reason: error.reason } : {}) };
+    ...(error instanceof BackupError && error.reason ? { reason: error.reason } : {}),
+    ...(error instanceof BackupError && error.sqlState ? { sqlState: error.sqlState } : {}),
+    ...(error instanceof BackupError && error.substage ? { substage: error.substage } : {}),
+    ...(error instanceof BackupError && error.sourceCapabilities ? { sourceCapabilities: error.sourceCapabilities } : {}) };
 }
 function requireValue(ok, stage) { if (!ok) throw new BackupError(stage); }
 
@@ -122,6 +139,7 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
   let outputDir;
   let ownsOutput = false;
   let succeeded = false;
+  let sourceCapabilities;
   const controller = new AbortController();
   const interrupt = () => controller.abort();
   signal?.addEventListener("abort", interrupt, { once: true });
@@ -144,19 +162,24 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
       child.once("error", () => resolve(false));
       child.once("close", (code, killed) => { children.delete(child); resolve(code === 0 && !killed); });
     });
-    return { child, done, failureReason: () => classifyProcessError(errorPrefix.toString("utf8")) };
+    return { child, done, failureReason: () => classifyProcessError(errorPrefix.toString("utf8")),
+      failureSqlState: () => processSqlState(errorPrefix.toString("utf8")) };
   }
   async function capture(command, args, childEnv) {
-    const { child, done, failureReason } = start(command, args, childEnv);
+    const { child, done, failureReason, failureSqlState } = start(command, args, childEnv);
     const chunks = [];
     let size = 0;
+    const cutover = ["source-freeze", "source-unfreeze"].includes(stage);
     for await (const chunk of child.stdout) {
       size += chunk.length;
-      requireValue(size <= 1024, stage);
+      requireValue(size <= (cutover ? 8192 : 1024), stage);
       chunks.push(chunk);
     }
-    if (!await done) throw new BackupError(stage, undefined, failureReason());
-    return Buffer.concat(chunks).toString("utf8").trim();
+    const text = Buffer.concat(chunks).toString("utf8").trim();
+    const progress = cutover ? parseCutoverProgress(text) : undefined;
+    if (!await done) throw new BackupError(stage, undefined, failureReason(), failureSqlState(), progress?.substage);
+    if (cutover) { requireValue(progress.result !== undefined, stage); return progress.result; }
+    return text;
   }
   try {
     validateContext(env);
@@ -199,7 +222,7 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
       PGOPTIONS: "-c default_transaction_read_only=on -c statement_timeout=600000 -c lock_timeout=10000" };
     stage = "source-version";
     const probe = await capture(`${PG_BIN}/psql`, ["--no-psqlrc", "--no-password", "--quiet", "--tuples-only",
-      "--no-align", "--set=ON_ERROR_STOP=1", "--command", PROBE_SQL], pgEnv);
+      "--no-align", "--set=ON_ERROR_STOP=1", "--set=VERBOSITY=sqlstate", "--command", PROBE_SQL], pgEnv);
     const match = /^([0-9]{6})\|([tf])\|([tf])\|([tf])\|([tf])\|([tf])$/.exec(probe);
     if (!match) throw new BackupError(stage, undefined, "source-shape");
     const probeReasons = ["source-readonly", "source-rls", "source-role", "source-database", "source-auth"];
@@ -208,7 +231,9 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
     }
     const sourceMajor = Math.floor(Number(match[1]) / 10_000);
     if (sourceMajor < 15 || sourceMajor > CLIENT_MAJOR) throw new BackupError(stage, undefined, "source-major");
-    const sqlArgs = (sql) => ["--no-psqlrc", "--no-password", "--quiet", "--tuples-only", "--no-align", "--set=ON_ERROR_STOP=1", "--command", sql];
+    const sqlArgs = (sql) => ["--no-psqlrc", "--no-password", "--quiet", "--tuples-only", "--no-align", "--set=ON_ERROR_STOP=1", "--set=VERBOSITY=sqlstate", "--command", sql];
+    stage = "source-capabilities";
+    sourceCapabilities = parseSourceCapabilities(await capture(`${PG_BIN}/psql`, sqlArgs(INSPECT_SOURCE_CAPABILITIES_SQL), pgEnv));
     if (operation === "freeze-and-backup" || operation === "unfreeze") {
       stage = operation === "freeze-and-backup" ? "source-freeze" : "source-unfreeze";
       const result = await capture(`${PG_BIN}/psql`, sqlArgs(operation === "freeze-and-backup" ? FREEZE_SOURCE_SQL : UNFREEZE_SOURCE_SQL),
@@ -269,9 +294,12 @@ export async function runBackup({ env = process.env, fetchImpl = fetch, spawnImp
     await link(partialPath, join(outputDir, ARCHIVE_NAME)); // Exclusive publish; never replace an archive.
     succeeded = true;
     return { status: "encrypted", schemas: schema === "t" ? 3 : 2, frozen, clientMajor: CLIENT_MAJOR, sourceMajor,
-      plaintextBytes, ciphertextBytes, consistency: "single-pg-dump-snapshot", restore: "not-verified" };
+      plaintextBytes, ciphertextBytes, consistency: "single-pg-dump-snapshot", restore: "not-verified", sourceCapabilities };
   } catch (error) {
-    if (error instanceof BackupError) throw error;
+    if (error instanceof BackupError) {
+      if (sourceCapabilities) error.sourceCapabilities = sourceCapabilities;
+      throw error;
+    }
     throw new BackupError(controller.signal.aborted ? "interrupted" : stage);
   } finally {
     clearTimeout(timer);

@@ -4,13 +4,17 @@
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
-import { SOURCE_TABLES, FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_STATE_SQL } from "../../scripts/gcp/source-database-cutover.mjs";
-import { PROBE_SQL } from "../../scripts/gcp/backup-database-auth.mjs";
+import { SOURCE_TABLES, FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_STATE_SQL,
+  INSPECT_SOURCE_CAPABILITIES_SQL, parseSourceCapabilities, parseCutoverProgress } from "../../scripts/gcp/source-database-cutover.mjs";
+import { PROBE_SQL, processSqlState } from "../../scripts/gcp/backup-database-auth.mjs";
 const IMAGE = "mfmf-gcp-postgres-test:17";
 const NAME = `mfmf-cutover-proof-${randomUUID().slice(0, 12)}`;
 const docker = (args, input) => execFileSync("docker", args, { input, encoding: "utf8", timeout: 120_000,
   maxBuffer: 4 * 1024 * 1024, stdio: ["pipe", "pipe", "pipe"] });
 const sql = (text, user = "postgres") => docker(["exec", "-i", NAME, "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-U", user, "-d", "postgres"], text).trim();
+// Match the production --command path, including multiple progress SELECTs.
+const cutover = (text) => parseCutoverProgress(docker(["exec", NAME, "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1",
+  "-v", "VERBOSITY=sqlstate", "-U", "postgres", "-d", "postgres", "--command", text]).trim()).result;
 let created = false; let stage = "startup"; let checks = 0;
 const check = (condition) => { assert.ok(condition); checks++; };
 const denied = (text, user = "authenticator") => { let rejected = false; try { sql(text, user); } catch { rejected = true; } check(rejected); };
@@ -36,13 +40,32 @@ try {
   // READ ONLY even when this server's default is writable.
   check(sql("SHOW default_transaction_read_only") === "off");
   check(/^17[0-9]{4}\|t\|t\|t\|t\|t$/.test(sql(PROBE_SQL)));
+  stage = "catalog capabilities";
+  const capabilities = parseSourceCapabilities(sql(INSPECT_SOURCE_CAPABILITIES_SQL));
+  check(capabilities.transactionReadOnly && capabilities.publicTables.owner === 20 && capabilities.auth.mfaFactors.trigger);
+  check(capabilities.replicationRoles.supabase_auth_admin.present && !capabilities.replicationRoles.supabase_auth_admin.canSetReplicationRole);
+  // TRIGGER + DML grants do not grant ownership or ENABLE ALWAYS privileges.
+  sql("GRANT TRIGGER ON ALL TABLES IN SCHEMA public,auth TO authenticator");
+  const limited = parseSourceCapabilities(sql(INSPECT_SOURCE_CAPABILITIES_SQL, "authenticator"));
+  check(!limited.superuser && limited.publicTables.owner === 0 && limited.publicTables.trigger === 20);
+  check(!limited.auth.users.owner && limited.auth.users.trigger && limited.auth.users.lock);
+  denied("ALTER TABLE auth.users ENABLE ALWAYS TRIGGER imaginary", "authenticator");
   sql("SELECT public.synthetic_definer_write()", "authenticator"); checks++;
   stage = "table drift";
-  sql("CREATE TABLE public.unreviewed(id integer)"); denied(FREEZE_SOURCE_SQL, "postgres");
+  sql("CREATE TABLE public.unreviewed(id integer)");
+  let rejectedCutover;
+  try { cutover(FREEZE_SOURCE_SQL); } catch (error) { rejectedCutover = error; }
+  // Exercise real psql --command with multiple SELECTs and a later SQL error.
+  // Provider stderr stays in memory; neither it nor stdout is printed.
+  check(Boolean(rejectedCutover?.status));
+  check(parseCutoverProgress(String(rejectedCutover.stdout)).substage === "identity");
+  check(processSqlState(String(rejectedCutover.stderr)) === "55000");
   check(sql("SELECT to_regnamespace('mfmf_cutover') IS NULL") === "t"); sql("DROP TABLE public.unreviewed");
   stage = "freeze";
-  check(sql(FREEZE_SOURCE_SQL) === "t|23");
-  check(sql(FREEZE_SOURCE_SQL) === "t|23"); // repeat freeze is explicit and idempotent
+  check(cutover(FREEZE_SOURCE_SQL) === "t|23");
+  // Explicit READ WRITE also works when the session defaults to read-only.
+  check(parseCutoverProgress(sql("SET default_transaction_read_only=on;\n" + FREEZE_SOURCE_SQL)).result === "t|23");
+  check(cutover(FREEZE_SOURCE_SQL) === "t|23"); // repeat freeze is explicit and idempotent
   for (const name of SOURCE_TABLES) {
     denied(`INSERT INTO public.${name} VALUES(2,'synthetic')`);
     denied(`UPDATE public.${name} SET value='changed' WHERE id=1`);
@@ -70,7 +93,7 @@ try {
   sql("ALTER TABLE public.tags DISABLE TRIGGER mfmf_cutover_write_guard");
   denied(UNFREEZE_SOURCE_SQL, "postgres"); check(sql("SELECT frozen FROM mfmf_cutover.state") === "t");
   sql("ALTER TABLE public.tags ENABLE ALWAYS TRIGGER mfmf_cutover_write_guard");
-  check(sql(UNFREEZE_SOURCE_SQL) === "f|23"); check(sql(INSPECT_CUTOVER_STATE_SQL) === "f|23");
+  check(cutover(UNFREEZE_SOURCE_SQL) === "f|23"); check(sql(INSPECT_CUTOVER_STATE_SQL) === "f|23");
   sql("SELECT public.synthetic_definer_write()", "authenticator"); checks++;
   sql("UPDATE auth.users SET value='after'", "supabase_auth_admin"); checks++;
   sql("UPDATE auth.mfa_factors SET value='after'", "supabase_auth_admin"); checks++;
@@ -81,7 +104,7 @@ try {
   const ready = new Promise((resolve, reject) => { child.stdout.once("data", resolve); child.once("error", reject); });
   child.stdin.end("BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT count(*) FROM public.daycare_records; SELECT pg_sleep(2); UPDATE public.daycare_records SET value='stale'; COMMIT;");
   await ready;
-  check(sql(FREEZE_SOURCE_SQL) === "t|23");
+  check(cutover(FREEZE_SOURCE_SQL) === "t|23");
   check(await finished !== 0);
   check(sql("SELECT value<>'stale' FROM public.daycare_records") === "t");
   console.log(JSON.stringify({ syntheticChecks: checks, allTableWritesBlocked: true, authAdminBlocked: true,

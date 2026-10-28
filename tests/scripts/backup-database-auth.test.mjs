@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { ARCHIVE_NAME, CA_SHA256, CA_URL, DUMP_ARGS, POOLER_URL, PROBE_SQL, SOURCE_REF,
-  classifyProcessError, diagnostic, runBackup, selectPooler, validateContext } from "../../scripts/gcp/backup-database-auth.mjs";
-import { FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_SCHEMA_SQL, INSPECT_CUTOVER_STATE_SQL, parseBackupOperation } from "../../scripts/gcp/source-database-cutover.mjs";
+  classifyProcessError, processSqlState, diagnostic, runBackup, selectPooler, validateContext } from "../../scripts/gcp/backup-database-auth.mjs";
+import { FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_SCHEMA_SQL, INSPECT_CUTOVER_STATE_SQL, INSPECT_SOURCE_CAPABILITIES_SQL, parseSourceCapabilities, parseCutoverProgress, parseBackupOperation } from "../../scripts/gcp/source-database-cutover.mjs";
 
 // Public Supabase Root 2021 CA fixture, not a private key or project credential.
 const CA = `-----BEGIN CERTIFICATE-----
@@ -35,6 +35,7 @@ o/bKiIz+Fq8=
 -----END CERTIFICATE-----
 `;
 const PRIVATE = "PRIVATE_FIXTURE_CANNOT_LOG";
+const CAPABILITIES = ["t", "f", "t", "t", "t", "t", "20", "20", "20", "20", ...Array(12).fill("t"), ...Array(5).fill(["t", "f"]).flat()].join("|");
 const ROW = { database_type: "PRIMARY", db_host: "aws-0-ap-northeast-1.pooler.supabase.com",
   db_user: `postgres.${SOURCE_REF}`, db_port: 6543, db_name: "postgres", pool_mode: "transaction",
   connection_string: PRIVATE };
@@ -76,6 +77,7 @@ async function fixture(t, overrides = {}) {
         assert.equal(options.env.PGPASSWORD, undefined);
       } else if (command.endsWith("psql")) {
         const sql = args.at(-1);
+        assert.ok(args.includes("--set=VERBOSITY=sqlstate"));
         let result;
         if (sql === PROBE_SQL) {
           assert.ok(args.includes("--quiet"));
@@ -84,12 +86,16 @@ async function fixture(t, overrides = {}) {
           assert.match(sql, /COMMIT;$/);
           result = overrides.probe ?? "170011|t|t|t|t|t";
         }
+        else if (sql === INSPECT_SOURCE_CAPABILITIES_SQL) result = overrides.capabilities ?? CAPABILITIES;
         else if (sql === FREEZE_SOURCE_SQL) { schema = true; frozen = true; result = "t|23"; }
         else if (sql === UNFREEZE_SOURCE_SQL) { frozen = false; result = "f|23"; }
         else if (sql === INSPECT_CUTOVER_SCHEMA_SQL) result = schema ? "t" : "f";
         else if (sql === INSPECT_CUTOVER_STATE_SQL) result = `${frozen ? "t" : "f"}|${overrides.triggerCount ?? 23}`;
         else throw new Error("Unexpected SQL");
-        source = sql === PROBE_SQL && overrides.probeError
+        if (sql === FREEZE_SOURCE_SQL && overrides.freezeError) {
+          schema = false; frozen = false; // Simulate transaction rollback.
+          source = `process.stdout.write(${JSON.stringify(overrides.freezeProgress ?? "mfmf-cutover:lock\n")}); process.stderr.write(${JSON.stringify(overrides.freezeError)}); process.exitCode=1;`;
+        } else source = sql === PROBE_SQL && overrides.probeError
           ? `process.stderr.write(${JSON.stringify(overrides.probeError)}); process.exitCode=1;`
           : `console.log(${JSON.stringify(result)});`;
       } else if (command.endsWith("pg_dump")) {
@@ -293,4 +299,56 @@ test("source freeze includes MFA factor enrollment, mutation and removal in its 
 test("preserve rejects a legacy 22-guard freeze missing MFA coverage",async(t)=>{
  const f=await fixture(t,{schema:true,frozen:true,triggerCount:22});
  await failsClean(f,{},"cutover-inspect");
+});
+
+test("source catalog diagnostic is READ ONLY, fixed 23 relations and no user data", () => {
+  assert.match(INSPECT_SOURCE_CAPABILITIES_SQL, /^BEGIN READ ONLY;/);
+  assert.match(INSPECT_SOURCE_CAPABILITIES_SQL, /COMMIT;$/);
+  assert.doesNotMatch(INSPECT_SOURCE_CAPABILITIES_SQL, /(?:UPDATE|DELETE|TRUNCATE|INSERT|ALTER|GRANT)\s+(?:TABLE|INTO|public\.|auth\.)/);
+  assert.match(INSPECT_SOURCE_CAPABILITIES_SQL, /has_parameter_privilege\(oid,'session_replication_role','SET'\)/);
+  const parsed = parseSourceCapabilities(CAPABILITIES);
+  assert.equal(parsed.publicTables.owner, 20);
+  assert.equal(parsed.auth.mfaFactors.trigger, true);
+  assert.equal(parsed.replicationRoles.supabase_auth_admin.canSetReplicationRole, false);
+  for (const bad of [PRIVATE, CAPABILITIES.replace(/^t/, "f"), CAPABILITIES.replace("|20|", "|21|"), CAPABILITIES+"|t"]) {
+    assert.throws(()=>parseSourceCapabilities(bad), e=>!e.message.includes(PRIVATE));
+  }
+});
+test("capability diagnosis does not assert catalog ownership is a provider DDL hardgate", async(t) => {
+  const fields = CAPABILITIES.split("|"); fields[8]="19"; fields[11]="f"; fields[19]="f"; fields[20]="f";
+  const f=await fixture(t,{capabilities:fields.join("|")});
+  const result=await f.run({operation:"freeze-and-backup"});
+  assert.equal(result.sourceCapabilities.auth.users.owner,false);
+  assert.equal(result.sourceCapabilities.auth.mfaFactors.trigger,false);
+  assert.equal(result.frozen,true,"actual fixed DDL is decisive; Supautils can override catalog privileges");
+});
+test("preserve reports only bounded catalog capabilities without freeze statements",async(t)=>{
+  const f=await fixture(t), result=await f.run();
+  assert.deepEqual(result.sourceCapabilities,parseSourceCapabilities(CAPABILITIES));
+  assert.ok(!JSON.stringify(result).includes(PRIVATE));
+  assert.equal(f.calls.filter(c=>c.args.at(-1)===INSPECT_SOURCE_CAPABILITIES_SQL).length,1);
+  assert.equal(f.calls.filter(c=>[FREEZE_SOURCE_SQL,UNFREEZE_SOURCE_SQL].includes(c.args.at(-1))).length,0);
+});
+test("fixed SQLSTATE plus exact failed table/substage is reported without raw errors",async(t)=>{
+  for(const [code,reason] of [["25006","read-only-transaction"],["42501","insufficient-privilege"],["55P03","lock-timeout"],["57014","query-canceled"],["55000","source-invariant"],["42P01","relation-missing"],["42883","function-missing"],["0A000","unsupported-feature"]]){
+    const f=await fixture(t,{freezeError:`ERROR:  ${code} ${PRIVATE}`,freezeProgress:"mfmf-cutover:create-auth-mfa_factors\n"});
+    await assert.rejects(f.run({operation:"freeze-and-backup"}),e=>{
+      const d=diagnostic(e);assert.equal(d.stage,"source-freeze");assert.equal(d.substage,"create-auth-mfa_factors");assert.equal(d.sqlState,code);assert.equal(d.reason,reason);assert.deepEqual(d.sourceCapabilities,parseSourceCapabilities(CAPABILITIES));assert.ok(!JSON.stringify(d).includes(PRIVATE));return true;
+    });
+    assert.equal(f.frozen(),false);assert.equal(f.calls.filter(c=>c.args.at(-1)===UNFREEZE_SOURCE_SQL).length,0);
+    assert.deepEqual(await readdir(f.root),[]);
+  }
+  assert.equal(processSqlState(`ERROR: ${PRIVATE}`),undefined);
+  assert.equal(processSqlState("ERROR: ZZ999"),undefined);
+});
+test("cutover SQL explicitly establishes READ WRITE and reports fixed progress only",()=>{
+  for(const text of [FREEZE_SOURCE_SQL,UNFREEZE_SOURCE_SQL])assert.match(text,/^BEGIN READ WRITE;/);
+  const progress=parseCutoverProgress("mfmf-cutover:identity\nmfmf-cutover:enable-auth-identities\nmfmf-cutover:inspect\nt|23");
+  assert.deepEqual(progress,{substage:"inspect",result:"t|23"});
+  assert.deepEqual(parseCutoverProgress(""),{substage:"transaction",result:undefined});
+  for(const bad of [PRIVATE,"mfmf-cutover:"+PRIVATE,"t|22","t|23\nmfmf-cutover:lock"])assert.throws(()=>parseCutoverProgress(bad),e=>!e.message.includes(PRIVATE));
+});
+test("unexpected capabilities or cutover stdout never escapes diagnostics",async(t)=>{
+  await failsClean(await fixture(t,{capabilities:PRIVATE}),{},"source-capabilities");
+  await failsClean(await fixture(t,{freezeError:`ERROR: 42501 ${PRIVATE}`,freezeProgress:PRIVATE}),{operation:"freeze-and-backup"},"source-freeze");
 });
