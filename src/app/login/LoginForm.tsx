@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createAuthClient } from "@/lib/identity/client";
 import { sanitizeNextPath, withNext } from "@/lib/nextPath";
 import { keepPostLoginNext } from "@/lib/keepPostLoginNext";
 
@@ -63,7 +63,7 @@ export default function LoginForm({ signupEnabled }: Props) {
     // されたりしても、このタブから始めるログインはこの戻り先を使う。
     await keepPostLoginNext(next);
 
-    const supabase = createClient();
+    const supabase = createAuthClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -87,7 +87,7 @@ export default function LoginForm({ signupEnabled }: Props) {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
+    const supabase = createAuthClient();
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,

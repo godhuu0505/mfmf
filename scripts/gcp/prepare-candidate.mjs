@@ -5,8 +5,9 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
-import { requireContinuousContext } from "./production-config.mjs";
+import { requireContinuousContext, SERVICE_NAME, PROJECT, PROJECT_NUMBER } from "./production-config.mjs";
 import { BuildKeyError, readServerActionsBuildKey } from "./server-actions-build-key.mjs";
+import { DATABASE_SECRETS, databaseMode, databasePins, databaseSourceConfig } from "./database-deployment-config.mjs";
 
 const execFileAsync = promisify(execFile);
 const REGISTRY = "asia-northeast1-docker.pkg.dev";
@@ -16,9 +17,10 @@ export const SECRET_NAMES = {
   GOOGLE_CLIENT_ID: "mfmf-google-client-id",
   GOOGLE_CLIENT_SECRET: "mfmf-google-client-secret",
   SENTRY_DSN: "mfmf-sentry-dsn",
+  ...DATABASE_SECRETS,
 };
 const OPTIONAL_CONFIG = ["SIGNUP_ENABLED", "SENTRY_ENVIRONMENT", "SENTRY_TRACES_SAMPLE_RATE"];
-const ALLOWED = new Set([...PUBLIC_KEYS, ...Object.keys(SECRET_NAMES), ...OPTIONAL_CONFIG]);
+const ALLOWED = new Set([...PUBLIC_KEYS, ...Object.keys(SECRET_NAMES).filter((key) => !Object.hasOwn(DATABASE_SECRETS, key)), ...OPTIONAL_CONFIG]);
 const PRESEEDED_KEYS = ["TOKEN_ENC_KEY", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
 class CandidateError extends Error {}
 
@@ -37,8 +39,9 @@ export function parsePreseededSecretVersions(env) {
   if (!input.trim()) return {};
   let refs;
   try { refs = JSON.parse(input); } catch { throw new CandidateError("Preseeded secret references must be JSON; input withheld."); }
+  const allowed = [...PRESEEDED_KEYS, ...(databaseMode(env) ? Object.keys(DATABASE_SECRETS) : [])];
   if (!refs || typeof refs !== "object" || Array.isArray(refs) ||
-      Object.entries(refs).some(([key, value]) => !PRESEEDED_KEYS.includes(key) || !validSecretVersion(value, key, env))) {
+      Object.entries(refs).some(([key, value]) => !allowed.includes(key) || !validSecretVersion(value, key, env))) {
     throw new CandidateError("Preseeded secret references must use fixed names, this project, and positive numeric versions.");
   }
   return refs;
@@ -226,11 +229,12 @@ async function readProductionConfig(env, fetchImpl, preseeded) {
 }
 
 export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, log = console.log, mode = "manual" }) {
+  const database = databaseMode(env);
   if (mode === "production") requireContinuousContext(env);
   else if (mode !== "manual" || env.GITHUB_ACTIONS !== "true" || env.GITHUB_REF !== "refs/heads/main" || env.GITHUB_EVENT_NAME !== "workflow_dispatch") {
     throw new CandidateError("Candidate preparation requires a manual main workflow run.");
   }
-  for (const key of ["VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID", "GCP_ACCESS_TOKEN"]) {
+  for (const key of [...(database ? [] : ["VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID"]), "GCP_ACCESS_TOKEN"]) {
     if (!env[key] || /[\r\n]/.test(env[key])) throw new CandidateError("Required deployment credentials are missing or invalid.");
   }
   if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(env.GCP_PROJECT_ID ?? "") ||
@@ -240,18 +244,28 @@ export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, l
     throw new CandidateError("Deployment project or workflow identity is invalid.");
   }
   const preseeded = parsePreseededSecretVersions(env);
-  const { publicEnv, secrets, features } = await readProductionConfig(env, fetchImpl, preseeded);
+  if (database && (env.GCP_PROJECT_ID !== PROJECT || env.GCP_PROJECT_NUMBER !== PROJECT_NUMBER)) {
+    throw new CandidateError("Database mode requires the fixed production project.");
+  }
+  if (database && [...PRESEEDED_KEYS, ...Object.keys(DATABASE_SECRETS)].some((key) => !preseeded[key])) {
+    throw new CandidateError("Database mode requires all fixed server secret references.");
+  }
+  const selected = database
+    ? databaseSourceConfig(await requestJson(fetchImpl, `https://run.googleapis.com/v2/${SERVICE_NAME}`, env.GCP_ACCESS_TOKEN), preseeded)
+    : await readProductionConfig(env, fetchImpl, preseeded);
+  const { publicEnv, secrets, features } = selected;
   const buildKey = await readServerActionsBuildKey(env, fetchImpl);
   const imageBase = `${REGISTRY}/${env.GCP_PROJECT_ID}/mfmf/mfmf-candidate`;
   const image = `${imageBase}:${env.GITHUB_SHA}-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
-  log("Production settings validated. Building candidate with public Supabase settings and signup flag only.");
+  log("Production settings validated. Building candidate with matching public authentication mode.");
   await docker(["build", "--platform", "linux/amd64", "-f", "Dockerfile.cloudrun",
     ...[...PUBLIC_KEYS, "SIGNUP_ENABLED"].flatMap((key) => ["--build-arg", `${key}=${publicEnv[key]}`]),
+    ...(database ? ["--build-arg", "NEXT_PUBLIC_GCP_AUTH_ENABLED=true"] : []),
     "--build-arg", `NEXT_SERVER_ACTIONS_KEY_VERSION=${buildKey.reference}`,
     "--secret", "id=next-server-actions-key,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY", "-t", image, "."], false,
   { NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: buildKey.key });
 
-  const secretVersions = { ...preseeded };
+  const secretVersions = { ...preseeded, ...selected.secretVersions };
   for (const [key, value] of Object.entries(secrets)) {
     const parent = `projects/${env.GCP_PROJECT_ID}/secrets/${SECRET_NAMES[key]}`;
     // addVersion だけ。対象は bootstrap 済み固定名であり、secret 作成・読取・上書き権限は不要。
@@ -272,7 +286,21 @@ export async function prepareCandidate({ env, fetchImpl = fetch, docker, save, l
   const digest = Array.isArray(digests) && digests.find((item) => typeof item === "string" &&
     item.startsWith(`${imageBase}@sha256:`) && /^[a-f0-9]{64}$/.test(item.slice(`${imageBase}@sha256:`.length)));
   if (!digest) throw new CandidateError("Artifact Registry image digest is missing.");
-  await save({ image: digest, region: "asia-northeast1", service: "mfmf-candidate", env: publicEnv, features, secretVersions });
+  let migrationImage;
+  if (database) {
+    const operatorBase = `${REGISTRY}/${env.GCP_PROJECT_ID}/mfmf/mfmf-db-operator`;
+    const operatorTag = `${operatorBase}:${env.GITHUB_SHA}-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
+    await docker(["build", "--platform", "linux/amd64", "-f", "Dockerfile.gcp-operator", "-t", operatorTag, "."], false);
+    await docker(["push", operatorTag], true);
+    let operatorDigests;
+    try { operatorDigests = JSON.parse(await docker(["image", "inspect", operatorTag, "--format", "{{json .RepoDigests}}"], false)); }
+    catch { throw new CandidateError("Operator image digest could not be verified."); }
+    migrationImage = Array.isArray(operatorDigests) && operatorDigests.find((item) => typeof item === "string"
+      && item.startsWith(`${operatorBase}@sha256:`) && /^[a-f0-9]{64}$/.test(item.slice(`${operatorBase}@sha256:`.length)));
+    if (!migrationImage) throw new CandidateError("Operator image digest is missing.");
+  }
+  await save({ image: digest, region: "asia-northeast1", service: "mfmf-candidate", env: publicEnv, features, secretVersions,
+    ...(database ? { migrationImage } : {}) });
   log("Candidate image and public configuration prepared. No Cloud Run service or traffic was changed.");
 }
 
@@ -295,6 +323,19 @@ async function main() {
     throw new CandidateError("Workflow event is missing, invalid, or too large; input withheld.");
   }
   const workflowEnv = { ...process.env, PRESEEDED_SECRET_VERSIONS: input };
+  if (databaseMode(workflowEnv)) {
+    const base = parsePreseededSecretVersions({ ...workflowEnv, GCP_AUTH_ENABLED: "false", NEXT_PUBLIC_GCP_AUTH_ENABLED: "false",
+      PRESEEDED_SECRET_VERSIONS: await readFile(new URL("./production-secret-versions.json", import.meta.url), "utf8") });
+    if (Object.keys(base).length !== 3 || PRESEEDED_KEYS.some((key) => !base[key]?.startsWith(`projects/${PROJECT_NUMBER}/`))) {
+      throw new CandidateError("Committed server secret references are invalid.");
+    }
+    const refs = { ...base, ...databasePins(await readFile(new URL("./production-database-secret-versions.json", import.meta.url), "utf8")) };
+    const original = parsePreseededSecretVersions(workflowEnv);
+    if (Object.keys(refs).some((key) => original[key] !== undefined && original[key] !== refs[key])) {
+      throw new CandidateError("Manual input changed a committed server secret reference.");
+    }
+    workflowEnv.PRESEEDED_SECRET_VERSIONS = JSON.stringify({ ...original, ...refs });
+  }
   parsePreseededSecretVersions(workflowEnv);
   await prepareWithDocker(workflowEnv);
 }

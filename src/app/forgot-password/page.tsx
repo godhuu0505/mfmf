@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createAuthClient } from "@/lib/identity/client";
 import { sanitizeNextPath, withNext } from "@/lib/nextPath";
 import { keepPostLoginNext } from "@/lib/keepPostLoginNext";
 
@@ -31,7 +31,7 @@ export default function ForgotPasswordPage() {
     // 招待リンクなどの戻り先はここで貼り直す（メールの往復に耐えるように）。
     await keepPostLoginNext(next);
 
-    const supabase = createClient();
+    const supabase = createAuthClient();
     // 再設定リンク → /auth/callback で code をセッションへ交換 → /reset-password。
     await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,

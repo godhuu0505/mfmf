@@ -58,6 +58,7 @@ jobs:
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
           GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
           GCP_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          GCP_AUTH_ENABLED: ${{ vars.GCP_AUTH_ENABLED || 'false' }}
           CANDIDATE_PUBLIC_CONFIG: ${{ runner.temp }}/candidate-public.json
         run: node scripts/gcp/prepare-candidate.mjs
 
