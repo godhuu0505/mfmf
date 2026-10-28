@@ -1,12 +1,50 @@
 # インフラを Google Cloud へ寄せる — アーキテクチャ案
 
-Vercel Hobby + Supabase Free（[D18](./decisions.md)）で動いている mfmf を、
-**Google Cloud を中心とする構成**へ段階的に置き換える計画です。
-2026-10-26 に **月額おおむね3,000円の負担を許容して移行を進める**ことを決定しました（D38）。
-本番切替は未実施です。まず P0 / P1 の土台と配信を検証し、DB・認証・画像は当面 Supabase を維持します。
+この文書は2026-10-26の段階移行計画と、その後の実装差分を記録します。
+D18からD38への判断の経緯や検討段階のコード例は履歴として残します。
+**運用の正は以下の現行実装へのリンクです。本文の案・旧P3/P4分割手順をそのまま本番へ実行しないでください。**
 
-このドキュメントは「なぜその形か」と「どこが難所か」を残すためのものです。
-現状の仕様（テーブル・画面・RLS）は書きません（[D16](./decisions.md)）。正はコードです。
+## 現在の実装と切替記録
+
+**切替後の確認: 今回の文書PRのCI・通常配信はpending。** managed restoreと全行全列一致、新しいbackup、GCP候補100%へのpromote、実Googleログイン・画面一致・軽量並行GETを確認済みです。
+ログイン後の再照合でfrozen/gcsの全行全列一致を確認してから、2026-10-28 18:03:33.456726 UTCにactivationが成功し、DB書込enabled・media gcsへ切り替わりました。
+同じ本人プロフィールを同値で保存できたことも確認済みです。事後inspectでDB enabled・media writes gcs・read backend gcs・imported=trueと全件数の維持を確認しました。残るCI・通常配信の証跡は実行後に追記します。
+
+| 層 | 実装と正 |
+| --- | --- |
+| 配信 | Cloud Run。Next.js＋loopback PostgREST＋Cloud SQL Auth Proxyを単一containerで実行。1CPU/1GiB、concurrency2、min0/max1、DB pool2 |
+| DB | 東京・PostgreSQL 17・Enterprise・db-f1-micro・単一ゾーン。Private IP、connector必須、Direct VPC private-ranges-only。HA/NAT/常時connectorは追加しない |
+| Auth | Identity Platform。既存providerとUUIDの対応を確認し、serverで失効確認・内部UUID対応・RLS用の短期tokenを作る。[認証境界](../../src/lib/identity/README.md) |
+| データアクセス | `src/lib/supabase/server.ts` の入口を維持し、GCPモードではserver専用bridgeへ分岐。SDKはPostgRESTクエリビルダにだけ使う。下記の直接pg/withUser案は採用していない |
+| 画像 | 非公開GCS、DB台帳・世代・binding・全byte hashで検証。[画像移送手順](../guides/storage-migration-operator.md) |
+| スキーマ／CI | [`db/gcp/`](../../db/gcp/README.md) のbaseline・checksum・元migration集合照合と実PostgreSQL/PostgREST試験。ローカルSupabaseと従来suiteも残す |
+| 通常配信 | [GCP DB通常配信](../guides/gcp-database-deployment.md)。trueモードでは旧Supabase migration/Vercel配信をskip。初回切替・import・activateは自動実行しない |
+
+今回のDBとAuthは最終source snapshotを共通にして切り替えます。旧計画の「DBだけ先に切り替え、後でAuth」を採用しません。
+元Supabaseのpublic20表ALWAYS＋credential Auth6表ORIGINを厳格なreplica回避防止条件付きで凍結し、dump前後を検査します。
+全27Auth表を照合して未対応18表が非空なら停止します。元DB・原本・旧画像は削除せず保全します。
+Auth session等の一時データを含む「全Auth状態の凍結」を意味しません。管理設定変更も別途禁止します。
+
+| 切替の証跡 | 状態 |
+| --- | --- |
+| 最終source26guard／schema3・暗号化原本、IdP UUID/provider対応、GCS全件hash/binding | 確認済み |
+| IdP手動暗号化export・独立復号・restore plan | 確認済み（4ユーザー・Google4・BCRYPT1・再設定必須0。実account restoreは未実施） |
+| 最終Cloud SQL import・復元後verify-import全行全列結果・inspect | 確認済み。復元後も全行全列一致、frozen/gcs |
+| managed backup同instance復元・設定確認・新しい復旧点 | 確認済み。18分47.589秒、backup設定一致・修復不要、post-restore backup成功 |
+| GCP候補100%へのpromote・canonical frozen login | 確認済み。2026-10-28 17:54:23 UTCにpromote。実Googleログイン後、profileの既定記入者・同じ世帯owner・同じpet・空のhomeが旧画面と一致 |
+| 軽量2並行GET | `/settings/account` 200・742.901ms、`/pets` 200・675.654ms。今回の現revision観測範囲で5xx/WARNなし。単発smokeであり負荷保証ではない |
+| ログイン後のDB再照合 | verify-importで全行全列一致、frozen/gcsを再確認。画面一致だけでDBの同一性を判断していない |
+| activation・本人の書込確認 | 2026-10-28 18:03:33.456726 UTC成功、changed=true・DB enabled・media gcs。18:04:29 UTCに既存profileの同値保存と成功表示を確認 |
+| activation後inspect | 確認済み。DB enabled・media writes gcs・read backend gcs・imported=true、全件数維持 |
+| 今回の文書PRのCI | pending |
+| Job通常形への復帰・workflow再開 | 確認済み。通常3項目のenvを検証し、upgradeはapplied=0・sourceManifestVerified=true。workflow state=active、GCP_AUTH_ENABLED/GCP_DEPLOY_ENABLEDともtrue |
+| 次のmainへのpushによる通常配信 | pending（今回の文書PRの全CI成功・merge後に実行結果を確認） |
+
+source凍結からactivationまでは47分21.116秒でした。この一回の実測であり、次回の停止時間や復旧時間を保証するものではありません。
+復旧の限界は [デプロイ手順](../guides/deploy.md#バックアップと復旧範囲)を参照します。
+Cloud SQL自動backup/PITR設定、同instance backup復元の実証、別instanceへのPITR実証は別です。
+IdPは手動暗号化exportと独立した復号・restore plan検証が成功し、4ユーザー・Google link4件・BCRYPT1件を保全しました。今回は再設定必須0件です。定期自動backupや実アカウントrestoreは未実施で、復旧点は最後に検証成功した手動export時点です。
+Standard on-demandは無期限のため、未適用SQLの通常upgradeは保持・削除手順を実証するまで停止します。
 
 ---
 
@@ -17,8 +55,8 @@ Vercel Hobby + Supabase Free（[D18](./decisions.md)）で動いている mfmf �
 | **採る形** | Cloud Run（Next.js）＋ Cloud SQL for PostgreSQL ＋ Identity Platform ＋ Cloud Storage |
 | **守るもの** | `public` の **既存RLS・関数の認可契約・Storage非依存のpgTAP**を保ち、互換DBで検証する |
 | **作り直すもの** | Storageの認可、**`delete_own_household`**、**Storageを参照するpgTAP**（§4.2） |
-| **置き換えるAPI** | Supabase PostgREST経由のデータ取得・RPC（`supabase-js`のクエリビルダ） |
-| **費用** | 完全移行後は **約2,400〜2,700円/月（税込概算、1 USD = 150円の仮定）**。予算目安3,000円。P0 / P1 では Cloud SQL を作成せず、費用の発生を段階に分ける（§6） |
+| **データAPI** | Supabaseの外部PostgREST接続をserver専用loopbackへ移す。`supabase-js`のクエリビルダとServer Action認可は維持 |
+| **費用** | 月3,000円は条件付き目標。31日・復元検証予備込み約2,851円、Run無料枠を使えなければ約3,128円。正価・税・使用量の前提は§6 |
 | **利用者影響** | P1 はまず別の `run.app` URL で検証。公開URLを変更する場合は再ログインとPWAの再インストールを確認する。P3 の停止時間は復元リハーサルの実測後に決め、30〜60分を保証しない |
 
 D38 は D18 の無料枠限定方針を移行後の構成について変更します。運用対象を絞る方針と
@@ -47,7 +85,7 @@ RLSによるデータ分離は維持します。自動バックアップ・PITR�
 
 ---
 
-## 2. 3 つの案と、却下したもの
+## 2. 3 つの案と、却下したもの（検討当時の比較）
 
 > **この節は要約です。** 評価観点を外部の枠組み（Well-Architected の 6 本柱／技術選定の
 > MCDA・ADR／ロックインの出口テスト）から引き直し、レイヤごとの候補を出して重み付きで
@@ -76,7 +114,7 @@ flowchart LR
 
 ---
 
-## 3. 目標アーキテクチャ
+## 3. 目標アーキテクチャ（検討当時の案）
 
 ### 3.1 レイヤの対応
 
@@ -140,7 +178,7 @@ flowchart TB
 
 ---
 
-## 4. 難所は 2 つ半
+## 4. 難所は 2 つ半（検討当時の設計例）
 
 ### 4.1 難所その 1 — RLS を Supabase 無しで動かす
 
@@ -662,7 +700,7 @@ D22 が「写真の事故からは戻せないことを許容」と書いた穴�
 
 ---
 
-## 5. CI/CD と環境
+## 5. CI/CD と環境（検討当時の案）
 
 ```mermaid
 flowchart TB
@@ -710,41 +748,40 @@ Cloud Run のリビジョンタグでプレビュー URL も出せます。
 
 ---
 
-## 6. 費用と予算（2026-10-26確認、東京、2人利用）
+## 6. 費用と予算（2026-10-28 JPY公開SKU照合、東京）
 
-**月額目安3,000円の移行を承認済み**です。これは運用予算であり、GCPの課金が自動停止する上限ではありません。
-以下は税込概算 **約2,400〜2,700円/月**。公開USD単価を **1 USD = 150円** で仮換算し、
-税相当10%を仮置きしています。実請求は請求通貨のSKU価格・適用税・使用量に従い、為替予測ではありません。
+月3,000円は承認された上限目標で、課金を停止する上限ではありません。共有コアの制約を受け入れて費用を抑えます。
+**約2,400〜2,700円という旧USD仮換算だけで現在の全体費用を判断しません。** 以下は長期コミットなしの公開JPY単価に税10%を仮置きした31日見積です。
 
-| 項目 | 使用量の仮定と単価 | 月額USD（税別） |
+| 項目 | 前提 | 税込概算 |
 | --- | --- | ---: |
-| Cloud SQL CPU / RAM | db-f1-micro、単一ゾーン、$0.014/時間 × 730時間 | $10.22 |
-| Cloud SQL SSD | 最小10GiB × $0.221/GiB月 | $2.21 |
-| Cloud SQLバックアップ | **実際に保存される合計量**を10GiBと仮定 × $0.104/GiB月。保持世代・PITR・デプロイ前バックアップで変動 | $1.04 |
-| Cloud Storage | 東京Standard、現行・旧世代・soft delete分を合計10GiB × $0.023、国内配信5GiB × $0.12、少量の操作 | 約$0.84 |
-| Cloud Run | 最小0、1vCPU / 512MiB、月3万リクエスト・平均処理1秒。起動時間を含め無料枠のCPU / RAM / リクエスト内 | 計算資源$0 |
-| Identity Platform | Google / email認証2MAU、SMSなし | $0 |
-| その他の余裕 | Artifact Registry数世代、Cloud Run外向き通信、Secret Manager等。実使用量を月次確認 | $0.50〜1.50 |
-| **合計** | 税別約2,200〜2,400円、税込・端数を含め約2,400〜2,700円 | **約$14.81〜15.81** |
+| Cloud SQL | db-f1-micro×744h、SSD10GiB、保存backup総量10GiB | 2,363円/月 |
+| 付帯サービスと予備 | GCS保存10GiB/配信5GiB/操作、AR1GiB、Secret10versions/1,000access、Run送信1GiB、その他税別100円。Run計算無料枠利用可 | 411円/月 |
+| 復元検証の予備 | 24時間の追加検証instance等を月1回と仮定。実際の方式・時間・保持量で変動 | 76円/月 |
+| **合計** | Run 1CPU/1GiB、月3万request×2秒を共有無料枠内、IdP少人数のGoogle/email、SMSなし | **約2,851円/月** |
+| Run無料枠を利用できない場合 | 同じ負荷で計算・request分を約277円追加 | **約3,128円/月** |
 
-根拠は [Cloud SQL](https://cloud.google.com/sql/pricing)、[Cloud Storage](https://cloud.google.com/storage/pricing)、
-[Cloud Run](https://cloud.google.com/run/pricing)、[Identity Platform](https://cloud.google.com/identity-platform/pricing)、
-[無料枠](https://docs.cloud.google.com/free/docs/free-cloud-features)。SQLとStorageの料金表は **Tokyo (asia-northeast1)** を選択した値です。
-Cloud Storageの無料枠は米国の指定リージョンのみで、東京へ適用していません。
-Cloud Runの無料枠（月200万リクエスト・18万vCPU秒・36万GiB秒）は請求先内の他サービス利用とも共有され、東京の外向き通信は別料金です。
+合計は丸め前の約2,363.05＋411.39＋76.23＝2,850.67円から算出しています。
+無料枠を使えない場合は約277.01円を加え、3,127.68円です。単発の性能smokeから月間使用量は推定しません。
+税別単価の例はmicro 2.20073円/時、SSD 34.740095円/GiB月、backup 16.34828円/GiB月です。
+[Cloud Billing Catalog](https://docs.cloud.google.com/billing/v1/how-tos/catalog-api)のJPY SKUで確認しており、USDを任意の為替で再換算していません。
+[Cloud SQL](https://cloud.google.com/sql/pricing/)、[Cloud Run](https://cloud.google.com/run/pricing)、
+[Storage](https://cloud.google.com/storage/pricing)、[Identity Platform](https://cloud.google.com/identity-platform/pricing)、
+[Artifact Registry](https://cloud.google.com/artifact-registry/pricing)、[Secret Manager](https://cloud.google.com/secret-manager/pricing)の正価・適用税・実使用量が優先します。
+無料枠は請求アカウント内で共有され、東京GCSを米国限定の保存無料枠に含めません。
 
-**Cloud SQL共有コアはSLAの対象外**です。性能不足でdb-g1-smallへ上げると、CPU / RAMだけで
-$0.046 × 730 = $33.58になり、全体は税別約5,700〜5,900円/月へ増えます。負荷試験で不足する場合は、
-3,000円内で可能と扱わず構成と予算を再判断します。独立した検証用SQL、HA、ALB、Cloud NAT、
-Serverless VPC Accessコネクター、常時起動、ドメイン購入、既存の他プロジェクト費用、移行期間の二重稼働は上表の対象外です。
+backupの10GiBは全保存量の仮定であり、日次14件の各backupが10GiBという意味でも、保存量の上限でもありません。
+実容量が小さければ費用は減りますが、復元品質のための保持世代を予算だけで削りません。
+SSDは安全容量のため最大20GiBへ自動増設でき、縮小は自動で戻りません。20GiBになればこの見積を更新します。
+無期限手動backup、ARの複数image、Secret version、GCS soft delete、通信、build・移行二重稼働を月次確認します。
+初回移行の一時費用、HA、専有コア、ALB/NAT/connector、別SMTP、ドメインは上表に含めません。
 
-**GenAI App Builderクレジットの一般インフラへの適用は未確認で、割引として計上しません。**
-公式の[クレジット説明](https://docs.cloud.google.com/billing/docs/how-to/resolve-issues)では、Scopeによりサービス／SKUが限定されます。
-現在の[Agent Search料金](https://cloud.google.com/generative-ai-app-builder/pricing)は検索・索引・生成回答などの料金で、
-Cloud SQL / Run / Storage / Identity Platformの利用料を負担する根拠にはなりません。対象SKUと期限が確認できた用途だけ別に判断します。
-通常のFree Trialも予算には含めません。個別アカウントの残高・請求先識別子・適用明細は公開ドキュメントへ載せません。
+**共有コアはGoogle公式でテスト・開発向け、本番非推奨、SLA対象外です。** 単一ゾーンには障害時の自動failoverがありません。
+[公式instance設定](https://docs.cloud.google.com/sql/docs/postgres/instance-settings)を踏まえ、少人数の性能実測と復旧手段を条件に採用しています。
+メモリ不足・接続枯渇・遅延が出たら3,000円内で維持できると決めつけず、構成と予算を再判断します。
+GenAI用途限定クレジットと期限切れFree Trialは一般インフラ費用から差し引きません。個人の残高・請求先IDは記載しません。
 
-### 6.1 P0 / P1から費用を制御する
+### 6.1 P0 / P1からの費用制御（計画時の段階条件）
 
 - Cloud SQLはP3の検証準備が整うまで作成しない。P0 / P1は既存Supabaseを使い、まず配信だけを評価する。
 - Cloud Runは最小0・最大1・リクエスト課金を初期値とする。最大値はデプロイ時等の一時的超過があり得るため、課金上限とは扱わない。
@@ -778,7 +815,7 @@ Supabase Free と違い、GCP は上限に当たって止まるのではなく�
 
 ---
 
-## 7. 移行計画 — 準備と5段階、各段階で戻し方を検証する
+## 7. 移行計画 — 準備と5段階（検討当時の案）
 
 一気に切り替えないこと。**各フェーズの終わりで本番が動いていて、前のフェーズへ戻せる**
 順序にしてあります。難所（DB）を真ん中に置き、利用者影響のある認証を後ろに寄せています。
@@ -987,7 +1024,7 @@ P3 が終わった時点で DB は Cloud SQL、**認証はまだ Supabase** で�
 
 ---
 
-## 9. まだ決めていないこと
+## 9. 検討当時の未決事項（現在の判断は冒頭を参照）
 
 1. **公開URLと切替時期。** 月額おおむね3,000円で移行する判断はD38で済んでいます。P1の検証結果と利用者影響を見て本番入口を決めます
 2. **Sentry を残すか。** ブラウザ側の JS エラーは Cloud Error Reporting では拾えないので、

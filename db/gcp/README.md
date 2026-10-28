@@ -1,8 +1,10 @@
 # GCP の DB ベースラインと認証ミラー
 
-このディレクトリは **新しい空の Cloud SQL PostgreSQL 17** 用の候補です。
-既存 Supabase へ適用しません。Cloud SQL への実適用・本番データの復元・認証切替はまだ行っていません。
-既存 `supabase/migrations/` は変更せず、現在の RLS と RPC を別の所有者・認証方式へ移します。
+このディレクトリは **Cloud SQL PostgreSQL 17のbaseline・operator・追加SQLの契約**です。
+baselineの新規適用は空DBに限定し、既存Supabaseへ適用しません。実baseline適用と最終importは実施済みです。
+最終復元・受入・配信再開の状態は [移行記録](../../docs/explanation/gcp-migration.md#現在の実装と切替記録)を参照してください。
+`supabase/migrations/` は互換元・ローカル開発の履歴として残し、source manifestで対応を追跡します。
+既存baselineを稼働DBへ再適用せず、通常変更は追加migrationとchecksum ledgerの契約に従います。
 
 ## 適用する主体
 
