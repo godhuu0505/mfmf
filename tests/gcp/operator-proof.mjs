@@ -2,7 +2,7 @@
 // namespace by run-operator-tests.py. No API, metadata, source archive or env file.
 import assert from "node:assert/strict";
 import { Client } from "pg";
-import { COLUMNS,FORMAT,SOURCE,runOperator } from "../../scripts/gcp/database-operator.mjs";
+import { COLUMNS,FORMAT,SOURCE,runOperator,diagnostic } from "../../scripts/gcp/database-operator.mjs";
 const credentials={postgres:"p".repeat(43),migrator:"m".repeat(43),operator:"o".repeat(43)};
 const env={CLOUD_RUN_JOB:"mfmf-db-operator",CLOUD_RUN_TASK_INDEX:"0",CLOUD_RUN_TASK_COUNT:"1",CLOUD_RUN_TASK_ATTEMPT:"0",
  MFMF_DB_OPERATOR_CREDENTIALS:JSON.stringify(credentials),MFMF_DATABASE_PASSWORD:"r".repeat(43),
@@ -79,6 +79,11 @@ try {
  const provision=await connectImpl({user:"postgres",database:"postgres"});
  await provision.query("CREATE DATABASE mfmf");await provision.end();
  assert.equal((await run("bootstrap")).baseline,"applied");
+ await assert.rejects(run("bootstrap"),error=>{
+  const result=diagnostic(error);
+  assert.equal(result.stage,"bootstrap");assert.equal(result.substage,"catalog");
+  assert.ok(result.reasons.includes("existing-app-roles")&&result.reasons.includes("public-objects"));return true;
+ });
  assert.equal((await run("inspect")).imported,false);
  assert.equal((await run("restore-test")).restore,"all-rows-compared");
  assert.equal((await run("migrate")).counts.auth_users,2);

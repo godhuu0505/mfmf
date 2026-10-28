@@ -5,6 +5,16 @@ export const OPERATOR_IMAGE = `asia-northeast1-docker.pkg.dev/${PROJECT}/mfmf/mf
 export const OPERATOR_JOB = `projects/${PROJECT}/locations/${REGION}/jobs/mfmf-db-operator`;
 const API = `https://run.googleapis.com/v2/${OPERATOR_JOB}`;
 const SA = `mfmf-db-operator@${PROJECT}.iam.gserviceaccount.com`;
+const fixedJob = (name) => ["mfmf-db-operator", OPERATOR_JOB,
+  OPERATOR_JOB.replace(`projects/${PROJECT}/`, `projects/${PROJECT_NUMBER}/`)].includes(name);
+// Cloud Run returns short names in Job.latestCreatedExecution and Execution.job.
+// Normalize only this fixed project's fixed Job, never follow an arbitrary URL.
+function executionName(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(`projects/${PROJECT_NUMBER}/`, `projects/${PROJECT}/`);
+  if (/^mfmf-db-operator-[a-z0-9-]+$/.test(normalized)) return `${OPERATOR_JOB}/executions/${normalized}`;
+  return new RegExp(`^${OPERATOR_JOB}/executions/mfmf-db-operator-[a-z0-9-]+$`).test(normalized) ? normalized : null;
+}
 const fail = (stage, status) => { throw new Error(`Database upgrade job failed: stage=${stage}${status ? ` http=${status}` : ""}; details withheld.`); };
 const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
@@ -70,20 +80,20 @@ export async function deployDatabaseJob({ env, image, fetchImpl = fetch,
     validateOperatorTask(job.template.template, expectedImage, sha);
   };
   const validateExecution = (value, expectedName) => {
-    if (!value || !new RegExp(`^${OPERATOR_JOB}/executions/mfmf-db-operator-[a-z0-9-]+$`).test(value.name ?? "")
-      || (expectedName && value.name !== expectedName) || value.job !== OPERATOR_JOB || value.deleteTime
+    if (!value || !executionName(value.name)
+      || (expectedName && executionName(value.name) !== expectedName) || !fixedJob(value.job) || value.deleteTime
       || value.taskCount !== 1 || value.parallelism !== 1) fail("execution-identity");
     validateOperatorTask(value.template, image, env.GITHUB_SHA);
-    return value.name;
+    return executionName(value.name);
   };
   const initial = await request(API, "read-job"); validateJob(initial);
   // Job PATCH never creates a missing Job or expands IAM; the initial operator
   // deployment and the first database cutover are separate, manual gates.
   if (initial.latestCreatedExecution?.name) {
-    const name = initial.latestCreatedExecution.name;
-    if (!new RegExp(`^${OPERATOR_JOB}/executions/mfmf-db-operator-[a-z0-9-]+$`).test(name)) fail("prior-execution");
+    const name = executionName(initial.latestCreatedExecution.name);
+    if (!name) fail("prior-execution");
     const previous = await request(`https://run.googleapis.com/v2/${name}`, "prior-execution");
-    if (previous.name !== name || previous.job !== OPERATOR_JOB || !previous.completionTime || (previous.runningCount ?? 0) !== 0) fail("prior-execution");
+    if (executionName(previous.name) !== name || !fixedJob(previous.job) || !previous.completionTime || (previous.runningCount ?? 0) !== 0) fail("prior-execution");
   }
   const template = structuredClone(initial.template);
   template.template.containers[0].image = image;
@@ -102,6 +112,6 @@ export async function deployDatabaseJob({ env, image, fetchImpl = fetch,
     || (finished.failedCount ?? 0) !== 0 || (finished.cancelledCount ?? 0) !== 0 || (finished.runningCount ?? 0) !== 0
     || (finished.retriedCount ?? 0) !== 0 || !finished.conditions?.some((c) => c.type === "Completed" && c.state === "CONDITION_SUCCEEDED")) fail("execution-result");
   const final = await request(API, "verify-job"); validateJob(final, image, env.GITHUB_SHA);
-  if (final.uid !== initial.uid || final.latestCreatedExecution?.name !== name) fail("job-changed");
+  if (final.uid !== initial.uid || executionName(final.latestCreatedExecution?.name) !== name) fail("job-changed");
   return { upgradeVerified: true };
 }

@@ -14,7 +14,7 @@ const task = () => ({ serviceAccount: "mfmf-db-operator@mfmf-499612.iam.gservice
       { name: "MFMF_DB_OPERATION", value: "upgrade" }, { name: "MFMF_DB_DEPLOY_SHA", value: "d".repeat(40) },
       { name: "MFMF_DB_OPERATOR_CREDENTIALS", valueSource: { secretKeyRef: { secret: "mfmf-db-operator-credentials", version: "1" } } },
     ] }] });
-function fixture({ change, failure } = {}) {
+function fixture({ change, failure, shortReferences = false } = {}) {
   let job = { name: OPERATOR_JOB, uid: "fixed-job", etag: "etag-before", generation: "1", observedGeneration: "1",
     terminalCondition: { state: "CONDITION_SUCCEEDED" }, template: { parallelism: 1, taskCount: 1, template: task() } };
   change?.(job); const calls = []; let execution;
@@ -33,7 +33,9 @@ function fixture({ change, failure } = {}) {
       if (failure === "image") execution.template.containers[0].image = `${OPERATOR_IMAGE}@sha256:${"e".repeat(64)}`;
       if (failure === "failed") { execution.succeededCount = 0; execution.failedCount = 1; }
       if (failure === "retry") execution.retriedCount = 1;
-      job.latestCreatedExecution = { name: execution.name }; return op(execution);
+      if (failure === "foreign-job") execution.job = "other-job";
+      if (shortReferences) execution.job = "mfmf-db-operator";
+      job.latestCreatedExecution = { name: shortReferences ? execution.name.split("/").pop() : execution.name }; return op(execution);
     }
     if (url === `https://run.googleapis.com/v2/${execution?.name}`) return Response.json(execution);
     if (url === API) return Response.json(job);
@@ -49,6 +51,10 @@ test("updates only an existing fixed job and verifies one successful exact-image
   assert.equal(patch.template.template.containers[0].env[1].value, env.GITHUB_SHA);
   assert.equal(writes[1].url, `${API}:run`);
 });
+test("accepts the observed API short execution reference and parent Job name", async () => {
+  const f = fixture({ shortReferences: true }); assert.deepEqual(await f.run(), { upgradeVerified: true });
+  assert.ok(f.calls.filter(({ url }) => url.includes("/executions/")).every(({ url }) => url.startsWith(`${API}/executions/mfmf-db-operator-`)));
+});
 for (const [label, change] of [
   ["foreign service account", (j) => { j.template.template.serviceAccount = "other"; }],
   ["public route", (j) => { j.template.template.vpcAccess.egress = "ALL_TRAFFIC"; }],
@@ -63,7 +69,7 @@ for (const [label, change] of [
 ]) test(`rejects ${label} before update/run`, async () => {
   const f = fixture({ change }); await assert.rejects(f.run()); assert.ok(f.calls.every(({ init }) => init.method === "GET"));
 });
-for (const failure of ["image", "failed", "retry"]) test(`never succeeds with execution ${failure}`, async () => {
+for (const failure of ["image", "failed", "retry", "foreign-job"]) test(`never succeeds with execution ${failure}`, async () => {
   await assert.rejects(fixture({ failure }).run());
 });
 test("disabled mode and PR context cannot access the job", async () => {

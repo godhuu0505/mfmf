@@ -182,9 +182,10 @@ test("age-keygen identity comments normalize to exactly one bounded key line",()
   }
 });
 
+const pristineCatalog={pristine:true,database_owner:true,public_owner:true,schemas:true,public_objects:true,extensions:true,event_triggers:true,existing_app_roles:true};
 for(const pristine of [true,false])test(`bootstrap ${pristine?"accepts a pristine existing database":"rejects any existing catalog or role drift"} without reset`,async()=>{
   const calls=[];
-  const client={async query(sql,params){calls.push({sql,params});return {rows:sql.includes("AS pristine")?[{pristine}]:[]};}};
+  const client={async query(sql,params){calls.push({sql,params});return {rows:sql.includes("AS pristine")?[{...pristineCatalog,pristine}]:[]};}};
   const root=process.cwd();
   const run=()=>applyBaseline(client,{...contract,baseline:"SELECT 1;"},root,credentials,"r".repeat(43));
   if(pristine)await run();else await assert.rejects(run());
@@ -194,6 +195,52 @@ for(const pristine of [true,false])test(`bootstrap ${pristine?"accepts a pristin
   assert.ok(calls.every(call=>!call.sql.includes("DROP DATABASE")&&!call.sql.includes("DROP ROLE")));
   assert.ok(calls.findIndex(call=>call.sql.includes("pg_advisory_xact_lock"))<calls.findIndex(call=>call.sql.includes("AS pristine")));
   assert.ok(calls.every(call=>!call.sql.includes(credentials.migrator)));
+});
+
+for(const [field,reason] of Object.entries({database_owner:"database-owner",public_owner:"public-owner",schemas:"schemas",
+ public_objects:"public-objects",extensions:"extensions",event_triggers:"event-triggers",existing_app_roles:"existing-app-roles"})) {
+ test(`bootstrap catalog emits only fixed ${reason} reason and never mutates a non-pristine target`,async()=>{
+  const calls=[];
+  const client={async query(sql){calls.push(sql);return {rows:sql.includes("AS pristine")?[{...pristineCatalog,pristine:false,[field]:false,detail:marker}]:[]};}};
+  await assert.rejects(applyBaseline(client,{...contract,baseline:"SELECT 1;"},process.cwd(),credentials,"r".repeat(43)),error=>{
+   assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage:"catalog",reasons:[reason]});
+   assert.ok(!JSON.stringify(error).includes(marker)&&!String(error).includes(marker));return true;
+  });
+  assert.equal(calls.at(-1),"ROLLBACK");assert.ok(calls.every(sql=>!/CREATE ROLE|COMMIT|DROP /.test(sql)));
+ });
+}
+test("bootstrap rejects absent, null or malformed catalog predicates without reflecting values",async()=>{
+ for(const rows of [[],[{...pristineCatalog,schemas:null}],[{...pristineCatalog,public_owner:marker}],[{pristine:true}]]) {
+  const calls=[];const client={async query(sql){calls.push(sql);return {rows:sql.includes("AS pristine")?rows:[]};}};
+  await assert.rejects(applyBaseline(client,{...contract,baseline:"SELECT 1;"},process.cwd(),credentials,"r".repeat(43)),error=>{
+   assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage:"catalog"});return true;
+  });
+  assert.ok(calls.every(sql=>!sql.includes("CREATE ROLE")));
+ }
+});
+for(const [substage,match] of [
+ ["catalog",sql=>sql.includes("AS pristine")],["roles",sql=>sql.includes("CREATE ROLE mfmf_owner")],
+ ["baseline",sql=>sql==="SELECT 1;"],["ledger",sql=>sql.startsWith("CREATE SCHEMA migration_admin")],
+ ["password",sql=>sql.startsWith("DO $$ BEGIN EXECUTE format('ALTER ROLE")],["commit",sql=>sql==="COMMIT"],
+])test(`bootstrap ${substage} failure exposes SQLSTATE only and rolls back`,async()=>{
+ const calls=[];const failure=Object.assign(new Error(marker),{code:"42501",detail:marker,where:marker,query:marker});
+ const client={async query(sql){calls.push(sql);if(match(sql))throw failure;return {rows:sql.includes("AS pristine")?[pristineCatalog]:[]};}};
+ await assert.rejects(applyBaseline(client,{...contract,baseline:"SELECT 1;"},process.cwd(),credentials,"r".repeat(43)),error=>{
+  assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage,sqlstate:"42501"});
+  assert.ok(!JSON.stringify(error).includes(marker)&&!String(error).includes(marker));return true;
+ });
+ assert.equal(calls.at(-1),"ROLLBACK");assert.equal(calls.filter(sql=>sql==="ROLLBACK").length,1);
+});
+test("bootstrap diagnostic rejects arbitrary exception codes and mutated diagnostic fields",async()=>{
+ for(const code of [marker,"42p01","42501\n",42501,"42501 ","P0001:detail"]) {
+  const client={async query(sql){if(sql.includes("AS pristine"))throw Object.assign(new Error(marker),{code});return {rows:[]};}};
+  await assert.rejects(applyBaseline(client,contract,process.cwd(),credentials,"r".repeat(43)),error=>{
+   assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage:"catalog"});
+   error.substage=marker;error.sqlstate=marker;error.reasons=[marker];
+   assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap"});
+   error.stage=marker;assert.deepEqual(diagnostic(error),{status:"failed",stage:"context"});return true;
+  });
+ }
 });
 
 for(const [name,options] of [["mismatched write state",{writeFrozen:false}],["missing ALWAYS guard",{triggerCount:20}]])test(`activate rejects ${name}`,async()=>{
