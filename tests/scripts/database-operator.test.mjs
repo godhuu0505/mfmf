@@ -254,6 +254,49 @@ test("bootstrap owner diagnosis never reflects arbitrary owner names, values or 
   });
  }
 });
+function managedBootstrap({initial={},privileges={owner_member:true,owner_usage:true,can_create_database:true},after={},failAt}={}) {
+ const calls=[];let changed=false;
+ const original={...pristineCatalog,pristine:false,database_owner:false,target_database_matches:true,admin_user_matches:true,
+  encoding_utf8:true,database_owner_class:"cloudsqlsuperuser",...initial};
+ const client={async query(sql){
+  calls.push(sql);if(failAt?.(sql))throw Object.assign(new Error(marker),{code:"42501"});
+  if(sql.includes("AS pristine"))return {rows:[changed?{...pristineCatalog,target_database_matches:true,admin_user_matches:true,
+   encoding_utf8:true,database_owner_class:"postgres",...after}:original]};
+  if(sql.startsWith("SELECT pg_has_role"))return {rows:privileges===null?[]:[privileges]};
+  if(sql==="ALTER DATABASE mfmf OWNER TO postgres")changed=true;
+  return {rows:[]};
+ }};return {calls,run:()=>applyBaseline(client,{...contract,baseline:"SELECT 1;"},process.cwd(),credentials,"r".repeat(43))};
+}
+test("managed bootstrap normalizes only the verified fixed owner and rereads all pristine predicates in one transaction",async()=>{
+ const f=managedBootstrap();assert.deepEqual(await f.run(),{databaseOwnerNormalized:true});
+ const changed=f.calls.indexOf("ALTER DATABASE mfmf OWNER TO postgres"),catalogs=f.calls.map((sql,index)=>sql.includes("AS pristine")?index:-1).filter(n=>n>=0);
+ assert.equal(catalogs.length,2);assert.ok(catalogs[0]<changed&&changed<catalogs[1]);
+ assert.ok(catalogs[1]<f.calls.findIndex(sql=>sql.includes("CREATE ROLE mfmf_owner")));
+ assert.equal(f.calls.filter(sql=>sql.startsWith("BEGIN")).length,1);assert.equal(f.calls.at(-1),"COMMIT");
+ assert.equal(f.calls.filter(sql=>sql.startsWith("ALTER DATABASE")).length,1);
+});
+for(const [name,options] of [
+ ["other owner",{initial:{database_owner_class:"other"}}],["system admin owner",{initial:{database_owner_class:"cloudsqladmin"}}],
+ ["wrong database",{initial:{target_database_matches:false}}],["wrong admin",{initial:{admin_user_matches:false}}],
+ ["wrong encoding",{initial:{encoding_utf8:false}}],
+ ...Object.keys(pristineCatalog).filter(key=>!["pristine","database_owner"].includes(key)).map(key=>[`${key} drift`,{initial:{[key]:false}}]),
+ ...["owner_member","owner_usage","can_create_database"].flatMap(key=>[false,null,marker].map(value=>[`${key} ${typeof value}`,{privileges:{owner_member:true,owner_usage:true,can_create_database:true,[key]:value}}])),
+ ["no privilege result",{privileges:null}],
+])test(`managed bootstrap refuses ${name} without owner mutation or new roles`,async()=>{
+ const f=managedBootstrap(options);await assert.rejects(f.run());assert.equal(f.calls.at(-1),"ROLLBACK");
+ assert.ok(f.calls.every(sql=>!sql.startsWith("ALTER DATABASE")&&!sql.includes("CREATE ROLE mfmf_owner")));
+});
+for(const key of Object.keys(pristineCatalog))test(`managed bootstrap refuses post-normalization ${key} drift before roles`,async()=>{
+ const f=managedBootstrap({after:{[key]:false}});await assert.rejects(f.run());assert.equal(f.calls.at(-1),"ROLLBACK");
+ assert.ok(f.calls.includes("ALTER DATABASE mfmf OWNER TO postgres"));assert.ok(f.calls.every(sql=>!sql.includes("CREATE ROLE mfmf_owner")));
+});
+test("managed bootstrap permission or later SQL failure rolls back the same owner-change transaction",async()=>{
+ for(const failAt of [sql=>sql.startsWith("ALTER DATABASE"),sql=>sql.includes("CREATE ROLE mfmf_owner"),sql=>sql==="SELECT 1;"]){
+  const f=managedBootstrap({failAt});await assert.rejects(f.run(),error=>{
+   assert.equal(diagnostic(error).sqlstate,"42501");assert.ok(!String(error).includes(marker));return true;
+  });assert.equal(f.calls.at(-1),"ROLLBACK");assert.ok(!f.calls.includes("COMMIT"));
+ }
+});
 for(const [substage,match] of [
  ["catalog",sql=>sql.includes("AS pristine")],["roles",sql=>sql.includes("CREATE ROLE mfmf_owner")],
  ["baseline",sql=>sql==="SELECT 1;"],["ledger",sql=>sql.startsWith("CREATE SCHEMA migration_admin")],

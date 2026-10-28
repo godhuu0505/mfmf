@@ -321,7 +321,7 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   } catch {
     try {
       const failed = await get();
-      validateService(failed);
+      validateService(failed, database);
       const unchanged = failed.uid === initial.uid && failed.etag === current.etag &&
         trafficIs(failed.traffic, oldRevision, shortRevision(failed.latestReadyRevision) === oldRevision) &&
         trafficIs(failed.trafficStatuses, oldRevision, true);
