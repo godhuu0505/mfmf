@@ -28,6 +28,7 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [guides/storage-operator-backup.md](./guides/storage-operator-backup.md) — 運用専用の固定source一覧取得、画像本体のage暗号化保全と全件byte検証。
 - [guides/storage-migration-operator.md](./guides/storage-migration-operator.md) — GCSへの段階移送、独立復元、同時CAS切替/rollback、terminal ledgerの定期回収。
 - [guides/genai-ranking-experiment.md](./guides/genai-ranking-experiment.md) — 架空の日本語記録だけを使うRanking APIのCLI実験・実測・料金。
+- [guides/related-records.md](./guides/related-records.md) — 明示操作による関連度検索、送信範囲・権限・期限・課金枠・テスト。
 - [guides/sentry.md](./guides/sentry.md) — Sentry でエラーモニタリング / Web Vitals の p75 を有効化する（任意）。
 
 ## リファレンス（reference/）

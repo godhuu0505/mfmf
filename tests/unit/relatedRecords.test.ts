@@ -7,9 +7,9 @@ vi.mock("@/lib/household", () => ({
 import { findRelatedRecords } from "@/lib/relatedRecords";
 
 const membership = { householdId: "11111111-1111-4111-8111-111111111111", role: "viewer" as const };
-function fake(options: { denied?: boolean; guest?: boolean; rows?: number; noUser?: boolean; currentRows?: number; edited?: boolean; freshUser?: "expired" | "other" } = {}) {
+function fake(options: { denied?: boolean; guest?: boolean; rows?: number; noUser?: boolean; currentRows?: number; currentTaggedRows?: number; edited?: boolean; freshUser?: "expired" | "other" } = {}) {
   const events: string[] = [];
-  let reads = 0; let authReads = 0;
+  let reads = 0; let authReads = 0; let tagReads = 0;
   const rows = Array.from({ length: options.rows ?? 2 }, (_, i) => ({
     id: `local-record-${i}`, body: "架空ポチが休んだ。連絡先 fake@example.test 12時", source: "daycare", author: "架空太郎",
     pets: { name: "架空ポチ" }, record_date: "2026-10-27", record_photos: [{ storage_path: "never-send-this-photo" }],
@@ -24,6 +24,13 @@ function fake(options: { denied?: boolean; guest?: boolean; rows?: number; noUse
       return { data: current, error: null };
     }),
   };
+  const tags = {
+    select: vi.fn(function () { return tags; }), eq: vi.fn(function () { return tags; }), in: vi.fn(function () { return tags; }),
+    limit: vi.fn(async () => {
+      tagReads++;
+      return { data: rows.slice(0, tagReads === 1 ? rows.length : options.currentTaggedRows ?? rows.length).map((row) => ({ record_id: row.id })), error: null };
+    }),
+  };
   const supabase = {
     auth: { getUser: vi.fn(async () => {
       authReads++; events.push("auth");
@@ -31,7 +38,7 @@ function fake(options: { denied?: boolean; guest?: boolean; rows?: number; noUse
       const id = authReads > 1 && options.freshUser === "other" ? "different-user" : "authenticated-user";
       return { data: { user: missing ? null : { id, email: "fake@example.test", user_metadata: {} } }, error: null };
     }) },
-    from: vi.fn(() => chain),
+    from: vi.fn((table: string) => table === "record_tags" ? tags : chain),
     rpc: vi.fn(async () => { events.push("reserve-budget"); return { data: { allowed: !options.denied }, error: null }; }),
   };
   const rank = vi.fn(async (_q: string, candidates: readonly { id: string }[]) => { events.push("paid-api"); return candidates.map((r) => r.id).reverse(); });
@@ -103,5 +110,16 @@ describe("authorized opt-in candidate ranking", () => {
   it("returns an empty result if RLS no longer permits any of the ranked rows", async () => {
     const h = fake({ currentRows: 0 });
     expect((await findRelatedRecords({ query: "休息" }, h.dependencies)).status).toBe("empty");
+  });
+  it("rechecks tag membership after Google and omits records whose tag was removed", async () => {
+    const h = fake({ currentTaggedRows: 1 });
+    const result = await findRelatedRecords({ query: "休息", tagId: "11111111-1111-4111-8111-111111111111" }, h.dependencies);
+    expect(result).toMatchObject({ status: "ranked", candidateCount: 1, records: [{ id: "local-record-0" }] });
+    expect(result.records).toHaveLength(1);
+  });
+  it("returns empty when the selected tag is removed from every candidate during Google", async () => {
+    const h = fake({ currentTaggedRows: 0 });
+    expect((await findRelatedRecords({ query: "休息", tagId: "11111111-1111-4111-8111-111111111111" }, h.dependencies)).status).toBe("empty");
+    expect(h.rank).toHaveBeenCalledTimes(1); expect(h.chain.limit).toHaveBeenCalledTimes(1);
   });
 });

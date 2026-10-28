@@ -1,5 +1,6 @@
 import { test, type Page } from "@playwright/test";
 import { issueInviteLink, login } from "./helpers";
+import { interceptRelatedSearch } from "./related-search-helpers";
 
 // UI 変更 PR 用のスクリーンショット生成（CLAUDE.md「Git / PR」参照）。
 // アサーションは持たない。他 spec の後（zz- 接頭辞で最後）に走らせ、
@@ -27,6 +28,15 @@ test("スクリーンショット一式（ライト）", async ({ page }) => {
   // レビュアーが変更を確認できない
   await page.getByRole("button", { name: "検索・絞り込み" }).click();
   await shot(page, "home-filters");
+  if (Date.now() < Date.parse("2027-06-24T00:00:00+09:00")) {
+    const related = await interceptRelatedSearch(page);
+    await page.getByPlaceholder("本文・記入者で検索").fill("保育園から帰って、ゆっくりした日");
+    await page.getByRole("button", { name: "関連度で探す", exact: true }).click();
+    await page.getByRole("region", { name: "関連度の検索結果" }).waitFor();
+    await shot(page, "home-related-search");
+    await page.getByRole("button", { name: "通常検索に戻す", exact: true }).click();
+    await related.remove();
+  }
 
   await page.goto("/calendar");
   await shot(page, "calendar");
@@ -103,6 +113,15 @@ test.describe("ダーク", () => {
   test("スクリーンショット一式（ダーク）", async ({ page }) => {
     await login(page);
     await shot(page, "home-dark");
+    if (Date.now() < Date.parse("2027-06-24T00:00:00+09:00")) {
+      await page.getByRole("button", { name: "検索・絞り込み" }).click();
+      const related = await interceptRelatedSearch(page);
+      await page.getByPlaceholder("本文・記入者で検索").fill("保育園から帰って、ゆっくりした日");
+      await page.getByRole("button", { name: "関連度で探す", exact: true }).click();
+      await page.getByRole("region", { name: "関連度の検索結果" }).waitFor();
+      await shot(page, "home-related-search-dark");
+      await related.remove();
+    }
     await page.goto("/menu");
     await shot(page, "menu-dark");
   });
