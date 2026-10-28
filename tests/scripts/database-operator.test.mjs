@@ -218,6 +218,42 @@ test("bootstrap rejects absent, null or malformed catalog predicates without ref
   assert.ok(calls.every(sql=>!sql.includes("CREATE ROLE")));
  }
 });
+for(const owner of ["postgres","cloudsqladmin","cloudsqlsuperuser","pg_database_owner","other","missing"])
+test(`bootstrap owner diagnosis permits only fixed ${owner} classification and booleans`,async()=>{
+ const calls=[];const row={...pristineCatalog,pristine:false,database_owner:false,target_database_matches:true,
+  admin_user_matches:true,encoding_utf8:true,database_owner_class:owner,arbitrary_name:marker};
+ const client={async query(sql){calls.push(sql);return {rows:sql.includes("AS pristine")?[row]:[]};}};
+ await assert.rejects(applyBaseline(client,contract,process.cwd(),credentials,"r".repeat(43)),error=>{
+  assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage:"catalog",reasons:["database-owner"],
+   database:{targetDatabase:true,adminUser:true,owner,utf8:true}});
+  assert.ok(!JSON.stringify(error).includes(marker));return true;
+ });
+ assert.ok(calls.every(sql=>!sql.includes("CREATE ROLE")));assert.equal(calls.at(-1),"ROLLBACK");
+});
+test("bootstrap owner diagnosis splits target, admin and encoding failures without weakening the gate",async()=>{
+ for(const field of ["target_database_matches","admin_user_matches","encoding_utf8"]){
+  const row={...pristineCatalog,pristine:false,database_owner:false,target_database_matches:true,
+   admin_user_matches:true,encoding_utf8:true,database_owner_class:"postgres",[field]:false};
+  const client={async query(sql){return {rows:sql.includes("AS pristine")?[row]:[]};}};
+  await assert.rejects(applyBaseline(client,contract,process.cwd(),credentials,"r".repeat(43)),error=>{
+   const result=diagnostic(error);assert.equal(Object.values(result.database).filter(v=>v===false).length,1);return true;
+  });
+ }
+});
+test("bootstrap owner diagnosis never reflects arbitrary owner names, values or extra fields",async()=>{
+ for(const change of [{database_owner_class:marker},{encoding_utf8:marker},{admin_user_matches:null}]){
+  const row={...pristineCatalog,pristine:false,database_owner:false,target_database_matches:true,
+   admin_user_matches:true,encoding_utf8:true,database_owner_class:"postgres",...change};
+  const client={async query(sql){return {rows:sql.includes("AS pristine")?[row]:[]};}};
+  await assert.rejects(applyBaseline(client,contract,process.cwd(),credentials,"r".repeat(43)),error=>{
+   assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage:"catalog",reasons:["database-owner"]});
+   assert.ok(!JSON.stringify(error).includes(marker));
+   error.database={targetDatabase:true,adminUser:true,owner:marker,utf8:true};assert.equal(diagnostic(error).database,undefined);
+   error.database={targetDatabase:true,adminUser:true,owner:"other",utf8:true,detail:marker};
+   assert.ok(!JSON.stringify(diagnostic(error)).includes(marker));return true;
+  });
+ }
+});
 for(const [substage,match] of [
  ["catalog",sql=>sql.includes("AS pristine")],["roles",sql=>sql.includes("CREATE ROLE mfmf_owner")],
  ["baseline",sql=>sql==="SELECT 1;"],["ledger",sql=>sql.startsWith("CREATE SCHEMA migration_admin")],
