@@ -17,7 +17,7 @@ const ORIGIN = "http://127.0.0.1:3001";
 const AUDIENCE = "mfmf-internal-database";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type DatabaseRole = "anon" | "authenticated" | "identity_sync";
-type ClientOptions = { secret?: string; fetchImpl?: typeof fetch; now?: () => number };
+type ClientOptions = { secret?: string; fetchImpl?: typeof fetch; now?: () => number; allowCreate?: false };
 
 function signingKey(value: string | undefined): Buffer {
   if (!value || !/^[A-Za-z0-9+/]{43}=$/.test(value)) {
@@ -87,7 +87,7 @@ export async function createGcpDataClient(identity: VerifiedIdentity | null, opt
     p_email_verified: identity.emailVerified,
     // Admission comes only from server configuration, never from an IdP's
     // mutable isNewUser response or browser-provided metadata.
-    p_allow_create: process.env.SIGNUP_ENABLED === "true",
+    p_allow_create: options.allowCreate === false ? false : process.env.SIGNUP_ENABLED === "true",
   });
   if (error || typeof userId !== "string" || !UUID.test(userId)) {
     throw new Error("Identity database synchronization failed; details withheld.");

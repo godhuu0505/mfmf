@@ -18,6 +18,26 @@ permissions:
   contents: read
 
 jobs:
+  mcp-oauth-storage:
+    name: MCP OAuth storage isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - name: Test real OAuth library and disposable Firestore emulator
+        env:
+          CI: "true"
+          FIREBASE_SKIP_UPDATE_CHECK: "1"
+        run: npm run test:mcp
+
   cloudrun-container:
     name: Cloud Run container
     runs-on: ubuntu-latest

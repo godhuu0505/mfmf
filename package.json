@@ -14,9 +14,12 @@
     "test:ranking-budget": "vitest run --config vitest.config.ranking.mts",
     "test:e2e": "playwright test",
     "icons": "node scripts/generate-icons.mjs",
-    "feedback:issues": "node scripts/feedback-to-issues.mjs"
+    "feedback:issues": "node scripts/feedback-to-issues.mjs",
+    "test:mcp": "firebase emulators:exec --config firebase.mcp.json --only firestore --project demo-mfmf-mcp \"vitest run --config vitest.config.mcp.mts\""
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@node-oauth/oauth2-server": "5.3.1",
     "@sentry/nextjs": "^10.76.2",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.58.0",
@@ -27,7 +30,8 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "server-only": "^0.0.1",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "1.56",
@@ -38,12 +42,20 @@
     "@types/react-dom": "^19.2.0",
     "eslint": "^9.37.0",
     "eslint-config-next": "^15.5.28",
+    "firebase-tools": "15.34.1",
     "pg": "^8.22.0",
     "tailwindcss": "^4.1.14",
     "typescript": "^5.9.0",
     "vitest": "^4.1.12"
   },
   "overrides": {
-    "postcss": "^8.5.31"
+    "postcss": "^8.5.31",
+    "re2": "1.27.0",
+    "@google-cloud/pubsub@5.3.1": {
+      "@opentelemetry/core": "2.8.0"
+    },
+    "gaxios@6.7.1": {
+      "uuid": "11.1.1"
+    }
   }
 }
