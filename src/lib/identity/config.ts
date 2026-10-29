@@ -41,3 +41,13 @@ export function identityConfig(): IdentityConfig {
   return { projectId, apiKey, origin: origin.origin, googleClientId,
     secure: !local, signupEnabled: process.env.SIGNUP_ENABLED === "true" };
 }
+
+export function identityConfigForHost(host: string | null): IdentityConfig {
+  const config = identityConfig();
+  if (host === new URL(config.origin).host) return config;
+  const webOrigin = process.env.GCP_AUTH_WEB_ORIGIN;
+  if (webOrigin === "https://mfmf.sanba.net" && host === "mfmf.sanba.net") {
+    return { ...config, origin: webOrigin };
+  }
+  throw new Error("Identity request host is not configured.");
+}
