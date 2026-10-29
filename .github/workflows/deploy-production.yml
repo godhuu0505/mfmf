@@ -1,7 +1,8 @@
 name: Deploy Production
 
 # main にマージ（push）されたら、CI 緑を確認したうえで
-# Supabase migration を本番に適用し、Vercel の Production 環境へデプロイする。
+# GCPモードではCloud SQLのupgrade後にCloud Runへ配信する。
+# 旧Supabase migration / Vercel配信はfalseモード限定。
 # 「merge = 本番リリース」。Release 公開ゲートは設けない。
 on:
   push:
@@ -33,12 +34,22 @@ jobs:
     outputs:
       has_vercel: ${{ steps.check.outputs.has_vercel }}
       has_supabase: ${{ steps.check.outputs.has_supabase }}
+      gcp_auth_enabled: ${{ steps.check.outputs.gcp_auth_enabled }}
     steps:
       - id: check
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          GCP_AUTH_ENABLED: ${{ vars.GCP_AUTH_ENABLED || 'false' }}
+          GCP_DEPLOY_ENABLED: ${{ vars.GCP_DEPLOY_ENABLED }}
         run: |
+          case "$GCP_AUTH_ENABLED" in
+            false) echo "gcp_auth_enabled=false" >> "$GITHUB_OUTPUT" ;;
+            true)
+              test "$GCP_DEPLOY_ENABLED" = true || { echo "GCP database mode requires Cloud Run deployment enabled."; exit 1; }
+              echo "gcp_auth_enabled=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Invalid authentication deployment mode; value withheld."; exit 1 ;;
+          esac
           if [ -n "$VERCEL_TOKEN" ]; then
             echo "has_vercel=true" >> "$GITHUB_OUTPUT"
           else
@@ -58,7 +69,7 @@ jobs:
   migrate:
     name: Supabase migrate
     needs: [verify, check-secrets]
-    if: needs.check-secrets.outputs.has_supabase == 'true'
+    if: needs.check-secrets.outputs.gcp_auth_enabled == 'false' && needs.check-secrets.outputs.has_supabase == 'true'
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -115,6 +126,7 @@ jobs:
     if: |
       !cancelled() &&
       needs.verify.result == 'success' &&
+      needs.check-secrets.outputs.gcp_auth_enabled == 'false' &&
       needs.check-secrets.outputs.has_vercel == 'true' &&
       needs.migrate.result == 'success'
     runs-on: ubuntu-latest
@@ -147,7 +159,8 @@ jobs:
       - name: Deploy prebuilt to Vercel (production)
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
-  # 移行期間は Vercel も継続。未設定 / false の間は認証もビルドも実行しない。
+  # GCP_DEPLOY_ENABLED が未設定 / false の間は認証もビルドも実行しない。
+  # GCP_AUTH_ENABLED=true は旧Supabase/Vercelを経由せず、固定DB Jobを検証して配信する。
   deploy-cloud-run:
     name: Cloud Run Production (opt-in)
     needs: [verify, check-secrets, migrate]
@@ -156,10 +169,12 @@ jobs:
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       vars.GCP_DEPLOY_ENABLED == 'true' &&
       needs.verify.result == 'success' &&
-      needs.check-secrets.outputs.has_vercel == 'true' &&
-      needs.migrate.result == 'success'
+      needs.check-secrets.result == 'success' &&
+      (needs.check-secrets.outputs.gcp_auth_enabled == 'true' ||
+       (needs.check-secrets.outputs.gcp_auth_enabled == 'false' &&
+        needs.check-secrets.outputs.has_vercel == 'true' && needs.migrate.result == 'success'))
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     environment:
       name: production
     permissions:
@@ -183,6 +198,7 @@ jobs:
         env:
           # Constant after the job gate. No arbitrary workflow input is expanded into logs.
           GCP_DEPLOY_ENABLED: 'true'
+          GCP_AUTH_ENABLED: ${{ needs.check-secrets.outputs.gcp_auth_enabled }}
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
           GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
           GCP_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}

@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deployExistingService, validateFixedVersions, validateManifest } from "../../scripts/gcp/deploy-existing-service.mjs";
+import { deployExistingService, preserveRankingEnv, validateFixedVersions, validateManifest } from "../../scripts/gcp/deploy-existing-service.mjs";
 import { IMAGE_BASE, PROJECT, PROJECT_NUMBER, PUBLIC_ORIGIN, REGION, RUNTIME, SERVICE, SERVICE_NAME } from "../../scripts/gcp/production-config.mjs";
 
 const env = {
@@ -139,6 +139,35 @@ function harness({ service = initial(), failure = "", candidate = manifest() } =
 }
 
 describe("existing Cloud Run continuous deployment", () => {
+  it("preserves only the two reviewed server-side ranking settings, outside public/build manifests", async () => {
+    const service = initial();
+    const ranking = [
+      { name: "MFMF_RANKING_ENABLED", value: "true" },
+      { name: "MFMF_RANKING_EXPIRES_AT", value: "2027-06-24T00:00:00+09:00" },
+    ];
+    service.template.containers[0].env.push(...ranking);
+    const h = harness({ service });
+    expect(await h.run()).toEqual(manifest());
+    const writes = h.fetchImpl.mock.calls.filter(([, options]) => options?.method === "PATCH");
+    const stage = JSON.parse(String(writes[0][1]?.body));
+    expect(stage.template.containers[0].env.filter((item: { name: string }) => item.name.startsWith("MFMF_RANKING_"))).toEqual(ranking);
+    expect(manifest().env).not.toHaveProperty("MFMF_RANKING_ENABLED");
+    expect(preserveRankingEnv([])).toEqual([]);
+    const candidate = manifest(); Object.assign(candidate.env, { MFMF_RANKING_ENABLED: "true" });
+    expect(() => validateManifest(candidate, pins, env)).toThrow();
+  });
+  it.each([
+    [{ name: "MFMF_RANKING_ENABLED", value: "TRUE" }],
+    [{ name: "MFMF_RANKING_ENABLED", value: "true" }],
+    [{ name: "MFMF_RANKING_EXPIRES_AT", value: "2027-06-25T00:00:00+09:00" }],
+    [{ name: "MFMF_RANKING_EXPIRES_AT", value: "tomorrow" }],
+    [{ name: "MFMF_RANKING_EXPIRES_AT", value: "2027-02-30T00:00:00Z" }],
+    [{ name: "MFMF_RANKING_EXPIRES_AT", value: "2027-04-31T00:00:00+09:00" }],
+    [{ name: "MFMF_RANKING_ENABLED", value: "false" }, { name: "MFMF_RANKING_ENABLED", value: "false" }],
+    [{ name: "MFMF_RANKING_ENABLED", valueSource: { secretKeyRef: { secret: "unreviewed", version: "1" } } }],
+  ])("rejects malformed or overlong-lived ranking configuration", (...items) => {
+    expect(() => preserveRankingEnv(items)).toThrow();
+  });
   it("stages with old traffic, verifies readiness/digest, then promotes and anonymously smokes", async () => {
     const h = harness();
     expect(await h.run()).toEqual(manifest());

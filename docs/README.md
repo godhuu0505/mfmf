@@ -18,7 +18,9 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 
 - [guides/local-supabase.md](./guides/local-supabase.md) — Supabase CLI でローカルスタックを立てる / トラブルシュート。
 - [guides/google-drive-setup.md](./guides/google-drive-setup.md) — Google ログイン / Drive 連携の設定（Google Cloud・Supabase・環境変数）。
-- [guides/deploy.md](./guides/deploy.md) — デプロイ・リリース手順（main→Preview、Release→Production）と初回セットアップ。
+- [guides/deploy.md](./guides/deploy.md) — main→Cloud Run本番配信、DB更新・復旧の境界、旧構成の参照手順。
+- [guides/gcp-database-deployment.md](./guides/gcp-database-deployment.md) — GCP DB/Auth通常配信と、未適用SQLのbackup保持gate。
+- [guides/database-auth-backup.md](./guides/database-auth-backup.md) — 元Supabaseのpublic/Auth原本保全と、明示的なfreeze/unfreeze。
 - [guides/cloud-run-candidate.md](./guides/cloud-run-candidate.md) — WIF で候補イメージと公開設定を準備し、サーバーの秘密を Secret Manager へ移す。
 - [guides/cloud-run-continuous.md](./guides/cloud-run-continuous.md) — 初期無効の Cloud Run 継続配信、固定 secret 参照、旧 traffic を維持した検証と切り替え。
 - [guides/verify-backend.md](./guides/verify-backend.md) — デプロイ済みアプリと Supabase バックエンドの動作確認。
@@ -28,6 +30,7 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [guides/storage-operator-backup.md](./guides/storage-operator-backup.md) — 運用専用の固定source一覧取得、画像本体のage暗号化保全と全件byte検証。
 - [guides/storage-migration-operator.md](./guides/storage-migration-operator.md) — GCSへの段階移送、独立復元、同時CAS切替/rollback、terminal ledgerの定期回収。
 - [guides/genai-ranking-experiment.md](./guides/genai-ranking-experiment.md) — 架空の日本語記録だけを使うRanking APIのCLI実験・実測・料金。
+- [guides/related-records.md](./guides/related-records.md) — 明示操作による関連度検索、送信範囲・権限・期限・課金枠・テスト。
 - [guides/sentry.md](./guides/sentry.md) — Sentry でエラーモニタリング / Web Vitals の p75 を有効化する（任意）。
 
 ## リファレンス（reference/）

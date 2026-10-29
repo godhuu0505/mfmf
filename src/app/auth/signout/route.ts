@@ -1,6 +1,7 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { siteRedirect } from "@/lib/siteRedirect";
+import { isGcpAuthEnabled } from "@/lib/identity/config";
 import {
   POST_LOGIN_NEXT_COOKIE,
   POST_LOGIN_NEXT_MAX_AGE,
@@ -9,8 +10,17 @@ import {
 } from "@/lib/nextPath";
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  if (isGcpAuthEnabled()) {
+    try {
+      const { getIdentityProtocol } = await import("@/lib/identity/server");
+      const protocol = await getIdentityProtocol();
+      if (!protocol.allowsOrigin(request)) return new NextResponse(null, { status: 403 });
+      await protocol.signout();
+    } catch { return new NextResponse("ログアウトを完了できませんでした。再度お試しください。", { status: 503, headers: { "Cache-Control": "no-store" } }); }
+  } else {
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+  }
 
   // 「別のアカウントでログインし直す」導線（招待の宛先違いなど）から呼ばれたときは、
   // ログイン後に元の画面へ戻す。行き先が無ければ従来どおり /login まで。

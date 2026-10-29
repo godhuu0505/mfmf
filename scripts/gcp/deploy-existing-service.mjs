@@ -1,6 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { parsePreseededSecretVersions, prepareWithDocker, selectProductionConfig, SECRET_NAMES } from "./prepare-candidate.mjs";
+import { DATABASE_ENV_KEYS, DATABASE_SECRETS, databaseMode, databasePins, databaseSourceConfig, isDatabaseVpc } from "./database-deployment-config.mjs";
+import { deployDatabaseJob, operatorDigest, databaseJobDiagnostic } from "./deploy-database-job.mjs";
 import { PROJECT, PROJECT_NUMBER, REGION, SERVICE, RUNTIME, SERVICE_NAME, PUBLIC_ORIGIN, IMAGE_BASE, requireContinuousContext } from "./production-config.mjs";
 
 const API = `https://run.googleapis.com/v2/${SERVICE_NAME}`;
@@ -8,6 +10,8 @@ const REVISION_TYPE = "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION";
 const LATEST_TYPE = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST";
 const PIN_KEYS = ["TOKEN_ENC_KEY", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
 const PUBLIC_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SIGNUP_ENABLED", "SENTRY_ENVIRONMENT", "SENTRY_TRACES_SAMPLE_RATE"];
+const RANKING_KEYS = ["MFMF_RANKING_ENABLED", "MFMF_RANKING_EXPIRES_AT"];
+const RANKING_HARD_STOP = Date.parse("2027-06-24T00:00:00+09:00");
 class DeploymentError extends Error {}
 const fail = (message) => { throw new DeploymentError(message); };
 const exactKeys = (object, keys) => object && typeof object === "object" && !Array.isArray(object) &&
@@ -17,24 +21,45 @@ const shortRevision = (value) => typeof value === "string" && value.startsWith(`
 const succeeded = (condition) => condition?.state === "CONDITION_SUCCEEDED";
 const imageDigest = (value) => typeof value === "string" && value.startsWith(`${IMAGE_BASE}@sha256:`) && /^[a-f0-9]{64}$/.test(value.slice(`${IMAGE_BASE}@sha256:`.length));
 
+// Server-only settings are read from the verified existing service, never from a
+// public/build manifest or untrusted workflow input. Missing settings stay missing.
+export function preserveRankingEnv(items = []) {
+  const selected = items.filter((item) => RANKING_KEYS.includes(item?.name));
+  if (new Set(selected.map((item) => item.name)).size !== selected.length || selected.some((item) =>
+    !exactKeys(item, ["name", "value"]) || typeof item.value !== "string")) fail("Existing ranking settings are invalid.");
+  const values = Object.fromEntries(selected.map((item) => [item.name, item.value]));
+  if (values.MFMF_RANKING_ENABLED !== undefined && !["true", "false"].includes(values.MFMF_RANKING_ENABLED)) fail("Existing ranking flag is invalid.");
+  const expiry = values.MFMF_RANKING_EXPIRES_AT;
+  if ((values.MFMF_RANKING_ENABLED === "true" && !expiry) || (expiry !== undefined &&
+      (!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:Z|[+-]\d{2}:\d{2})$/.test(expiry) ||
+       !Number.isFinite(Date.parse(expiry)) || Date.parse(expiry) > RANKING_HARD_STOP))) fail("Existing ranking expiry is invalid.");
+  if (expiry !== undefined) {
+    const calendarDay = new Date(`${expiry.slice(0, 10)}T00:00:00Z`);
+    if (!Number.isFinite(calendarDay.getTime()) || calendarDay.toISOString().slice(0, 10) !== expiry.slice(0, 10)) fail("Existing ranking expiry is invalid.");
+  }
+  return selected.map(({ name, value }) => ({ name, value }));
+}
+
 export function validateFixedVersions(text, env) {
   const refs = parsePreseededSecretVersions({ ...env, PRESEEDED_SECRET_VERSIONS: text });
-  if (!exactKeys(refs, PIN_KEYS) || Object.values(refs).some((ref) => !ref.startsWith(`projects/${PROJECT_NUMBER}/`))) {
-    fail("Committed secret references must contain the three fixed project-number references.");
+  if (!exactKeys(refs, [...PIN_KEYS, ...(databaseMode(env) ? Object.keys(DATABASE_SECRETS) : [])]) || Object.values(refs).some((ref) => !ref.startsWith(`projects/${PROJECT_NUMBER}/`))) {
+    fail("Committed secret references must match the authentication mode and fixed project-number references.");
   }
   return refs;
 }
 
 export function validateManifest(manifest, pins, env) {
-  if (!exactKeys(manifest, ["image", "region", "service", "env", "features", "secretVersions"]) ||
+  const database = databaseMode(env);
+  const publicKeys = [...PUBLIC_KEYS, ...(database ? DATABASE_ENV_KEYS : [])];
+  if (!exactKeys(manifest, ["image", "region", "service", "env", "features", "secretVersions", ...(database ? ["migrationImage"] : [])]) ||
       !imageDigest(manifest.image) || manifest.region !== REGION || manifest.service !== SERVICE ||
-      !exactKeys(manifest.env, PUBLIC_KEYS) || !exactKeys(manifest.features, ["googleDriveConfigured", "sentryConfigured"]) ||
+      (database && !operatorDigest(manifest.migrationImage)) || !exactKeys(manifest.env, publicKeys) || !exactKeys(manifest.features, ["googleDriveConfigured", "sentryConfigured"]) ||
       !manifest.secretVersions || typeof manifest.secretVersions !== "object" || Array.isArray(manifest.secretVersions)) {
     fail("Candidate public manifest is invalid; contents withheld.");
   }
-  for (const key of PIN_KEYS) if (manifest.secretVersions[key] !== pins[key]) fail("Candidate changed a committed secret reference.");
+  for (const key of [...PIN_KEYS, ...(database ? Object.keys(DATABASE_SECRETS) : [])]) if (manifest.secretVersions[key] !== pins[key]) fail("Candidate changed a committed secret reference.");
   for (const [key, ref] of Object.entries(manifest.secretVersions)) {
-    if (!Object.hasOwn(SECRET_NAMES, key) || typeof ref !== "string" ||
+    if (!Object.hasOwn(SECRET_NAMES, key) || (!database && Object.hasOwn(DATABASE_SECRETS, key)) || typeof ref !== "string" ||
         !new RegExp(`^projects/(${PROJECT}|${PROJECT_NUMBER})/secrets/${SECRET_NAMES[key]}/versions/[1-9][0-9]*$`).test(ref)) {
       fail("Candidate secret reference is invalid.");
     }
@@ -42,14 +67,26 @@ export function validateManifest(manifest, pins, env) {
   // Reuse the source setting validation without manufacturing or reading server secret values.
   const entries = Object.entries(manifest.env).map(([key, value]) => ({ key, value, target: ["production"], type: "plain" }));
   entries.push(...PIN_KEYS.map((key) => ({ key, target: ["production"], type: "sensitive" })));
-  const checked = selectProductionConfig({ envs: entries }, pins);
-  if (PUBLIC_KEYS.some((key) => checked.publicEnv[key] !== manifest.env[key]) ||
+  const checked = database ? databaseSourceConfig({ name: SERVICE_NAME, uri: PUBLIC_ORIGIN,
+    template: { containers: [{ env: Object.entries(manifest.env).map(([name, value]) => ({ name, value })) }] } }, pins)
+    : selectProductionConfig({ envs: entries }, pins);
+  if (publicKeys.some((key) => checked.publicEnv[key] !== manifest.env[key]) ||
       manifest.features.googleDriveConfigured !== true ||
       manifest.features.sentryConfigured !== Object.hasOwn(manifest.secretVersions, "SENTRY_DSN") ||
       env.GCP_PROJECT_ID !== PROJECT) fail("Candidate configuration does not match the validated source.");
 }
 
-function validateService(service) {
+function assertRuntimeMode(container, database) {
+  const entries = (container.env ?? []).filter((item) => DATABASE_ENV_KEYS.includes(item?.name));
+  if (new Set(entries.map((item) => item.name)).size !== entries.length || entries.some((item) => !exactKeys(item, ["name", "value"]))) fail("Runtime authentication settings are invalid.");
+  const values = Object.fromEntries(entries.map((item) => [item.name, item.value]));
+  if (database) {
+    if (!exactKeys(values, DATABASE_ENV_KEYS) || values.GCP_AUTH_ENABLED !== "true" || values.NEXT_PUBLIC_GCP_AUTH_ENABLED !== "true"
+      || values.GCP_PROJECT_ID !== PROJECT || values.GCP_AUTH_ORIGIN !== PUBLIC_ORIGIN) fail("Automatic deployment cannot change authentication mode.");
+  } else if (entries.some((item) => !["GCP_AUTH_ENABLED", "NEXT_PUBLIC_GCP_AUTH_ENABLED"].includes(item.name) || item.value !== "false")) fail("Automatic deployment cannot change authentication mode.");
+}
+
+function validateService(service, database = false) {
   const template = service?.template;
   const container = template?.containers?.[0];
   if (service?.name !== SERVICE_NAME || service.uri !== PUBLIC_ORIGIN ||
@@ -59,10 +96,10 @@ function validateService(service) {
       ![undefined, "AUTOMATIC"].includes(service.scaling?.scalingMode) ||
       (template?.scaling?.minInstanceCount ?? 0) !== 0 || template?.scaling?.maxInstanceCount !== 1 ||
       template?.serviceAccount !== RUNTIME || template.executionEnvironment !== "EXECUTION_ENVIRONMENT_GEN2" ||
-      template.maxInstanceRequestConcurrency !== 10 || template.timeout !== "60s" ||
-      template.vpcAccess || template.volumes?.length || template.healthCheckDisabled === true ||
+      template.maxInstanceRequestConcurrency !== (database ? 2 : 10) || template.timeout !== "60s" ||
+      (database ? !isDatabaseVpc(template.vpcAccess) : Boolean(template.vpcAccess)) || template.volumes?.length || template.healthCheckDisabled === true ||
       !Array.isArray(template.containers) || template.containers.length !== 1 || !imageDigest(container?.image) ||
-      container.resources?.limits?.cpu !== "1" || container.resources?.limits?.memory !== "512Mi" ||
+      container.resources?.limits?.cpu !== "1" || container.resources?.limits?.memory !== (database ? "1Gi" : "512Mi") ||
       Object.keys(container.resources?.limits ?? {}).length !== 2 || container.resources?.cpuIdle !== true ||
       !Array.isArray(container.ports) || container.ports.length !== 1 || container.ports[0].containerPort !== 8080 ||
       container.ports[0].name !== "http1" || container.command?.length || container.args?.length ||
@@ -71,7 +108,7 @@ function validateService(service) {
   }
   const seen = new Set();
   for (const item of container.env ?? []) {
-    if (!item || seen.has(item.name) || ![...PUBLIC_KEYS, ...Object.keys(SECRET_NAMES)].includes(item.name)) {
+    if (!item || seen.has(item.name) || ![...PUBLIC_KEYS, ...DATABASE_ENV_KEYS, ...RANKING_KEYS, ...Object.keys(SECRET_NAMES).filter((key) => database || !Object.hasOwn(DATABASE_SECRETS, key))].includes(item.name)) {
       fail("Existing runtime has duplicate or unmanaged environment settings.");
     }
     seen.add(item.name);
@@ -79,6 +116,8 @@ function validateService(service) {
       fail("Existing server settings must use secret references.");
     }
   }
+  preserveRankingEnv(container.env);
+  assertRuntimeMode(container, database);
   return container;
 }
 
@@ -151,13 +190,14 @@ async function smoke(fetchImpl, origin = PUBLIC_ORIGIN) {
   }
 }
 
-export async function deployExistingService({ env, pins, prepare, fetchImpl = fetch, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = console.log, maxPolls = 60 }) {
+export async function deployExistingService({ env, pins, prepare, fetchImpl = fetch, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = console.log, maxPolls = 60, upgrade = deployDatabaseJob }) {
   requireContinuousContext(env);
+  const database = databaseMode(env);
   if (!env.GCP_ACCESS_TOKEN || /[\r\n]/.test(env.GCP_ACCESS_TOKEN)) fail("Short-lived WIF token is missing or invalid.");
   validateFixedVersions(JSON.stringify(pins), env);
   const get = () => api(fetchImpl, env.GCP_ACCESS_TOKEN);
   const initial = await get();
-  validateService(initial);
+  validateService(initial, database);
   assertReady(initial);
   const oldRevision = shortRevision(initial.trafficStatuses?.[0]?.revision);
   if (!revisionName(oldRevision) ||
@@ -171,6 +211,7 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
         serving.containers?.length !== 1 || !imageDigest(serving.containers[0].image)) {
       fail("The currently serving revision is not verified healthy; no update was attempted.");
     }
+    assertRuntimeMode(serving.containers[0], database);
   };
   await verifyServing();
   const oldTraffic = [{ type: REVISION_TYPE, revision: oldRevision, percent: 100 }];
@@ -179,10 +220,18 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   let manifest;
   await prepare((value) => { validateManifest(value, pins, env); manifest = value; });
   if (!manifest) fail("Candidate preparation did not produce a verified manifest.");
-  const current = await get();
-  validateService(current);
+  let current = await get();
+  validateService(current, database);
   assertReady(current);
   if (current.uid !== initial.uid || current.etag !== initial.etag) fail("Service changed while building; refusing concurrent deployment.");
+  if (database) {
+    await verifyServing();
+    await upgrade({ env, image: manifest.migrationImage, fetchImpl, wait });
+    current = await get();
+    validateService(current, database);
+    assertReady(current);
+    if (current.uid !== initial.uid || current.etag !== initial.etag) fail("Service changed during database upgrade; refusing concurrent deployment.");
+  }
   const revision = `${SERVICE}-${env.GITHUB_SHA.slice(0, 12)}-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
   if (!revisionName(revision)) fail("Generated revision name is invalid.");
   const tag = `verify-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`;
@@ -203,6 +252,7 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   };
   const runtimeEnv = [
     ...Object.entries(manifest.env).map(([name, value]) => ({ name, value })),
+    ...preserveRankingEnv(current.template.containers[0].env),
     ...Object.entries(manifest.secretVersions).map(([name, ref]) => {
       const parts = ref.split("/");
       return { name, valueSource: { secretKeyRef: { secret: parts[3], version: parts[5] } } };
@@ -219,7 +269,7 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   const poll = async (phase) => {
     for (let count = 0; count < maxPolls; count++) {
       const service = await get();
-      validateService(service);
+      validateService(service, database);
       if (!ownsCandidate(service)) {
         // A just-accepted PATCH may not be visible yet. Only the unchanged pre-PATCH snapshot is tolerable.
         if (phase === "staged" && service.uid === initial.uid && service.etag === current.etag) { await wait(5_000); continue; }
@@ -271,7 +321,7 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   } catch {
     try {
       const failed = await get();
-      validateService(failed);
+      validateService(failed, database);
       const unchanged = failed.uid === initial.uid && failed.etag === current.etag &&
         trafficIs(failed.traffic, oldRevision, shortRevision(failed.latestReadyRevision) === oldRevision) &&
         trafficIs(failed.trafficStatuses, oldRevision, true);
@@ -288,7 +338,7 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
       await smoke(fetchImpl);
       if (unchanged) {
         const finalState = await get();
-        validateService(finalState);
+        validateService(finalState, database);
         assertReady(finalState);
         if (finalState.uid !== initial.uid || finalState.etag !== current.etag ||
             !trafficIs(finalState.traffic, oldRevision, shortRevision(finalState.latestReadyRevision) === oldRevision) ||
@@ -307,15 +357,27 @@ async function main() {
   let text;
   try { text = await readFile(new URL("./production-secret-versions.json", import.meta.url), "utf8"); }
   catch { fail("Committed secret reference file is unreadable; details withheld."); }
+  if (databaseMode(process.env)) {
+    let refs;
+    try { refs = databasePins(await readFile(new URL("./production-database-secret-versions.json", import.meta.url), "utf8")); }
+    catch { fail("Committed database secret references are unreadable or invalid."); }
+    text = JSON.stringify({ ...JSON.parse(text), ...refs });
+  }
   const pins = validateFixedVersions(text, process.env);
   const env = { ...process.env, PRESEEDED_SECRET_VERSIONS: JSON.stringify(pins) };
   const manifest = await deployExistingService({ env, pins, prepare: (save) => prepareWithDocker(env, { mode: "production", save }) });
   if (env.CANDIDATE_PUBLIC_CONFIG) await writeFile(env.CANDIDATE_PUBLIC_CONFIG, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
 }
 
+export function deploymentErrorMessage(error) {
+  const database = databaseJobDiagnostic(error);
+  if (database) return JSON.stringify(database);
+  return error instanceof DeploymentError ? error.message : "Continuous deployment failed; credentials, input and API details withheld.";
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
-    console.error(error instanceof DeploymentError ? error.message : "Continuous deployment failed; credentials, input and API details withheld.");
+    console.error(deploymentErrorMessage(error));
     process.exitCode = 1;
   });
 }

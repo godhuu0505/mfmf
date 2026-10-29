@@ -1,4 +1,21 @@
 # syntax=docker/dockerfile:1
+FROM debian:bookworm-slim AS database-tools
+ARG TARGETARCH
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl xz-utils && rm -rf /var/lib/apt/lists/*
+# Official release assets are pinned by version and SHA256, including both build architectures.
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64) pgrst_arch=x86-64; pgrst_sha=5099e7ada38f9f6846cd87c14c5f158b7c165f1e9959665ad412e61f4dceba95; proxy_sha=5533a05cdbf12f8a0cb46db34c775847a496e181d47f863284d3d02b0fad49fa ;; \
+      arm64) pgrst_arch=aarch64; pgrst_sha=96d75a34c7c095d5f97b87f88042f898192724350861328db9e1509e696ea057; proxy_sha=75273ebeba06cf82ed72726a662b89e6a886b72e7b507a4fcaade4703c4a0d2d ;; \
+      *) exit 1 ;; \
+    esac; \
+    curl --fail --location --retry 2 --max-time 120 "https://github.com/PostgREST/postgrest/releases/download/v16.5/postgrest-v16.5-linux-static-${pgrst_arch}.tar.xz" -o /tmp/postgrest.tar.xz; \
+    echo "$pgrst_sha  /tmp/postgrest.tar.xz" | sha256sum --check --status; \
+    tar -xJf /tmp/postgrest.tar.xz -C /usr/local/bin postgrest; \
+    curl --fail --location --retry 2 --max-time 120 "https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.26.3/cloud-sql-proxy.linux.${TARGETARCH}" -o /usr/local/bin/cloud-sql-proxy; \
+    echo "$proxy_sha  /usr/local/bin/cloud-sql-proxy" | sha256sum --check --status; \
+    chmod 755 /usr/local/bin/postgrest /usr/local/bin/cloud-sql-proxy
+
 FROM node:22-bookworm-slim AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -11,12 +28,15 @@ ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 # login/signup are prerendered, so preserve this public flag at build time too.
 ARG SIGNUP_ENABLED=false
+ARG NEXT_PUBLIC_GCP_AUTH_ENABLED=false
 # Public fixed version reference invalidates the build cache on key rotation.
 # BuildKit secret values themselves do not participate in cache invalidation.
 ARG NEXT_SERVER_ACTIONS_KEY_VERSION
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
     NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY \
     SIGNUP_ENABLED=$SIGNUP_ENABLED \
+    NEXT_PUBLIC_GCP_AUTH_ENABLED=$NEXT_PUBLIC_GCP_AUTH_ENABLED \
+    GCP_AUTH_ENABLED=$NEXT_PUBLIC_GCP_AUTH_ENABLED \
     NEXT_TELEMETRY_DISABLED=1 \
     NEXT_OUTPUT_STANDALONE=1
 COPY . .
@@ -30,14 +50,21 @@ RUN --mount=type=secret,id=next-server-actions-key,env=NEXT_SERVER_ACTIONS_ENCRY
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ARG SIGNUP_ENABLED=false
+ARG NEXT_PUBLIC_GCP_AUTH_ENABLED=false
 ENV NODE_ENV=production \
     SIGNUP_ENABLED=$SIGNUP_ENABLED \
+    NEXT_PUBLIC_GCP_AUTH_ENABLED=$NEXT_PUBLIC_GCP_AUTH_ENABLED \
+    GCP_AUTH_ENABLED=$NEXT_PUBLIC_GCP_AUTH_ENABLED \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0 \
     PORT=8080
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --from=database-tools /usr/local/bin/postgrest /usr/local/bin/postgrest
+COPY --from=database-tools /usr/local/bin/cloud-sql-proxy /usr/local/bin/cloud-sql-proxy
+COPY --from=database-tools /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --chown=node:node scripts/gcp/runtime.mjs ./runtime.mjs
 USER node
 EXPOSE 8080
-CMD ["node", "server.js"]
+CMD ["node", "runtime.mjs"]

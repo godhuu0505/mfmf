@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createAuthClient } from "@/lib/identity/client";
 
 const inputClass =
   "w-full rounded-lg border border-border px-3 py-2 text-foreground outline-none focus:border-muted-foreground focus:ring-1 focus:ring-muted-foreground";
@@ -31,7 +31,7 @@ export default function ResetPasswordForm({ next }: { next: string }) {
     }
 
     setLoading(true);
-    const supabase = createClient();
+    const supabase = createAuthClient();
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
