@@ -84,9 +84,20 @@ AUTOMATED / FINAL、初回移行用の既存手動backup3件、専用probe marke
 
 [DeleteBackup API](https://docs.cloud.google.com/sql/docs/postgres/admin-api/rest/v1/Backups/DeleteBackup)はETag条件を持たないため、
 固定IDの直前照合と管理操作の排他を境界にします。別operatorのrestore・設定変更・backup削除を同時に行わないでください。
-DELETEは1回だけ送信し、operation完了後のGET404と完全一覧での不存在を確認します。応答不明時にDELETEを再送しません。
+DELETEは1回だけ送信し、自分が送った固定対象の同一operation成功を確認します。削除直後の対象GETは404、
+または実APIで観測した403を検査対象としますが、**403だけを不存在の証拠にはしません**。
+同じtokenで直後の完全一覧と全件個別GETが成功して対象がなく、事前に固定した新しい復旧点が一覧にも存在し、
+個別GETの内容・48時間以内の開始・instance作成時刻と設定が再一致することをすべて要求します。
+[AIP-193](https://google.aip.dev/193#permission-denied)の403は存在/不存在を区別しないため、この限定経路以外の403は停止します。
+対象GETが200、一覧や復旧点を取得不能、情報が変化した場合も停止し、応答不明時にDELETEを再送しません。
 専用SAのSQL権限は `cloudsql.backupRuns.delete/get/list` と `cloudsql.instances.get/list` です。
 create・restore・instance更新やDB接続権限は付けません。[公式IAM表](https://docs.cloud.google.com/sql/docs/postgres/iam-permissions)を参照してください。
+`mfmfBackupQuotaUser` は `serviceusage.services.use` だけを含み、固定projectで
+IdP保全・SQL保持・既存DB operator・通常deployerの4SAだけに付与します。Scheduler SAには付けません。
+固定projectを `X-Goog-User-Project` で指定するための権限で、同projectのSAでもこの明示指定の要件は変わりません。
+APIの有効化・無効化やquota変更権限は付けません。[公式system parameter契約](https://docs.cloud.google.com/apis/docs/system-parameters)を参照してください。
+bootstrapは新roleが無ければ作成し、ETag付きproject IAMで不足bindingだけを追加して既存grantを保持します。
+既存roleの権限が異なる場合は停止し、自動修復しません。
 
 receiptは固定pathのgenerationを読み、CASで`running`を先に保存します。成功だけ`success`へ更新し、同generationを再読します。
 policy/version・3moduleの実装SHA256・main SHA・instance作成時刻・集計を保持し、個別backup本文やユーザー情報は出しません。

@@ -250,8 +250,30 @@ export async function runDatabaseBackupRetention({ env, accessToken, fetchImpl =
         await wait(5000); operation = await api(`${API}/operations/${operationName}`, "poll");
       }
       requireValue(done, "timeout");
-      requireValue(await api(`https://sqladmin.googleapis.com/v1/${old.name}`, "absence", { missing: true }) === null, "absence");
-      requireValue(!(await retentionInventory(api)).some((b) => b.name === old.name), "absence");
+      // Cloud SQL may answer 403 for the deleted resource. That response is
+      // NOT proof of absence (https://google.aip.dev/193#permission-denied).
+      // Only this exact, just-deleted ID may continue after 403, and only after
+      // our own fixed-target DELETE operation completed successfully above.
+      // Every other API 403 remains fatal. Do not read an error body/message.
+      try {
+        requireValue(await api(`https://sqladmin.googleapis.com/v1/${old.name}`, "absence", { missing: true }) === null, "absence");
+      } catch (error) {
+        const detail = retentionDiagnostic(error);
+        if (detail?.stage !== "absence" || detail.httpStatus !== 403) throw error;
+      }
+      // Under the SAME token, prove the complete namespace is readable and the
+      // pinned newer recovery point is still present and readable. Neither a
+      // missing list entry alone nor an object-level 403 can authorize success.
+      const afterDelete = await retentionInventory(api);
+      requireValue(!afterDelete.some((b) => b.name === old.name), "absence");
+      const listedNewer = afterDelete.find((b) => b.name === newer.name);
+      requireValue(listedNewer && pinnedBackup(listedNewer) === pinnedBackup(proof), "absence");
+      const readableNewer = await api(`https://sqladmin.googleapis.com/v1/${newer.name}`, "newer");
+      requireValue(pinnedBackup(readableNewer) === pinnedBackup(proof), "drift");
+      const newerTime = validateRetentionBackup(readableNewer, instance.createTime, now());
+      requireValue(newerTime.start >= now() - RETENTION.newerMaximumAgeHours * 3600000
+        && newerTime.start > instant(old.backupInterval.endTime), "newer");
+      requireValue(JSON.stringify(await retentionInstance(api, now())) === JSON.stringify(instance), "drift");
       receipt.deletedCount++;
     }
     const final = await retentionInventory(api); const finalPlan = planRetention(final, instance.createTime, now());

@@ -36,6 +36,7 @@ export const ROLES = [
   { id: "mfmfBackupReceiptReader", permissions: ["storage.objects.get"] },
   { id: "mfmfBackupJobDeployer", permissions: ["run.executions.get", "run.jobs.get", "run.jobs.run", "run.jobs.update"] },
   { id: "mfmfBackupJobInvoker", permissions: ["run.jobs.run"] },
+  { id: "mfmfBackupQuotaUser", permissions: ["serviceusage.services.use"] },
 ];
 const sorted = (v) => [...v].sort();
 const object = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -174,7 +175,8 @@ export async function bootstrapBackups({ token, phase = "inspect", executions = 
   const saPolicy = (id) => request(`${IAM}/${accountName(id)}:getIamPolicy`, { method: "POST", body: { options: { requestedPolicyVersion: 3 } } });
   const bucketPolicy = (name) => request(`${STORAGE}/b/${name}/iam?optionsRequestedPolicyVersion=3`);
   const jobPolicy = (id) => request(`${RUN}/${PARENT}/jobs/${id}:getIamPolicy?options.requestedPolicyVersion=3`);
-  const projectWanted = [binding(ROLES[0].id, ACCOUNTS[0]), binding(ROLES[1].id, ACCOUNTS[1])];
+  const projectWanted = [binding(ROLES[0].id, ACCOUNTS[0]), binding(ROLES[1].id, ACCOUNTS[1]),
+    ...[...JOBS, DB_OPERATOR, DEPLOYER].map((id) => binding("mfmfBackupQuotaUser", id))];
   const bucketWanted = (name) => name === IDENTITY_BUCKET
     ? [binding("mfmfBackupBucketReader", ACCOUNTS[0]), binding("mfmfBackupObjectWriter", ACCOUNTS[0], authCondition)]
     : [binding("mfmfBackupBucketReader", ACCOUNTS[1]), binding("mfmfBackupReceiptWriter", ACCOUNTS[1], receiptCondition), binding("mfmfBackupBucketReader", DB_OPERATOR), binding("mfmfBackupReceiptReader", DB_OPERATOR, receiptCondition)];

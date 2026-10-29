@@ -81,7 +81,7 @@ test("inspect performs only reads even when resources do not exist", async () =>
 test("three phases preserve existing project IAM, verify resources, then schedule only proven jobs", async () => {
   const h = harness(); h.state.projectPolicy.bindings.push({ role: "roles/viewer", members: ["user:fixture@example.invalid"] });
   h.state.apis.set("cloudscheduler.googleapis.com", "DISABLED");
-  await bootstrapBackups({ ...h.options, phase: "prepare" }); assert.equal(h.state.accounts.size, 3); assert.equal(h.state.buckets.size, 2); assert.equal(h.state.roles.size, 8); assert.equal(h.state.schedules.size, 0);
+  await bootstrapBackups({ ...h.options, phase: "prepare" }); assert.equal(h.state.accounts.size, 3); assert.equal(h.state.buckets.size, 2); assert.equal(h.state.roles.size, 9); assert.equal(h.state.schedules.size, 0);
   assert.ok(h.state.projectPolicy.bindings.some((b) => b.members.includes("user:fixture@example.invalid")));
   h.addJobs(); await bootstrapBackups({ ...h.options, phase: "bind-jobs" }); assert.equal(h.state.schedules.size, 0);
   await bootstrapBackups({ ...h.options, phase: "schedule", executions: Object.fromEntries(JOBS.map((id) => [id, `${id}-proof`])) });
@@ -111,6 +111,24 @@ test("user-managed account keys stop before any mutation", async () => {
   await assert.rejects(bootstrapBackups({ ...h.options, phase: "prepare" })); assert.equal(h.writes().length, 0); assert.equal(h.logs.join("").includes("private-marker"), false);
 });
 test("widened role permissions stop before mutation", async () => { const h = harness(); h.state.roles.set(ROLES[0].id, { name: role(ROLES[0].id), stage: "GA", includedPermissions: [...ROLES[0].permissions, "firebaseauth.users.delete"] }); await assert.rejects(bootstrapBackups({ ...h.options, phase: "prepare" })); assert.equal(h.writes().length, 0); });
+test("explicit quota project grants one permission to exactly four callers and preserves existing grants", async () => {
+  const quota = ROLES.find((r) => r.id === "mfmfBackupQuotaUser");
+  assert.deepEqual(quota.permissions, ["serviceusage.services.use"]);
+  assert.deepEqual(ROLES.flatMap((r) => r.permissions.filter((p) => p.startsWith("serviceusage."))), ["serviceusage.services.use"]);
+  const h = harness(); const existing = [
+    { role: "roles/cloudsql.client", members: [member("mfmf-db-operator")] },
+    { role: "roles/logging.logWriter", members: [member("mfmf-deploy")] },
+  ]; h.state.projectPolicy.bindings.push(...structuredClone(existing));
+  await bootstrapBackups({ ...h.options, phase: "prepare" });
+  const bindings = h.state.projectPolicy.bindings.filter((b) => b.role === role(quota.id));
+  assert.deepEqual(bindings, [{ role: role(quota.id), members: [...JOBS, "mfmf-db-operator", "mfmf-deploy"].map(member) }]);
+  for (const grant of existing) assert.ok(h.state.projectPolicy.bindings.some((b) => JSON.stringify(b) === JSON.stringify(grant)));
+  assert.ok(h.calls.filter((c) => c.method === "POST" && c.url.endsWith("/roles")).every((c) => c.body.roleId !== "mfmfBackupQuotaUser" || JSON.stringify(c.body.role.includedPermissions) === '["serviceusage.services.use"]'));
+});
+for (const permissions of [[], ["serviceusage.services.use", "serviceusage.services.enable"]]) test(`quota role drift stops without automatic role repair: ${permissions.length}`, async () => {
+  const id = "mfmfBackupQuotaUser"; const h = harness(); h.state.roles.set(id, { name: role(id), stage: "GA", includedPermissions: permissions });
+  await assert.rejects(bootstrapBackups({ ...h.options, phase: "prepare" })); assert.equal(h.writes().length, 0);
+});
 for (const [label, mutate] of [
   ["wrong project", (b) => { b.projectNumber = "123"; }], ["public", (b) => { b.iamConfiguration.publicAccessPrevention = "inherited"; }],
   ["no UBLA", (b) => { b.iamConfiguration.uniformBucketLevelAccess.enabled = false; }], ["versioning", (b) => { b.versioning.enabled = true; }],

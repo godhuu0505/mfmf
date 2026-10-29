@@ -158,3 +158,83 @@ test("bounded HTTP diagnostics suppress body, invalid JSON, huge responses, and 
     await assert.rejects(api(`${API}/backups`, "list"), e => /stage=list/.test(e.message) && !/PRIVATE/.test(e.message));
   }
 });
+
+test("post-delete 403 requires successful owned operation, full absence and same-token pinned newer readback", async () => {
+  const f = await fixture({ rows: [old(), recent()], hook: (url, init, state) => {
+    if (url.endsWith("/backups/owned-old") && init.method === "GET" && state.deleted.length) return new Response("PRIVATE_PERMISSION_BODY", { status: 403 });
+  } });
+  const result = await run(f); assert.equal(result.deletedCount, 1); assert.equal(f.state.proof.status, "success");
+  assert.equal(writes(f, "DELETE").length, 1);
+  const deletion = f.state.calls.findIndex(c => c.init.method === "DELETE");
+  const after = f.state.calls.slice(deletion + 1);
+  assert.ok(after.some(c => c.url.startsWith(`${API}/backups?`)));
+  assert.ok(after.filter(c => c.url.endsWith("/backups/automated")).length >= 2);
+  assert.ok(after.every(c => c.init.headers.Authorization === "Bearer PRIVATE_TOKEN"));
+});
+test("post-delete 403 cannot pass when list/individual GET/newer/instance permissions fail", async () => {
+  for (const failureAt of ["list", "newer", "instance"]) {
+    const f = await fixture({ rows: [old(), recent()], hook: (url, init, state) => {
+      if (!state.deleted.length || init.method !== "GET") return;
+      if (url.endsWith("/backups/owned-old") || failureAt === "list" && url.startsWith(`${API}/backups?`)
+        || failureAt === "newer" && url.endsWith("/backups/automated") || failureAt === "instance" && url.endsWith("/instances/mfmf-db")) return new Response("PRIVATE", { status: 403 });
+    } });
+    await failure(f); assert.equal(writes(f, "DELETE").length, 1);
+  }
+});
+test("post-delete 403 cannot pass incomplete listing, retained target, or missing newer", async () => {
+  for (const mode of ["partial", "target", "no-newer"]) {
+    const f = await fixture({ rows: [old(), recent()], hook: (url, init, state) => {
+      if (!state.deleted.length || init.method !== "GET") return;
+      if (url.endsWith("/backups/owned-old")) return new Response("PRIVATE", { status: 403 });
+      if (url.startsWith(`${API}/backups?`)) {
+        if (mode === "partial") return Response.json({ backups: [], warnings: ["PRIVATE"] });
+        if (mode === "no-newer") return Response.json({ backups: [] });
+        return Response.json({ backups: [old(), recent()] });
+      }
+    } });
+    await failure(f); assert.equal(writes(f, "DELETE").length, 1);
+  }
+});
+test("post-delete 403 cannot pass newer identity or instance birth/config drift", async () => {
+  for (const mode of ["newer", "birth", "settings"]) {
+    const f = await fixture({ rows: [old(), recent()], hook: (url, init, state) => {
+      if (!state.deleted.length || init.method !== "GET") return;
+      if (url.endsWith("/backups/owned-old")) return new Response("PRIVATE", { status: 403 });
+      if (mode === "newer" && url.endsWith("/backups/automated")) return Response.json({ ...recent(), maxChargeableBytes: "1001" });
+      if (url.endsWith("/instances/mfmf-db")) {
+        const resource = structuredClone(state.resource);
+        if (mode === "birth") resource.createTime = "2026-01-02T00:00:00Z";
+        if (mode === "settings") resource.settings.settingsVersion = "2";
+        return Response.json(resource);
+      }
+    } });
+    await failure(f); assert.equal(writes(f, "DELETE").length, 1);
+  }
+});
+test("403 before DELETE, from DELETE, or after a failed operation never enters absence fallback", async () => {
+  for (const mode of ["before", "delete", "operation"]) {
+    const f = await fixture({ rows: [old(), recent()], operation: mode === "operation" ? { error: { message: "PRIVATE" } } : {},
+      hook: (url, init) => {
+        if (mode === "before" && url.endsWith("/backups/owned-old") && init.method === "GET"
+          || mode === "delete" && init.method === "DELETE") return new Response("PRIVATE", { status: 403 });
+      } });
+    await failure(f); assert.equal(writes(f, "DELETE").length, mode === "before" ? 0 : 1);
+  }
+});
+test("post-delete 401/429/500 or network failure never use the narrow 403 fallback", async () => {
+  for (const status of [401, 429, 500, null]) {
+    const f = await fixture({ rows: [old(), recent()], hook: (url, init, state) => {
+      if (url.endsWith("/backups/owned-old") && init.method === "GET" && state.deleted.length) {
+        if (status === null) throw new Error("PRIVATE");
+        return new Response("PRIVATE", { status });
+      }
+    } });
+    await failure(f, /absence/); assert.equal(writes(f, "DELETE").length, 1);
+  }
+});
+test("404 also requires the pinned newer recovery point to remain readable", async () => {
+  const f = await fixture({ rows: [old(), recent()], hook: (url, init, state) => {
+    if (state.deleted.length && init.method === "GET" && url.endsWith("/backups/automated")) return new Response("PRIVATE", { status: 403 });
+  } });
+  await failure(f); assert.equal(writes(f, "DELETE").length, 1);
+});
