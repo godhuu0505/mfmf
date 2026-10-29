@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const [authorization, context] = await Promise.all([loadAuthorization(transactionId), getMcpBrowserContext()]);
     if (!context) throw new McpHttpError("UNAUTHENTICATED", 401, "ログインしてください。");
     if (!authorization) throw new McpHttpError("NOT_FOUND", 404, "接続を最初からやり直してください。");
-    return json({ transactionId, ...authorization, eligibleHouseholds: context.households, csrfToken: (await getIdentityProtocol()).csrfToken() });
+    return json({ transactionId, ...authorization, accountLabel: context.accountLabel, eligibleHouseholds: context.households, csrfToken: (await getIdentityProtocol()).csrfToken() });
   } catch (error) { return oauthErrorResponse(error); }
 }
 export async function POST(request: Request) {

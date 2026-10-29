@@ -156,6 +156,9 @@ export class IdentityProtocol {
   }
   async passwordLogin(email: unknown, password: unknown) {
     const session = await this.accept(await this.request("signInWithPassword", { ...this.credentials(email, password), returnSecureToken: true }));
+    // A page opened under the previous identity must reconfirm after login.
+    // Background same-subject refresh deliberately keeps its existing CSRF token.
+    this.clear("csrf");
     if (!session.identity.emailVerified || !session.identity.email) throw new IdentityError("unverified");
   }
   async signup(email: unknown, password: unknown, acceptedTerms: unknown) {
@@ -164,6 +167,7 @@ export class IdentityProtocol {
     if (credentials.password.length < 8 || acceptedTerms !== true) throw new IdentityError();
     const data = await this.request("signUp", { ...credentials, returnSecureToken: true });
     const session = await this.accept(data);
+    this.clear("csrf");
     try { await this.deps.recordConsent(session.identity.subject, new Date(this.now()).toISOString()); }
     catch { this.clearSession(); throw new IdentityError("unavailable"); }
     await this.request("sendOobCode", { requestType: "VERIFY_EMAIL", idToken: session.token,
@@ -208,6 +212,7 @@ export class IdentityProtocol {
     if (!verified.identity.emailVerified || !verified.identity.email || verified.identity.provider !== "google.com" ||
         !verified.decoded.firebase.identities["google.com"]?.includes(google.sub)) throw new IdentityError();
     const session = await this.accept(data, verified.identity.subject);
+    this.clear("csrf");
     return { identity: session.identity, ...(data.oauthRefreshToken ? { refreshToken: text(data.oauthRefreshToken) } : {}) };
   }
   async continueEmail(): Promise<boolean> {
