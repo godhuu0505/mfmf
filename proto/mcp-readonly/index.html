@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'" />
+  <title>mfmf — AIとの接続・画面確認</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' rx='22' fill='%23c2410c'/%3E%3Ctext x='9' y='57' font-size='52'%3E%F0%9F%90%BE%3C/text%3E%3C/svg%3E" />
+  <!-- proto.css:start -->
+<style>
+/*! tailwindcss v4.3.1 | MIT License | https://tailwindcss.com */
+@layer properties;
+@layer theme, base, components, utilities;
+@layer theme {
+  :root, :host {
+    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    --color-red-300: oklch(80.8% 0.114 19.571);
+    --color-red-700: oklch(50.5% 0.213 27.518);
+    --spacing: 0.25rem;
+    --container-2xl: 42rem;
+    --text-xs: 0.75rem;
+    --text-xs--line-height: calc(1 / 0.75);
+    --text-sm: 0.875rem;
+    --text-sm--line-height: calc(1.25 / 0.875);
+    --text-base: 1rem;
+    --text-base--line-height: calc(1.5 / 1);
+    --text-lg: 1.125rem;
+    --text-lg--line-height: calc(1.75 / 1.125);
+    --text-xl: 1.25rem;
+    --text-xl--line-height: calc(1.75 / 1.25);
+    --text-2xl: 1.5rem;
+    --text-2xl--line-height: calc(2 / 1.5);
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --tracking-tight: -0.025em;
+    --leading-snug: 1.375;
+    --leading-relaxed: 1.625;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+    --default-transition-duration: 150ms;
+    --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    --default-font-family: var(--font-sans);
+    --default-mono-font-family: var(--font-mono);
+  }
+}
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  html, :host {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    font-family: var(--default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
+    -webkit-tap-highlight-color: transparent;
+  }
+  hr {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+  abbr:where([title]) {
+    -webkit-text-decoration: underline dotted;
+    text-decoration: underline dotted;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  a {
+    color: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit;
+  }
+  b, strong {
+    font-weight: bolder;
+  }
+  code, kbd, samp, pre {
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-feature-settings: var(--default-mono-font-feature-settings, normal);
+    font-variation-settings: var(--default-mono-font-variation-settings, normal);
+    font-size: 1em;
+  }
+  small {
+    font-size: 80%;
+  }
+  sub, sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+  sub {
+    bottom: -0.25em;
+  }
+  sup {
+    top: -0.5em;
+  }
+  table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+  :-moz-focusring {
+    outline: auto;
+  }
+  progress {
+    vertical-align: baseline;
+  }
+  summary {
+    display: list-item;
+  }
+  ol, ul, menu {
+    list-style: none;
+  }
+  img, svg, video, canvas, audio, iframe, embed, object {
+    display: block;
+    vertical-align: middle;
+  }
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+  button, input, select, optgroup, textarea, ::file-selector-button {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  :where(select:is([multiple], [size])) optgroup {
+    font-weight: bolder;
+  }
+  :where(select:is([multiple], [size])) optgroup option {
+    padding-inline-start: 20px;
+  }
+  ::file-selector-button {
+    margin-inline-end: 4px;
+  }
+  ::placeholder {
+    opacity: 1;
+  }
+  @supports (not (-webkit-appearance: -apple-pay-button))  or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: currentcolor;
+      @supports (color: color-mix(in lab, red, red)) {
+        color: color-mix(in oklab, currentcolor 50%, transparent);
+      }
+    }
+  }
+  textarea {
+    resize: vertical;
+  }
+  ::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+  ::-webkit-date-and-time-value {
+    min-height: 1lh;
+    text-align: inherit;
+  }
+  ::-webkit-datetime-edit {
+    display: inline-flex;
+  }
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  ::-webkit-datetime-edit, ::-webkit-datetime-edit-year-field, ::-webkit-datetime-edit-month-field, ::-webkit-datetime-edit-day-field, ::-webkit-datetime-edit-hour-field, ::-webkit-datetime-edit-minute-field, ::-webkit-datetime-edit-second-field, ::-webkit-datetime-edit-millisecond-field, ::-webkit-datetime-edit-meridiem-field {
+    padding-block: 0;
+  }
+  ::-webkit-calendar-picker-indicator {
+    line-height: 1;
+  }
+  :-moz-ui-invalid {
+    box-shadow: none;
+  }
+  button, input:where([type="button"], [type="reset"], [type="submit"]), ::file-selector-button {
+    appearance: button;
+  }
+  ::-webkit-inner-spin-button, ::-webkit-outer-spin-button {
+    height: auto;
+  }
+  [hidden]:where(:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
+@layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+  .col-span-2 {
+    grid-column: span 2 / span 2;
+  }
+  .mx-auto {
+    margin-inline: auto;
+  }
+  .mt-1 {
+    margin-top: var(--spacing);
+  }
+  .mt-2 {
+    margin-top: calc(var(--spacing) * 2);
+  }
+  .mt-3 {
+    margin-top: calc(var(--spacing) * 3);
+  }
+  .mt-5 {
+    margin-top: calc(var(--spacing) * 5);
+  }
+  .mt-8 {
+    margin-top: calc(var(--spacing) * 8);
+  }
+  .mb-1 {
+    margin-bottom: var(--spacing);
+  }
+  .mb-6 {
+    margin-bottom: calc(var(--spacing) * 6);
+  }
+  .block {
+    display: block;
+  }
+  .flex {
+    display: flex;
+  }
+  .grid {
+    display: grid;
+  }
+  .inline-flex {
+    display: inline-flex;
+  }
+  .table {
+    display: table;
+  }
+  .h-4 {
+    height: calc(var(--spacing) * 4);
+  }
+  .min-h-10 {
+    min-height: calc(var(--spacing) * 10);
+  }
+  .min-h-11 {
+    min-height: calc(var(--spacing) * 11);
+  }
+  .min-h-12 {
+    min-height: calc(var(--spacing) * 12);
+  }
+  .min-h-screen {
+    min-height: 100vh;
+  }
+  .w-4 {
+    width: calc(var(--spacing) * 4);
+  }
+  .w-full {
+    width: 100%;
+  }
+  .max-w-2xl {
+    max-width: var(--container-2xl);
+  }
+  .min-w-0 {
+    min-width: 0;
+  }
+  .flex-shrink {
+    flex-shrink: 1;
+  }
+  .shrink-0 {
+    flex-shrink: 0;
+  }
+  .border-collapse {
+    border-collapse: collapse;
+  }
+  .cursor-pointer {
+    cursor: pointer;
+  }
+  .resize {
+    resize: both;
+  }
+  .list-disc {
+    list-style-type: disc;
+  }
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .flex-wrap {
+    flex-wrap: wrap;
+  }
+  .items-center {
+    align-items: center;
+  }
+  .items-start {
+    align-items: flex-start;
+  }
+  .justify-between {
+    justify-content: space-between;
+  }
+  .gap-1 {
+    gap: var(--spacing);
+  }
+  .gap-2 {
+    gap: calc(var(--spacing) * 2);
+  }
+  .gap-3 {
+    gap: calc(var(--spacing) * 3);
+  }
+  .space-y-1 {
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(var(--spacing) * var(--tw-space-y-reverse));
+      margin-block-end: calc(var(--spacing) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .space-y-2 {
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 2) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 2) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .space-y-3 {
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 3) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 3) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .space-y-4 {
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 4) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 4) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .space-y-5 {
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 5) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 5) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .space-y-6 {
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 6) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 6) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .gap-x-3 {
+    column-gap: calc(var(--spacing) * 3);
+  }
+  .gap-y-1 {
+    row-gap: var(--spacing);
+  }
+  .rounded-2xl {
+    border-radius: var(--radius-2xl);
+  }
+  .rounded-full {
+    border-radius: calc(infinity * 1px);
+  }
+  .rounded-lg {
+    border-radius: var(--radius-lg);
+  }
+  .rounded-xl {
+    border-radius: var(--radius-xl);
+  }
+  .border {
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+  }
+  .border-t {
+    border-top-style: var(--tw-border-style);
+    border-top-width: 1px;
+  }
+  .border-b {
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 1px;
+  }
+  .border-dashed {
+    --tw-border-style: dashed;
+    border-style: dashed;
+  }
+  .border-border {
+    border-color: var(--border-color);
+  }
+  .bg-background {
+    background-color: var(--background);
+  }
+  .bg-primary {
+    background-color: var(--primary);
+  }
+  .bg-surface {
+    background-color: var(--surface);
+  }
+  .bg-surface-muted {
+    background-color: var(--surface-muted);
+  }
+  .p-1 {
+    padding: var(--spacing);
+  }
+  .p-4 {
+    padding: calc(var(--spacing) * 4);
+  }
+  .p-5 {
+    padding: calc(var(--spacing) * 5);
+  }
+  .p-6 {
+    padding: calc(var(--spacing) * 6);
+  }
+  .px-2 {
+    padding-inline: calc(var(--spacing) * 2);
+  }
+  .px-3 {
+    padding-inline: calc(var(--spacing) * 3);
+  }
+  .px-4 {
+    padding-inline: calc(var(--spacing) * 4);
+  }
+  .py-1 {
+    padding-block: var(--spacing);
+  }
+  .py-2 {
+    padding-block: calc(var(--spacing) * 2);
+  }
+  .py-3 {
+    padding-block: calc(var(--spacing) * 3);
+  }
+  .py-4 {
+    padding-block: calc(var(--spacing) * 4);
+  }
+  .pt-1 {
+    padding-top: var(--spacing);
+  }
+  .pt-4 {
+    padding-top: calc(var(--spacing) * 4);
+  }
+  .pt-5 {
+    padding-top: calc(var(--spacing) * 5);
+  }
+  .pb-12 {
+    padding-bottom: calc(var(--spacing) * 12);
+  }
+  .pl-5 {
+    padding-left: calc(var(--spacing) * 5);
+  }
+  .text-center {
+    text-align: center;
+  }
+  .text-2xl {
+    font-size: var(--text-2xl);
+    line-height: var(--tw-leading, var(--text-2xl--line-height));
+  }
+  .text-base {
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
+  }
+  .text-lg {
+    font-size: var(--text-lg);
+    line-height: var(--tw-leading, var(--text-lg--line-height));
+  }
+  .text-sm {
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+  }
+  .text-xl {
+    font-size: var(--text-xl);
+    line-height: var(--tw-leading, var(--text-xl--line-height));
+  }
+  .text-xs {
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+  }
+  .leading-relaxed {
+    --tw-leading: var(--leading-relaxed);
+    line-height: var(--leading-relaxed);
+  }
+  .leading-snug {
+    --tw-leading: var(--leading-snug);
+    line-height: var(--leading-snug);
+  }
+  .font-bold {
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+  }
+  .font-medium {
+    --tw-font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-medium);
+  }
+  .font-semibold {
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+  }
+  .tracking-tight {
+    --tw-tracking: var(--tracking-tight);
+    letter-spacing: var(--tracking-tight);
+  }
+  .break-words {
+    overflow-wrap: break-word;
+  }
+  .break-all {
+    word-break: break-all;
+  }
+  .text-foreground {
+    color: var(--foreground);
+  }
+  .text-muted-foreground {
+    color: var(--muted-foreground);
+  }
+  .text-primary {
+    color: var(--primary);
+  }
+  .text-primary-foreground {
+    color: var(--primary-foreground);
+  }
+  .text-red-700 {
+    color: var(--color-red-700);
+  }
+  .underline {
+    text-decoration-line: underline;
+  }
+  .accent-primary {
+    accent-color: var(--primary);
+  }
+  .opacity-40 {
+    opacity: 40%;
+  }
+  .shadow-sm {
+    --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-1 {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring-border {
+    --tw-ring-color: var(--border-color);
+  }
+  .outline {
+    outline-style: var(--tw-outline-style);
+    outline-width: 1px;
+  }
+  .transition {
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .ease-in-out {
+    --tw-ease: var(--ease-in-out);
+    transition-timing-function: var(--ease-in-out);
+  }
+  .hover\:bg-primary-hover {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--primary-hover);
+      }
+    }
+  }
+  .hover\:bg-surface-muted {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--surface-muted);
+      }
+    }
+  }
+  .disabled\:cursor-not-allowed {
+    &:disabled {
+      cursor: not-allowed;
+    }
+  }
+  .disabled\:opacity-40 {
+    &:disabled {
+      opacity: 40%;
+    }
+  }
+  .has-checked\:border-primary {
+    &:has(*:checked) {
+      border-color: var(--primary);
+    }
+  }
+  .has-checked\:bg-surface-muted {
+    &:has(*:checked) {
+      background-color: var(--surface-muted);
+    }
+  }
+  .sm\:col-span-1 {
+    @media (width >= 40rem) {
+      grid-column: span 1 / span 1;
+    }
+  }
+  .sm\:grid-cols-3 {
+    @media (width >= 40rem) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .sm\:p-6 {
+    @media (width >= 40rem) {
+      padding: calc(var(--spacing) * 6);
+    }
+  }
+  .sm\:pt-8 {
+    @media (width >= 40rem) {
+      padding-top: calc(var(--spacing) * 8);
+    }
+  }
+  .dark\:text-red-300 {
+    @media (prefers-color-scheme: dark) {
+      &:where(:not([data-theme="light"] *)) {
+        color: var(--color-red-300);
+      }
+    }
+    &:where([data-theme="dark"] *) {
+      color: var(--color-red-300);
+    }
+  }
+}
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1220;
+    --foreground: #e2e8f0;
+    --surface: #111827;
+    --surface-muted: #1f2937;
+    --border-color: #334155;
+    --muted: #475569;
+    --muted-foreground: #94a3b8;
+    --primary: #fb923c;
+    --primary-hover: #fdba74;
+    --primary-foreground: #431407;
+    --skeleton-base: #1f2937;
+    --skeleton-shine: rgba(71, 85, 105, 0.6);
+    --focus-ring: #fb923c;
+  }
+}
+html {
+  color-scheme: light dark;
+}
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+body:has([data-app-tabbar]) main {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+.safe-px {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+.safe-pt {
+  padding-top: env(safe-area-inset-top);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 60;
+}
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.18);
+}
+.skeleton {
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton-base) 100%
+  );
+  @supports (color: color-mix(in lab, red, red)) {
+    background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--skeleton-base) 100%, transparent) 0%,
+    var(--skeleton-shine) 50%,
+    color-mix(in srgb, var(--skeleton-base) 100%, transparent) 100%
+  );
+  }
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+:root[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-color: #e2e8f0;
+  --muted: #cbd5e1;
+  --muted-foreground: #475569;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: rgba(248, 250, 252, 0.9);
+  --focus-ring: #c2410c;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --surface: #111827;
+  --surface-muted: #1f2937;
+  --border-color: #334155;
+  --muted: #475569;
+  --muted-foreground: #94a3b8;
+  --primary: #fb923c;
+  --primary-hover: #fdba74;
+  --primary-foreground: #431407;
+  --skeleton-base: #1f2937;
+  --skeleton-shine: rgba(71, 85, 105, 0.6);
+  --focus-ring: #fb923c;
+  color-scheme: dark;
+}
+@property --tw-space-y-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-border-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
+@property --tw-leading {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-font-weight {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-tracking {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-inset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-ring-inset {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-offset-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --tw-ring-offset-color {
+  syntax: "*";
+  inherits: false;
+  initial-value: #fff;
+}
+@property --tw-ring-offset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-outline-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
+@property --tw-ease {
+  syntax: "*";
+  inherits: false;
+}
+@layer properties {
+  @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
+    *, ::before, ::after, ::backdrop {
+      --tw-space-y-reverse: 0;
+      --tw-border-style: solid;
+      --tw-leading: initial;
+      --tw-font-weight: initial;
+      --tw-tracking: initial;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-color: initial;
+      --tw-shadow-alpha: 100%;
+      --tw-inset-shadow: 0 0 #0000;
+      --tw-inset-shadow-color: initial;
+      --tw-inset-shadow-alpha: 100%;
+      --tw-ring-color: initial;
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-inset-ring-color: initial;
+      --tw-inset-ring-shadow: 0 0 #0000;
+      --tw-ring-inset: initial;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-outline-style: solid;
+      --tw-ease: initial;
+    }
+  }
+}
+
+</style>
+<!-- proto.css:end -->
+</head>
+<body class="min-h-screen bg-background text-foreground">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <div class="border-b border-border bg-surface-muted safe-px py-3">
+    <div class="mx-auto max-w-2xl space-y-3">
+      <p class="text-xs font-medium text-muted-foreground">画面確認用 · すべて架空データです。実際の接続や記録の変更は行いません。</p>
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <label class="space-y-1 text-xs text-muted-foreground">表示
+          <select id="theme" class="min-h-10 w-full rounded-lg border border-border bg-surface px-2 text-sm text-foreground">
+            <option value="system">端末に合わせる</option><option value="light">ライト</option><option value="dark">ダーク</option>
+          </select>
+        </label>
+        <label class="space-y-1 text-xs text-muted-foreground">接続先
+          <select id="provider" class="min-h-10 w-full rounded-lg border border-border bg-surface px-2 text-sm text-foreground">
+            <option>ChatGPT</option><option>Claude</option>
+          </select>
+        </label>
+        <label class="col-span-2 space-y-1 text-xs text-muted-foreground sm:col-span-1">確認する状態
+          <select id="scenario" class="min-h-10 w-full rounded-lg border border-border bg-surface px-2 text-sm text-foreground">
+            <option value="normal">通常</option><option value="long">長い家族名</option><option value="no-household">所属する家族なし</option><option value="expired">申し込み期限切れ</option><option value="empty">接続0件</option><option value="duplicates">同じAIの接続2件</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </div>
+  <header class="border-b border-border bg-surface safe-px safe-pt">
+    <div class="mx-auto flex max-w-2xl items-center justify-between gap-3 py-4">
+      <button id="brand" type="button" class="flex min-h-11 items-center gap-2 font-bold text-primary" aria-label="接続確認画面へ">
+        <span aria-hidden="true" class="text-xl">🐾</span><span class="text-xl tracking-tight">mfmf</span>
+      </button>
+      <span class="rounded-full bg-surface-muted px-3 py-1 text-xs font-medium text-muted-foreground">AIとの接続</span>
+    </div>
+  </header>
+  <main id="main" class="mx-auto max-w-2xl px-4 pb-12 pt-5 sm:pt-8">
+    <nav aria-label="確認する画面" class="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-border bg-surface p-1">
+      <button id="consent-tab" type="button" class="min-h-11 rounded-lg px-3 text-sm font-semibold" aria-current="page">接続の確認</button>
+      <button id="connections-tab" type="button" class="min-h-11 rounded-lg px-3 text-sm font-semibold">接続の管理</button>
+    </nav>
+    <div id="screen"></div>
+    <p id="announcement" role="status" aria-live="polite" class="mt-5 text-sm font-medium text-primary"></p>
+    <footer class="mt-8 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">架空の家族「こもれび家」「そよかぜ家」とペット「モモ」「ナギ」を使った、画面と操作の確認用です。</footer>
+  </main>
+  <script>
+  (() => {
+    'use strict';
+    const screen = document.getElementById('screen');
+    const announcement = document.getElementById('announcement');
+    const roleLabels = { owner: '管理者', editor: '編集できるメンバー', viewer: '閲覧のみのメンバー' };
+    const households = [
+      { id: 'fictional-household-a', name: 'こもれび家', role: 'owner', pet: 'モモ', animal: 'いぬ' },
+      { id: 'fictional-household-b', name: 'そよかぜ家', role: 'viewer', pet: 'ナギ', animal: 'ねこ' },
+      { id: 'fictional-household-c', name: 'ひだまり家', role: 'editor', pet: 'コハル', animal: 'いぬ' },
+    ];
+    const initialConnections = () => [
+      { id: 'fictional-connection-a', clientName: 'ChatGPT', householdId: households[0].id, createdAt: '2026年10月29日 20:15:10', expiresAt: '2026年11月28日 20:15:10' },
+      { id: 'fictional-connection-b', clientName: 'Claude', householdId: households[1].id, createdAt: '2026年10月28日 19:30:24', expiresAt: '2026年11月27日 19:30:24' },
+    ];
+    let page = 'consent';
+    let scenario = 'normal';
+    let provider = 'ChatGPT';
+    let selected = households[0].id;
+    let connections = initialConnections();
+    let completed = false;
+    let denied = false;
+    let added = 0;
+    const escape = (value) => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+    const householdName = household => scenario === 'long' && household.id === households[0].id ? 'こもれびと、遠くで暮らす家族のみんなの記録' : household.name;
+    function choosePage(next) {
+      page = next;
+      announcement.textContent = '';
+      render();
+      document.getElementById('page-title').focus();
+    }
+    function render() {
+      for (const [id, active] of [['consent-tab', page === 'consent'], ['connections-tab', page === 'connections']]) {
+        const button = document.getElementById(id);
+        button.className = 'min-h-11 rounded-lg px-3 text-sm font-semibold ' + (active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-surface-muted');
+        if (active) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
+      }
+      if (page === 'connections') return renderConnections();
+      if (completed) return renderComplete();
+      if (denied) {
+        screen.innerHTML = `<section class="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border sm:p-6"><h1 id="page-title" tabindex="-1" class="text-xl font-bold">接続を取り消しました</h1><p class="text-sm leading-relaxed text-muted-foreground">この申し込みでは、家族の記録はAIサービスへ渡りません。</p><button id="try-again" class="min-h-12 w-full rounded-xl border border-border px-4 text-sm font-semibold hover:bg-surface-muted">もう一度、画面を確認する</button></section>`;
+        document.getElementById('try-again').onclick = () => { denied = false; render(); };
+        return;
+      }
+      if (scenario === 'expired') {
+        screen.innerHTML = `<section class="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border sm:p-6"><span class="inline-flex rounded-full bg-surface-muted px-3 py-1 text-xs font-medium text-muted-foreground">申し込みの期限が切れました</span><h1 id="page-title" tabindex="-1" class="text-xl font-bold">接続元から、もう一度お申し込みください</h1><p class="text-sm leading-relaxed text-muted-foreground">安全のため、接続の申し込みには有効期限があります。この画面からは許可できません。</p><button id="view-connections" class="min-h-12 w-full rounded-xl border border-border px-4 text-sm font-semibold hover:bg-surface-muted">現在の接続を確認する</button></section>`;
+        document.getElementById('view-connections').onclick = () => choosePage('connections');
+        return;
+      }
+      const available = scenario === 'no-household' ? [] : households;
+      if (!available.length) {
+        screen.innerHTML = `<section class="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border sm:p-6"><h1 id="page-title" tabindex="-1" class="text-xl font-bold">接続できる家族がありません</h1><p class="text-sm leading-relaxed text-muted-foreground">家族のメンバーとして参加してからお申し込みください。ゲストとしての閲覧権限は、AI接続には使えません。</p><button id="approve" disabled class="min-h-12 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground opacity-40">この家族の記録の閲覧を許可</button><button id="deny" class="min-h-12 w-full rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-surface-muted">許可しない</button></section>`;
+        document.getElementById('deny').onclick = () => { denied = true; render(); document.getElementById('page-title').focus(); };
+        return;
+      }
+      const current = households.find(household => household.id === selected);
+      screen.innerHTML = `
+        <section class="space-y-6 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border sm:p-6">
+          <div class="space-y-3"><span class="inline-flex rounded-full bg-surface-muted px-3 py-1 text-xs font-medium text-primary">閲覧のみ</span><h1 id="page-title" tabindex="-1" class="text-2xl font-bold leading-snug">${escape(provider)}に<br>家族の記録をつなぐ</h1><p class="text-sm leading-relaxed text-muted-foreground">許可した家族の記録を、${escape(provider)}から振り返れるようにします。</p></div>
+          <div class="rounded-xl bg-surface-muted p-4"><p class="text-xs text-muted-foreground">ログイン中のアカウント</p><p class="mt-1 break-all text-sm font-medium">fictional@example.test</p></div>
+          <fieldset class="space-y-3"><legend class="mb-1 text-sm font-semibold">どの家族の記録をつなぎますか？</legend>
+            ${available.length ? available.map(household => `<label class="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-4 has-checked:border-primary has-checked:bg-surface-muted"><input type="radio" name="household" value="${household.id}" ${household.id === selected ? 'checked' : ''} class="mt-1 h-4 w-4 shrink-0 accent-primary"><span class="min-w-0"><span class="block break-words text-sm font-semibold">${escape(householdName(household))}</span><span class="mt-1 block text-xs leading-relaxed text-muted-foreground">${escape(household.pet)}（${household.animal}） · ${roleLabels[household.role]}</span></span></label>`).join('') : `<div class="rounded-xl border border-border bg-surface-muted p-4"><p class="text-sm font-semibold">接続できる家族がありません</p><p class="mt-2 text-sm leading-relaxed text-muted-foreground">家族のメンバーとして参加してからお申し込みください。ゲストとしての閲覧権限は、AI接続には使えません。</p></div>`}
+          </fieldset>
+          <section class="space-y-3 border-t border-border pt-5" aria-labelledby="scope-title"><h2 id="scope-title" class="text-sm font-semibold">AIへ渡る情報</h2><ul class="list-disc space-y-2 pl-5 text-sm leading-relaxed"><li>選んだ家族の、保存済みの記録の日付・本文・記録の種類・入力済みの体重</li><li>その家族のペットの名前など、記録を読むための基本情報</li></ul><p class="text-xs leading-relaxed text-muted-foreground">家族が書いた記録も含みます。記録の本文に個人情報が書かれている場合、その内容がAIへ渡ることがあります。</p><details class="rounded-xl border border-border p-4"><summary class="cursor-pointer text-sm font-medium">AIへ渡る記録の例を見る</summary><div class="mt-3 space-y-2 text-sm leading-relaxed"><p class="text-xs text-muted-foreground">2026年10月28日 · 保存済み · 架空の記録</p><p id="preview-title" class="font-semibold">${escape(current.pet)}のおうちでの様子</p><p>ごはんを食べてから、いつものおもちゃで遊びました。午後は窓辺でのんびり。</p></div></details></section>
+          <div class="space-y-2 rounded-xl bg-surface-muted p-4 text-sm leading-relaxed"><p class="font-semibold">写真や動画は渡しません</p><p class="text-muted-foreground">写真・動画の本体や閲覧用リンク、メンバー一覧・メールアドレスなどの会員情報は対象外です。下書きと削除済みの記録も含みません。</p><p class="pt-1 text-muted-foreground">記録の追加・変更・削除、家族への招待はできません。</p></div>
+          <div class="space-y-2 text-sm leading-relaxed text-muted-foreground"><p>接続の有効期限は<strong class="text-foreground">最長30日</strong>。いつでも「AIとの接続」から解除できます。</p><p>許可した内容は${escape(provider)}へ送られ、そのサービスのデータの扱いに従います。</p><p>この接続先の家族は固定です。mfmfで表示する家族を切り替えても変わりません。</p></div>
+          <div class="space-y-3 border-t border-border pt-5"><p id="selected-household" class="break-words text-sm font-medium">${available.length ? escape(householdName(current)) + 'の記録をつなぎます' : '家族への参加が必要です'}</p><button id="approve" ${available.length ? '' : 'disabled'} class="min-h-12 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40">この家族の記録の閲覧を許可</button><button id="deny" class="min-h-12 w-full rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-surface-muted">許可しない</button></div>
+        </section>`;
+      for (const input of screen.querySelectorAll('input[name="household"]')) input.onchange = event => {
+        selected = event.target.value;
+        const household = households.find(household => household.id === selected);
+        document.getElementById('selected-household').textContent = householdName(household) + 'の記録をつなぎます';
+        document.getElementById('preview-title').textContent = household.pet + 'のおうちでの様子';
+      };
+      document.getElementById('approve').onclick = () => {
+        if (!available.length) return;
+        connections.unshift({ id: 'fictional-added-' + (++added), clientName: provider, householdId: selected, createdAt: '2026年10月29日 21:05:32', expiresAt: '2026年11月28日 21:05:32' });
+        completed = true; render(); document.getElementById('page-title').focus();
+      };
+      document.getElementById('deny').onclick = () => { denied = true; render(); document.getElementById('page-title').focus(); };
+    }
+    function renderComplete() {
+      const household = households.find(household => household.id === selected);
+      screen.innerHTML = `<section class="space-y-5 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border sm:p-6"><span class="inline-flex rounded-full bg-surface-muted px-3 py-1 text-xs font-medium text-primary">操作イメージ</span><h1 id="page-title" tabindex="-1" class="text-xl font-bold">${escape(provider)}と接続できました</h1><p class="break-words text-sm leading-relaxed"><strong>${escape(householdName(household))}</strong>の保存済みの記録を、${escape(provider)}から振り返れるようになります。</p><div class="rounded-xl bg-surface-muted p-4 text-sm leading-relaxed text-muted-foreground">画面確認用のため、実際には接続していません。記録の送信も行っていません。</div><button id="manage" class="min-h-12 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary-hover">接続の管理へ</button><button id="another" class="min-h-12 w-full rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-surface-muted">別の家族の接続を確認する</button></section>`;
+      document.getElementById('manage').onclick = () => choosePage('connections');
+      document.getElementById('another').onclick = () => { completed = false; choosePage('consent'); };
+    }
+    function renderConnections() {
+      screen.innerHTML = `<div class="space-y-5"><div class="space-y-2"><h1 id="page-title" tabindex="-1" class="text-xl font-bold">AIとの接続</h1><p class="text-sm leading-relaxed text-muted-foreground">あなたが許可した接続です。接続先の家族と有効期限を確認できます。</p></div><div class="rounded-xl border border-border bg-surface p-4 text-sm leading-relaxed text-muted-foreground">解除すると、新たな閲覧を停止します。AIサービスがすでに受け取った内容は削除されません。接続先のサービスでも確認してください。</div><div id="connection-list" class="space-y-4">${connections.length ? connections.map(connection => {
+        const household = households.find(household => household.id === connection.householdId);
+        return `<article class="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border"><div class="flex items-start justify-between gap-3"><h2 class="text-lg font-bold">${escape(connection.clientName)}</h2><span class="shrink-0 rounded-full bg-surface-muted px-2 py-1 text-xs font-medium text-primary">閲覧のみ</span></div><div><p class="text-xs text-muted-foreground">接続先の家族</p><p class="mt-1 break-words text-sm font-semibold">${escape(householdName(household))}</p></div><dl class="space-y-2 text-xs text-muted-foreground"><div class="flex flex-wrap justify-between gap-x-3 gap-y-1"><dt>接続した日時</dt><dd class="text-foreground">${connection.createdAt}</dd></div><div class="flex flex-wrap justify-between gap-x-3 gap-y-1"><dt>有効期限</dt><dd class="text-foreground">${connection.expiresAt}</dd></div></dl><button data-revoke="${connection.id}" aria-label="${escape(connection.clientName)}・${escape(householdName(household))}・${connection.createdAt}の接続を解除" class="min-h-11 w-full rounded-xl border border-border px-4 py-2 text-sm font-medium text-red-700 hover:bg-surface-muted dark:text-red-300">接続を解除</button></article>`;
+      }).join('') : `<section class="space-y-3 rounded-2xl border border-dashed border-border bg-surface p-6 text-center"><h2 class="text-base font-semibold">接続中のAIサービスはありません</h2><p class="text-sm leading-relaxed text-muted-foreground">使いたいサービスから接続を申し込むと、ここで確認できます。</p></section>`}</div><button id="new-connection" class="min-h-12 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium hover:bg-surface-muted">接続確認の画面をもう一度見る</button></div>`;
+      for (const button of screen.querySelectorAll('[data-revoke]')) button.onclick = () => {
+        const connection = connections.find(connection => connection.id === button.dataset.revoke);
+        connections = connections.filter(item => item.id !== connection.id);
+        renderConnections();
+        announcement.textContent = connection.clientName + '・' + householdName(households.find(household => household.id === connection.householdId)) + 'との接続を解除しました（確認用）。';
+        document.getElementById('page-title').focus();
+      };
+      document.getElementById('new-connection').onclick = () => { completed = false; denied = false; choosePage('consent'); };
+    }
+    document.getElementById('theme').onchange = event => {
+      if (event.target.value === 'system') delete document.documentElement.dataset.theme;
+      else document.documentElement.dataset.theme = event.target.value;
+    };
+    document.getElementById('provider').onchange = event => { provider = event.target.value; completed = false; denied = false; render(); };
+    document.getElementById('scenario').onchange = event => {
+      scenario = event.target.value; completed = false; denied = false;
+      connections = scenario === 'empty' ? [] : initialConnections();
+      if (scenario === 'duplicates') connections[1] = { ...connections[1], clientName: 'ChatGPT', createdAt: '2026年10月29日 20:17:42' };
+      if (scenario === 'empty' || scenario === 'duplicates') page = 'connections';
+      render(); announcement.textContent = '';
+    };
+    document.getElementById('consent-tab').onclick = () => { completed = false; denied = false; choosePage('consent'); };
+    document.getElementById('connections-tab').onclick = () => choosePage('connections');
+    document.getElementById('brand').onclick = () => { completed = false; denied = false; choosePage('consent'); };
+    render();
+  })();
+  </script>
+</body>
+</html>

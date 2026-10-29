@@ -7,14 +7,19 @@ import { cache } from "react";
 import { identityConfig } from "./config";
 import { IdentityProtocol, type IdentityCookies } from "./protocol";
 
-export function createIdentityProtocol(cookieStore: IdentityCookies): IdentityProtocol {
+export function getIdentityAdminAuth() {
   const config = identityConfig();
   if (process.env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error("Identity emulator is not permitted in this server.");
   // A named app prevents accidental reuse of another project's Admin client.
   const app = getApps().find((candidate) => candidate.name === "mfmf-identity") ??
     initializeApp({ credential: applicationDefault(), projectId: config.projectId }, "mfmf-identity");
   if (app.options.projectId !== config.projectId) throw new Error("Identity project mismatch.");
-  const auth = getAuth(app);
+  return getAuth(app);
+}
+
+export function createIdentityProtocol(cookieStore: IdentityCookies): IdentityProtocol {
+  const config = identityConfig();
+  const auth = getIdentityAdminAuth();
   return new IdentityProtocol(config, {
     fetch,
     verify: (token) => auth.verifyIdToken(token, true),

@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { runtimePlan } from "../../scripts/gcp/runtime.mjs";
 import { createGcpDataClient } from "../../src/lib/gcp/dataClient.ts";
+import { createMcpReadRepository } from "../../src/lib/mcp/repository.ts";
 
 const BASE = "http://127.0.0.1:3001";
 const UUID_A = "91000000-0000-4000-8000-000000000001";
@@ -131,6 +132,27 @@ async function main() {
     checked(!seen.some((item) => !["identity_sync", "authenticated", "anon"].includes(item.role)), "data client uses only allowed roles");
     // Prove normal application work still succeeds after timeout and all rejected JWTs.
     await query(b.client, RECORD_B); await query(a.client, RECORD_A);
+    // MCP uses the same actual user JWT/RLS, with an explicit consent-household
+    // restriction even when the identity can also read a second household.
+    const hhB = "92000000-0000-4000-8000-000000000002";
+    const added = await b.client.from("household_members").insert({ household_id: hhB, user_id: UUID_A, role: "viewer" });
+    checked(!added.error, "synthetic viewer membership added for MCP isolation");
+    const shared = await a.client.from("daycare_records").select("id").eq("id", RECORD_B).single();
+    checked(!shared.error && shared.data.id === RECORD_B, "identity really has access to the second household");
+    const boundA = createMcpReadRepository(a.client, UUID_A, HH_A);
+    checked((await boundA.record(RECORD_A)).id === RECORD_A, "MCP own household read uses actual RLS");
+    checked(await boundA.record(RECORD_B) === null, "MCP grant cannot follow a second readable household");
+    const plannedId = "93000000-0000-4000-8000-000000000003";
+    const planned = await a.client.from("daycare_records").insert({ id: plannedId, owner_id: UUID_A, household_id: HH_A, body: "synthetic private planned", status: "planned" });
+    checked(!planned.error && await boundA.record(plannedId) === null, "MCP cannot return planned records");
+    const boundB = createMcpReadRepository(a.client, UUID_A, hhB);
+    checked((await boundB.record(RECORD_B)).id === RECORD_B, "MCP permits currently authorized viewer reads");
+    const removed = await b.client.from("household_members").delete().eq("household_id", hhB).eq("user_id", UUID_A);
+    checked(!removed.error, "synthetic viewer grant revoked");
+    await assert.rejects(boundB.record(RECORD_B), (error) => error.kind === "not_found"); assertions++;
+    process.env.SIGNUP_ENABLED = "true";
+    await assert.rejects(createGcpDataClient({ subject: "never-admit-via-mcp", email: "fictional@example.test", emailVerified: true }, { ...options, allowCreate: false }), /synchronization failed/); assertions++;
+    process.env.SIGNUP_ENABLED = "false";
     console.log(JSON.stringify({ postgrest: "16.5", assertions, concurrentRequests: 40, queryPoolConnections: pids.size,
       privateLoopback: true, runtimePlanUsed: true, actualDataClientUsed: true, rlsIsolation: true, claimsReset: true,
       productionResourcesTouched: false }));

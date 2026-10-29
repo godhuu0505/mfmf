@@ -13,6 +13,10 @@ import {
 
 // 認証セッションを更新し、未ログインなら /login へリダイレクトする。
 export async function updateSession(request: NextRequest) {
+  // Protocol endpoints verify their own resource-bound OAuth credentials. They
+  // never redirect to browser login or refresh/read a browser session cookie.
+  if (["/mcp", "/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource/mcp",
+    "/oauth/authorize", "/oauth/register", "/oauth/token"].includes(request.nextUrl.pathname)) return NextResponse.next({ request });
   let supabaseResponse = NextResponse.next({ request });
 
   let supabase: ReturnType<typeof createServerClient> | undefined;
