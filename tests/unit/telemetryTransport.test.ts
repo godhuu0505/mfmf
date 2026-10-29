@@ -9,11 +9,12 @@ afterEach(async () => { await Sentry.close(100); vi.restoreAllMocks(); });
 describe("last outbound privacy boundary", () => {
   it("drops attachment, transaction, log, replay and envelope trace/DSN headers", () => {
     const envelope = [{ trace: { secret: marker }, dsn: marker }, [
-      [{ type: "event" }, { event_id: "a".repeat(32), message: marker, request: { url: marker }, tags: { route: `/records/${marker}`, category: "server" } }],
+      [{ type: "event" }, { event_id: "a".repeat(32), message: marker, request: { url: marker }, sdk: { name: marker, settings: { infer_ip: "auto" } }, tags: { route: `/records/${marker}`, category: "server" } }],
       ...["attachment", "transaction", "log", "replay_recording", "session", "profile", "feedback", "check_in", "client_report"].map((type) => [{ type }, marker]),
     ]] as unknown as Envelope;
     const result = privateEnvelope(envelope)!;
     expect(result[1]).toHaveLength(1); expect(JSON.stringify(result)).not.toContain(marker); expect(result[0]).not.toHaveProperty("trace"); expect(result[0]).not.toHaveProperty("dsn");
+    expect(result[1][0][1]).toHaveProperty("sdk", { settings: { infer_ip: "never" } });
   });
   it("reprojects SDK serialized metrics and removes scope/trace identifiers", () => {
     const envelope = [{ trace: marker }, [[{ type: "trace_metric" }, { ingest_settings: { infer_ip: "auto" }, items: [
@@ -54,5 +55,10 @@ describe("last outbound privacy boundary", () => {
     expect(bodies.length).toBeGreaterThanOrEqual(2);
     expect(bodies.join()).not.toContain(marker); expect(bodies.join()).toContain("web_vital.lcp"); expect(bodies.join()).toContain("TypeError");
     expect(bodies.join()).not.toContain('"attachment"'); expect(bodies.join()).not.toContain('"user"');
+    const eventBody = bodies.find((body) => body.split("\n")[1] === '{"type":"event"}')!;
+    const sentEvent = JSON.parse(eventBody.split("\n")[2]);
+    expect(sentEvent.sdk).toEqual({ settings: { infer_ip: "never" } });
+    expect(Object.keys(sentEvent.sdk)).toEqual(["settings"]);
+    expect(sentEvent).not.toHaveProperty("user");
   });
 });

@@ -52,6 +52,9 @@ export function privateErrorEvent(input: unknown) {
   return {
     ...(typeof event.event_id === "string" && /^[a-f0-9]{32}$/.test(event.event_id) ? { event_id: event.event_id } : {}),
     type: undefined, level: "error" as const, platform: "javascript", environment: "production",
+    // Relay otherwise applies legacy IP inference to JavaScript events, even with no user.
+    // Rebuild this setting at both projection boundaries; never preserve caller SDK fields.
+    sdk: { settings: { infer_ip: "never" as const } },
     exception: { values: [{ type, value: `mfmf ${category} failure; details withheld` }] },
     fingerprint: ["mfmf-private-v1", category, route, type], tags: { category, route },
   };

@@ -14,6 +14,9 @@ Sentry は運営者向けの障害分類と、限定した画面性能の確認�
 SDKのscopeや自動付加情報も含めて、`beforeSend` と最終transportの両方で投影します。
 最終envelopeはerrorと既知Web Vitalsだけを許可し、attachment・breadcrumb・request・user・context・trace header・
 log・session・replay・profile・check-in・client reportを送信しません。
+例外の`event.sdk`は`{ settings: { infer_ip: "never" } }`だけを固定生成します。
+SDK名・version・packagesや呼出元のsettingsは引き継ぎません。SDKの`sendDefaultPii: false`やuserの省略だけでは、
+Sentry側がJavaScriptイベントへ接続元IPを補完するため不十分です。最終transportでもこの固定値を再設定します。
 Session Replay、browser SDK、HTTP/SQL tracing、profiling、console転送は導入しません。
 Sentry build pluginも使わず、source map・build token・ソースコードのuploadはありません。
 `SENTRY_TRACES_SAMPLE_RATE` が既存環境に残っていても読みません。トレースは無効です。
@@ -21,6 +24,39 @@ Sentry build pluginも使わず、source map・build token・ソースコード�
 この制限により、Sentryから利用者や個々の記録を特定したり、元のstackを調査したりはできません。
 固定分類と配信時刻を手掛かりに、運用ログ・ローカル再現・本人の問い合わせで調べます。
 Sentryが受け取るHTTP通信元はサーバーです。ブラウザーからSentryへ直接送信しません。
+
+## Sentry側のプライバシー前提
+
+本番有効化には、Sentry組織のserver-side data scrubbing・
+**Prevent Storing of IP Addresses**（APIでは`scrubIPAddresses: true`）・enhanced privacyを有効にし、
+匿名Issue共有を無効にすることを必須とします。projectでの設定だけに依存せず、組織側で適用を確認します。
+`Require Using Default Scrubbers`は現画面でチェック不可・Value 0だったため、有効化済みとは扱いません。
+この項目の適用可否は未確認であり、既定scrubberが働くことを前提にせず、明示した機密フィールドと保存結果を実測します。
+
+IP推測停止と位置情報の除去は別です。Relayは`infer_ip: never`でも接続元IPから`user.geo`を補完する経路を持ちます。
+`user.geo`のAdvanced Data Scrubbingルールだけを設定した実測でもgeoが残ったため、そのルールだけでは受入済みとしません。
+[Sentry公式手順](https://www.sentry.help/en/articles/13964201-can-i-disable-ip-geolocation-for-gdpr-compliance)に従い、
+Data ScrubbingのSensitive Fieldsへ、次の5項目を1行ずつ追加します。
+共通の組織設定（Global Sensitive Fields）を使う場合も対象projectへ適用されることを確認します。
+
+```text
+city
+subdivision
+region
+country_code
+ip_address
+```
+
+既存の機密フィールドやscrubbing rulesは保持します。公式の反映時間は**5〜15分**です。
+設定保存から15分以上待ち、固有event IDの新しい合成イベントを1件だけ送信して、
+そのイベント詳細でIP・city・subdivision・region・country_codeの実値が無いことを確認します。
+削除済みまたは明示的なredaction表示を確認し、値をログや証跡へ転記しません。
+古いイベントやIssue全体の集計表示で判定せず、未反映・不明時は追加送信せず設定と対象IDを調べます。
+**新規イベントの保存結果の実測が不可欠**であり、unit testやHTTP 200だけでは証明できません。
+
+これらの設定は新規イベントに適用され、既存イベントを遡って消去するものではありません。
+設定前の合成テストにIPやgeoが残った場合は、そのイベントを含むテストIssueの削除を別途確認します。
+外部サービスへのHTTP通信自体には送信元IPが必要であり、Sentry基盤のアクセスログ等まで収集しない保証ではありません。
 
 ## ブラウザー例外と Web Vitals
 
@@ -55,13 +91,13 @@ processのcounterは再起動で消え、複数revision/instanceでは合算さ�
 
 ## 本番の設定・受入
 
-1. 本人がSentryアカウントと専用projectを用意し、規約・プラン・送信先regionを確認する。
+1. 本人がSentryアカウントと専用projectを用意し、規約・プラン・送信先regionと上記の組織側プライバシー設定を確認する。
 2. 現コードが受け入れるSaaS DSNは `https://<32桁hex public key>@o<数字>.ingest[.us|.de].sentry.io/<project番号>`。
    self-hostedや別の形式は黙って許可せず、宛先契約とtestsを先に更新する。
 3. root担当の配信手順でSecret Managerの固定versionを**新revisionだけ**へ渡す。
    フィルター導入前の旧revisionへ先にDSNを設定しない。DSNをチャット・ログ・public artifact・build contextへ出さない。
 4. CIの秘密marker fixtureで、SDK実シリアライズ後のenvelopeに原文・添付・URL・任意属性が無いことを確認する。
-5. 承認済みの架空例外でSentry到達・分類・通知・使用量を確認する。実利用者のデータで試験しない。
+5. 承認済みの架空例外でSentry到達・分類・通知・使用量、保存イベントのIP/geo不存在を確認する。実利用者のデータで試験しない。
    新しい公開「エラーを投げる」endpointは作らない。ブラウザーglobalには`Sentry`を公開しない。
 6. DSNを外したrevisionで通信が止まること、アプリ本来のログイン・表示・保存に影響しないことを確認する。
 
@@ -77,3 +113,8 @@ source mapやraw stackを後から有効にする場合は、別のprivacy設計
   [公式Options](https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/)と
   [Filtering](https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/filtering/)を参照。
   SDK更新時はeventだけでなくmetric envelope・rate limit・attachment除去の実SDK試験も維持する。
+- IP推測の根拠: [Relayの固定SDK設定](https://github.com/getsentry/relay/blob/ac463005933167023fc03b229e8ced7de646f7bc/relay-event-schema/src/protocol/clientsdk.rs#L26)と
+  [IP補完処理](https://github.com/getsentry/relay/blob/ac463005933167023fc03b229e8ced7de646f7bc/relay-event-normalization/src/event.rs#L423)。
+  [geo補完](https://github.com/getsentry/relay/blob/ac463005933167023fc03b229e8ced7de646f7bc/relay-event-normalization/src/event.rs#L507)は別処理。
+- 組織側の設定は[公式Organization API](https://docs.sentry.io/api/organizations/update-an-organization/)を参照。
+  IP保存禁止とadvanced scrubbingは新しい受信イベントが対象で、実設定と保存結果を別々に確認する。

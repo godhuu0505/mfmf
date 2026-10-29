@@ -24,7 +24,14 @@ describe("privacy projection", () => {
     expect(JSON.stringify(event)).not.toContain(secret);
     expect(event?.tags).toEqual({ category: "server", route: "/records/[id]" });
     expect(event?.exception.values[0]).toEqual({ type: "Error", value: "mfmf server failure; details withheld" });
-    expect(Object.keys(event!)).toEqual(["type", "level", "platform", "environment", "exception", "fingerprint", "tags"]);
+    expect(Object.keys(event!)).toEqual(["type", "level", "platform", "environment", "sdk", "exception", "fingerprint", "tags"]);
+  });
+  it.each([undefined, null, {}, { settings: { infer_ip: "auto" } }, { settings: { infer_ip: "legacy" } },
+    { name: secret, version: secret, packages: [secret], settings: { infer_ip: "never", extra: secret } }])("always prevents IP inference with a fresh fixed SDK setting", (sdk) => {
+    const event = privateErrorEvent({ sdk, user: { ip_address: "{{auto}}", geo: { city: secret } } });
+    expect(event?.sdk).toEqual({ settings: { infer_ip: "never" } });
+    expect(event).not.toHaveProperty("user");
+    expect(JSON.stringify(event)).not.toContain(secret);
   });
   it.each(["transaction", "profile", "replay_event", "feedback"])("drops %s", (type) => expect(privateErrorEvent({ type, message: secret })).toBeNull());
   it("keeps useful fixed error classes without reading custom messages", () => {
