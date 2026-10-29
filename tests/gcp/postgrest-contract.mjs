@@ -135,8 +135,14 @@ async function main() {
     // MCP uses the same actual user JWT/RLS, with an explicit consent-household
     // restriction even when the identity can also read a second household.
     const hhB = "92000000-0000-4000-8000-000000000002";
-    const added = await b.client.from("household_members").insert({ household_id: hhB, user_id: UUID_A, role: "viewer" });
-    checked(!added.error, "synthetic viewer membership added for MCP isolation");
+    const directAdd = await b.client.from("household_members").insert({ household_id: hhB, user_id: UUID_A, role: "viewer" });
+    checked(directAdd.error?.code === "42501", "runtime cannot bypass invite-only membership creation");
+    const inviteToken = "synthetic-postgrest-mcp-viewer-invitation";
+    const invitation = await b.client.from("household_invites").insert({ household_id: hhB, email: "a@example.test", role: "viewer",
+      token: inviteToken, invited_by: UUID_B, expires_at: new Date(Date.now() + 3600_000).toISOString() });
+    checked(!invitation.error, "owner creates synthetic viewer invitation");
+    const accepted = await a.client.rpc("accept_household_invite", { p_token: inviteToken });
+    checked(!accepted.error && accepted.data === hhB, "synthetic viewer joins through verified invite acceptance");
     const shared = await a.client.from("daycare_records").select("id").eq("id", RECORD_B).single();
     checked(!shared.error && shared.data.id === RECORD_B, "identity really has access to the second household");
     const boundA = createMcpReadRepository(a.client, UUID_A, HH_A);
