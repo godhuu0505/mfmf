@@ -5,6 +5,20 @@
 以下は実装した契約です。実Jobの成功、暗号文の独立復号、復元、削除API、Scheduler有効化の受入はそれぞれ別に確認します。
 設定やfixture成功だけで実環境の復旧を保証しません。
 
+### 2026-10-29 の復元受入
+
+- 新しいCloud SQL backupを本番とは別のprivate instanceへ実復元（16分26秒）。読取専用transactionで
+  24表・273行の全列、RLS policy74件・関数43件・runtime roleを本番と照合し、一致しました。
+  復元先に継承された削除保護は、照合後の一時instance撤去時にだけ解除します。本番の削除保護は維持します。
+- 隔離Identity Platform tenantで架空3ユーザーのBCRYPT2件・native SCRYPT1件を暗号化・独立復号・空の別tenantへ復元。
+  UID、確認済み/無効化状態、claims、hashを照合し、実password login、無効ユーザー拒否、既発行token失効を検証しました。
+  試験tenantは全削除し、一時的なtenant許可設定も元に戻しました。本番ユーザーへの書込・メール送信は0件です。
+- 本番4ユーザー・Google対応4件・BCRYPT1件を新exporterで読取保全し、独立保管鍵による復号・restore planを照合しました。
+  これは実ユーザーへの再importやGoogle providerの実復元試験ではありません。
+
+実行コードと機微な復旧材料を含む原本はprivate operator保管です。
+Job/Schedulerの最終配信・削除APIの受入結果は [PR #195](https://github.com/godhuu0505/mfmf/pull/195) に追記します。
+
 ## 日次構成と権限
 
 | Job / 同名の専用SA | JST | 処理 | 書込先・境界 |
@@ -31,6 +45,9 @@ Cloud Run metadataのproject ID/number・専用SAを検証してtokenをメモ�
 未知のcredential・provider・MFA/tenant等を黙って捨てず停止します。セッションtoken、OAuth秘密鍵、メール送信設定等は含みません。
 
 UID・Google provider対応・SCRYPT設定とhash、明示形式を検証できたBCRYPTを保全します。
+本projectは既知のBCRYPT移行とIdentity Platformが生成したSCRYPTだけを使う前提です。RESTのaccount応答は
+個別のhash方式を返さないため、非BCRYPTでsalt付きのhashをbytesだけから未知方式と識別できません。
+将来別方式の外部hashをimportする場合は、対応するbackup/restore gateの明示追加と実検証、またはpassword再設定を先に計画します。
 APIがpassword hashを返せないユーザーは再設定必須として数え、古い原本のhashで補完しません。
 権限不足のREDACTEDは停止します。移行時に確認したBCRYPTが将来のAPIでも常に取得できると保証しません。
 [REST UserInfo](https://docs.cloud.google.com/identity-platform/docs/reference/rest/v1/UserInfo)と
