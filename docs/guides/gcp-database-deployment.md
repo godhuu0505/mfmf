@@ -13,7 +13,7 @@ Cloud Runのtemplateと実際の100% serving revisionの両方が要求モード
 GCPの公開・サーバーフラグは両方trueで一致し、build時のSupabase公開値は無効な固定placeholderです。
 設定取得にVercelを使いません。既存3secretとDB password / Identity Platform API keyの2secretは、
 コミット済みの固定project/正のversion番号への参照を使います。`latest`や生のserver secretを公開manifestへ入れません。
-任意のSentry設定は既存サービスの固定secret参照だけを再利用します。
+任意のSentry設定は、コミット済みの `production-sentry-secret-version.json` で固定versionを指定できます。初回配信時に参照を追加し、既存の参照と異なる場合は停止します。secretの値は読み取りません。
 
 runtimeは既存の単一container / 1CPU / 1GiB / concurrency2 / min0-max1を検査します。
 Direct VPCは `mfmf-db-network` / `mfmf-app-tokyo` / `PRIVATE_RANGES_ONLY` 固定で、connectorやNATを作りません。

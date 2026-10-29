@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { databaseMode, databasePins, databasePublicEnv, DATABASE_VPC, isDatabaseVpc } from "../../scripts/gcp/database-deployment-config.mjs";
+import { databaseMode, databasePins, databasePublicEnv, databaseSourceConfig, DATABASE_VPC, isDatabaseVpc } from "../../scripts/gcp/database-deployment-config.mjs";
 import { prepareCandidate } from "../../scripts/gcp/prepare-candidate.mjs";
 import { validateFixedVersions, validateManifest, deployExistingService } from "../../scripts/gcp/deploy-existing-service.mjs";
 import { PROJECT, PROJECT_NUMBER, SERVICE_NAME, PUBLIC_ORIGIN, IMAGE_BASE } from "../../scripts/gcp/production-config.mjs";
@@ -27,6 +27,20 @@ test("mode and version pins reject ambiguous or floating configuration", () => {
   assert.deepEqual(databasePins(JSON.stringify(refs)), refs);
   assert.throws(() => databasePins(JSON.stringify({ ...refs, IDENTITY_PLATFORM_API_KEY: refs.IDENTITY_PLATFORM_API_KEY.replace("/1", "/latest") })));
   assert.ok(isDatabaseVpc(DATABASE_VPC)); assert.equal(isDatabaseVpc({ ...DATABASE_VPC, connector: "anything" }), false);
+});
+test("an explicitly pinned Sentry version is introduced only into the new GCP revision", () => {
+  const ref = `projects/${PROJECT_NUMBER}/secrets/mfmf-sentry-dsn/versions/1`;
+  const withSentry = { ...pins, SENTRY_DSN: ref };
+  assert.deepEqual(validateFixedVersions(JSON.stringify(withSentry), env), withSentry);
+  const service = { name: SERVICE_NAME, uri: PUBLIC_ORIGIN, template: { containers: [{ env: Object.entries(publicEnv).map(([name, value]) => ({ name, value })) }] } };
+  const selected = databaseSourceConfig(service, withSentry);
+  assert.equal(selected.features.sentryConfigured, true);
+  assert.equal(selected.secretVersions.SENTRY_DSN, ref);
+  const configured = { ...manifest(), features: { googleDriveConfigured: true, sentryConfigured: true }, secretVersions: withSentry };
+  validateManifest(configured, withSentry, env);
+  assert.throws(() => validateManifest({ ...configured, secretVersions: { ...withSentry, SENTRY_DSN: ref.replace('/1', '/2') } }, withSentry, env));
+  assert.throws(() => validateFixedVersions(JSON.stringify({ ...pins, SENTRY_DSN: ref.replace('/1', '/latest') }), env));
+  assert.throws(() => databaseSourceConfig({ ...service, template: { containers: [{ env: [{ name: 'SENTRY_DSN', valueSource: { secretKeyRef: { secret: 'mfmf-sentry-dsn', version: '2' } } }] }] } }, withSentry));
 });
 test("true manifest requires matching flags, fixed placeholders, both secret references and operator digest", () => {
   validateManifest(manifest(), pins, env);

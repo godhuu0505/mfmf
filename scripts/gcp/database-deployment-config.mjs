@@ -42,8 +42,8 @@ export function isDatabaseVpc(value) {
     && (item.tags === undefined || (Array.isArray(item.tags) && item.tags.length === 0));
 }
 
-// Only non-Auth preferences and an optional existing Sentry reference are reused.
-// No Vercel read, secret value read or new SecretVersion in database mode.
+// Reuse preferences and an optional existing Sentry reference, or an explicitly
+// committed fixed Sentry version for its first rollout. No secret value is read.
 export function databaseSourceConfig(service, pins) {
   if (service?.name !== SERVICE_NAME || service.uri !== PUBLIC_ORIGIN || service.template?.containers?.length !== 1) fail();
   const entries = service.template.containers[0].env;
@@ -65,6 +65,12 @@ export function databaseSourceConfig(service, pins) {
         || !/^[1-9][0-9]*$/.test(ref.version ?? "")) fail();
       sentryRef = `projects/${PROJECT_NUMBER}/secrets/mfmf-sentry-dsn/versions/${ref.version}`;
     }
+  }
+  const sentryPin = pins?.SENTRY_DSN;
+  if (sentryPin !== undefined) {
+    if (typeof sentryPin !== "string" || !new RegExp(`^projects/${PROJECT_NUMBER}/secrets/mfmf-sentry-dsn/versions/[1-9][0-9]*$`).test(sentryPin)
+      || (sentryRef && sentryRef !== sentryPin)) fail();
+    sentryRef = sentryPin;
   }
   values.SIGNUP_ENABLED ??= "false";
   values.SENTRY_ENVIRONMENT ??= "cloud-run-candidate";

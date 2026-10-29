@@ -44,7 +44,7 @@ D9〜D14 は原典を参照。
 | **D18**<br>（移行後の費用・配信先はD38で変更） | 配信は Vercel Hobby、認証/DB/画像は Supabase Free に寄せて**無料枠で完結**させる | **ネイティブアプリ化と独自サーバーを却下**。少人数で使う PWA に運用コストと運用対象を増やす価値がない |
 | **D19** | フェーズ1 は「記録（テキスト＋写真）を残して振り返る」核だけを作る | **LINE 自動取り込み / カレンダー連携 / Google ドライブ・フォト連携 / プッシュ通知を意図的に外した**。やりたいことを増やすより、まず日々続けられる最小形を優先するため |
 | **D20** | 画像は**ブラウザ側**で長辺 1600px へ縮小・JPEG 再圧縮してからアップロードする（`src/lib/imageResize.ts`）。PWA アイコンは Node 標準 zlib で直接生成（`npm run icons`） | **サーバー側リサイズを却下**（Free 枠の帯域と Vercel Function ボディ上限 4.5MB に収めるため）。**画像処理ライブラリの追加も却下**（アイコン生成のためだけに依存を増やさない） |
-| **D21** | ご意見・不具合フォームの内容は **Supabase の `feedback` テーブルにのみ**保存する | **公開リポジトリへの自動 Issue 起票を却下**。フォームには個人的な内容が入りうる。Issue 化は必要なときだけ、マスクして**非公開リポジトリ宛て**に手元スクリプトで転記する（[feedback-to-issues.md](../guides/feedback-to-issues.md)） |
+| **D21** | ご意見・不具合フォームの内容は `feedback` テーブルに保存する（当初はSupabase、現在の本番はCloud SQL） | **公開リポジトリへの自動 Issue 起票を却下**。フォームには個人的な内容が入りうる。GCPでは本人の報告の固定分類だけを確認のうえ、共通の**非公開リポジトリ**へ手元スクリプトで転記する（[feedback-to-issues.md](../guides/feedback-to-issues.md)） |
 | **D22** | デプロイは **GitHub Actions から Vercel CLI で明示的に**行い、Vercel の Git 連携自動デプロイは無効化する（`vercel.json` の `git.deploymentEnabled: false`）。main マージ = 本番リリース | **Vercel の Git 連携による自動デプロイを却下**（「いつ・どこへ出すか」を Actions に一本化するため）。**preview 用の別 Supabase プロジェクトも却下**（Free 枠の active 2 プロジェクト上限と両立しない。Database Branching は Pro 以上）。Free には自動バックアップも PITR も無いため `migrate` は push 前に本番 DB をダンプして Artifact に 90 日保存する —— **これが唯一のロールバック資産**で、Storage の写真は対象外（**写真の事故からは戻せないことを許容**） |
 | **D23** | Service Worker は Supabase の API レスポンスと署名付き写真 URL を**キャッシュしない** | **全レスポンスをキャッシュして高速化する案を却下**。署名付き URL は private かつ期限付きで、期限切れ URL や他人に見えてはいけない内容がキャッシュに残るため。静的アセットは stale-while-revalidate、ページ遷移は network-first に留める |
 
