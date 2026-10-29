@@ -6,6 +6,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  runtime: "nodejs",
   matcher: [
     // 以下を除く全ルートに適用:
     // - _next/static, _next/image, favicon, 画像/アイコン等の静的ファイル

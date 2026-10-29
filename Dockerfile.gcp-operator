@@ -1,0 +1,27 @@
+FROM node:22-bookworm-slim AS dependencies
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts --omit=optional
+# Copy only pg and its locked dependency graph, not the application build.
+RUN mkdir /pg-modules && for package in pg pg-connection-string pg-pool pg-protocol pg-types pgpass pg-int8 postgres-array postgres-bytea postgres-date postgres-interval split2 xtend; do cp -R "node_modules/$package" /pg-modules/; done
+
+FROM postgres:17-bookworm AS runner
+ARG TARGETARCH
+RUN apt-get update && apt-get install -y --no-install-recommends age ca-certificates curl && rm -rf /var/lib/apt/lists/*
+RUN set -eu; case "$TARGETARCH" in \
+    amd64) proxy_sha=5533a05cdbf12f8a0cb46db34c775847a496e181d47f863284d3d02b0fad49fa ;; \
+    arm64) proxy_sha=75273ebeba06cf82ed72726a662b89e6a886b72e7b507a4fcaade4703c4a0d2d ;; \
+    *) exit 1 ;; esac; \
+    curl --fail --location --retry 2 --max-time 120 "https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.26.3/cloud-sql-proxy.linux.${TARGETARCH}" -o /usr/local/bin/cloud-sql-proxy; \
+    echo "$proxy_sha  /usr/local/bin/cloud-sql-proxy" | sha256sum --check --status; \
+    chmod 755 /usr/local/bin/cloud-sql-proxy
+COPY --from=dependencies /usr/local/bin/node /usr/local/bin/node
+COPY --from=dependencies /pg-modules /app/node_modules
+WORKDIR /app
+COPY db/gcp/ /app/db/gcp/
+COPY supabase/migrations/ /app/supabase/migrations/
+COPY tests/gcp/ /app/tests/gcp/
+COPY scripts/gcp/database-operator.mjs scripts/gcp/database-prebackup.mjs /app/scripts/gcp/
+USER postgres
+ENTRYPOINT ["node", "/app/scripts/gcp/database-operator.mjs"]
+CMD ["--plan"]

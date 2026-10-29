@@ -82,15 +82,25 @@ export async function findRelatedRecords(input: RelatedRecordInput, dependencies
     if (freshAuth.error || freshAuth.data.user?.id !== user.id) return empty("unavailable");
     const freshMembership = await getMembership(supabase);
     if (!freshMembership || freshMembership.householdId !== membership.householdId) return empty("unavailable");
+    let currentIds = ids;
+    if (input.tagId) {
+      const currentTags = await supabase.from("record_tags").select("record_id")
+        .eq("tag_id", input.tagId).in("record_id", ids).limit(RANKING_MAX_CANDIDATES + 1);
+      if (currentTags.error || !currentTags.data || currentTags.data.length > RANKING_MAX_CANDIDATES) return empty("unavailable");
+      const tagged = new Set(currentTags.data.map((row) => row.record_id));
+      currentIds = ids.filter((id) => tagged.has(id));
+      if (!currentIds.length) return empty("empty");
+    }
     let freshQuery = supabase.from("daycare_records").select("id, record_date, source, body, author")
-      .in("id", ids).eq("status", "done").or(householdScopeFilter(freshMembership.householdId));
+      .in("id", currentIds).eq("status", "done").or(householdScopeFilter(freshMembership.householdId));
     if (input.source && input.source !== "all") freshQuery = freshQuery.eq("source", input.source);
     if (input.from) freshQuery = freshQuery.gte("record_date", input.from);
     if (input.to) freshQuery = freshQuery.lte("record_date", input.to);
     const fresh = await freshQuery.limit(RANKING_MAX_CANDIDATES);
     if (fresh.error || !fresh.data) return empty("unavailable");
     const currentRows = fresh.data as unknown as RelatedRecord[];
-    const byId = new Map(currentRows.filter((row) => candidateIds.has(row.id)).map((row) => [row.id, {
+    const allowedIds = new Set(currentIds);
+    const byId = new Map(currentRows.filter((row) => candidateIds.has(row.id) && allowedIds.has(row.id)).map((row) => [row.id, {
       id: row.id, record_date: row.record_date, source: row.source, body: row.body, author: row.author,
     }]));
     const records = ids.filter((id) => byId.has(id)).map((id) => byId.get(id)!);

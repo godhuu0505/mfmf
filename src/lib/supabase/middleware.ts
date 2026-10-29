@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_AUTH_COOKIE } from "./cookieName";
+import { isGcpAuthEnabled } from "@/lib/identity/config";
 import { siteRelativeLocation } from "@/lib/siteRedirect";
 import { cloudRunCutoverRoute } from "@/lib/cloudRunCutover";
 import {
@@ -14,36 +15,58 @@ import {
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.SUPABASE_INTERNAL_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookieOptions: { name: SUPABASE_AUTH_COOKIE },
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
+  let supabase: ReturnType<typeof createServerClient> | undefined;
+  let user: { id: string } | null = null;
+  if (isGcpAuthEnabled()) {
+    try {
+      const { createIdentityProtocol } = await import("@/lib/identity/server");
+      const protocol = createIdentityProtocol({
+        get: (name) => request.cookies.get(name)?.value,
+        set: (name, value, options) => {
+          request.cookies.set(name, value);
+          const previous = supabaseResponse.cookies.getAll();
           supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
+          previous.forEach((cookie) => supabaseResponse.cookies.set(cookie));
+          supabaseResponse.cookies.set(name, value, options);
+        },
+      });
+      const identity = await protocol.verifiedIdentity();
+      user = identity ? { id: identity.subject } : null;
+    } catch {
+      return new NextResponse("認証を確認できません。時間をおいて再度お試しください。", { status: 503, headers: { "Cache-Control": "private, no-store" } });
+    }
+  } else {
+    supabase = createServerClient(
+      process.env.SUPABASE_INTERNAL_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookieOptions: { name: SUPABASE_AUTH_COOKIE },
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value),
+            );
+            supabaseResponse = NextResponse.next({ request });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options),
+            );
+          },
         },
       },
-    },
-  );
+    );
 
-  // getUser() を呼ぶことでトークンをリフレッシュする (重要)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    // getUser() を呼ぶことでトークンをリフレッシュする (重要)
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  }
 
   // The canonical old entry must redirect even if Vercel's optional system-env
   // exposure is disabled. Preview deployments still use the platform flag.
   if (process.env.VERCEL === "1" || request.nextUrl.hostname === "mfmf-1223.vercel.app") {
+    if (!supabase) return new NextResponse(null, { status: 503 });
     const { data: readBackend, error: readError } = await supabase.rpc("get_media_read_backend");
     let cutoverResponse: NextResponse | null = null;
     if (readError || !["supabase", "gcs"].includes(readBackend)) {

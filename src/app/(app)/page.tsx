@@ -31,6 +31,7 @@ import TodayPlanCard, { type TodayPlan } from "@/components/TodayPlanCard";
 import { EMPTY_SCHEDULE, fetchSchedule } from "@/lib/scheduleQuery";
 import { itemsOnDate, planOnDate } from "@/lib/schedule";
 import { jstTodayISO } from "@/lib/dateRange";
+import { rankingEnabled } from "@/lib/ranking";
 import SourceIcon from "@/components/SourceIcon";
 import { Camera, PawPrint, Scale, X } from "lucide-react";
 
@@ -407,11 +408,12 @@ export default async function HomePage({
           <h1 className="text-xl font-bold text-foreground">記録一覧</h1>
         </div>
 
-        {/* key で絞り込み変更時に再マウントし、入力欄を現在の URL 条件に同期する */}
+        {/* 世帯・利用者・タグ・機能状態をまたいで、未完了の関連度検索を再利用しない。 */}
         <RecordFilters
-          key={buildQueryString(filters)}
+          key={`${user.id}:${householdId}:${activeTag?.id ?? ""}:${rankingEnabled()}:${buildQueryString(filters)}`}
           filters={filters}
           activeTagId={activeTag?.id ?? null}
+          rankingEnabled={rankingEnabled()}
         />
 
         {/* 記録元チップ（常設・ワンタップ）。
