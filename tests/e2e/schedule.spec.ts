@@ -126,7 +126,18 @@ test("UC-P04: 毎週のルールがカレンダーに入り、記録を足して
   const label = labels[weekday];
   const row = page.locator("li", { has: page.getByText(`${label}曜`) }).first();
   await row.getByLabel(`${label}曜の種類`).selectOption("daycare");
-  await row.getByRole("button", { name: `${label}曜を今日から変える` }).click();
+  const saveButton = row.getByRole("button", { name: `${label}曜を今日から変える` });
+  // click は保存完了を待たない。直後のフル遷移で Action を中断したり、
+  // 保存前のカレンダーを読むのを防ぐため、応答を先に待ち受ける。
+  const saved = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    new URL(response.url()).pathname === "/schedule/rules",
+  );
+  await saveButton.click();
+  const response = await saved;
+  expect(response.ok()).toBe(true);
+  expect(await response.finished()).toBeNull();
+  await expect(saveButton).toBeEnabled();
 
   // 来週の同じ曜日に、ルール由来の予定が出る
   await page.goto(`/calendar?ym=${nextWeek.slice(0, 7)}`);
