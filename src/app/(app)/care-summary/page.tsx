@@ -132,7 +132,7 @@ export default async function CareSummaryPage({ searchParams }: { searchParams: 
           {summary.pastPlanned.length > 0 && <Section title="過去の未完了予定" description="保存済みの予定のうち、完了・見送りが記録されていないもの" count={summary.pastPlanned.length}>{recordList(summary.pastPlanned, "")}</Section>}
           {summary.unassignedRecordCount > 0 && <p className="text-xs text-muted-foreground">対象ペットが未設定の記録{summary.unassignedRecordCount}件は、このシートの記録に含めていません。</p>}
         </article>
-        <CareSummaryCopyButton key={`${pet.id}:${range.from}:${range.to}`} text={formatCareSummaryText({ pet, range, today, asOf: report.asOf, latestWeight: report.latestWeight, summary, memberNames })} />
+        <CareSummaryCopyButton text={formatCareSummaryText({ pet, range, today, asOf: report.asOf, latestWeight: report.latestWeight, summary, memberNames })} />
         <CareSummaryPrintButton />
         <footer className="border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground"><p>mfmf · 入力された記録と予定を整理したシートです。</p><p>記載内容は作成時点のものです。渡す相手に必要な情報か確認してください。</p></footer>
       </>}
