@@ -64,6 +64,9 @@ describe("Identity session verification and refresh", () => {
     expect(await f.protocol.session()).toBeNull(); expect(f.get("id")).toBe("");
   });
   it("does not authorize a forged token payload", () => { expect(() => identityFromToken(decoded({ sub: "other" }))).toThrow(IdentityError); });
+  it.each(["recovery-tenant", "", undefined])("rejects a tenant-scoped token even when its UID matches (%s)", (tenant) => {
+    expect(() => identityFromToken(decoded({ firebase: { sign_in_provider: "google.com", identities: {}, tenant } }))).toThrow(IdentityError);
+  });
   it("does not erase a session during an upstream 503", async () => {
     const f = fixture(); f.set("id", TOKEN); f.set("refresh", "old-refresh"); f.verify.mockRejectedValueOnce({ code: "auth/id-token-expired" }); f.queue.push({ status: 503, data: { error: { message: SECRET } } });
     await expect(f.protocol.session()).rejects.toThrow("unavailable"); expect(f.get("refresh")).toBe("old-refresh");

@@ -42,6 +42,10 @@ function same(a: string, b: string): boolean {
 }
 export function identityFromToken(decoded: DecodedIdToken): VerifiedIdentity {
   const subject = text(decoded.sub, 128);
+  // This application uses the project's default user namespace. A separately
+  // signed tenant token must never alias a default-namespace UID (including
+  // accounts imported into an isolated recovery-test tenant).
+  if (decoded.firebase && Object.hasOwn(decoded.firebase, "tenant")) throw new IdentityError();
   if (decoded.uid !== subject || typeof decoded.email_verified !== "boolean") throw new IdentityError();
   return { subject, email: typeof decoded.email === "string" ? text(decoded.email, 320) : null,
     emailVerified: decoded.email_verified === true,

@@ -133,6 +133,7 @@ jobs:
           # The earlier offline-script gate may run before age is installed.
           # Re-run this focused suite to require the real synthetic encrypt/decrypt round trip.
           node --test tests/scripts/storage-backup.test.mjs
+          node --test tests/scripts/identity-backup.test.mjs
 
       - name: Test GCP bootstrap and failure handling
         run: python3 tests/scripts/gcp-bootstrap.test.py

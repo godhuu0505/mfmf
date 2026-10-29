@@ -3,6 +3,8 @@ import { pathToFileURL } from "node:url";
 import { parsePreseededSecretVersions, prepareWithDocker, selectProductionConfig, SECRET_NAMES } from "./prepare-candidate.mjs";
 import { DATABASE_ENV_KEYS, DATABASE_SECRETS, databaseMode, databasePins, databaseSourceConfig, isDatabaseVpc } from "./database-deployment-config.mjs";
 import { deployDatabaseJob, operatorDigest, databaseJobDiagnostic } from "./deploy-database-job.mjs";
+import { deployBackupJobs } from "./deploy-backup-jobs.mjs";
+import { backupJobDiagnostic } from "./backup-job-config.mjs";
 import { PROJECT, PROJECT_NUMBER, REGION, SERVICE, RUNTIME, SERVICE_NAME, PUBLIC_ORIGIN, IMAGE_BASE, requireContinuousContext } from "./production-config.mjs";
 
 const API = `https://run.googleapis.com/v2/${SERVICE_NAME}`;
@@ -190,7 +192,7 @@ async function smoke(fetchImpl, origin = PUBLIC_ORIGIN) {
   }
 }
 
-export async function deployExistingService({ env, pins, prepare, fetchImpl = fetch, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = console.log, maxPolls = 60, upgrade = deployDatabaseJob }) {
+export async function deployExistingService({ env, pins, prepare, fetchImpl = fetch, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = console.log, maxPolls = 60, upgrade = deployDatabaseJob, backups = deployBackupJobs }) {
   requireContinuousContext(env);
   const database = databaseMode(env);
   if (!env.GCP_ACCESS_TOKEN || /[\r\n]/.test(env.GCP_ACCESS_TOKEN)) fail("Short-lived WIF token is missing or invalid.");
@@ -226,6 +228,7 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   if (current.uid !== initial.uid || current.etag !== initial.etag) fail("Service changed while building; refusing concurrent deployment.");
   if (database) {
     await verifyServing();
+    await backups({ env, image: manifest.migrationImage, fetchImpl, wait });
     await upgrade({ env, image: manifest.migrationImage, fetchImpl, wait });
     current = await get();
     validateService(current, database);
@@ -372,6 +375,8 @@ async function main() {
 export function deploymentErrorMessage(error) {
   const database = databaseJobDiagnostic(error);
   if (database) return JSON.stringify(database);
+  const backup = backupJobDiagnostic(error);
+  if (backup) return JSON.stringify(backup);
   return error instanceof DeploymentError ? error.message : "Continuous deployment failed; credentials, input and API details withheld.";
 }
 

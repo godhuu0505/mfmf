@@ -1,5 +1,8 @@
 # public + Auth の暗号化原本バックアップ
 
+このページは旧Supabaseの移行原本保全です。切替後のIdentity Platform日次保全・Cloud SQL保持は
+[GCPバックアップ運用](./gcp-backup-automation.md)を参照してください。日次Jobから旧sourceの凍結を解除しません。
+
 `Back up database and Auth` は、Supabase の `public` と `auth` を**一回の `pg_dump -Fc`**で
 取得し、その stdout を `age` の stdin へ直結する、運用担当者用の手動 workflow です。
 schema と data を別々に dump しないため、両 schema のテーブルデータは同じ PostgreSQL
