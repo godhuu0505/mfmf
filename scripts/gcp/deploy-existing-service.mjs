@@ -44,7 +44,9 @@ export function preserveRankingEnv(items = []) {
 
 export function validateFixedVersions(text, env) {
   const refs = parsePreseededSecretVersions({ ...env, PRESEEDED_SECRET_VERSIONS: text });
-  if (!exactKeys(refs, [...PIN_KEYS, ...(databaseMode(env) ? Object.keys(DATABASE_SECRETS) : [])]) || Object.values(refs).some((ref) => !ref.startsWith(`projects/${PROJECT_NUMBER}/`))) {
+  const required = [...PIN_KEYS, ...(databaseMode(env) ? Object.keys(DATABASE_SECRETS) : [])];
+  const expected = [...required, ...(databaseMode(env) && Object.hasOwn(refs, "SENTRY_DSN") ? ["SENTRY_DSN"] : [])];
+  if (!exactKeys(refs, expected) || Object.values(refs).some((ref) => !ref.startsWith(`projects/${PROJECT_NUMBER}/`))) {
     fail("Committed secret references must match the authentication mode and fixed project-number references.");
   }
   return refs;
@@ -59,7 +61,7 @@ export function validateManifest(manifest, pins, env) {
       !manifest.secretVersions || typeof manifest.secretVersions !== "object" || Array.isArray(manifest.secretVersions)) {
     fail("Candidate public manifest is invalid; contents withheld.");
   }
-  for (const key of [...PIN_KEYS, ...(database ? Object.keys(DATABASE_SECRETS) : [])]) if (manifest.secretVersions[key] !== pins[key]) fail("Candidate changed a committed secret reference.");
+  for (const key of Object.keys(pins)) if (manifest.secretVersions[key] !== pins[key]) fail("Candidate changed a committed secret reference.");
   for (const [key, ref] of Object.entries(manifest.secretVersions)) {
     if (!Object.hasOwn(SECRET_NAMES, key) || (!database && Object.hasOwn(DATABASE_SECRETS, key)) || typeof ref !== "string" ||
         !new RegExp(`^projects/(${PROJECT}|${PROJECT_NUMBER})/secrets/${SECRET_NAMES[key]}/versions/[1-9][0-9]*$`).test(ref)) {
@@ -364,7 +366,11 @@ async function main() {
     let refs;
     try { refs = databasePins(await readFile(new URL("./production-database-secret-versions.json", import.meta.url), "utf8")); }
     catch { fail("Committed database secret references are unreadable or invalid."); }
-    text = JSON.stringify({ ...JSON.parse(text), ...refs });
+    let sentry;
+    try { sentry = JSON.parse(await readFile(new URL("./production-sentry-secret-version.json", import.meta.url), "utf8")); }
+    catch { fail("Committed Sentry secret reference is unreadable or invalid."); }
+    if (sentry !== null && !exactKeys(sentry, ["SENTRY_DSN"])) fail("Committed Sentry secret reference is invalid.");
+    text = JSON.stringify({ ...JSON.parse(text), ...refs, ...(sentry ?? {}) });
   }
   const pins = validateFixedVersions(text, process.env);
   const env = { ...process.env, PRESEEDED_SECRET_VERSIONS: JSON.stringify(pins) };

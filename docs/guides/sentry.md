@@ -1,126 +1,79 @@
-# Sentry でエラーモニタリング / Web Vitals を有効化する
+# Sentry の安全な有効化
 
-mfmf は `@sentry/nextjs` を **サーバ / Edge ランタイム限定** で組み込み済み。
-`SENTRY_DSN` が無いときは SDK が初期化されず通信もしない（no-op）。
-本番でエラーモニタリングや Web Vitals 計測を有効化したい時に、本手順で DSN を設定する。
+Sentry は運営者向けの障害分類と、限定した画面性能の確認に使います。
+`SENTRY_DSN` 未設定・形式不正なら SDK は初期化せず、Sentry へ通信しません。
+実 DSN・アカウント設定・到達確認は運用の受入条件であり、コードのマージだけで有効化済みとはしません。
 
-**スコープ**: サーバサイドの例外（Server Component / Server Action / Route
-Handler / middleware）が捕捉される。クライアントサイドの React レンダリング
-エラーは含めていない（PWA のバンドルサイズを優先）。クライアント側も必要に
-なったら `src/instrumentation-client.ts` を作成し `Sentry.init` を呼べば足る。
-加えて Web Vitals（LCP/INP/CLS/FCP/TTFB）を Sentry の Trace Metrics として送り、
-画面ごとの p75 を継続的に追える（→ [Web Vitals の p75 を確認する](#web-vitals-の-p75-を確認する)）。
+## 送信する情報と、送信しない情報
 
-## 1. Sentry プロジェクトを用意する
+例外は **固定の分類、固定の画面分類、既知のJavaScript例外型、ランダムなイベント識別子**だけに変換します。
+例: `server` / `/records/[id]` / `TypeError`。エラー本文・stack・コード周辺・関数引数・フォーム内容・記録本文・写真・
+オブジェクトパス・署名URL・メール・UID・世帯ID・Cookie・Authorization・任意URL・query・fragmentは送りません。
+原文を正規表現で部分マスクする方式ではなく、許可した項目だけで新しいイベントを作ります。
 
-1. [sentry.io](https://sentry.io/) でアカウントを作成（Developer プランで開始可、~5k errors/月まで無料）
-2. New Project から **Next.js** を選択し、プロジェクト名を `mfmf` などで作成
-3. DSN（`https://...@oXXXXX.ingest.sentry.io/YYYY` のような URL）が発行されるので控える
+SDKのscopeや自動付加情報も含めて、`beforeSend` と最終transportの両方で投影します。
+最終envelopeはerrorと既知Web Vitalsだけを許可し、attachment・breadcrumb・request・user・context・trace header・
+log・session・replay・profile・check-in・client reportを送信しません。
+Session Replay、browser SDK、HTTP/SQL tracing、profiling、console転送は導入しません。
+Sentry build pluginも使わず、source map・build token・ソースコードのuploadはありません。
+`SENTRY_TRACES_SAMPLE_RATE` が既存環境に残っていても読みません。トレースは無効です。
 
-## 2. 環境変数を設定する
+この制限により、Sentryから利用者や個々の記録を特定したり、元のstackを調査したりはできません。
+固定分類と配信時刻を手掛かりに、運用ログ・ローカル再現・本人の問い合わせで調べます。
+Sentryが受け取るHTTP通信元はサーバーです。ブラウザーからSentryへ直接送信しません。
 
-`.env.local` または Vercel のプロジェクト設定で以下を設定する。
+## ブラウザー例外と Web Vitals
 
-```
-SENTRY_DSN=https://...@oXXXXX.ingest.sentry.io/YYYY
-```
+- React error boundary、ルートerror boundary、`error`、`unhandledrejection` を固定categoryで報告します。
+  `event.error`、rejection reason、DOM、resource URLにはアクセスしません。
+- ブラウザーは `/api/vitals` のGETで有効/無効だけを一度確認し、無効ならPOSTしません。
+  `NEXT_PUBLIC_SENTRY_DSN`、公開build引数、新しいCookieやlocalStorageは不要です。
+- 既存middlewareの認証確認を維持します。匿名GET/POSTは204で破棄し、ログイン前のブラウザー障害は対象外です。
+  ログイン画面の稼働確認は別のuptime監視で補います。回復・招待Cookieを計測のために消費しません。
+- POSTは同一originのJSONのみ、UTF-8本文1KiB以内・読取2秒以内。未知fieldは拒否します。
+  画面はクライアントとサーバーの両方で固定分類へ変換し、queryや動的IDは送信前に落とします。
+- Web Vitalsは `CLS/FCP/INP/LCP/TTFB` の5種だけです。documentの10%を抽出し、各種を最大1回送ります。
+  `rating` / `navigation_type` は固定enum、値は非負有限数（CLS≤10、時間≤120秒）、小数3桁に制限します。
+  metric IDは送りません。属性は`route/rating/navigation_type`だけです。
+- Metricsで`web_vital.lcp`等を`route`別に集計できます。ただし抽出・上限制限付きの標本なので、
+  リクエスト数・利用者数・DAU・完全なエラー件数を表すものではありません。少数標本のp75は慎重に扱います。
 
-任意で sampling rate を絞れる（既定 `0.1` = 10%）:
+## 費用と送信量の制限
 
-```
-SENTRY_TRACES_SAMPLE_RATE=0.05
-```
-
-クライアント側も有効化する場合は `src/instrumentation-client.ts` を追加し、
-`NEXT_PUBLIC_SENTRY_DSN` を設定する（バンドルサイズが ~80 KB 増えるので
-本当に必要になってから入れることを推奨）。
-
-## 3. Source map のアップロード（任意）
-
-スタックトレースを元のソースで見られるようにするには Sentry CLI に渡す
-auth token が必要。CI/CD（Vercel）に以下を追加する:
-
-```
-SENTRY_ORG=your-org-slug
-SENTRY_PROJECT=mfmf
-SENTRY_AUTH_TOKEN=sntrys_xxxxxxxxxxxx
-```
-
-これらが揃ったときだけ `next.config.mjs` の `withSentryConfig` が
-ビルド時に source map をアップロードする（未設定なら upload は無効）。
-auth token は Sentry の Settings → Auth Tokens から、`project:releases`
-スコープで発行する。
-
-## 4. 動作確認
-
-- ローカル: `npm run build && npm start` → ブラウザでエラーを発生させ Sentry の Issues に届くか確認
-- 本番: 開発者ツールから `Sentry.captureException(new Error("test"))` を呼ぶ
-
-## 仕組み（参考）
-
-- `src/instrumentation.ts` — Node / Edge ランタイムでの `Sentry.init` + `onRequestError`
-- `next.config.mjs` — `withSentryConfig` で build-time プラグインを有効化
-- クライアント側 SDK は同梱しない（バンドルサイズ優先）。導入する場合は
-  `src/instrumentation-client.ts` を追加して `Sentry.init({ dsn: process.env.NEXT_PUBLIC_SENTRY_DSN, ... })` を呼ぶ
-- Session Replay は **意図的に無効**（写真記録という性質上、画面録画を保持したくない）
-
-## Web Vitals の p75 を確認する
-
-主要画面の Web Vitals を Sentry 側で **p75** として継続的に見るための運用手順。
-独自ダッシュボードや DB テーブルは持たず、Sentry の Trace Metrics に寄せている。
-
-### 仕組み
-
-- `src/components/WebVitalsReporter.tsx`（全ページ配置）がナビゲーションごとに
-  CLS / INP / LCP / FCP / TTFB を取得し、本番は `/api/vitals` へ `sendBeacon`
-  （開発時は console に出すだけで送信しない）。送る値は **PII 無し**
-  （name / value / rating / id / navigationType / path）。
-- `src/app/api/vitals/route.ts` が受け取り、`Sentry.metrics.distribution()` で
-  **Trace Metrics** として送出する。distribution 型は分布を保持するので Sentry
-  側でパーセンタイル（p75 など）を集計できる。送信後に `Sentry.flush()` で確実に
-  送る（serverless 関数が凍結して計測が失われないため）。
-- **前提**: `SENTRY_DSN` が設定されていること。未設定なら SDK は no-op で何も送らない。
-
-### メトリクス名と属性
-
-| メトリクス名 | 元の Web Vital | 単位 |
-| --- | --- | --- |
-| `web_vital.lcp` | LCP | millisecond |
-| `web_vital.inp` | INP | millisecond |
-| `web_vital.cls` | CLS | none（スコア） |
-| `web_vital.fcp` | FCP | millisecond |
-| `web_vital.ttfb` | TTFB | millisecond |
-
-各メトリクスには属性（attributes）が付く:
-
-- `metric` — 元の名前（`LCP` など）
-- `rating` — `good` / `needs-improvement` / `poor` / `unknown`
-- `path` — 計測時の画面パス。動的ルートは `/records/[id]` / `/share/[token]` の
-  ようにパターンへ正規化して送る（UUID/token ごとに p75 が分裂せず、画面単位で
-  集計できる）。未知のパスは `other` に丸める
-- `navigation_type` — `navigate` / `reload` / `back-forward` など
-
-### Sentry 上で見る
-
-1. Sentry プロジェクトの **Metrics**（Trace Explorer / メトリクスのエクスプローラ）を開く。
-2. メトリクスに `web_vital.lcp`（や `web_vital.inp` 等）を選ぶ。
-3. 集計関数を **p75** にする。
-4. **Group by** に `path` を指定すると、画面ごとの p75 が並ぶ。
-   `rating` で group by すれば good/poor の内訳も見られる。
-5. ダッシュボードに保存しておくと継続的に追える。
-
-主要画面の `path` 例: `/`（一覧）, `/records/new`, `/records/[id]`, `/calendar`,
-`/gallery`, `/weight`, `/pets`, `/settings`, `/shares`。
-
-> Trace Metrics は比較的新しい機能のため、組織（org）によっては Sentry 側で
-> 有効化（beta のオプトイン）が必要な場合がある。Metrics のメニューが見当たらない
-> ときは組織の設定 / プランで Metrics が利用可能か確認する。
-
-## トラブルシュート
-
-| 症状 | 原因 / 対処 |
+| 範囲 | 制限 |
 | --- | --- |
-| ローカルで Sentry の警告が出続ける | `SENTRY_DSN` を空に保つ（既定で no-op） |
-| Vercel ビルドで source map が出る警告 | `SENTRY_AUTH_TOKEN` を設定する（無ければ upload は自動で disable） |
-| クライアントエラーが届かない | `NEXT_PUBLIC_SENTRY_DSN` がブラウザに渡っているか確認（rebuild が必要） |
-| Web Vitals の p75 が出ない | `SENTRY_DSN` が本番に設定されているか / 本番ビルドか（開発時は送信しない） / Sentry org で Metrics が有効か確認 |
+| browser document | error最大3件、同category再送なし。性能は10%抽出、5種各1回 |
+| API process | 有効な同一origin JSON要求を最大60回/分 |
+| 最終送信process | error最大3件/分・60件/日、metric最大30件/分・360件/日 |
+| 通信 | transport queue最大4、3秒timeout、redirect禁止、Sentryの429/rate-limitを尊重、独自retryなし |
+| accepted API | flush最大500ms。通知失敗で画面の操作は失敗させない |
+
+processのcounterは再起動で消え、複数revision/instanceでは合算されません。
+**これらは無料枠・月額の上限保証ではありません。** Sentry管理画面で利用可能な無料プラン、Errors/Metricsの枠、
+超過課金無効またはspend limit、通知先を確認してから有効化します。プランの数値はアカウントの現行表示を正とします。
+枠が足りなければまず計測を止め、画像保全や復元品質を削って費用を合わせません。
+
+## 本番の設定・受入
+
+1. 本人がSentryアカウントと専用projectを用意し、規約・プラン・送信先regionを確認する。
+2. 現コードが受け入れるSaaS DSNは `https://<32桁hex public key>@o<数字>.ingest[.us|.de].sentry.io/<project番号>`。
+   self-hostedや別の形式は黙って許可せず、宛先契約とtestsを先に更新する。
+3. root担当の配信手順でSecret Managerの固定versionを**新revisionだけ**へ渡す。
+   フィルター導入前の旧revisionへ先にDSNを設定しない。DSNをチャット・ログ・public artifact・build contextへ出さない。
+4. CIの秘密marker fixtureで、SDK実シリアライズ後のenvelopeに原文・添付・URL・任意属性が無いことを確認する。
+5. 承認済みの架空例外でSentry到達・分類・通知・使用量を確認する。実利用者のデータで試験しない。
+   新しい公開「エラーを投げる」endpointは作らない。ブラウザーglobalには`Sentry`を公開しない。
+6. DSNを外したrevisionで通信が止まること、アプリ本来のログイン・表示・保存に影響しないことを確認する。
+
+source mapやraw stackを後から有効にする場合は、別のprivacy設計と受入が必要です。
+
+## 実装と一次資料
+
+- `src/instrumentation.ts`: Nextの`onRequestError`で固定分類だけをcapture。
+- `src/lib/telemetry/privacy.ts` / `transport.ts`: 二段の投影と送信先固定。
+- `src/lib/telemetry/client.ts` / `limits.ts`: browser/documentとprocessの上限。
+- `src/app/api/vitals/route.ts`: 認証middleware下の同一origin受け口。
+- SDK契約はインストール済み`@sentry/nextjs` v10系の型・実シリアライズをtestsで確認。
+  [公式Options](https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/)と
+  [Filtering](https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/filtering/)を参照。
+  SDK更新時はeventだけでなくmetric envelope・rate limit・attachment除去の実SDK試験も維持する。

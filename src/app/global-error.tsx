@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { browserReporter } from "@/lib/telemetry/client";
 
 // ルートレイアウト自体が落ちたときの最後の受け皿（error.tsx では拾えない）。
 // html/body を自分で描画する必要があるため、globals.css のトークンに依存しない
@@ -13,7 +14,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    void browserReporter().error("global-render");
   }, [error]);
 
   return (
