@@ -1,6 +1,6 @@
 # AIとの接続 — 画面確認用
 
-**未合意の静的プロトタイプ。製品UIはまだ実装していない。**
+**2026-10-30、ローカル静的画面を利用者が確認し「この内容で進めていってください。」と承認したプロトタイプ。**
 
 架空の家族とペットだけを使う。HTMLにCSS/JSを埋め込み、外部ファイル・API・DB・認証・写真・ブラウザストレージに依存しない。CSPの `connect-src 'none'` / `form-action 'none'` でも通信と送信を止める。リロードすると操作をリセットする。
 
@@ -19,23 +19,23 @@
 リポジトリのルートで（本番アプリの開発サーバーは使わない）:
 
 ```sh
-node proto/mcp-readonly/build.mjs
-python3 -m http.server 5187 --bind 127.0.0.1 --directory proto/mcp-readonly
+node docs/archive/mcp-readonly/build.mjs
+python3 -m http.server 5187 --bind 127.0.0.1 --directory docs/archive/mcp-readonly
 ```
 
 URL: `http://127.0.0.1:5187/`
 
-別ターミナルで `node proto/mcp-readonly/verify.mjs` を実行すると、隔離したブラウザで操作・明暗・横はみ出し・通信先を検証し、`/tmp/mfmf-mcp-prototype/` に架空画面のスクリーンショットを保存する。インストール済みGoogle ChromeとPlaywrightを使い、通常のブラウザプロファイルやログイン情報は使わない。
+別ターミナルで `node docs/archive/mcp-readonly/verify.mjs` を実行すると、隔離したブラウザで操作・明暗・横はみ出し・通信先を検証し、`/tmp/mfmf-mcp-prototype/` に架空画面のスクリーンショットを保存する。インストール済みGoogle ChromeとPlaywrightを使い、通常のブラウザプロファイルやログイン情報は使わない。
 
 ## 手順上の位置
 
 `.claude/skills/prototype/SKILL.md` §4は「Artifact ツールで proto/<slug>/index.html を publish し、URL をユーザーに渡す。」、§5は「実機で触って合意する」と規定している。明示的なfallbackの記載はない。
 
-現在のツール環境にはArtifact公開用ツールがないため、ローカル静的表示とスクリーンショットで具体案を提示し、ユーザーへ画面の合意を依頼している。ユーザーが延期したのはClaude実クライアントでのMCP接続確認であり、Artifact公開手順についての明示的な指示ではない。**画面への承認前に製品UIへ移植しない。** 合意後にD25の受け入れ条件をE2Eへ起こし、`spec.md` と決定ログを整える。
+Artifact公開用ツールが利用できなかったため、利用者が明示的に求めたローカル確認環境で具体案とスクリーンショットを提示した。2026-10-30に明示承認を得て、受け入れ条件とE2Eを先に作成してから製品UIへ移植した。Claude実クライアントでのMCP接続試験の延期とは区別する。D27に従い、この静的画面と合意時の `spec.md` を手動でアーカイブした。
 
-## 承認後に接続するAPI契約（バックエンド担当との合意）
+## 合意時のAPI連携メモ
 
-- `GET /api/oauth/consent?transactionId=...` → `{transactionId, clientName, clientId, eligibleHouseholds:[{householdId, householdName, role}], csrfToken}`
+- `GET /api/oauth/consent?transactionId=...` → `{transactionId, clientName, clientId, accountLabel, eligibleHouseholds:[{householdId, householdName, role}], csrfToken}`
 - `POST /api/oauth/consent` body `{transactionId, householdId, approved}` → `{redirectTo}`。不許可時は家族未選択でも取り消せること。
 - `GET /api/oauth/connections` → `{connections:[{id, clientName, householdName, createdAt, expiresAt}], csrfToken}`
 - `DELETE /api/oauth/connections` body `{id}`

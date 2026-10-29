@@ -73,7 +73,12 @@ describe("Identity session verification and refresh", () => {
   });
   it("sets only host-bound HttpOnly secure Lax cookies", async () => {
     const f = fixture(); f.accept(); await f.protocol.passwordLogin("fixture@example.com", "test-password");
-    expect(f.writes).toHaveLength(2); for (const write of f.writes) { expect(write.name).toMatch(/^__Host-mfmf-idp-/); expect(write.options).toEqual({ httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 2592000 }); }
+    expect(f.writes).toHaveLength(3);
+    for (const write of f.writes) {
+      expect(write.name).toMatch(/^__Host-mfmf-idp-/);
+      expect(write.options).toEqual({ httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: write.name.endsWith("-csrf") ? 0 : 2592000 });
+    }
+    expect(f.get("csrf")).toBe("");
   });
 });
 
@@ -91,6 +96,66 @@ describe("Same-origin authentication mutations", () => {
   it("ignores forwarded host headers for origin decisions", () => {
     const f = fixture(); f.protocol.csrfToken();
     expect(f.protocol.allowsMutation({ headers: new Headers({ origin: "https://evil.example", "x-forwarded-host": "app.example", "sec-fetch-site": "same-origin", "x-mfmf-csrf": NONCE }) })).toBe(false);
+  });
+});
+
+describe("Interactive login invalidates forms shown under the previous identity", () => {
+  const oldCsrf = "a".repeat(43);
+  const mutation = (csrf = oldCsrf) => ({ headers: new Headers({ origin: config.origin, "sec-fetch-site": "same-origin", "x-mfmf-csrf": csrf }) });
+
+  it("rejects a stale consent after an invalidated account logs in as another account", async () => {
+    const f = fixture(); f.set("id", TOKEN); f.set("refresh", "old-refresh"); f.set("csrf", oldCsrf);
+    expect((await f.protocol.verifiedIdentity())?.subject).toBe("user-one");
+    expect(f.protocol.allowsMutation(mutation())).toBe(true);
+    f.verify.mockRejectedValueOnce({ code: "auth/id-token-revoked" });
+    expect(await f.protocol.verifiedIdentity()).toBeNull();
+    f.verify.mockResolvedValue(decoded({ sub: "user-two", uid: "user-two", email: "second@example.test" }));
+    f.queue.push({ data: { idToken: "fictional-second-id-token", refreshToken: "fictional-second-refresh" } });
+    await f.protocol.passwordLogin("second@example.test", "test-password");
+    expect((await f.protocol.verifiedIdentity())?.subject).toBe("user-two");
+    expect(f.protocol.allowsMutation(mutation())).toBe(false);
+    const currentCsrf = f.protocol.csrfToken();
+    expect(currentCsrf).not.toBe(oldCsrf);
+    expect(f.protocol.allowsMutation(mutation(currentCsrf))).toBe(true);
+  });
+
+  it("invalidates old forms even when password login replaces them with an unverified session", async () => {
+    const f = fixture(); f.set("csrf", oldCsrf); f.accept();
+    f.verify.mockResolvedValue(decoded({ sub: "user-two", uid: "user-two", email_verified: false }));
+    await expect(f.protocol.passwordLogin("second@example.test", "test-password")).rejects.toMatchObject({ code: "unverified" });
+    expect(f.protocol.allowsMutation(mutation())).toBe(false);
+  });
+
+  it("invalidates old forms after a successfully verified Google account replacement", async () => {
+    const f = fixture(); f.set("id", TOKEN); f.set("csrf", oldCsrf);
+    f.google(); await f.protocol.beginGoogle(); f.complete();
+    f.verify.mockResolvedValue(decoded({ sub: "user-two", uid: "user-two", email: "second@example.test" }));
+    expect((await f.protocol.finishGoogle(new URLSearchParams({ code: "one-use-code", state: STATE }))).identity.subject).toBe("user-two");
+    expect(f.protocol.allowsMutation(mutation())).toBe(false);
+  });
+
+  it("invalidates old forms when signup replaces the browser session", async () => {
+    const f = fixture(); f.set("id", TOKEN); f.set("csrf", oldCsrf);
+    f.accept(); f.queue.push({ data: {} });
+    f.verify.mockResolvedValue(decoded({ sub: "user-two", uid: "user-two", email_verified: false }));
+    await f.protocol.signup("second@example.test", "test-password", true);
+    expect(f.protocol.allowsMutation(mutation())).toBe(false);
+  });
+
+  it("keeps a same-subject background refresh's current form valid", async () => {
+    const f = fixture(); f.set("id", TOKEN); f.set("refresh", "old-refresh"); f.set("csrf", oldCsrf);
+    f.verify.mockRejectedValueOnce({ code: "auth/id-token-expired" });
+    f.queue.push({ data: { id_token: TOKEN, refresh_token: "rotated-refresh" } });
+    expect((await f.protocol.verifiedIdentity())?.subject).toBe("user-one");
+    expect(f.protocol.allowsMutation(mutation())).toBe(true);
+  });
+
+  it("keeps current forms and session on a rejected login attempt", async () => {
+    const f = fixture(); f.set("id", TOKEN); f.set("csrf", oldCsrf);
+    f.queue.push({ status: 400, data: { error: { message: "INVALID_LOGIN_CREDENTIALS" } } });
+    await expect(f.protocol.passwordLogin("second@example.test", "wrong-password")).rejects.toThrow(IdentityError);
+    expect(f.get("id")).toBe(TOKEN);
+    expect(f.protocol.allowsMutation(mutation())).toBe(true);
   });
 });
 

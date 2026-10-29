@@ -283,6 +283,11 @@ jobs:
           TOKEN_ENC_KEY: e2e-local-dummy
         run: npm run test:e2e
 
+      # Production client components, fictional API fixtures, no app credentials.
+      # Screenshots join the existing ui-screenshots artifact without changing permissions.
+      - name: Test MCP consent and connection screens
+        run: npm run test:mcp-ui
+
       # 失敗テストの aria スナップショットをログに直接出す（アーティファクトの
       # 実体ホストへ到達できない環境からでも一次調査できるように）
       - name: Print error contexts

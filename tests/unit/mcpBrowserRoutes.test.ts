@@ -13,7 +13,7 @@ function request(body: unknown, method = "POST", headers = { origin: "https://mf
   return new Request("https://mfmf.example.test/api/oauth/consent", { method, headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
 }
 beforeEach(() => {
-  mocks.context.mockReset().mockResolvedValue({ subject: "fictional-subject", userId, households: [{ householdId, householdName: "架空の家族", role: "viewer" }] });
+  mocks.context.mockReset().mockResolvedValue({ subject: "fictional-subject", userId, accountLabel: "fictional@example.test", households: [{ householdId, householdName: "架空の家族", role: "viewer" }] });
   mocks.allows.mockReset().mockImplementation((request: Request) => request.headers.get("origin") === "https://mfmf.example.test" && request.headers.get("x-mfmf-csrf") === "fictional-csrf");
   mocks.consent.mockReset().mockResolvedValue("https://claude.ai/api/mcp/auth_callback?code=fictional");
   mocks.load.mockReset().mockResolvedValue({ clientName: "Claude", clientId: "fictional-client" });
@@ -54,10 +54,13 @@ describe("browser OAuth wrappers preserve normal session and CSRF boundary", () 
   });
   it("returns household names for consent and strips household/identity IDs from connection DTOs", async () => {
     const context = await consent.GET(new Request(`https://mfmf.example.test/api/oauth/consent?transactionId=${transactionId}`));
-    expect((await context.json()).eligibleHouseholds[0].householdName).toBe("架空の家族");
+    const body = await context.json();
+    expect(body.eligibleHouseholds[0].householdName).toBe("架空の家族");
+    expect(body.accountLabel).toBe("fictional@example.test");
+    expect(body).not.toHaveProperty("subject"); expect(body).not.toHaveProperty("userId");
     mocks.connections.mockResolvedValue([{ id: transactionId, clientName: "Claude", householdId, createdAt: "2026-10-29T00:00:00Z", expiresAt: "2026-11-28T00:00:00Z" }]);
     const response = await connections.GET(); const serialized = await response.text();
-    expect(serialized).toContain("架空の家族"); expect(serialized).not.toContain(householdId); expect(serialized).not.toContain(userId);
+    expect(serialized).toContain("架空の家族"); expect(serialized).not.toContain(householdId); expect(serialized).not.toContain(userId); expect(serialized).not.toContain("fictional@example.test");
     expect(response.headers.get("cache-control")).toContain("no-store");
   });
 });

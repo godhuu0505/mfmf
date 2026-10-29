@@ -9,6 +9,20 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const roles = ["owner", "editor", "viewer"];
 const denied = () => new McpHttpError("ACCESS_DENIED", 403, "接続先の家族へのアクセス権がありません。");
 
+/** Presentation only: legacy household names may be empty or contain line breaks. */
+export function mcpHouseholdLabel(name: unknown): string {
+  if (typeof name !== "string") return "名前未設定の家族";
+  return name.replace(/[\u0000-\u001f\u007f]/gu, " ").trim().slice(0, 120) || "名前未設定の家族";
+}
+
+/** Never accept an account label from an OAuth client or a browser payload. */
+export function mcpAccountLabel(identity: { email?: string | null; emailVerified?: boolean }): string {
+  const email = identity.email;
+  return identity.emailVerified === true && typeof email === "string" && email.length <= 320 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email) && !/[\u0000-\u001f\u007f]/u.test(email)
+    ? email : "ログイン中のmfmfアカウント";
+}
+
 /** No token, browser UID, role or cookie can become a DB principal here. */
 export async function verifyMcpIdentity(identity: McpIdentity, expectedValidAfter?: string) {
   mcpConfiguration();
@@ -37,6 +51,6 @@ export async function getMcpBrowserContext() {
   const { data, error } = await client.from("household_members")
     .select("household_id, role, households(name)").eq("user_id", user.id).order("created_at").limit(101);
   if (error || !data || data.length > 100) throw denied();
-  return { subject: identity.subject, userId: user.id, households: data.filter(row => roles.includes(row.role)).map(row => ({ householdId: row.household_id as string,
-    householdName: ((row.households as unknown as { name?: string } | null)?.name ?? "家族").slice(0, 120), role: row.role as "owner" | "editor" | "viewer" })) };
+  return { subject: identity.subject, userId: user.id, accountLabel: mcpAccountLabel(identity), households: data.filter(row => roles.includes(row.role)).map(row => ({ householdId: row.household_id as string,
+    householdName: mcpHouseholdLabel((row.households as unknown as { name?: string } | null)?.name), role: row.role as "owner" | "editor" | "viewer" })) };
 }

@@ -13,6 +13,7 @@
     "test:integration": "vitest run --config vitest.config.integration.mts",
     "test:ranking-budget": "vitest run --config vitest.config.ranking.mts",
     "test:e2e": "playwright test",
+    "test:mcp-ui": "playwright test --config playwright.mcp-ui.config.ts",
     "icons": "node scripts/generate-icons.mjs",
     "feedback:issues": "node scripts/feedback-to-issues.mjs",
     "test:mcp": "firebase emulators:exec --config firebase.mcp.json --only firestore --project demo-mfmf-mcp \"vitest run --config vitest.config.mcp.mts\""

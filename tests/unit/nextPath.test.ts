@@ -7,6 +7,14 @@ describe("sanitizeNextPath", () => {
     expect(sanitizeNextPath("/records/1?edit=1")).toBe("/records/1?edit=1");
   });
 
+  it("preserves an opaque consent request through login without permitting an external next", () => {
+    const path = `/oauth/consent/${"t".repeat(43)}`;
+    expect(sanitizeNextPath(path)).toBe(path);
+    expect(new URL(withNext("/login", path), "https://example.test").searchParams.get("next")).toBe(path);
+    expect(callbackRetryNext(null, path)).toBe(path);
+    expect(sanitizeNextPath("/connections")).toBe("/connections");
+  });
+
   it("未指定・空文字はフォールバックへ", () => {
     expect(sanitizeNextPath(null)).toBe("/");
     expect(sanitizeNextPath(undefined)).toBe("/");

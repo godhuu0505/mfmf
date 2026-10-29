@@ -116,6 +116,16 @@ export async function updateSession(request: NextRequest) {
     pathname === "/terms" ||
     pathname === "/privacy";
 
+  // A background OAuth UI request must not replace a pending browser deep link
+  // with /api/... or follow login HTML as if it were an authenticated JSON DTO.
+  if (!user && ["/api/oauth/consent", "/api/oauth/connections"].includes(pathname)) {
+    const response = NextResponse.json({ error: "UNAUTHENTICATED", message: "ログインしてください。" }, {
+      status: 401, headers: { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" },
+    });
+    supabaseResponse.cookies.getAll().forEach(cookie => response.cookies.set(cookie));
+    return response;
+  }
+
   if (!user && !isAuthRoute && !isPublicRoute) {
     // 未ログイン → /login へ。招待リンク（/invite/{token}）のような deep link を
     // ログインで失わないよう、行き先を ?next= と Cookie の両方で持ち回る

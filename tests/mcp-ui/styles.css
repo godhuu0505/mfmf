@@ -1,0 +1,3 @@
+@import "../../src/app/globals.css";
+/* Vite's isolated root is tests/mcp-ui; include the real component utilities. */
+@source "../../src/components/mcp";

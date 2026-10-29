@@ -8,7 +8,7 @@ import postcss from "postcss";
 import tailwind from "@tailwindcss/postcss";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(directory, "../..");
+const root = path.resolve(directory, "../../..");
 const globals = await fs.readFile(path.join(root, "src/app/globals.css"), "utf8");
 const marker = '@source not "../../proto";';
 if (!globals.includes(marker)) throw new Error("Prototype exclusion marker is missing");
