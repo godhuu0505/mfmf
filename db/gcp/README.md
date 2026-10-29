@@ -112,7 +112,7 @@ Job は task 1・parallelism 1・retry 0 とし、script 自体も task index/co
 | `restore-test` | 別の一時 DB で baseline + RLS 負例を実行し、bundle を復元して全行・全列を typed comparison。その DB / 一時 role を撤去 |
 | `migrate` | frozen/gcs の未 import・空 DB に、固定列の parameterized INSERT を一つの transaction で実行 |
 | `verify-import` | 同じ generation 固定 bundle を取得し、既存固定 DB の baseline / import SHA / frozen 状態を確認。読取専用 snapshot で全行・全列を照合。DML / DDL / 試験 DB 作成なし |
-| `upgrade` | image 内の `db/gcp/migrations/` と適用履歴を比較。未適用 SQL がある場合だけ TTL 検証済み backup を先行し、SQL と checksum を atomic 適用 |
+| `upgrade` | image 内の `db/gcp/migrations/` と適用履歴を比較。未適用 SQL がある場合だけ 外部保持契約と直前 backup を検証して先行し、SQL と checksum を atomic 適用 |
 | `activate` | baseline / import SHA / 全 media 参照 / 21 表 guard を検査後、全体書込を有効にし media state を gcs に同 transaction で切替 |
 | `freeze` | 同じ固定対象と import SHA を確認し、全体書込と media write を同 transaction で frozen にする。read backend は gcs のまま |
 
@@ -181,15 +181,15 @@ GCP 側が追いついていない場合に、Cloud SQL の更新を黙って省
 過去の checksum / 適用順序が違う場合は拒否します。private ledger と advisory transaction lock を用い、
 未適用が 0 件なら backup 作成も DDL もありません。
 
-未適用があれば固定 Cloud SQL の backup API で TTL 14 日を要求し、SUCCESSFUL / expiry / 開始・完了時刻を実確認します。
-同じ main SHA の再利用は開始から15分以内だけ、新規は今回request以降の開始だけを許可します（時計ずれ30秒）。
-全 ON_DEMAND の完全一覧で8件 / 最大課金bytes合計1 GiBを上限にし、不明な容量や空き不足でも停止します。
+未適用があれば固定Cloud SQLの直前backupを要求し、SUCCESSFULと開始・完了時刻を実確認します。
+同じmain SHAの再利用は開始15分以内だけ、新規は今回request以降の開始だけを許可します（時計ずれ30秒）。
+全ON_DEMANDの完全一覧と個別GETで8件/最大課金bytes合計1GiBを上限にし、不明な容量・空き不足で停止します。
+StandardのNULL expiryは、日次保持Jobの30時間以内の成功receipt・実装hash・instance作成時刻と設定を確認できる場合だけ許可します。
+backup完了後も同じreceipt世代と全容量を再検査します。prebackup自身は削除せず、別SAの日次Jobが所有markerと14日経過、
+新しい復旧点を確認して回収します。他用途の手動backupは削除しません。
 新backupの容量は作成後に判明するため請求上限の保証ではなく、超過時も自動削除しません。
-Standard の実APIは TTL 指定後も expiry が NULL でした。そのため現構成で未適用SQLがある通常配信は停止し、
-SQLが0件の配信は従来通りです。手動backupは明示削除まで無期限で、自動backupの保持14件とは別です。
-期限を緩和するfallbackはなく、通常SQL更新を開放するには専用の保持/削除手順と実検証が別途必要です。
-初回切替用の手動backup整理も、復元・全行照合と後続復旧点を確認する個別操作です。
-詳細と公式仕様は [通常配信のバックアップ契約](../../docs/guides/gcp-database-deployment.md#更新直前バックアップと保持期限) を参照してください。
+[通常配信の契約](../../docs/guides/gcp-database-deployment.md#更新直前バックアップと保持期限)と
+[日次保持・認証バックアップ](../../docs/guides/gcp-backup-automation.md)に初期受入・失敗時の境界を示します。
 `verify-import` は固定 session advisory lock を snapshot 作成前に取り、REPEATABLE READ READ ONLY transaction で検証します。
 変更セルが1つでもあれば、件数が同じでも失敗します。lock は成功・失敗の両方で解放します。
 この操作自体は backup / restore を開始しません。managed backup から固定対象へ復元した後の比較用です。

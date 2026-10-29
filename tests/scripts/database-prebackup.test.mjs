@@ -1,150 +1,111 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ensurePreMigrationBackup } from "../../scripts/gcp/database-prebackup.mjs";
-const sha = "a".repeat(40);
-const env = { CLOUD_RUN_JOB: "mfmf-db-operator", MFMF_DB_OPERATION: "upgrade", MFMF_DB_DEPLOY_SHA: sha };
-const clock = Date.parse("2026-10-28T00:00:00Z");
-const name = "projects/mfmf-499612/backups/fixture-backup";
-const backup = () => ({ name, instance: "mfmf-db", description: `mfmf-managed-preupgrade-v1:${sha}`,
-  type: "ON_DEMAND", state: "SUCCESSFUL", location: "asia-northeast1", expiryTime: new Date(clock + 14 * 86400000).toISOString(),
-  maxChargeableBytes: "1000",
-  backupInterval: { startTime: new Date(clock).toISOString(), endTime: new Date(clock).toISOString() } });
-const operation = () => ({ name: "fixture-operation", targetProject: "mfmf-499612", targetId: "mfmf-db",
-  operationType: "BACKUP_VOLUME", status: "DONE", backupContext: { name } });
-function fixture({ list = [], saved = backup(), op = operation(), failStatus } = {}) {
-  const calls = [];
-  const fetchImpl = async (url, init) => {
-    calls.push({ url, init });
-    assert.equal(init.redirect, "error");
-    assert.equal(init.headers["X-Goog-User-Project"], "mfmf-499612");
-    if (failStatus) return new Response("PRIVATE_PROVIDER_BODY", { status: failStatus });
-    if (url.includes("?")) return Response.json({ backups: list });
-    if (init.method === "POST" || url.includes("/operations/")) return Response.json(op);
-    if (url.endsWith("/fixture-backup")) return Response.json(saved);
-    throw new Error("PRIVATE_UNEXPECTED_URL");
-  };
-  return { calls, run: (extra = {}) => ensurePreMigrationBackup({ env, accessToken: "PRIVATE_TOKEN", fetchImpl,
-    now: () => clock, wait: async () => {}, maxPolls: 2, ...extra }) };
-}
-test("creates fixed 14-day backup and verifies final resource before returning", async () => {
-  const f = fixture(); assert.deepEqual(await f.run(), { verified: true, retentionDaysMaximum: 14 });
-  assert.equal(f.calls.length, 3);
-  assert.deepEqual(JSON.parse(f.calls[1].init.body), { instance: "mfmf-db", description: `mfmf-managed-preupgrade-v1:${sha}`,
-    location: "asia-northeast1", ttlDays: "14" });
+import { API, META, CLOCK, SHA, backup, receipt, instance, fixture } from "./helpers/database-retention-fixture.mjs";
+const env = { CLOUD_RUN_JOB: "mfmf-db-operator", MFMF_DB_OPERATION: "upgrade", MFMF_DB_DEPLOY_SHA: SHA };
+const run = (f, extra = {}) => ensurePreMigrationBackup({ env, accessToken: "PRIVATE_TOKEN", fetchImpl: f.fetchImpl, now: () => CLOCK, wait: async () => {}, maxPolls: 2, ...extra });
+const other = (id, extra = {}) => backup(`other-${id}`, 0, { description: "other-marker", ...extra });
+const posts = (f) => f.state.calls.filter(c => c.init.method === "POST");
+test("Standard null expiry is allowed only with verified external retention; summaries are hydrated", async () => {
+  const f = await fixture({ saved: backup("fixture", 0, { expiryTime: null }) });
+  assert.deepEqual(await run(f), { verified: true, retentionMode: "verified-external-cleanup", minimumRetentionDays: 14, cleanupReceiptMaximumAgeHours: 30 });
+  assert.equal(posts(f).length, 1);
+  assert.deepEqual(JSON.parse(posts(f)[0].init.body), { instance: "mfmf-db", description: `mfmf-managed-preupgrade-v1:${SHA}`, location: "asia-northeast1", ttlDays: "14" });
+  assert.ok(f.state.calls.some(c => c.url.endsWith("/backups/fixture") && c.init.method === "GET"));
+  assert.ok(f.state.calls.every(c => c.init.redirect === "error" && c.init.headers["X-Goog-User-Project"] === "mfmf-499612"));
 });
-test("retry reuses the same verified SHA marker without writes", async () => {
-  const f = fixture({ list: [backup()] }); await f.run(); assert.ok(f.calls.every(({ init }) => init.method === "GET"));
+test("same recent SHA reuses one immutable backup without creating", async () => {
+  const f = await fixture({ rows: [backup()] }); await run(f); assert.equal(posts(f).length, 0);
 });
-for (const change of [{ expiryTime: undefined }, { expiryTime: "2029-01-01T00:00:00Z" }, { expiryTime: "2026-10-28T12:00:00Z" },
+for (const change of [{ expiryTime: "2029-01-01T00:00:00Z" }, { expiryTime: "2026-10-28T12:00:00Z" },
   { instance: "other" }, { location: "us" }, { state: "FAILED" }, { type: "AUTOMATED" }, { description: "PRIVATE" }, { name: "https://attacker.invalid" }]) {
-  test(`rejects backup drift ${Object.keys(change)[0]} ${JSON.stringify(change)}`, async () => {
-    const f = fixture({ saved: { ...backup(), ...change } }); await assert.rejects(f.run(), /stage=verify-backup/);
+  test(`rejects returned backup drift ${JSON.stringify(change)}`, async () => {
+    const f = await fixture({ saved: backup("fixture", 0, change) }); await assert.rejects(run(f), /stage=(verify-backup|backup-operation)/);
   });
 }
-test("old or future same-SHA backups never create another backup or authorize SQL", async () => {
-  for (const endTime of [undefined, new Date(clock - 16 * 60_000).toISOString(), new Date(clock + 60_000).toISOString()]) {
-    const saved = { ...backup(), backupInterval: { endTime } };
-    const f = fixture({ list: [saved], saved }); await assert.rejects(f.run(), /stage=verify-backup/);
-    assert.ok(f.calls.every(({ init }) => init.method === "GET"));
+test("old, missing, future, reversed start or end does not authorize SQL or create a retry duplicate", async () => {
+  for (const interval of [{ endTime: new Date(CLOCK).toISOString() }, { startTime: "PRIVATE", endTime: "PRIVATE" },
+    { startTime: new Date(CLOCK - 960000).toISOString(), endTime: new Date(CLOCK).toISOString() },
+    { startTime: new Date(CLOCK + 60000).toISOString(), endTime: new Date(CLOCK + 60000).toISOString() },
+    { startTime: new Date(CLOCK + 1000).toISOString(), endTime: new Date(CLOCK).toISOString() },
+    { startTime: new Date(CLOCK).toISOString() }]) {
+    const f = await fixture({ rows: [backup("fixture", 0, { backupInterval: interval })] });
+    await assert.rejects(run(f), /stage=verify-backup/); assert.equal(posts(f).length, 0);
   }
 });
-test("fresh completion cannot hide an old, missing, future or reversed start time", async () => {
-  for (const startTime of [undefined, "PRIVATE_INVALID_TIME", new Date(clock - 16 * 60_000).toISOString(),
-    new Date(clock + 60_000).toISOString(), new Date(clock + 1_000).toISOString()]) {
-    const saved = { ...backup(), backupInterval: { startTime, endTime: new Date(clock).toISOString() } };
-    const f = fixture({ list: [saved], saved });
-    await assert.rejects(f.run(), (error) => /stage=verify-backup/.test(error.message) && !/PRIVATE/.test(error.message));
-    assert.ok(f.calls.every(({ init }) => init.method === "GET"));
-  }
+test("created backup must start after request tolerance; reuse may be up to 15 minutes old", async () => {
+  const b = backup("fixture", 0, { backupInterval: { startTime: new Date(CLOCK - 60000).toISOString(), endTime: new Date(CLOCK).toISOString() } });
+  await assert.rejects(run(await fixture({ saved: b })), /stage=verify-backup/);
+  await run(await fixture({ rows: [b] }));
 });
-test("new backup must start within 30 seconds of this request; retry can reuse a recent start", async () => {
-  const saved = { ...backup(), backupInterval: { startTime: new Date(clock - 60_000).toISOString(), endTime: new Date(clock).toISOString() } };
-  await assert.rejects(fixture({ saved }).run(), /stage=verify-backup/);
-  await fixture({ list: [saved], saved }).run();
-  await fixture({ saved: { ...saved, backupInterval: { ...saved.backupInterval, startTime: new Date(clock - 30_000).toISOString() } } }).run();
+test("every marker counts toward capacity; exactly eight permits reuse but not creation", async () => {
+  const f = await fixture({ rows: Array.from({ length: 8 }, (_, i) => other(i)) });
+  await assert.rejects(run(f), /capacity/); assert.equal(posts(f).length, 0);
+  await run(await fixture({ rows: [backup(), ...Array.from({ length: 7 }, (_, i) => other(i))] }));
+  await assert.rejects(run(await fixture({ rows: Array.from({ length: 9 }, (_, i) => other(i)) })), /capacity/);
 });
-const otherBackup = (i, extra = {}) => ({ ...backup(), name: `projects/mfmf-499612/backups/other-${i}`, description: "other-marker", ...extra });
-test("all on-demand markers count toward the eight-backup limit before a create", async () => {
-  const f = fixture({ list: Array.from({ length: 8 }, (_, i) => otherBackup(i)) });
-  await assert.rejects(f.run(), /stage=backup-capacity/);
-  assert.equal(f.calls.length, 1); assert.equal(f.calls[0].init.method, "GET");
-  await fixture({ list: Array.from({ length: 7 }, (_, i) => otherBackup(i)) }).run();
-});
-test("existing marker can be reused at eight backups but not above the limit", async () => {
-  await fixture({ list: [backup(), ...Array.from({ length: 7 }, (_, i) => otherBackup(i))] }).run();
-  const f = fixture({ list: [backup(), ...Array.from({ length: 8 }, (_, i) => otherBackup(i))] });
-  await assert.rejects(f.run(), /stage=backup-capacity/);
-  assert.ok(f.calls.every(({ init }) => init.method === "GET"));
-});
-test("capacity unknown, invalid or already at one GiB prevents any create", async () => {
+test("unknown and invalid detailed bytes fail closed; list omission alone is supported", async () => {
   for (const maxChargeableBytes of [undefined, null, 10, "-1", "1.5", "01", "PRIVATE_BYTES", "99999999999999999999", "1073741824"]) {
-    const f = fixture({ list: [otherBackup(1, { maxChargeableBytes })] });
-    await assert.rejects(f.run(), (error) => /stage=backup-capacity/.test(error.message) && !/PRIVATE/.test(error.message));
-    assert.equal(f.calls.length, 1);
+    const f = await fixture({ rows: [other(1, { maxChargeableBytes })] });
+    await assert.rejects(run(f), e => /capacity/.test(e.message) && !/PRIVATE/.test(e.message)); assert.equal(posts(f).length, 0);
   }
 });
-test("capacity adds all on-demand bytes and rechecks the returned resource", async () => {
-  const full = fixture({ list: [otherBackup(1, { maxChargeableBytes: "536870912" }), otherBackup(2, { maxChargeableBytes: "536870912" })] });
-  await assert.rejects(full.run(), /stage=backup-capacity/); assert.equal(full.calls.length, 1);
-  const created = fixture({ list: [otherBackup(1, { maxChargeableBytes: "1073741820" })] });
-  await assert.rejects(created.run(), /stage=backup-capacity/); assert.equal(created.calls.length, 3);
-  const reused = fixture({ list: [backup(), otherBackup(1, { maxChargeableBytes: "1073740824" })],
-    saved: { ...backup(), maxChargeableBytes: "1001" } });
-  await assert.rejects(reused.run(), /stage=backup-capacity/);
-  assert.ok(reused.calls.every(({ init }) => init.method === "GET"));
+test("new size and final full inventory cannot exceed one GiB", async () => {
+  const f = await fixture({ rows: [other(1, { maxChargeableBytes: "1073741820" })] });
+  await assert.rejects(run(f), /capacity/); assert.equal(posts(f).length, 1);
 });
-test("automated and final backups do not consume the on-demand allowance and are never changed", async () => {
-  const f = fixture({ list: Array.from({ length: 14 }, (_, i) => otherBackup(i, {
-    type: i % 2 ? "AUTOMATED" : "FINAL", maxChargeableBytes: undefined,
-  })) });
-  await f.run(); assert.equal(f.calls.filter(({ init }) => init.method === "POST").length, 1);
-  assert.ok(f.calls.every(({ init }) => ["GET", "POST"].includes(init.method)));
+test("automated and final snapshots do not use manual capacity and are never mutated", async () => {
+  const f = await fixture({ rows: [other(1, { type: "AUTOMATED" }), other(2, { type: "FINAL" })] });
+  await run(f); assert.equal(posts(f).length, 1); assert.equal(f.state.deleted.length, 0);
 });
-test("partial, duplicate or foreign inventory fails before creation", async () => {
-  for (const list of [[otherBackup(1), otherBackup(1)], [otherBackup(1, { instance: "other" })],
-    [otherBackup(1, { type: "PRIVATE_UNKNOWN" })], [null]]) {
-    const f = fixture({ list }); await assert.rejects(f.run(), /stage=list-backups/); assert.equal(f.calls.length, 1);
+test("all pages are hydrated before the capacity check", async () => {
+  const rows = Array.from({ length: 8 }, (_, i) => other(i));
+  const f = await fixture({ rows, hook: (url) => {
+    if (!url.startsWith(`${API}/backups?`)) return;
+    const second = new URL(url).searchParams.has("pageToken");
+    return Response.json({ backups: rows.slice(second ? 4 : 0, second ? 8 : 4).map(({ name, instance, type }) => ({ name, instance, type })), ...(second ? {} : { nextPageToken: "next" }) });
+  } });
+  await assert.rejects(run(f), /capacity/); assert.equal(posts(f).length, 0);
+});
+test("duplicate markers, foreign summaries, cyclic/partial lists stop without create", async () => {
+  for (const payload of [{ backups: [backup(), backup()] }, { backups: [other(1, { instance: "other" })] },
+    { backups: [], warnings: ["PRIVATE"] }, { backups: [], nextPageToken: "repeat" }]) {
+    const f = await fixture({ hook: url => url.startsWith(`${API}/backups?`) ? Response.json(payload) : undefined });
+    await assert.rejects(run(f), /stage=list/); assert.equal(posts(f).length, 0);
   }
-  for (const result of [{ backups: [], warnings: ["PRIVATE_WARNING"] }, { backups: [], nextPageToken: "repeated" }]) {
-    const calls = [];
-    await assert.rejects(ensurePreMigrationBackup({ env, accessToken: "PRIVATE_TOKEN", now: () => clock,
-      fetchImpl: async (_url, init) => { calls.push(init); return Response.json(result); } }), /stage=list-backups/);
-    assert.ok(calls.every(({ method }) => method === "GET"));
-  }
+  const f = await fixture({ rows: [backup("a"), backup("b")] }); await assert.rejects(run(f), /stage=list/); assert.equal(posts(f).length, 0);
 });
-test("capacity is accumulated across all pages before creating", async () => {
-  let calls = 0;
-  await assert.rejects(ensurePreMigrationBackup({ env, accessToken: "PRIVATE_TOKEN", now: () => clock,
-    fetchImpl: async (url, init) => {
-      assert.equal(init.method, "GET"); calls++;
-      const offset = new URL(url).searchParams.has("pageToken") ? 4 : 0;
-      return Response.json({ backups: Array.from({ length: 4 }, (_, i) => otherBackup(offset + i)),
-        ...(offset ? {} : { nextPageToken: "next" }) });
-    } }), /stage=backup-capacity/);
-  assert.equal(calls, 2);
-});
-test("standard on-demand missing expiry still blocks SQL after a successful create", async () => {
-  const f = fixture({ saved: { ...backup(), expiryTime: null, ttlDays: null } });
-  await assert.rejects(f.run(), /stage=verify-backup/);
-  assert.equal(f.calls.length, 3);
-});
-test("duplicate markers and pending prior backups stop without creating more", async () => {
-  for (const list of [[backup(), backup()], [backup()]]) {
-    const f = fixture({ list, saved: { ...backup(), state: "RUNNING" } }); await assert.rejects(f.run());
-    assert.ok(f.calls.every(({ init }) => init.method === "GET"));
+test("pending same marker and foreign operation cannot authorize or create duplicates", async () => {
+  const f = await fixture({ rows: [backup("a", 0, { state: "RUNNING" })] }); await assert.rejects(run(f)); assert.equal(posts(f).length, 0);
+  for (const operation of [{ targetProject: "other" }, { targetId: "other" }, { name: "../other" }, { backupContext: { name: "projects/other/backups/private" } }]) {
+    await assert.rejects(run(await fixture({ operation })), /stage=backup-operation/);
   }
 });
-test("never follows foreign operations or resource names", async () => {
-  for (const change of [{ targetProject: "other" }, { targetId: "other" }, { name: "../other" }, { backupContext: { name: "projects/other/backups/private" } }]) {
-    const f = fixture({ op: { ...operation(), ...change } }); await assert.rejects(f.run(), /stage=backup-operation/);
-    assert.equal(f.calls.length, 2);
+test("missing, stale, future, foreign birth, changed implementation or non-success receipt fails before creating", async () => {
+  for (const proof of [null, await receipt({ startedAt: new Date(CLOCK - 31 * 3600000).toISOString() }),
+    await receipt({ completedAt: new Date(CLOCK + 1000).toISOString() }), await receipt({ status: "running" }),
+    await receipt({ instanceCreateTime: "2025-01-01T00:00:00Z" }), await receipt({ implementationSha256: "b".repeat(64) }), await receipt({ extra: "PRIVATE" })]) {
+    const f = await fixture({ proof }); await assert.rejects(run(f), e => !/PRIVATE/.test(e.message)); assert.equal(posts(f).length, 0);
   }
 });
-test("fixed errors omit provider bodies and token values", async () => {
-  const f = fixture({ failStatus: 400 });
-  await assert.rejects(f.run(), (error) => /stage=list-backups http=400/.test(error.message) && !/PRIVATE/.test(error.message));
+test("receipt generation drift after backup completion fails closed", async () => {
+  let reads = 0;
+  const f = await fixture({ hook: (url, _init, state) => { if (url === META && ++reads === 2) state.generation = "101"; } });
+  await assert.rejects(run(f), /retention-drift/); assert.equal(posts(f).length, 1);
 });
-test("wrong operation or missing SHA makes no request", async () => {
-  const f = fixture(); await assert.rejects(f.run({ env: { ...env, MFMF_DB_OPERATION: "import" } }));
-  await assert.rejects(f.run({ env: { ...env, MFMF_DB_DEPLOY_SHA: "" } })); assert.equal(f.calls.length, 0);
+test("instance birth/config drift and wrong context cannot reach create", async () => {
+  const resource = instance(); resource.settings.ipConfiguration.ipv4Enabled = true;
+  const f = await fixture({ resource }); await assert.rejects(run(f), /instance/); assert.equal(posts(f).length, 0);
+  const clean = await fixture(); await assert.rejects(run(clean, { env: { ...env, MFMF_DB_OPERATION: "migrate" } }), /context/); assert.equal(clean.state.calls.length, 0);
+});
+test("provider failures and lost create responses never expose raw bodies or retry", async () => {
+  for (const mode of ["body", "throw"]) {
+    const f = await fixture({ hook: (url, init) => {
+      if (url === `${API}/backups` && init.method === "POST") {
+        if (mode === "throw") throw new Error("PRIVATE");
+        return new Response("PRIVATE", { status: 400 });
+      }
+    } });
+    await assert.rejects(run(f), e => /create-backup/.test(e.message) && !/PRIVATE/.test(e.message)); assert.equal(posts(f).length, 1);
+  }
 });

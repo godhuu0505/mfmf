@@ -63,7 +63,7 @@ test("a legacy running service cannot implicitly become GCP mode", async () => {
   assert.equal(calls, 1); assert.equal(prepared, false); assert.equal(upgraded, false);
 });
 
-function deploymentFixture({ upgradeFailure = false, servingLegacy = false, smokeFailure } = {}) {
+function deploymentFixture({ upgradeFailure = false, backupFailure = false, servingLegacy = false, smokeFailure } = {}) {
   const API = `https://run.googleapis.com/v2/${SERVICE_NAME}`;
   const old = "mfmf-candidate-old";
   const next = `mfmf-candidate-${env.GITHUB_SHA.slice(0, 12)}-123-1`;
@@ -108,18 +108,24 @@ function deploymentFixture({ upgradeFailure = false, servingLegacy = false, smok
   };
   return { events, state, run: () => deployExistingService({ env, pins, fetchImpl, log: () => {}, wait: async () => {}, maxPolls: 2,
     prepare: async (save) => { events.push("prepare"); save(manifest()); },
+    backups: async (options) => { events.push("backups"); assert.equal(options.image, migrationImage);
+      if (backupFailure) throw new Error("Fixed backup failure"); return { backupsVerified: true }; },
     upgrade: async (options) => { events.push("upgrade"); assert.equal(options.image, migrationImage);
       if (upgradeFailure) throw new Error("Fixed upgrade failure"); return { upgradeVerified: true }; } }) };
 }
 test("GCP deployment waits for exact-image database upgrade before staging or promotion", async () => {
   const f = deploymentFixture(); assert.deepEqual(await f.run(), manifest());
-  assert.deepEqual(f.events, ["prepare", "upgrade", "patch", "patch"]);
+  assert.deepEqual(f.events, ["prepare", "backups", "upgrade", "patch", "patch"]);
   assert.equal(f.state.template.maxInstanceRequestConcurrency, 2);
   assert.deepEqual(f.state.template.vpcAccess, DATABASE_VPC);
 });
 test("failed upgrade prevents all service writes", async () => {
   const f = deploymentFixture({ upgradeFailure: true }); await assert.rejects(f.run(), /Fixed upgrade failure/);
-  assert.deepEqual(f.events, ["prepare", "upgrade"]);
+  assert.deepEqual(f.events, ["prepare", "backups", "upgrade"]);
+});
+test("failed backup maintenance prevents SQL upgrade and all service writes", async () => {
+  const f = deploymentFixture({ backupFailure: true }); await assert.rejects(f.run(), /Fixed backup failure/);
+  assert.deepEqual(f.events, ["prepare", "backups"]);
 });
 test("a GCP template with a legacy serving revision cannot trigger migration", async () => {
   const f = deploymentFixture({ servingLegacy: true }); await assert.rejects(f.run(), /cannot change authentication mode/);
@@ -130,7 +136,7 @@ for (const smokeFailure of ["staged", "promoted"]) test(`GCP ${smokeFailure} smo
   await assert.rejects(f.run(), smokeFailure === "staged" ? /Staging failed; the previous healthy revision/ : /traffic was restored to the previous healthy revision/);
   assert.deepEqual(f.state.traffic, [{ type: "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION", revision: "mfmf-candidate-old", percent: 100 }]);
   assert.deepEqual(f.state.trafficStatuses, f.state.traffic);
-  assert.deepEqual(f.events, smokeFailure === "staged" ? ["prepare", "upgrade", "patch", "patch"] : ["prepare", "upgrade", "patch", "patch", "patch"]);
+  assert.deepEqual(f.events, smokeFailure === "staged" ? ["prepare", "backups", "upgrade", "patch", "patch"] : ["prepare", "backups", "upgrade", "patch", "patch", "patch"]);
   assert.deepEqual(f.state.template.vpcAccess, DATABASE_VPC);
   assert.equal(f.state.template.containers[0].resources.limits.memory, "1Gi");
 });

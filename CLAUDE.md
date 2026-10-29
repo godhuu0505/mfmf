@@ -155,8 +155,9 @@ GCPへの対応は [db/gcp/README.md](db/gcp/README.md) のbaseline生成・sour
 成功時だけCloud Runをstage/probe/promoteする。Supabaseの `db push` とVercel配信はskipする。
 通常配信は初回import・freeze解除・認証モード変更を行わない。
 追加SQLは `db/gcp/migrations/` に置き、既適用checksum・順序・旧revisionとの互換性を検証する。
-**現在はStandard on-demand backupの期限を確認できないため、未適用SQLがある通常配信は停止する。**
-SQLが0件の配信は可能。保持・削除手順の承認と実検証なしにこのgateを緩めない。
+**未適用SQLは直前backupと、30時間以内の成功した日次保持receipt・実装hash・固定instanceの一致を必須とする。**
+StandardのNULL expiryを単独で許可しない。通常配信は先に同じimage/SHAの既存2バックアップJobを検証する。
+[日次保全・保持契約](docs/guides/gcp-backup-automation.md)の初期実受入、失敗時の停止、独立した復号鍵を維持する。
 
 破壊的変更はPR段階でローカルSupabaseと隔離GCP DBの復元・認可検証を行う。
 appのtrafficを戻してもDB・IdPは戻らない。旧Supabaseは凍結保全し、通常配信から更新・自動解除しない。
