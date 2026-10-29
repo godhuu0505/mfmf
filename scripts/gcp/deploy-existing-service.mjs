@@ -14,6 +14,7 @@ const PIN_KEYS = ["TOKEN_ENC_KEY", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
 const PUBLIC_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SIGNUP_ENABLED", "SENTRY_ENVIRONMENT", "SENTRY_TRACES_SAMPLE_RATE"];
 const RANKING_KEYS = ["MFMF_RANKING_ENABLED", "MFMF_RANKING_EXPIRES_AT"];
 const MCP_KEYS = ["MCP_ENABLED"];
+const WEB_ORIGIN_KEYS = ["GCP_AUTH_WEB_ORIGIN"];
 const RANKING_HARD_STOP = Date.parse("2027-06-24T00:00:00+09:00");
 class DeploymentError extends Error {}
 const fail = (message) => { throw new DeploymentError(message); };
@@ -46,6 +47,12 @@ export function preserveRankingEnv(items = []) {
 export function preserveMcpEnv(items = []) {
   const selected = items.filter((item) => MCP_KEYS.includes(item?.name));
   if (selected.length > 1 || selected.some((item) => !exactKeys(item, ["name", "value"]) || !["true", "false"].includes(item.value))) fail("Existing MCP settings are invalid.");
+  return selected.map(({ name, value }) => ({ name, value }));
+}
+
+export function preserveWebOriginEnv(items = []) {
+  const selected = items.filter((item) => WEB_ORIGIN_KEYS.includes(item?.name));
+  if (selected.length > 1 || selected.some((item) => !exactKeys(item, ["name", "value"]) || item.value !== "https://mfmf.sanba.net")) fail("Existing web origin is invalid.");
   return selected.map(({ name, value }) => ({ name, value }));
 }
 
@@ -119,7 +126,7 @@ function validateService(service, database = false) {
   }
   const seen = new Set();
   for (const item of container.env ?? []) {
-    if (!item || seen.has(item.name) || ![...PUBLIC_KEYS, ...DATABASE_ENV_KEYS, ...RANKING_KEYS, ...MCP_KEYS, ...Object.keys(SECRET_NAMES).filter((key) => database || !Object.hasOwn(DATABASE_SECRETS, key))].includes(item.name)) {
+    if (!item || seen.has(item.name) || ![...PUBLIC_KEYS, ...DATABASE_ENV_KEYS, ...RANKING_KEYS, ...MCP_KEYS, ...WEB_ORIGIN_KEYS, ...Object.keys(SECRET_NAMES).filter((key) => database || !Object.hasOwn(DATABASE_SECRETS, key))].includes(item.name)) {
       fail("Existing runtime has duplicate or unmanaged environment settings.");
     }
     seen.add(item.name);
@@ -129,6 +136,7 @@ function validateService(service, database = false) {
   }
   preserveRankingEnv(container.env);
   preserveMcpEnv(container.env);
+  preserveWebOriginEnv(container.env);
   assertRuntimeMode(container, database);
   return container;
 }
@@ -267,6 +275,7 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
     ...Object.entries(manifest.env).map(([name, value]) => ({ name, value })),
     ...preserveRankingEnv(current.template.containers[0].env),
     ...preserveMcpEnv(current.template.containers[0].env),
+    ...preserveWebOriginEnv(current.template.containers[0].env),
     ...Object.entries(manifest.secretVersions).map(([name, ref]) => {
       const parts = ref.split("/");
       return { name, valueSource: { secretKeyRef: { secret: parts[3], version: parts[5] } } };

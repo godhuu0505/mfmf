@@ -2,9 +2,9 @@ import "server-only";
 import { applicationDefault, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { OAuth2Client } from "google-auth-library";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { cache } from "react";
-import { identityConfig } from "./config";
+import { identityConfig, identityConfigForHost } from "./config";
 import { IdentityProtocol, type IdentityCookies } from "./protocol";
 
 export function getIdentityAdminAuth() {
@@ -17,8 +17,8 @@ export function getIdentityAdminAuth() {
   return getAuth(app);
 }
 
-export function createIdentityProtocol(cookieStore: IdentityCookies): IdentityProtocol {
-  const config = identityConfig();
+export function createIdentityProtocol(cookieStore: IdentityCookies, host?: string | null): IdentityProtocol {
+  const config = host === undefined ? identityConfig() : identityConfigForHost(host);
   const auth = getIdentityAdminAuth();
   return new IdentityProtocol(config, {
     fetch,
@@ -40,11 +40,12 @@ export function createIdentityProtocol(cookieStore: IdentityCookies): IdentityPr
 
 export async function getIdentityProtocol() {
   const store = await cookies();
+  const host = (await headers()).get("host");
   return createIdentityProtocol({ get: (name) => store.get(name)?.value,
     set: (name, value, options) => {
       try { store.set(name, value, options); }
       catch { /* RSC cannot write cookies; middleware refreshes the request first. */ }
-    } });
+    } }, host);
 }
 
 /** Only verified, non-revoked identities cross into the internal database bridge. */
