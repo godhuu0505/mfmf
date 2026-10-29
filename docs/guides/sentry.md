@@ -27,11 +27,11 @@ Sentryが受け取るHTTP通信元はサーバーです。ブラウザーからS
 
 ## Sentry側のプライバシー前提
 
-本番有効化には、Sentry組織のserver-side data scrubbing・
+本番有効化には、Sentry組織のserver-side data scrubbing・`Require Using Default Scrubbers`・
 **Prevent Storing of IP Addresses**（APIでは`scrubIPAddresses: true`）・enhanced privacyを有効にし、
 匿名Issue共有を無効にすることを必須とします。projectでの設定だけに依存せず、組織側で適用を確認します。
-`Require Using Default Scrubbers`は現画面でチェック不可・Value 0だったため、有効化済みとは扱いません。
-この項目の適用可否は未確認であり、既定scrubberが働くことを前提にせず、明示した機密フィールドと保存結果を実測します。
+`Require Using Default Scrubbers`は2026-10-29に有効化し、画面の再読でValue 1を確認済みです。
+標準scrubberだけに依存せず、明示した機密フィールドと新規イベントの保存結果も実測します。
 
 IP推測停止と位置情報の除去は別です。Relayは`infer_ip: never`でも接続元IPから`user.geo`を補完する経路を持ちます。
 `user.geo`のAdvanced Data Scrubbingルールだけを設定した実測でもgeoが残ったため、そのルールだけでは受入済みとしません。
