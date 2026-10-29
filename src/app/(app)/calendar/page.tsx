@@ -50,7 +50,8 @@ function addDays(iso: string, n: number): string {
 }
 
 /**
- * YYYY-MM-DD が**実在する日**か。?open= は日別シートの見出し（Intl の format）へ
+ * YYYY-MM-DD が**実在する日**か。?w= の週計算にも ?open= の日別シートにも使う。
+ * ?open= は日別シートの見出し（Intl の format）へ
  * そのまま渡るので、形だけの検査では足りない —— 2026-99-99 のような値を通すと
  * Invalid Date になり、カレンダーごと RangeError で落ちる。
  */
@@ -119,8 +120,8 @@ export default async function CalendarPage({
 
   // 週表示の起点。?w= があればその日を含む週、無ければ「その月の今日」または
   // その月の 1 日の週（?w= が無いと 9 月の 15 日の週などを一生開けない）
-  const weekAnchor = /^\d{4}-\d{2}-\d{2}$/.test(w ?? "")
-    ? (w as string)
+  const weekAnchor = w && isRealDate(w)
+    ? w
     : year === todayYear && month === todayMonth
       ? todayStr
       : firstDay;
