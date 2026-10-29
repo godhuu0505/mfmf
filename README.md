@@ -4,15 +4,17 @@
 
 [![CI](https://github.com/godhuu0505/mfmf/actions/workflows/ci.yml/badge.svg)](https://github.com/godhuu0505/mfmf/actions/workflows/ci.yml)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
-![Supabase](https://img.shields.io/badge/Supabase-Free-3ECF8E)
+![Google Cloud](https://img.shields.io/badge/Google_Cloud-Run%20%2F%20SQL%20%2F%20Storage-4285F4)
 
 家族で 1 つの世帯を共有し、保育園とおうち（両親）どちらのノートも同じ仕組みで記録します。
 世帯には **editor / viewer** で招待でき（owner は参加後に既存 owner が昇格させる）、保育園やシッターは対象ペット・期間を
 限定した外部ゲストとして招けます。
-フロントは **Next.js（App Router）/ Cloud Run**、認証・DBは **Supabase**。
-写真・アバターは、検証後に **Cloud Storage（GCS）** へ切り替えます。ローカル開発は引き続きSupabase Storageを使用します。
-切り替え後の入口は [Cloud Run](https://mfmf-candidate-wspqvmhj6q-an.a.run.app/) です。旧Vercel URLも新しい入口へ誘導します。
-移行では再ログインとホーム画面へのPWA再登録が必要です。GCPは従量課金で、予算通知は月3,000円に設定しています（自動停止ではありません）。
+本番は **Next.js（App Router）/ Cloud Run**、認証は **Identity Platform**、DBは **Cloud SQL PostgreSQL**、
+写真・アバターは **Cloud Storage（GCS）** です。ローカル開発は引き続きSupabaseを使用します。
+入口は [Cloud Run](https://mfmf-candidate-wspqvmhj6q-an.a.run.app/) で、旧Vercel URLは新しい入口へ誘導します。
+認証の移行後は再ログインが必要です。旧originのPWAは新しい入口で再登録してください。
+GCPは従量課金で、月3,000円は使用量・無料枠に条件がある運用目標です。予算通知は自動停止ではありません。
+切替受入と費用の前提は [GCP移行記録](./docs/explanation/gcp-migration.md#現在の実装と切替記録)を参照してください。
 
 ## クイックスタート
 
@@ -22,7 +24,7 @@ OAuth クライアント発行が必要です。セルフ登録（`/signup`）�
 
 ### A. リモート Supabase に繋ぐ（最短）
 
-クラウド上の Supabase プロジェクトを使う場合：
+開発用のSupabaseプロジェクトを使う場合です。本番Cloud SQLへの接続手順ではありません：
 
 ```bash
 git clone https://github.com/godhuu0505/mfmf.git
@@ -102,7 +104,7 @@ just setup-google   # 初回のみ：Google OAuth 認証情報を対話投入
 - **写真の紐付け** — 1 記録に複数枚。GCSでは期限・サイズ付きのURLで一時領域へアップロードし、サーバーで画像と権限を確認してから公開対象にする。詳細は[画像ストレージの契約](./docs/reference/media-storage-ledger.md)。
 - **記録メタデータ** — 記録元（🏫 保育園 / 🏠 おうち）・記入者・体重(kg)。記録元で絞り込み、体重は推移グラフへ。
 - **PWA** — ホーム画面に追加、スタンドアロン表示、オフラインフォールバック。
-- **ご意見・不具合フォーム** — どの画面からでも送信。内容は Supabase にのみ保存（GitHub には送らない）。
+- **ご意見・不具合フォーム** — どの画面からでも送信。内容はアプリDBにのみ保存（フォームからGitHubには送らない）。
 
 ## ドキュメント
 

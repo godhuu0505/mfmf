@@ -8,7 +8,7 @@ import { PassThrough } from "node:stream";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { COLUMNS, SOURCE, FORMAT, BUCKET, ACCOUNT, validateContext, validateBundle,
-  diagnostic, sourceContract, importBundle, upgrade, loadBundle, runOperator, setMediaMode, parseImportIdentity, applyBaseline } from "../../scripts/gcp/database-operator.mjs";
+  diagnostic, sourceContract, importBundle, upgrade, loadBundle, runOperator, setMediaMode, parseImportIdentity, applyBaseline, verifyImport } from "../../scripts/gcp/database-operator.mjs";
 
 const hash=(value)=>createHash("sha256").update(value).digest("hex");
 const marker="SENSITIVE_FIXTURE_NEVER_PRINT";
@@ -23,9 +23,9 @@ function bundle(){
   return {format:FORMAT,source:{projectRef:SOURCE},authMirror:[{id:"80000000-0000-4000-8000-000000000001",provider_subject:"80000000-0000-4000-8000-000000000001",email:"fixture@example.test",email_verified:true,created_at:"2026-01-01T00:00:00.123456Z",updated_at:"2026-10-28T00:00:00+00:00"}],
     tables,expected:{counts:{auth_users:1,...Object.fromEntries(Object.entries(tables).map(([name,rows])=>[name,rows.length]))}}};
 }
-function db({mode="frozen",imported=0,badCounts=false,history=[],baselineHash=contract.baselineHash,importHash="b".repeat(64),mediaProblems=0,writeFrozen=mode==="frozen",triggerCount=21,failWriteGate=false}={}){
+function db({mode="frozen",imported=0,badCounts=false,history=[],baselineHash=contract.baselineHash,importHash="b".repeat(64),mediaProblems=0,writeFrozen=mode==="frozen",triggerCount=21,failWriteGate=false,loaded=false,changedCell=false}={}){
   const calls=[];
-  const rows={auth_users:0,...Object.fromEntries(Object.keys(COLUMNS).map(name=>[name,name==="record_ranking_project_budget"?1:0]))};
+  const rows={auth_users:loaded?1:0,...Object.fromEntries(Object.keys(COLUMNS).map(name=>[name,name==="record_ranking_project_budget"?1:0]))};
   return {calls,async end(){},async query(sql,params){
     calls.push({sql,params});
     if(sql.startsWith("SELECT name,sha256") && sql.includes("name='baseline'"))return {rows:[{name:"baseline",sha256:baselineHash}]};
@@ -38,6 +38,7 @@ function db({mode="frozen",imported=0,badCounts=false,history=[],baselineHash=co
     if(sql.startsWith("UPDATE migration_admin.write_state") && failWriteGate)throw new Error(marker);
     if(sql.startsWith("SELECT count(*)::int n FROM migration_admin.imports"))return {rows:[{n:imported}]};
     if(sql.startsWith("SELECT sha256 FROM migration_admin.imports"))return {rows:imported?[{sha256:importHash}]:[]};
+    if(sql.includes(" IS NOT DISTINCT FROM "))return {rows:[{n:changedCell?0:1}]};
     if(sql.startsWith("SELECT count(*)::int n FROM auth.users"))return {rows:[{n:rows.auth_users}]};
     const count=/^SELECT count\(\*\)::int n FROM public\.(\w+)/.exec(sql);
     if(count)return {rows:[{n:badCounts?9:rows[count[1]]}]};
@@ -181,9 +182,10 @@ test("age-keygen identity comments normalize to exactly one bounded key line",()
   }
 });
 
+const pristineCatalog={pristine:true,database_owner:true,public_owner:true,schemas:true,public_objects:true,extensions:true,event_triggers:true,existing_app_roles:true};
 for(const pristine of [true,false])test(`bootstrap ${pristine?"accepts a pristine existing database":"rejects any existing catalog or role drift"} without reset`,async()=>{
   const calls=[];
-  const client={async query(sql,params){calls.push({sql,params});return {rows:sql.includes("AS pristine")?[{pristine}]:[]};}};
+  const client={async query(sql,params){calls.push({sql,params});return {rows:sql.includes("AS pristine")?[{...pristineCatalog,pristine}]:[]};}};
   const root=process.cwd();
   const run=()=>applyBaseline(client,{...contract,baseline:"SELECT 1;"},root,credentials,"r".repeat(43));
   if(pristine)await run();else await assert.rejects(run());
@@ -193,6 +195,131 @@ for(const pristine of [true,false])test(`bootstrap ${pristine?"accepts a pristin
   assert.ok(calls.every(call=>!call.sql.includes("DROP DATABASE")&&!call.sql.includes("DROP ROLE")));
   assert.ok(calls.findIndex(call=>call.sql.includes("pg_advisory_xact_lock"))<calls.findIndex(call=>call.sql.includes("AS pristine")));
   assert.ok(calls.every(call=>!call.sql.includes(credentials.migrator)));
+});
+
+for(const [field,reason] of Object.entries({database_owner:"database-owner",public_owner:"public-owner",schemas:"schemas",
+ public_objects:"public-objects",extensions:"extensions",event_triggers:"event-triggers",existing_app_roles:"existing-app-roles"})) {
+ test(`bootstrap catalog emits only fixed ${reason} reason and never mutates a non-pristine target`,async()=>{
+  const calls=[];
+  const client={async query(sql){calls.push(sql);return {rows:sql.includes("AS pristine")?[{...pristineCatalog,pristine:false,[field]:false,detail:marker}]:[]};}};
+  await assert.rejects(applyBaseline(client,{...contract,baseline:"SELECT 1;"},process.cwd(),credentials,"r".repeat(43)),error=>{
+   assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage:"catalog",reasons:[reason]});
+   assert.ok(!JSON.stringify(error).includes(marker)&&!String(error).includes(marker));return true;
+  });
+  assert.equal(calls.at(-1),"ROLLBACK");assert.ok(calls.every(sql=>!/CREATE ROLE|COMMIT|DROP /.test(sql)));
+ });
+}
+test("bootstrap rejects absent, null or malformed catalog predicates without reflecting values",async()=>{
+ for(const rows of [[],[{...pristineCatalog,schemas:null}],[{...pristineCatalog,public_owner:marker}],[{pristine:true}]]) {
+  const calls=[];const client={async query(sql){calls.push(sql);return {rows:sql.includes("AS pristine")?rows:[]};}};
+  await assert.rejects(applyBaseline(client,{...contract,baseline:"SELECT 1;"},process.cwd(),credentials,"r".repeat(43)),error=>{
+   assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage:"catalog"});return true;
+  });
+  assert.ok(calls.every(sql=>!sql.includes("CREATE ROLE")));
+ }
+});
+for(const owner of ["postgres","cloudsqladmin","cloudsqlsuperuser","pg_database_owner","other","missing"])
+test(`bootstrap owner diagnosis permits only fixed ${owner} classification and booleans`,async()=>{
+ const calls=[];const row={...pristineCatalog,pristine:false,database_owner:false,target_database_matches:true,
+  admin_user_matches:true,encoding_utf8:true,database_owner_class:owner,arbitrary_name:marker};
+ const client={async query(sql){calls.push(sql);return {rows:sql.includes("AS pristine")?[row]:[]};}};
+ await assert.rejects(applyBaseline(client,contract,process.cwd(),credentials,"r".repeat(43)),error=>{
+  assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage:"catalog",reasons:["database-owner"],
+   database:{targetDatabase:true,adminUser:true,owner,utf8:true}});
+  assert.ok(!JSON.stringify(error).includes(marker));return true;
+ });
+ assert.ok(calls.every(sql=>!sql.includes("CREATE ROLE")));assert.equal(calls.at(-1),"ROLLBACK");
+});
+test("bootstrap owner diagnosis splits target, admin and encoding failures without weakening the gate",async()=>{
+ for(const field of ["target_database_matches","admin_user_matches","encoding_utf8"]){
+  const row={...pristineCatalog,pristine:false,database_owner:false,target_database_matches:true,
+   admin_user_matches:true,encoding_utf8:true,database_owner_class:"postgres",[field]:false};
+  const client={async query(sql){return {rows:sql.includes("AS pristine")?[row]:[]};}};
+  await assert.rejects(applyBaseline(client,contract,process.cwd(),credentials,"r".repeat(43)),error=>{
+   const result=diagnostic(error);assert.equal(Object.values(result.database).filter(v=>v===false).length,1);return true;
+  });
+ }
+});
+test("bootstrap owner diagnosis never reflects arbitrary owner names, values or extra fields",async()=>{
+ for(const change of [{database_owner_class:marker},{encoding_utf8:marker},{admin_user_matches:null}]){
+  const row={...pristineCatalog,pristine:false,database_owner:false,target_database_matches:true,
+   admin_user_matches:true,encoding_utf8:true,database_owner_class:"postgres",...change};
+  const client={async query(sql){return {rows:sql.includes("AS pristine")?[row]:[]};}};
+  await assert.rejects(applyBaseline(client,contract,process.cwd(),credentials,"r".repeat(43)),error=>{
+   assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage:"catalog",reasons:["database-owner"]});
+   assert.ok(!JSON.stringify(error).includes(marker));
+   error.database={targetDatabase:true,adminUser:true,owner:marker,utf8:true};assert.equal(diagnostic(error).database,undefined);
+   error.database={targetDatabase:true,adminUser:true,owner:"other",utf8:true,detail:marker};
+   assert.ok(!JSON.stringify(diagnostic(error)).includes(marker));return true;
+  });
+ }
+});
+function managedBootstrap({initial={},privileges={owner_member:true,owner_usage:true,can_create_database:true},after={},failAt}={}) {
+ const calls=[];let changed=false;
+ const original={...pristineCatalog,pristine:false,database_owner:false,target_database_matches:true,admin_user_matches:true,
+  encoding_utf8:true,database_owner_class:"cloudsqlsuperuser",...initial};
+ const client={async query(sql){
+  calls.push(sql);if(failAt?.(sql))throw Object.assign(new Error(marker),{code:"42501"});
+  if(sql.includes("AS pristine"))return {rows:[changed?{...pristineCatalog,target_database_matches:true,admin_user_matches:true,
+   encoding_utf8:true,database_owner_class:"postgres",...after}:original]};
+  if(sql.startsWith("SELECT pg_has_role"))return {rows:privileges===null?[]:[privileges]};
+  if(sql==="ALTER DATABASE mfmf OWNER TO postgres")changed=true;
+  return {rows:[]};
+ }};return {calls,run:()=>applyBaseline(client,{...contract,baseline:"SELECT 1;"},process.cwd(),credentials,"r".repeat(43))};
+}
+test("managed bootstrap normalizes only the verified fixed owner and rereads all pristine predicates in one transaction",async()=>{
+ const f=managedBootstrap();assert.deepEqual(await f.run(),{databaseOwnerNormalized:true});
+ const changed=f.calls.indexOf("ALTER DATABASE mfmf OWNER TO postgres"),catalogs=f.calls.map((sql,index)=>sql.includes("AS pristine")?index:-1).filter(n=>n>=0);
+ assert.equal(catalogs.length,2);assert.ok(catalogs[0]<changed&&changed<catalogs[1]);
+ assert.ok(catalogs[1]<f.calls.findIndex(sql=>sql.includes("CREATE ROLE mfmf_owner")));
+ assert.equal(f.calls.filter(sql=>sql.startsWith("BEGIN")).length,1);assert.equal(f.calls.at(-1),"COMMIT");
+ assert.equal(f.calls.filter(sql=>sql.startsWith("ALTER DATABASE")).length,1);
+});
+for(const [name,options] of [
+ ["other owner",{initial:{database_owner_class:"other"}}],["system admin owner",{initial:{database_owner_class:"cloudsqladmin"}}],
+ ["wrong database",{initial:{target_database_matches:false}}],["wrong admin",{initial:{admin_user_matches:false}}],
+ ["wrong encoding",{initial:{encoding_utf8:false}}],
+ ...Object.keys(pristineCatalog).filter(key=>!["pristine","database_owner"].includes(key)).map(key=>[`${key} drift`,{initial:{[key]:false}}]),
+ ...["owner_member","owner_usage","can_create_database"].flatMap(key=>[false,null,marker].map(value=>[`${key} ${typeof value}`,{privileges:{owner_member:true,owner_usage:true,can_create_database:true,[key]:value}}])),
+ ["no privilege result",{privileges:null}],
+])test(`managed bootstrap refuses ${name} without owner mutation or new roles`,async()=>{
+ const f=managedBootstrap(options);await assert.rejects(f.run());assert.equal(f.calls.at(-1),"ROLLBACK");
+ assert.ok(f.calls.every(sql=>!sql.startsWith("ALTER DATABASE")&&!sql.includes("CREATE ROLE mfmf_owner")));
+});
+for(const key of Object.keys(pristineCatalog))test(`managed bootstrap refuses post-normalization ${key} drift before roles`,async()=>{
+ const f=managedBootstrap({after:{[key]:false}});await assert.rejects(f.run());assert.equal(f.calls.at(-1),"ROLLBACK");
+ assert.ok(f.calls.includes("ALTER DATABASE mfmf OWNER TO postgres"));assert.ok(f.calls.every(sql=>!sql.includes("CREATE ROLE mfmf_owner")));
+});
+test("managed bootstrap permission or later SQL failure rolls back the same owner-change transaction",async()=>{
+ for(const failAt of [sql=>sql.startsWith("ALTER DATABASE"),sql=>sql.includes("CREATE ROLE mfmf_owner"),sql=>sql==="SELECT 1;"]){
+  const f=managedBootstrap({failAt});await assert.rejects(f.run(),error=>{
+   assert.equal(diagnostic(error).sqlstate,"42501");assert.ok(!String(error).includes(marker));return true;
+  });assert.equal(f.calls.at(-1),"ROLLBACK");assert.ok(!f.calls.includes("COMMIT"));
+ }
+});
+for(const [substage,match] of [
+ ["catalog",sql=>sql.includes("AS pristine")],["roles",sql=>sql.includes("CREATE ROLE mfmf_owner")],
+ ["baseline",sql=>sql==="SELECT 1;"],["ledger",sql=>sql.startsWith("CREATE SCHEMA migration_admin")],
+ ["password",sql=>sql.startsWith("DO $$ BEGIN EXECUTE format('ALTER ROLE")],["commit",sql=>sql==="COMMIT"],
+])test(`bootstrap ${substage} failure exposes SQLSTATE only and rolls back`,async()=>{
+ const calls=[];const failure=Object.assign(new Error(marker),{code:"42501",detail:marker,where:marker,query:marker});
+ const client={async query(sql){calls.push(sql);if(match(sql))throw failure;return {rows:sql.includes("AS pristine")?[pristineCatalog]:[]};}};
+ await assert.rejects(applyBaseline(client,{...contract,baseline:"SELECT 1;"},process.cwd(),credentials,"r".repeat(43)),error=>{
+  assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage,sqlstate:"42501"});
+  assert.ok(!JSON.stringify(error).includes(marker)&&!String(error).includes(marker));return true;
+ });
+ assert.equal(calls.at(-1),"ROLLBACK");assert.equal(calls.filter(sql=>sql==="ROLLBACK").length,1);
+});
+test("bootstrap diagnostic rejects arbitrary exception codes and mutated diagnostic fields",async()=>{
+ for(const code of [marker,"42p01","42501\n",42501,"42501 ","P0001:detail"]) {
+  const client={async query(sql){if(sql.includes("AS pristine"))throw Object.assign(new Error(marker),{code});return {rows:[]};}};
+  await assert.rejects(applyBaseline(client,contract,process.cwd(),credentials,"r".repeat(43)),error=>{
+   assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap",substage:"catalog"});
+   error.substage=marker;error.sqlstate=marker;error.reasons=[marker];
+   assert.deepEqual(diagnostic(error),{status:"failed",stage:"bootstrap"});
+   error.stage=marker;assert.deepEqual(diagnostic(error),{status:"failed",stage:"context"});return true;
+  });
+ }
 });
 
 for(const [name,options] of [["mismatched write state",{writeFrozen:false}],["missing ALWAYS guard",{triggerCount:20}]])test(`activate rejects ${name}`,async()=>{
@@ -209,3 +336,31 @@ test("whole-database freeze and media switch commit together or roll back togeth
   assert.ok(failed.calls.some(call=>call.sql.startsWith("SELECT public.set_media_storage_mode")));
   assert.ok(failed.calls.some(call=>call.sql==="ROLLBACK"));assert.ok(failed.calls.every(call=>call.sql!=="COMMIT"));
 });
+
+test("verify-import requires a pinned generation and identity just like restore-test",()=>{
+ const valid={...env,MFMF_DB_OPERATION:"verify-import",MFMF_DB_BUNDLE_SHA256:"b".repeat(64),MFMF_DB_BUNDLE_GENERATION:"1",MFMF_DB_IMPORT_IDENTITY:ageKey};
+ assert.equal(validateContext(valid).operation,"verify-import");
+ for(const key of ["MFMF_DB_BUNDLE_SHA256","MFMF_DB_BUNDLE_GENERATION","MFMF_DB_IMPORT_IDENTITY"]){const changed={...valid};delete changed[key];assert.throws(()=>validateContext(changed));}
+});
+test("verify-import reads a stable snapshot and compares every column without DML or DDL",async()=>{
+ const client=db({loaded:true,imported:1});const result=await verifyImport(client,bundle(),"b".repeat(64),contract);
+ assert.equal(result.comparison,"all-rows-compared");assert.equal(result.readOnly,true);
+ assert.ok(client.calls.some(call=>call.sql.startsWith("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")));
+ assert.ok(client.calls.findIndex(call=>call.sql.includes("pg_advisory_lock("))<client.calls.findIndex(call=>call.sql.startsWith("BEGIN")));
+ const compared=client.calls.filter(call=>call.sql.includes(" IS NOT DISTINCT FROM "));
+ assert.equal(compared.length,2);assert.ok(compared[0].sql.includes("created_at IS NOT DISTINCT FROM")&&compared[0].sql.includes("updated_at IS NOT DISTINCT FROM"));
+ assert.deepEqual(compared[0].params,Object.values(bundle().authMirror[0]));
+ assert.ok(client.calls.every(call=>/^(SELECT|BEGIN|COMMIT)/.test(call.sql)));
+ assert.ok(client.calls.at(-1).sql.includes("pg_advisory_unlock("));
+});
+for(const [name,options] of [["changed cell at equal counts",{changedCell:true}],["extra/missing rows",{badCounts:true}],
+ ["missing import ledger",{imported:0}],["wrong import hash",{importHash:"c".repeat(64)}],["wrong baseline",{baselineHash:"d".repeat(64)}],
+ ["active database",{mode:"gcs"}],["unfrozen private state",{writeFrozen:false}],["missing write guard",{triggerCount:20}]]){
+ test(`verify-import refuses ${name} and releases lock without mutation`,async()=>{
+  const client=db({loaded:true,imported:1,...options});
+  await assert.rejects(verifyImport(client,bundle(),"b".repeat(64),contract),error=>!String(error).includes(marker));
+  assert.ok(client.calls.some(call=>call.sql==="ROLLBACK"));assert.ok(client.calls.every(call=>call.sql!=="COMMIT"));
+  assert.ok(client.calls.every(call=>/^(SELECT|BEGIN|ROLLBACK)/.test(call.sql)));
+  assert.ok(client.calls.at(-1).sql.includes("pg_advisory_unlock("));
+ });
+}

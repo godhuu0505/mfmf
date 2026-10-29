@@ -7,7 +7,8 @@ const clock = Date.parse("2026-10-28T00:00:00Z");
 const name = "projects/mfmf-499612/backups/fixture-backup";
 const backup = () => ({ name, instance: "mfmf-db", description: `mfmf-managed-preupgrade-v1:${sha}`,
   type: "ON_DEMAND", state: "SUCCESSFUL", location: "asia-northeast1", expiryTime: new Date(clock + 14 * 86400000).toISOString(),
-  backupInterval: { startTime: new Date(clock - 60_000).toISOString(), endTime: new Date(clock).toISOString() } });
+  maxChargeableBytes: "1000",
+  backupInterval: { startTime: new Date(clock).toISOString(), endTime: new Date(clock).toISOString() } });
 const operation = () => ({ name: "fixture-operation", targetProject: "mfmf-499612", targetId: "mfmf-db",
   operationType: "BACKUP_VOLUME", status: "DONE", backupContext: { name } });
 function fixture({ list = [], saved = backup(), op = operation(), failStatus } = {}) {
@@ -46,6 +47,86 @@ test("old or future same-SHA backups never create another backup or authorize SQ
     const f = fixture({ list: [saved], saved }); await assert.rejects(f.run(), /stage=verify-backup/);
     assert.ok(f.calls.every(({ init }) => init.method === "GET"));
   }
+});
+test("fresh completion cannot hide an old, missing, future or reversed start time", async () => {
+  for (const startTime of [undefined, "PRIVATE_INVALID_TIME", new Date(clock - 16 * 60_000).toISOString(),
+    new Date(clock + 60_000).toISOString(), new Date(clock + 1_000).toISOString()]) {
+    const saved = { ...backup(), backupInterval: { startTime, endTime: new Date(clock).toISOString() } };
+    const f = fixture({ list: [saved], saved });
+    await assert.rejects(f.run(), (error) => /stage=verify-backup/.test(error.message) && !/PRIVATE/.test(error.message));
+    assert.ok(f.calls.every(({ init }) => init.method === "GET"));
+  }
+});
+test("new backup must start within 30 seconds of this request; retry can reuse a recent start", async () => {
+  const saved = { ...backup(), backupInterval: { startTime: new Date(clock - 60_000).toISOString(), endTime: new Date(clock).toISOString() } };
+  await assert.rejects(fixture({ saved }).run(), /stage=verify-backup/);
+  await fixture({ list: [saved], saved }).run();
+  await fixture({ saved: { ...saved, backupInterval: { ...saved.backupInterval, startTime: new Date(clock - 30_000).toISOString() } } }).run();
+});
+const otherBackup = (i, extra = {}) => ({ ...backup(), name: `projects/mfmf-499612/backups/other-${i}`, description: "other-marker", ...extra });
+test("all on-demand markers count toward the eight-backup limit before a create", async () => {
+  const f = fixture({ list: Array.from({ length: 8 }, (_, i) => otherBackup(i)) });
+  await assert.rejects(f.run(), /stage=backup-capacity/);
+  assert.equal(f.calls.length, 1); assert.equal(f.calls[0].init.method, "GET");
+  await fixture({ list: Array.from({ length: 7 }, (_, i) => otherBackup(i)) }).run();
+});
+test("existing marker can be reused at eight backups but not above the limit", async () => {
+  await fixture({ list: [backup(), ...Array.from({ length: 7 }, (_, i) => otherBackup(i))] }).run();
+  const f = fixture({ list: [backup(), ...Array.from({ length: 8 }, (_, i) => otherBackup(i))] });
+  await assert.rejects(f.run(), /stage=backup-capacity/);
+  assert.ok(f.calls.every(({ init }) => init.method === "GET"));
+});
+test("capacity unknown, invalid or already at one GiB prevents any create", async () => {
+  for (const maxChargeableBytes of [undefined, null, 10, "-1", "1.5", "01", "PRIVATE_BYTES", "99999999999999999999", "1073741824"]) {
+    const f = fixture({ list: [otherBackup(1, { maxChargeableBytes })] });
+    await assert.rejects(f.run(), (error) => /stage=backup-capacity/.test(error.message) && !/PRIVATE/.test(error.message));
+    assert.equal(f.calls.length, 1);
+  }
+});
+test("capacity adds all on-demand bytes and rechecks the returned resource", async () => {
+  const full = fixture({ list: [otherBackup(1, { maxChargeableBytes: "536870912" }), otherBackup(2, { maxChargeableBytes: "536870912" })] });
+  await assert.rejects(full.run(), /stage=backup-capacity/); assert.equal(full.calls.length, 1);
+  const created = fixture({ list: [otherBackup(1, { maxChargeableBytes: "1073741820" })] });
+  await assert.rejects(created.run(), /stage=backup-capacity/); assert.equal(created.calls.length, 3);
+  const reused = fixture({ list: [backup(), otherBackup(1, { maxChargeableBytes: "1073740824" })],
+    saved: { ...backup(), maxChargeableBytes: "1001" } });
+  await assert.rejects(reused.run(), /stage=backup-capacity/);
+  assert.ok(reused.calls.every(({ init }) => init.method === "GET"));
+});
+test("automated and final backups do not consume the on-demand allowance and are never changed", async () => {
+  const f = fixture({ list: Array.from({ length: 14 }, (_, i) => otherBackup(i, {
+    type: i % 2 ? "AUTOMATED" : "FINAL", maxChargeableBytes: undefined,
+  })) });
+  await f.run(); assert.equal(f.calls.filter(({ init }) => init.method === "POST").length, 1);
+  assert.ok(f.calls.every(({ init }) => ["GET", "POST"].includes(init.method)));
+});
+test("partial, duplicate or foreign inventory fails before creation", async () => {
+  for (const list of [[otherBackup(1), otherBackup(1)], [otherBackup(1, { instance: "other" })],
+    [otherBackup(1, { type: "PRIVATE_UNKNOWN" })], [null]]) {
+    const f = fixture({ list }); await assert.rejects(f.run(), /stage=list-backups/); assert.equal(f.calls.length, 1);
+  }
+  for (const result of [{ backups: [], warnings: ["PRIVATE_WARNING"] }, { backups: [], nextPageToken: "repeated" }]) {
+    const calls = [];
+    await assert.rejects(ensurePreMigrationBackup({ env, accessToken: "PRIVATE_TOKEN", now: () => clock,
+      fetchImpl: async (_url, init) => { calls.push(init); return Response.json(result); } }), /stage=list-backups/);
+    assert.ok(calls.every(({ method }) => method === "GET"));
+  }
+});
+test("capacity is accumulated across all pages before creating", async () => {
+  let calls = 0;
+  await assert.rejects(ensurePreMigrationBackup({ env, accessToken: "PRIVATE_TOKEN", now: () => clock,
+    fetchImpl: async (url, init) => {
+      assert.equal(init.method, "GET"); calls++;
+      const offset = new URL(url).searchParams.has("pageToken") ? 4 : 0;
+      return Response.json({ backups: Array.from({ length: 4 }, (_, i) => otherBackup(offset + i)),
+        ...(offset ? {} : { nextPageToken: "next" }) });
+    } }), /stage=backup-capacity/);
+  assert.equal(calls, 2);
+});
+test("standard on-demand missing expiry still blocks SQL after a successful create", async () => {
+  const f = fixture({ saved: { ...backup(), expiryTime: null, ttlDays: null } });
+  await assert.rejects(f.run(), /stage=verify-backup/);
+  assert.equal(f.calls.length, 3);
 });
 test("duplicate markers and pending prior backups stop without creating more", async () => {
   for (const list of [[backup(), backup()], [backup()]]) {

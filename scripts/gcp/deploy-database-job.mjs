@@ -5,7 +5,39 @@ export const OPERATOR_IMAGE = `asia-northeast1-docker.pkg.dev/${PROJECT}/mfmf/mf
 export const OPERATOR_JOB = `projects/${PROJECT}/locations/${REGION}/jobs/mfmf-db-operator`;
 const API = `https://run.googleapis.com/v2/${OPERATOR_JOB}`;
 const SA = `mfmf-db-operator@${PROJECT}.iam.gserviceaccount.com`;
-const fail = (stage, status) => { throw new Error(`Database upgrade job failed: stage=${stage}${status ? ` http=${status}` : ""}; details withheld.`); };
+const fixedJob = (name) => ["mfmf-db-operator", OPERATOR_JOB,
+  OPERATOR_JOB.replace(`projects/${PROJECT}/`, `projects/${PROJECT_NUMBER}/`)].includes(name);
+// Cloud Run returns short names in Job.latestCreatedExecution and Execution.job.
+// Normalize only this fixed project's fixed Job, never follow an arbitrary URL.
+function executionName(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(`projects/${PROJECT_NUMBER}/`, `projects/${PROJECT}/`);
+  if (/^mfmf-db-operator-[a-z0-9-]+$/.test(normalized)) return `${OPERATOR_JOB}/executions/${normalized}`;
+  return new RegExp(`^${OPERATOR_JOB}/executions/mfmf-db-operator-[a-z0-9-]+$`).test(normalized) ? normalized : null;
+}
+const ERROR_STAGES = new Set(["context", "task-constraints", "container-constraints", "job-environment", "job-secret-reference",
+  "read-job", "job-identity", "prior-execution", "update-job", "update-operation", "read-updated-job", "job-replaced",
+  "job-changed", "run-job", "run-operation", "verify-execution", "execution-identity", "execution-vpc",
+  "execution-result", "verify-job", "operation-timeout", "unexpected"]);
+const MUTATION_BOUNDARIES = new Set(["none", "update-requested", "run-requested"]);
+const errorDetails = new WeakMap();
+
+export class DatabaseJobError extends Error {
+  constructor(stage, status, mutationBoundary = "none") {
+    const safeStage = ERROR_STAGES.has(stage) ? stage : "unexpected";
+    const httpStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined;
+    super(`Database upgrade job failed: stage=${safeStage}${httpStatus ? ` http=${httpStatus}` : ""}; details withheld.`);
+    errorDetails.set(this, Object.freeze({ status: "failed", component: "database-upgrade", stage: safeStage,
+      ...(httpStatus ? { httpStatus } : {}), mutationBoundary: MUTATION_BOUNDARIES.has(mutationBoundary) ? mutationBoundary : "unknown" }));
+  }
+}
+
+// Never print Error.message, API bodies, or caller-supplied diagnostic properties.
+export function databaseJobDiagnostic(error) {
+  const details = errorDetails.get(error);
+  return details ? { ...details } : null;
+}
+const fail = (stage, status) => { throw new DatabaseJobError(stage, status); };
 const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 export const operatorDigest = (value) => typeof value === "string" && value.startsWith(`${OPERATOR_IMAGE}@sha256:`)
@@ -34,17 +66,21 @@ export function validateOperatorTask(task, image, sha) {
     || ref.version !== "1") fail("job-secret-reference");
 }
 
-export async function deployDatabaseJob({ env, image, fetchImpl = fetch,
-  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), maxPolls = 360 }) {
-  requireContinuousContext(env);
+async function runDatabaseJob({ env, image, fetchImpl = fetch,
+  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), maxPolls = 360 }, recordMutation) {
+  try { requireContinuousContext(env); } catch { fail("context"); }
   if (env.GCP_AUTH_ENABLED !== "true" || !operatorDigest(image) || !env.GCP_ACCESS_TOKEN || /[\r\n]/.test(env.GCP_ACCESS_TOKEN)) fail("context");
   const request = async (url, stage, method = "GET", body) => {
+    // Mark before dispatch: a failed/timeout request can still have been applied.
+    // This is an observation boundary, never permission to retry a mutation.
+    if (method === "PATCH") recordMutation("update-requested");
+    if (method === "POST") recordMutation("run-requested");
     let response;
     try { response = await fetchImpl(url, { method, redirect: "error", signal: AbortSignal.timeout(30_000),
       headers: { Authorization: `Bearer ${env.GCP_ACCESS_TOKEN}`, "X-Goog-User-Project": PROJECT,
         ...(body ? { "Content-Type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) }); }
     catch { fail(stage); }
-    if (!response.ok) { await response.body?.cancel(); fail(stage, response.status); }
+    if (!response.ok) { try { await response.body?.cancel(); } catch { /* Preserve only the fixed HTTP diagnostic. */ } fail(stage, response.status); }
     try { const parts = []; let size = 0;
       for await (const part of response.body) { size += part.length; if (size > 1_048_576) throw new Error(); parts.push(Buffer.from(part)); }
       return JSON.parse(Buffer.concat(parts).toString("utf8"));
@@ -69,21 +105,49 @@ export async function deployDatabaseJob({ env, image, fetchImpl = fetch,
       || job.startExecutionToken || job.runExecutionToken) fail("job-identity");
     validateOperatorTask(job.template.template, expectedImage, sha);
   };
-  const validateExecution = (value, expectedName) => {
-    if (!value || !new RegExp(`^${OPERATOR_JOB}/executions/mfmf-db-operator-[a-z0-9-]+$`).test(value.name ?? "")
-      || (expectedName && value.name !== expectedName) || value.job !== OPERATOR_JOB || value.deleteTime
+  const validateExecution = async (value, expectedName, expectedUid) => {
+    if (!value || !executionName(value.name)
+      || (expectedName && executionName(value.name) !== expectedName) || !fixedJob(value.job) || value.deleteTime
+      || typeof value.uid !== "string" || !value.uid || value.uid.length > 128
+      || (expectedUid && value.uid !== expectedUid)
       || value.taskCount !== 1 || value.parallelism !== 1) fail("execution-identity");
-    validateOperatorTask(value.template, image, env.GITHUB_SHA);
-    return value.name;
+    let task = value.template;
+    // The observed v2 Execution omits Direct VPC, although Job includes it.
+    // Read the immutable v1 Execution with the same UID; never assume Job's
+    // current network was also the network used by this execution.
+    if (task && !Object.hasOwn(task, "vpcAccess")) {
+      const shortName = executionName(value.name).split("/").pop();
+      const legacy = await request(`https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT}/executions/${shortName}`, "execution-vpc");
+      if (legacy?.kind !== "Execution" || legacy.metadata?.name !== shortName || legacy.metadata?.uid !== value.uid
+        || ![PROJECT, PROJECT_NUMBER].includes(legacy.metadata?.namespace) || legacy.metadata?.deletionTimestamp) fail("execution-vpc");
+      const annotations = [legacy.metadata?.annotations, legacy.spec?.template?.metadata?.annotations];
+      if (annotations.some((a) => a !== undefined && (!a || typeof a !== "object" || Array.isArray(a)))) fail("execution-vpc");
+      const annotation = (key) => {
+        const values = annotations.map((a) => a?.[key]).filter((v) => v !== undefined);
+        if (values.some((v) => typeof v !== "string" || v.length > 4096) || new Set(values).size > 1) fail("execution-vpc");
+        return values[0];
+      };
+      if (annotation("run.googleapis.com/vpc-access-egress") !== "private-ranges-only"
+        || annotation("run.googleapis.com/vpc-access-connector") !== undefined) fail("execution-vpc");
+      let networkInterfaces;
+      try { networkInterfaces = JSON.parse(annotation("run.googleapis.com/network-interfaces")); } catch { fail("execution-vpc"); }
+      if (!Array.isArray(networkInterfaces) || networkInterfaces.length !== 1
+        || !exact(networkInterfaces[0], ["network", "subnetwork"])) fail("execution-vpc");
+      const vpcAccess = { egress: "PRIVATE_RANGES_ONLY", networkInterfaces };
+      if (!isDatabaseVpc(vpcAccess)) fail("execution-vpc");
+      task = { ...task, vpcAccess };
+    }
+    validateOperatorTask(task, image, env.GITHUB_SHA);
+    return executionName(value.name);
   };
   const initial = await request(API, "read-job"); validateJob(initial);
   // Job PATCH never creates a missing Job or expands IAM; the initial operator
   // deployment and the first database cutover are separate, manual gates.
   if (initial.latestCreatedExecution?.name) {
-    const name = initial.latestCreatedExecution.name;
-    if (!new RegExp(`^${OPERATOR_JOB}/executions/mfmf-db-operator-[a-z0-9-]+$`).test(name)) fail("prior-execution");
+    const name = executionName(initial.latestCreatedExecution.name);
+    if (!name) fail("prior-execution");
     const previous = await request(`https://run.googleapis.com/v2/${name}`, "prior-execution");
-    if (previous.name !== name || previous.job !== OPERATOR_JOB || !previous.completionTime || (previous.runningCount ?? 0) !== 0) fail("prior-execution");
+    if (executionName(previous.name) !== name || !fixedJob(previous.job) || !previous.completionTime || (previous.runningCount ?? 0) !== 0) fail("prior-execution");
   }
   const template = structuredClone(initial.template);
   template.template.containers[0].image = image;
@@ -96,12 +160,21 @@ export async function deployDatabaseJob({ env, image, fetchImpl = fetch,
   const ready = await request(API, "read-updated-job"); validateJob(ready, image, env.GITHUB_SHA);
   if (ready.uid !== initial.uid || ready.etag !== updated.etag) fail("job-changed");
   const executed = await operation(await request(`${API}:run`, "run-job", "POST", { etag: ready.etag }), "run-operation");
-  const name = validateExecution(executed);
-  const finished = await request(`https://run.googleapis.com/v2/${name}`, "verify-execution"); validateExecution(finished, name);
+  const name = await validateExecution(executed);
+  const finished = await request(`https://run.googleapis.com/v2/${name}`, "verify-execution"); await validateExecution(finished, name, executed.uid);
   if (!finished.completionTime || finished.reconciling === true || finished.succeededCount !== 1
     || (finished.failedCount ?? 0) !== 0 || (finished.cancelledCount ?? 0) !== 0 || (finished.runningCount ?? 0) !== 0
     || (finished.retriedCount ?? 0) !== 0 || !finished.conditions?.some((c) => c.type === "Completed" && c.state === "CONDITION_SUCCEEDED")) fail("execution-result");
   const final = await request(API, "verify-job"); validateJob(final, image, env.GITHUB_SHA);
-  if (final.uid !== initial.uid || final.latestCreatedExecution?.name !== name) fail("job-changed");
+  if (final.uid !== initial.uid || executionName(final.latestCreatedExecution?.name) !== name) fail("job-changed");
   return { upgradeVerified: true };
+}
+
+export async function deployDatabaseJob(options) {
+  let mutationBoundary = "none";
+  try { return await runDatabaseJob(options, (boundary) => { mutationBoundary = boundary; }); }
+  catch (error) {
+    const details = databaseJobDiagnostic(error);
+    throw new DatabaseJobError(details?.stage ?? "unexpected", details?.httpStatus, mutationBoundary);
+  }
 }

@@ -1,8 +1,10 @@
 # GCP の DB ベースラインと認証ミラー
 
-このディレクトリは **新しい空の Cloud SQL PostgreSQL 17** 用の候補です。
-既存 Supabase へ適用しません。Cloud SQL への実適用・本番データの復元・認証切替はまだ行っていません。
-既存 `supabase/migrations/` は変更せず、現在の RLS と RPC を別の所有者・認証方式へ移します。
+このディレクトリは **Cloud SQL PostgreSQL 17のbaseline・operator・追加SQLの契約**です。
+baselineの新規適用は空DBに限定し、既存Supabaseへ適用しません。実baseline適用と最終importは実施済みです。
+最終復元・受入・配信再開の状態は [移行記録](../../docs/explanation/gcp-migration.md#現在の実装と切替記録)を参照してください。
+`supabase/migrations/` は互換元・ローカル開発の履歴として残し、source manifestで対応を追跡します。
+既存baselineを稼働DBへ再適用せず、通常変更は追加migrationとchecksum ledgerの契約に従います。
 
 ## 適用する主体
 
@@ -109,6 +111,7 @@ Job は task 1・parallelism 1・retry 0 とし、script 自体も task index/co
 | `inspect` | baseline hash、runtime role、行数、media state / binding 整合だけを検査 |
 | `restore-test` | 別の一時 DB で baseline + RLS 負例を実行し、bundle を復元して全行・全列を typed comparison。その DB / 一時 role を撤去 |
 | `migrate` | frozen/gcs の未 import・空 DB に、固定列の parameterized INSERT を一つの transaction で実行 |
+| `verify-import` | 同じ generation 固定 bundle を取得し、既存固定 DB の baseline / import SHA / frozen 状態を確認。読取専用 snapshot で全行・全列を照合。DML / DDL / 試験 DB 作成なし |
 | `upgrade` | image 内の `db/gcp/migrations/` と適用履歴を比較。未適用 SQL がある場合だけ TTL 検証済み backup を先行し、SQL と checksum を atomic 適用 |
 | `activate` | baseline / import SHA / 全 media 参照 / 21 表 guard を検査後、全体書込を有効にし media state を gcs に同 transaction で切替 |
 | `freeze` | 同じ固定対象と import SHA を確認し、全体書込と media write を同 transaction で frozen にする。read backend は gcs のまま |
@@ -124,7 +127,16 @@ IdP 自体や GCS 本体の操作はこの DB guard の対象外なので、切�
 
 `bootstrap` は public 以外の独自 schema、public の表・sequence・view・関数・型、plpgsql 以外の extension、
 event trigger、固定 app role の既存を拒否します。既存 object / role / data の削除や再利用はしません。
+SQLAdmin が作った空 DB の所有者が `cloudsqlsuperuser` の場合だけ、他の空状態条件すべてと固定 DB / admin / UTF8、
+既存 owner の MEMBER / USAGE と CREATEDB を確認し、固定 `mfmf` の所有者を `postgres` にそろえます。
+同一 transaction 内で元の全条件を再確認してから roles / baseline を作り、後続の失敗では所有者変更も rollback します。
+他 owner、権限不足、既存 object がある場合は変更しません。system role の変更や追加 grant は行いません。
 途中停止した初期化先が残る場合は、状態を調査してから明示的に復旧し、汎用 reset で自動的に進めません。
+失敗時の診断は固定工程名（catalog / roles / baseline / ledger / password / commit）と、存在すれば
+5文字の SQLSTATE だけです。空 DB 条件の不一致は固定の理由名だけを出し、DB object 名・SQL・例外本文は出しません。
+DB 所有者条件の診断は固定名との一致を boolean で、所有者を既知の管理 role 分類または other / missing で示します。
+任意の所有者名をログへ出さず、roles 作成前には postgres 所有を含む元の全許可条件を満たすことが必要です。
+工程の特定は自動再実行や空 DB 条件の緩和を許可するものではありません。
 
 ### Job の環境と秘密
 
@@ -133,7 +145,7 @@ event trigger、固定 app role の既存を拒否します。既存 object / ro
 各 password は 32〜128 文字の base64url 形式とし、コードや引数には入れません。
 
 - bootstrap のみ `MFMF_DATABASE_PASSWORD`（別 secret `mfmf-database-password`）。runtime の authenticator に設定する値です。
-- migrate / restore-test は `MFMF_DB_BUNDLE_SHA256`、`MFMF_DB_BUNDLE_GENERATION`、`MFMF_DB_IMPORT_IDENTITY`。
+- migrate / restore-test / verify-import は `MFMF_DB_BUNDLE_SHA256`、`MFMF_DB_BUNDLE_GENERATION`、`MFMF_DB_IMPORT_IDENTITY`。
   最後の値は operator 専用 `mfmf-db-import-identity` から渡します。既存の長期 backup identity を共有しません。
 - activate / freeze は期待する `MFMF_DB_BUNDLE_SHA256` のみ。generation や復号鍵は不要です。
 - upgrade は `MFMF_DB_DEPLOY_SHA`（main commit の 40 桁 SHA）のみを追加します。
@@ -169,8 +181,20 @@ GCP 側が追いついていない場合に、Cloud SQL の更新を黙って省
 過去の checksum / 適用順序が違う場合は拒否します。private ledger と advisory transaction lock を用い、
 未適用が 0 件なら backup 作成も DDL もありません。
 
-未適用があれば固定 Cloud SQL の backup API で TTL 14 日を要求し、SUCCESSFUL / expiry / 作成時刻を実確認します。
-同じ main SHA の backup 再利用は 15 分以内だけです。TTL 未対応・古い backup・重複・不明な作成結果では SQL を始めません。
+未適用があれば固定 Cloud SQL の backup API で TTL 14 日を要求し、SUCCESSFUL / expiry / 開始・完了時刻を実確認します。
+同じ main SHA の再利用は開始から15分以内だけ、新規は今回request以降の開始だけを許可します（時計ずれ30秒）。
+全 ON_DEMAND の完全一覧で8件 / 最大課金bytes合計1 GiBを上限にし、不明な容量や空き不足でも停止します。
+新backupの容量は作成後に判明するため請求上限の保証ではなく、超過時も自動削除しません。
+Standard の実APIは TTL 指定後も expiry が NULL でした。そのため現構成で未適用SQLがある通常配信は停止し、
+SQLが0件の配信は従来通りです。手動backupは明示削除まで無期限で、自動backupの保持14件とは別です。
+期限を緩和するfallbackはなく、通常SQL更新を開放するには専用の保持/削除手順と実検証が別途必要です。
+初回切替用の手動backup整理も、復元・全行照合と後続復旧点を確認する個別操作です。
+詳細と公式仕様は [通常配信のバックアップ契約](../../docs/guides/gcp-database-deployment.md#更新直前バックアップと保持期限) を参照してください。
+`verify-import` は固定 session advisory lock を snapshot 作成前に取り、REPEATABLE READ READ ONLY transaction で検証します。
+変更セルが1つでもあれば、件数が同じでも失敗します。lock は成功・失敗の両方で解放します。
+この操作自体は backup / restore を開始しません。managed backup から固定対象へ復元した後の比較用です。
+PITR は別 instance への復元が必要で、この固定対象の操作だけでは PITR の実復元を検証できません。
+
 backup は DB のみです。IdP と GCS 本体の巻戻しや、破壊的 migration 後の旧アプリ互換性を保証しません。
 
 ```sh
@@ -179,7 +203,10 @@ python3 tests/gcp/run-operator-tests.py
 ```
 
 後者は既存 DB / 本番 env に触れず、専用 image と network-none の一時 PostgreSQL を用います。
-7 操作と再 import 拒否、全列復元、最大 2 接続、試験 DB / role の撤去を検査します。
+8 操作と再 import 拒否、全列復元、最大 2 接続、試験 DB / role の撤去を検査します。
+別の新品 container では、通常 OID の postgres を NOSUPERUSER / NOBYPASSRLS / CREATEDB / CREATEROLE として用い、
+cloudsqlsuperuser 所有の空 DB から初期化、後続故障時の所有者 rollback、runtime role の非昇格を実 SQL で検査します。
+この fixture は Cloud SQL 固有の extension 処理などを再現するものではなく、実 managed DB の検証も別途必要です。
 実 authenticator 接続で frozen 時の read / 同値 identity sync 許可と DML / identity変更 / SECURITY DEFINER 書込拒否、
 activate 後の書込許可、state 変更の故障注入時の atomic rollback、旧 repeatable-read snapshot の拒否も検査します。
 `--skip-build` は同じ source で作成した test image の再試験専用です。

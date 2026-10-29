@@ -27,7 +27,10 @@ snapshot に属します。既定の `preserve` は読取だけです。`freeze-
 - Ubuntu 24.04で `postgresql-client-17` を明示導入し、`/usr/lib/postgresql/17/bin/` の
   `psql` / `pg_dump` のmajorを検証します。17系の修正パッチは追従します。
   接続後にサーバーmajorが15〜17、接続roleがpostgresかつRLS bypass、DB名、Auth表の存在と
-  read-only設定を検証します。サーバーmajorがクライアントより新しければdump前に停止します。
+  read-only設定を検証します。poolerが起動時の `PGOPTIONS` を渡さない場合に備え、probeは
+  SQLで `BEGIN READ ONLY` を明示し、サーバーの実transaction状態を確認します。
+  `pg_dump` 自身も [READ ONLYのsnapshot transaction](https://github.com/postgres/postgres/blob/REL_17_STABLE/src/bin/pg_dump/pg_dump.c) を開始します。
+  サーバーmajorがクライアントより新しければdump前に停止します。
 - DBパスワードは `PGPASSWORD` としてDB子プロセスの環境メモリだけに渡します。
   argv、URI、ファイル、age子プロセスには渡しません。PATも子プロセスへ渡しません。
   子プロセスのstderrは先頭4096bytesだけメモリで固定分類し、原文をログやファイルへ出しません。
@@ -38,16 +41,35 @@ snapshot に属します。既定の `preserve` は読取だけです。`freeze-
 1. 公開recipientの検証、接続構成とCAの検証、バージョン/read-only probeを行います。
 2. 初回 `preserve` は schema指定2件と `--strict-names` を付けた一回のcustom dumpをageへpipeします。
    凍結管理schemaが存在する場合は、固定の3件目 `mfmf_cutover` も同じdumpに含めます。
-   パイプで流すdumpは最大1GiB、DB接続は15秒、各statementは10分、全体は20分で制限します。
+   パイプで流すdumpは最大1GiB、DB接続は15秒、probeのstatementは10秒、dumpのlock待ちは10秒、
+   全体は20分で制限します。pg_dumpがstatement timeoutを解除するため、dump中は外側の全体期限で停止します。
 3. dump/age両方の終了コード0、stream完了、custom/age header、出力サイズ・0600 permissionを
    確認後のみ、完成したciphertextを公開用ディレクトリへ排他的に作ります。
+   凍結管理schemaがある場合は、dump/age完了後にも同じ厳格なread-only検証を実行し、
+   初回のfrozen状態・26個のguard・20 ALWAYS/6 ORIGIN・replica回避防止条件を再確認します。
+   状態変化や検証失敗があればciphertextは公開せず停止します。最終確認後の特権変更まで防ぐ仕組みではないため、
+   移行中の別operator・role設定変更は禁止します。
 4. 成功した場合だけ `database-auth-backup-encrypted-<run id>-<attempt>` Artifactへ
    **`database-auth.pgdump.age` 一個だけ**を90日保持します。runnerのciphertextは最後に削除します。
 
 平文dumpをディスクへ保存しません。一時ディレクトリは0700、暗号化ファイルは0600です。
 失敗、途中切断、ageエラー、上限超過では完成ファイルを公開せず非0終了します。
-ログは固定stage / reason enum / HTTP status数値、成功時はmajor・byte数などの集計だけです。
+ログは固定stage / substage / reason enum / 許可したSQLSTATE / HTTP status数値、成功時はmajor・byte数などの集計だけです。
 既存の出力ディレクトリがあれば上書きせず停止します。失敗時に手動でpartialをArtifact化しないでください。
+
+各操作は `BEGIN READ ONLY` 内の固定catalog SELECTで、公開20表の存在・owner権限・TRIGGER権限・lock権限の件数と、
+Auth6表それぞれの同じboolean、固定5ロールの `session_replication_role` SET権限を診断します。
+ユーザーデータ、実所有者名、任意のrole名は出しません。`sourceCapabilities` はカタログ上の権限の報告であり、
+Supabaseの管理拡張による追加許可・制限までは証明しません。owner membershipがfalseでも、この診断だけで
+DDLを禁止・許可する判定には使いません。一方、AuthのORIGIN triggerを採用するためのreplica回避防止条件は
+凍結・解除・状態確認で厳密に検証し、満たさなければ停止します。既定 `preserve` で書込なしに確認できます。
+
+凍結・解除はSQLで `BEGIN READ WRITE` を明示します。失敗時はpsqlの `VERBOSITY=sqlstate` と
+固定SELECTの進捗マーカーから、例として `enable-auth-users` / `42501` のような固定段階・コードだけを返します。
+接続先の権限やRLSは変更しません。trigger modeの条件は下記のとおりです。コード `25006` はread-only transaction、
+`42501` は権限、`55P03` はlock待ち失敗の切り分けに使えます。エラー本文・元のstdoutは出しません。
+進捗の `commit` 表示はcommit成功の証拠ではありません。結果不明時は `preserve` のschema数とfrozen状態を確認し、
+自動freeze再試行・自動unfreezeを行わないでください。
 
 既定の `preserve` は`deploy-production`と直列化しますが、**アプリ・直接API・Auth操作を凍結しません**。snapshot以後の更新は含まれません。Auth/session・publicのtable dataは同一snapshotですが、
 PostgreSQL sequenceの進行、別時点のStorage/GCS本体、外部OAuth設定、SMTP設定、署名鍵、
@@ -56,17 +78,35 @@ DB/Auth切替直前は下記の明示freezeとfresh snapshotに続けて、GCS�
 
 ## 明示的な source 凍結と解除
 
-`freeze-and-backup` は公開schemaの固定20テーブル集合を照合し、`auth.users` / `auth.identities` / `auth.mfa_factors` を加えた23表を
-`SHARE ROW EXCLUSIVE` でlockします。進行中DMLの終了後、private `mfmf_cutover` schema/state/guard と
-23個の `BEFORE INSERT/UPDATE/DELETE/TRUNCATE` statement triggerを同じtransactionで設定します。
-ロック待ちは10秒で停止し、対象tableの増減も拒否します。triggerは `ENABLE ALWAYS` です。
+`freeze-and-backup` は公開schemaの固定20テーブル集合を照合し、次のAuth6表を加えた26表を
+`SHARE ROW EXCLUSIVE` でlockします: `auth.users`、`auth.identities`、`auth.mfa_factors`、
+`auth.mfa_recovery_code_sets`、`auth.mfa_recovery_codes`、`auth.webauthn_credentials`。
+進行中DMLの終了後、private `mfmf_cutover` schema/state/guard と26個の
+`BEFORE INSERT/UPDATE/DELETE/TRUNCATE` statement triggerを同じtransactionで設定します。
+ロック待ちは10秒で停止し、対象tableの増減も拒否します。
+
+public20表は `ENABLE ALWAYS`、Auth6表は作成時の `ORIGIN` modeを使います。Supabase管理Authでは
+TRIGGER権限があっても `ALTER TABLE ... ENABLE ALWAYS TRIGGER` は所有者権限不足で拒否されるため、
+Auth tableの所有権やGRANTを変更して迂回しません。ORIGIN modeはreplica sessionで動かないため、
+この構成は次の条件を満たす場合だけ利用できます。
+
+- PostgreSQL 17であること（guardが無い通常の原本保全は引き続き15〜17に対応）。
+- 操作接続とDB/roleの既定設定がreplicaでないこと。operator接続のsession/role overrideで
+  サーバー既定値が隠れている場合も、runtimeと同じだと推定せず拒否すること。
+- 固定runtime/Auth5ロールと、そこから `SET ROLE` で到達できるロールが、replicaへ変更できる権限を持たないこと。
+- 全26表のguard関数・trigger modeが期待どおりであること。Authの想定外modeを黙って置き換えないこと。
+
+この検証はカタログ上の実設定に依存します。プロバイダーによるDDL制限や権限変更を受け入れたまま進めず、
+作成・検証に失敗すればtransactionをロールバックして切替を止めます。
+[Supabaseの管理schema制限](https://github.com/orgs/supabase/discussions/34270)はAuthの全表で任意DDLを許可するものではありません。
+6表すべてへの実CREATE成功とfreeze後の完全一致確認を、本番切替の必須条件にします。
 
 例外は `session_user` が `postgres` / `supabase_admin` のoperator接続だけです。
 アプリが `SECURITY DEFINER` 関数でpostgres権限に入ってもsession_userは変わらず拒否されます。
 Auth管理接続の `supabase_auth_admin` も例外にしません。guardはprivate stateを `FOR SHARE` で読み、
 旧repeatable-read snapshotが凍結前のfalse状態を使う場合もserialization失敗にします。
 読取とoperatorの原本dumpは維持されます。Authのログインや更新がエラーになることは、切替作業中の想定動作です。
-凍結対象のAuth表は `users` / `identities` / `mfa_factors` です。password/provider mapping・MFA要素の登録/更新/削除とpublicの最終データを守りますが、
+凍結対象は上記Auth6表です。password/provider mapping、MFA要素・回復コード・WebAuthn credentialの登録/更新/削除とpublicの最終データを守りますが、
 `auth.sessions` / `auth.refresh_tokens` などへの独立した内部更新まで止めません。全Auth状態が移行中ずっと固定される保証ではありません。
 
 成功後は3schemaを一回のdumpで保全します。**freeze後にdumpや暗号化が失敗しても自動解除しません。**
@@ -87,7 +127,11 @@ archiveも作りません。GCP側で新しい書込が始まった後に、sour
 目録やSQLをログに出さず、全archiveの読取・Auth users/identities/password hashの変換確認、
 隔離DBでの許可したデータ復元、FK・RLS・認可・Google/email/passwordログインの試験が必要です。
 COPY変換器へ渡す `pg_restore --data-only` 出力は `--schema=public --schema=auth` を明示し、
-凍結管理schema `mfmf_cutover` を実行も変換もせず除外します。MFA要素が1件でもあれば現行のIdP変換は停止します。
+凍結管理schema `mfmf_cutover` を実行も変換もせず除外します。変換器はAuth全27表のCOPYを要求し、
+未知・欠落・重複した表を拒否します。保持するAuthデータは `users` / `identities` です。
+MFA・回復コード・WebAuthn・OAuth client/provider・SCIM・SSO・instance関連の18表は空であることを要求します。
+一時セッション5表と履歴2表だけは非空でも移行対象外として明示的に破棄し、暗号化原本は保全します。
+非対応認証データを黙って無視して移行を完了させません。
 復号済み原本をCloud SQL本番や稼働Supabaseへ直接実行しないでください。
 
 ## オフライン検証
@@ -103,10 +147,14 @@ node tests/scripts/source-database-cutover-local.mjs
 ファイルの非公開/排他作成・明示freeze・失敗時の凍結維持を検証します。workflowでも秘密を渡す前にこの試験を実行します。
 隔離PostgreSQL fixtureはnetwork none/tmpfs/ランダムcontainerで、全表DML、Auth管理role、SECURITY DEFINER、
 旧repeatable-read transactionの拒否、operator dump、stateだけの解除を実際に検証し、containerを削除します。
+Auth6表のORIGIN guard、replica設定/到達可能roleの拒否、guard数やmodeの不一致も失敗として確認します。
 
 一次資料:
 
 - [PostgreSQL 17 pg_dump — consistent snapshot / client compatibility / schema selection](https://www.postgresql.org/docs/17/app-pgdump.html)
+- [PostgreSQL 17 CREATE TRIGGER privileges](https://www.postgresql.org/docs/17/sql-createtrigger.html)
+- [PostgreSQL 17 ALTER TABLE ownership](https://www.postgresql.org/docs/17/sql-altertable.html)
+- [PostgreSQL session_replication_role とtrigger実行](https://www.postgresql.org/docs/17/runtime-config-client.html#GUC-SESSION-REPLICATION-ROLE)
 - [Supabase session poolerでのbackup](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
 - [Supabase Pooler Management API](https://supabase.com/docs/reference/api/v1-get-pooler-config)
 - [Supabase session modeは5432](https://supabase.com/kb/troubleshooting/how-do-i-update-connection-pool-settings-in-my-dashboard-wAxTJ_)

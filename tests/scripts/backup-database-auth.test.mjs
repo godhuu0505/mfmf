@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { ARCHIVE_NAME, CA_SHA256, CA_URL, DUMP_ARGS, POOLER_URL, PROBE_SQL, SOURCE_REF,
-  classifyProcessError, diagnostic, runBackup, selectPooler, validateContext } from "../../scripts/gcp/backup-database-auth.mjs";
-import { FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_SCHEMA_SQL, INSPECT_CUTOVER_STATE_SQL, parseBackupOperation } from "../../scripts/gcp/source-database-cutover.mjs";
+  classifyProcessError, processSqlState, diagnostic, runBackup, selectPooler, validateContext } from "../../scripts/gcp/backup-database-auth.mjs";
+import { FREEZE_SOURCE_SQL, UNFREEZE_SOURCE_SQL, INSPECT_CUTOVER_SCHEMA_SQL, INSPECT_CUTOVER_STATE_SQL, INSPECT_SOURCE_CAPABILITIES_SQL, parseSourceCapabilities, parseCutoverProgress, parseBackupOperation, SOURCE_GUARD_COUNT, SOURCE_AUTH_TABLES } from "../../scripts/gcp/source-database-cutover.mjs";
 
 // Public Supabase Root 2021 CA fixture, not a private key or project credential.
 const CA = `-----BEGIN CERTIFICATE-----
@@ -35,6 +35,7 @@ o/bKiIz+Fq8=
 -----END CERTIFICATE-----
 `;
 const PRIVATE = "PRIVATE_FIXTURE_CANNOT_LOG";
+const CAPABILITIES = ["t", "f", "t", "t", "t", "t", "20", "20", "20", "20", ...Array(24).fill("t"), ...Array(5).fill(["t", "f"]).flat()].join("|");
 const ROW = { database_type: "PRIMARY", db_host: "aws-0-ap-northeast-1.pooler.supabase.com",
   db_user: `postgres.${SOURCE_REF}`, db_port: 6543, db_name: "postgres", pool_mode: "transaction",
   connection_string: PRIVATE };
@@ -51,6 +52,7 @@ async function fixture(t, overrides = {}) {
   const calls = [];
   const requests = [];
   let ageCalls = 0;
+  let inspections = 0;
   let schema = overrides.schema ?? false;
   let frozen = overrides.frozen ?? false;
   const deps = {
@@ -76,14 +78,30 @@ async function fixture(t, overrides = {}) {
         assert.equal(options.env.PGPASSWORD, undefined);
       } else if (command.endsWith("psql")) {
         const sql = args.at(-1);
+        assert.ok(args.includes("--set=VERBOSITY=sqlstate"));
         let result;
-        if (sql === PROBE_SQL) result = overrides.probe ?? "170011|t|t|t|t|t";
-        else if (sql === FREEZE_SOURCE_SQL) { schema = true; frozen = true; result = "t|23"; }
-        else if (sql === UNFREEZE_SOURCE_SQL) { frozen = false; result = "f|23"; }
+        if (sql === PROBE_SQL) {
+          assert.ok(args.includes("--quiet"));
+          assert.match(sql, /^BEGIN READ ONLY;/);
+          assert.match(sql, /SET LOCAL statement_timeout='10000';/);
+          assert.match(sql, /COMMIT;$/);
+          result = overrides.probe ?? "170011|t|t|t|t|t";
+        }
+        else if (sql === INSPECT_SOURCE_CAPABILITIES_SQL) result = overrides.capabilities ?? CAPABILITIES;
+        else if (sql === FREEZE_SOURCE_SQL) { schema = true; frozen = true; result = overrides.freezeResult ?? "t|26|20|6"; }
+        else if (sql === UNFREEZE_SOURCE_SQL) { frozen = false; result = "f|26|20|6"; }
         else if (sql === INSPECT_CUTOVER_SCHEMA_SQL) result = schema ? "t" : "f";
-        else if (sql === INSPECT_CUTOVER_STATE_SQL) result = `${frozen ? "t" : "f"}|${overrides.triggerCount ?? 23}`;
+        else if (sql === INSPECT_CUTOVER_STATE_SQL) {
+          result = overrides.inspectStates?.[inspections] ?? `${frozen ? "t" : "f"}|${overrides.triggerCount ?? 26}|${overrides.publicAlways ?? 20}|${overrides.authOrigin ?? 6}`;
+          inspections++;
+        }
         else throw new Error("Unexpected SQL");
-        source = sql === PROBE_SQL && overrides.probeError
+        if (sql === FREEZE_SOURCE_SQL && overrides.freezeError) {
+          schema = false; frozen = false; // Simulate transaction rollback.
+          source = `process.stdout.write(${JSON.stringify(overrides.freezeProgress ?? "mfmf-cutover:lock\n")}); process.stderr.write(${JSON.stringify(overrides.freezeError)}); process.exitCode=1;`;
+        } else if (sql === INSPECT_CUTOVER_STATE_SQL && inspections === overrides.inspectErrorAt) {
+          source = `process.stderr.write('ERROR: 55000 ${PRIVATE}'); process.exitCode=1;`;
+        } else source = sql === PROBE_SQL && overrides.probeError
           ? `process.stderr.write(${JSON.stringify(overrides.probeError)}); process.exitCode=1;`
           : `console.log(${JSON.stringify(result)});`;
       } else if (command.endsWith("pg_dump")) {
@@ -253,6 +271,7 @@ test("workflow has manual/main/production gates, ciphertext-only artifact and no
 test("freeze is explicit and includes the cutover schema in the single archive", async (t) => {
   const f = await fixture(t); const result = await f.run({ operation: "freeze-and-backup" });
   assert.equal(result.frozen, true); assert.equal(result.schemas, 3); assert.equal(f.frozen(), true);
+  assert.deepEqual(result.sourceGuardCounts,{total:26,publicAlways:20,authOrigin:6});
   assert.equal(f.calls.filter((call) => call.args.at(-1) === FREEZE_SOURCE_SQL).length, 1);
   assert.equal(f.calls.filter((call) => call.args.at(-1) === UNFREEZE_SOURCE_SQL).length, 0);
 });
@@ -266,7 +285,7 @@ test("unfreeze changes state only and does not run a dump or publish an archive"
   assert.equal(f.calls.filter((call) => call.command.endsWith("pg_dump") && call.args[0] !== "--version").length, 0);
   assert.deepEqual(await readdir(f.root), []); assert.equal(f.frozen(), false);
 });
-test("preserve of a previously frozen source includes guards and requires all 23 triggers", async (t) => {
+test("preserve of a previously frozen source includes guards and requires all 26 triggers and expected modes", async (t) => {
   const f = await fixture(t, { schema: true, frozen: true }); assert.equal((await f.run()).schemas, 3);
   await failsClean(await fixture(t, { schema: true, frozen: true, triggerCount: 21 }), {}, "cutover-inspect");
 });
@@ -278,13 +297,117 @@ test("event metadata permits only the three fixed operations", () => {
   }
 });
 
-test("source freeze includes MFA factor enrollment, mutation and removal in its fixed drain and ALWAYS guards",()=>{
-  assert.match(FREEZE_SOURCE_SQL,/LOCK TABLE [^;]*auth\.mfa_factors IN SHARE ROW EXCLUSIVE MODE/);
-  assert.match(FREEZE_SOURCE_SQL,/CREATE OR REPLACE TRIGGER mfmf_cutover_write_guard BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON auth\.mfa_factors/);
-  assert.match(FREEZE_SOURCE_SQL,/ALTER TABLE auth\.mfa_factors ENABLE ALWAYS TRIGGER mfmf_cutover_write_guard/);
-  assert.match(UNFREEZE_SOURCE_SQL,/\)\) <> 23 THEN/);
+test("source freeze protects six Auth credential tables using conditional ORIGIN guards",()=>{
+  assert.equal(SOURCE_GUARD_COUNT,26);
+  assert.equal(SOURCE_AUTH_TABLES.length,6);
+  for(const table of SOURCE_AUTH_TABLES){
+    assert.ok(FREEZE_SOURCE_SQL.includes(`ON ${table}`));
+    assert.ok(FREEZE_SOURCE_SQL.includes(table),"fixed table must be locked and guarded");
+    assert.ok(!FREEZE_SOURCE_SQL.includes(`ALTER TABLE ${table} ENABLE ALWAYS`),"do not require managed table ownership");
+  }
+  assert.match(FREEZE_SOURCE_SQL,/ALTER TABLE public\.daycare_records ENABLE ALWAYS TRIGGER mfmf_cutover_write_guard/);
 });
-test("preserve rejects a legacy 22-guard freeze missing MFA coverage",async(t)=>{
- const f=await fixture(t,{schema:true,frozen:true,triggerCount:22});
- await failsClean(f,{},"cutover-inspect");
+
+test("preserve rejects legacy guard totals or mismatched public/Auth modes",async(t)=>{
+ for(const wrong of [{triggerCount:22},{triggerCount:23},{triggerCount:25},{triggerCount:26,publicAlways:19},{triggerCount:26,authOrigin:5}]){
+  const f=await fixture(t,{schema:true,frozen:true,...wrong});
+  await failsClean(f,{},"cutover-inspect");
+ }
+});
+
+test("source catalog diagnostic is READ ONLY, fixed 26 relations and no user data", () => {
+  assert.match(INSPECT_SOURCE_CAPABILITIES_SQL, /^BEGIN READ ONLY;/);
+  assert.match(INSPECT_SOURCE_CAPABILITIES_SQL, /COMMIT;$/);
+  assert.doesNotMatch(INSPECT_SOURCE_CAPABILITIES_SQL, /(?:UPDATE|DELETE|TRUNCATE|INSERT|ALTER|GRANT)\s+(?:TABLE|INTO|public\.|auth\.)/);
+  assert.match(INSPECT_SOURCE_CAPABILITIES_SQL, /has_parameter_privilege\(oid,'session_replication_role','SET'\)/);
+  const parsed = parseSourceCapabilities(CAPABILITIES);
+  assert.equal(parsed.publicTables.owner, 20);
+  assert.equal(parsed.auth.mfaFactors.trigger, true);
+  assert.equal(parsed.replicationRoles.supabase_auth_admin.canSetReplicationRole, false);
+  for (const bad of [PRIVATE, CAPABILITIES.replace(/^t/, "f"), CAPABILITIES.replace("|20|", "|21|"), CAPABILITIES+"|t"]) {
+    assert.throws(()=>parseSourceCapabilities(bad), e=>!e.message.includes(PRIVATE));
+  }
+});
+test("capability diagnosis does not assert catalog ownership is a provider DDL hardgate", async(t) => {
+  const fields = CAPABILITIES.split("|"); fields[8]="19"; fields[11]="f"; fields[19]="f"; fields[20]="f";
+  const f=await fixture(t,{capabilities:fields.join("|")});
+  const result=await f.run({operation:"freeze-and-backup"});
+  assert.equal(result.sourceCapabilities.auth.users.owner,false);
+  assert.equal(result.sourceCapabilities.auth.mfaFactors.trigger,false);
+  assert.equal(result.frozen,true,"actual fixed DDL is decisive; Supautils can override catalog privileges");
+});
+test("preserve reports only bounded catalog capabilities without freeze statements",async(t)=>{
+  const f=await fixture(t), result=await f.run();
+  assert.deepEqual(result.sourceCapabilities,parseSourceCapabilities(CAPABILITIES));
+  assert.ok(!JSON.stringify(result).includes(PRIVATE));
+  assert.equal(f.calls.filter(c=>c.args.at(-1)===INSPECT_SOURCE_CAPABILITIES_SQL).length,1);
+  assert.equal(f.calls.filter(c=>[FREEZE_SOURCE_SQL,UNFREEZE_SOURCE_SQL].includes(c.args.at(-1))).length,0);
+});
+test("fixed SQLSTATE plus exact failed table/substage is reported without raw errors",async(t)=>{
+  for(const [code,reason] of [["25006","read-only-transaction"],["42501","insufficient-privilege"],["55P03","lock-timeout"],["57014","query-canceled"],["55000","source-invariant"],["42P01","relation-missing"],["42883","function-missing"],["0A000","unsupported-feature"]]){
+    const f=await fixture(t,{freezeError:`ERROR:  ${code} ${PRIVATE}`,freezeProgress:"mfmf-cutover:create-auth-mfa_factors\n"});
+    await assert.rejects(f.run({operation:"freeze-and-backup"}),e=>{
+      const d=diagnostic(e);assert.equal(d.stage,"source-freeze");assert.equal(d.substage,"create-auth-mfa_factors");assert.equal(d.sqlState,code);assert.equal(d.reason,reason);assert.deepEqual(d.sourceCapabilities,parseSourceCapabilities(CAPABILITIES));assert.ok(!JSON.stringify(d).includes(PRIVATE));return true;
+    });
+    assert.equal(f.frozen(),false);assert.equal(f.calls.filter(c=>c.args.at(-1)===UNFREEZE_SOURCE_SQL).length,0);
+    assert.deepEqual(await readdir(f.root),[]);
+  }
+  assert.equal(processSqlState(`ERROR: ${PRIVATE}`),undefined);
+  assert.equal(processSqlState("ERROR: ZZ999"),undefined);
+});
+test("cutover SQL explicitly establishes READ WRITE and reports fixed progress only",()=>{
+  for(const text of [FREEZE_SOURCE_SQL,UNFREEZE_SOURCE_SQL])assert.match(text,/^BEGIN READ WRITE;/);
+  const progress=parseCutoverProgress("mfmf-cutover:identity\nmfmf-cutover:create-auth-identities\nmfmf-cutover:inspect\nt|26|20|6");
+  assert.deepEqual(progress,{substage:"inspect",result:"t|26|20|6"});
+  assert.deepEqual(parseCutoverProgress(""),{substage:"transaction",result:undefined});
+  for(const bad of [PRIVATE,"mfmf-cutover:"+PRIVATE,"t|25|20|5","t|26|20|6\nmfmf-cutover:lock"])assert.throws(()=>parseCutoverProgress(bad),e=>!e.message.includes(PRIVATE));
+});
+test("unexpected capabilities or cutover stdout never escapes diagnostics",async(t)=>{
+  await failsClean(await fixture(t,{capabilities:PRIVATE}),{},"source-capabilities");
+  await failsClean(await fixture(t,{freezeError:`ERROR: 42501 ${PRIVATE}`,freezeProgress:PRIVATE}),{operation:"freeze-and-backup"},"source-freeze");
+});
+
+test("new Auth recovery/WebAuthn capability columns are retained without returning source data",()=>{
+ const fields=CAPABILITIES.split("|");fields[23]="f";fields[28]="f";fields[33]="f";
+ const parsed=parseSourceCapabilities(fields.join("|"));
+ assert.equal(parsed.auth.mfaRecoveryCodeSets.owner,false);
+ assert.equal(parsed.auth.mfaRecoveryCodes.trigger,false);
+ assert.equal(parsed.auth.webauthnCredentials.lock,false);
+ assert.equal(JSON.stringify(parsed).includes(PRIVATE),false);
+});
+test("malformed final guard report stops after freeze without automatic unfreeze",async(t)=>{
+ const f=await fixture(t,{schema:true,frozen:true,publicAlways:19});
+ await failsClean(f,{operation:"freeze-and-backup"},"cutover-inspect");
+ assert.equal(f.calls.filter(c=>c.args.at(-1)===UNFREEZE_SOURCE_SQL).length,0);
+});
+
+test("freeze cannot succeed with only total guards or an unexpected mode distribution",async(t)=>{
+ for(const freezeResult of ["t|26","t|26|19|7","t|26|20|5","t|23|20|3"]){
+  const f=await fixture(t,{freezeResult});
+  await failsClean(f,{operation:"freeze-and-backup"},"source-freeze");
+  assert.equal(f.calls.filter(c=>c.args.at(-1)===UNFREEZE_SOURCE_SQL).length,0);
+  assert.equal(f.calls.filter(c=>c.command.endsWith("pg_dump")&&c.args[0]!=="--version").length,0);
+ }
+});
+test("frozen and unfrozen existing guards repeat the complete inspection after dump before publish",async(t)=>{
+ for(const frozen of [true,false]){
+  const f=await fixture(t,{schema:true,frozen});const result=await f.run();
+  assert.equal(result.frozen,frozen);
+  const positions=f.calls.map((c,i)=>c.args.at(-1)===INSPECT_CUTOVER_STATE_SQL?i:-1).filter(i=>i>=0);
+  const dump=f.calls.findIndex(c=>c.command.endsWith("pg_dump")&&c.args[0]!=="--version");
+  assert.equal(positions.length,2);assert.ok(positions[0]<dump&&positions[1]>dump);
+ }
+});
+test("post-dump state, guard mode, or conditional safety drift prevents artifact publication",async(t)=>{
+ for(const override of [
+  {inspectStates:["t|26|20|6","f|26|20|6"]},
+  {inspectStates:["t|26|20|6","t|26|19|6"]},
+  {inspectErrorAt:2},
+ ]){
+  const f=await fixture(t,{schema:true,frozen:true,...override});
+  await failsClean(f,{},"cutover-inspect");
+  assert.equal(f.calls.filter(c=>c.args.at(-1)===INSPECT_CUTOVER_STATE_SQL).length,2);
+  assert.equal(f.calls.filter(c=>c.command.endsWith("pg_dump")&&c.args[0]!=="--version").length,1);
+  assert.equal(f.calls.filter(c=>c.args.at(-1)===UNFREEZE_SOURCE_SQL).length,0);
+ }
 });

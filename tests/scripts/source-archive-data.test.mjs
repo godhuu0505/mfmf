@@ -12,6 +12,12 @@ const user={id:ID,email:"fixture@example.test",role:"authenticated",aud:"authent
  deleted_at:null,phone:null,phone_confirmed_at:null,created_at:AT,updated_at:AT,email_confirmed_at:AT,last_sign_in_at:null,
  encrypted_password:HASH,banned_until:null,raw_user_meta_data:{tos_accepted_at:"2026-10-28T00:00:00Z"},raw_app_meta_data:{provider:"email",providers:["email"]}};
 const identity={id:"80000000-0000-4000-8000-000000000002",user_id:ID,provider:"email",provider_id:ID,identity_data:{sub:ID,email:user.email,email_verified:true},created_at:AT,updated_at:AT};
+const UNSUPPORTED=["mfa_factors","mfa_challenges","mfa_recovery_code_sets","mfa_recovery_codes","webauthn_credentials",
+ "webauthn_challenges","custom_oauth_providers","oauth_clients","oauth_authorizations","oauth_consents","oauth_client_states",
+ "scim_users","scim_tokens","sso_providers","sso_domains","saml_providers","saml_relay_states","instances"];
+const DISCARDED=["sessions","refresh_tokens","flow_state","mfa_amr_claims","one_time_tokens","audit_log_entries","schema_migrations"];
+const AUTH_COLUMNS={users:Object.keys(user),identities:Object.keys(identity),mfa_factors:["id","user_id","factor_type","status"],
+ ...Object.fromEntries([...UNSUPPORTED.filter(name=>name!=="mfa_factors"),...DISCARDED].map(name=>[name,["id"]]))};
 function escape(value){
  if(value===null)return "\\N";
  if(typeof value==="boolean")return value?"t":"f";
@@ -19,13 +25,16 @@ function escape(value){
  return String(value).replace(/\\/g,"\\\\").replace(/\x08/g,"\\b").replace(/\t/g,"\\t").replace(/\n/g,"\\n").replace(/\r/g,"\\r");
 }
 function copy(schema,table,columns,rows=[]){return `COPY "${schema}"."${table}" (${columns.map(name=>`"${name}"`).join(", ")}) FROM stdin;\n${rows.map(row=>columns.map(column=>escape(row[column])).join("\t")+"\n").join("")}\\.\n`;}
-function fixture({tableRows={},users=[user],identities=[identity],mfa=[],extra=""}={}){
+function fixture({tableRows={},users=[user],identities=[identity],mfa=[],authRows={},extra=""}={}){
  let sql="-- PostgreSQL database dump\nSET statement_timeout = 0;\nSET client_encoding = 'UTF8';\nSET standard_conforming_strings = on;\nSELECT pg_catalog.set_config('search_path', '', false);\n\n";
  for(const [name,columns] of Object.entries(COLUMNS))sql+=copy("public",name,columns,tableRows[name]??[])+"\n";
  sql+=copy("public","media_storage_state",["singleton","mode","read_backend"],[{singleton:true,mode:"frozen",read_backend:"gcs"}]);
  sql+=copy("auth","users",Object.keys(user),users);
  sql+=copy("auth","identities",Object.keys(identity),identities);
  sql+=copy("auth","mfa_factors",["id","user_id","factor_type","status"],mfa);
+ for(const [table,columns] of Object.entries(AUTH_COLUMNS)){
+  if(!["users","identities","mfa_factors"].includes(table))sql+=copy("auth",table,columns,authRows[table]??[]);
+ }
  return sql+extra+"-- PostgreSQL database dump complete\n";
 }
 const parse=(sql)=>parseSourceArchiveData(Buffer.from(sql));
@@ -59,13 +68,42 @@ test("parser feeds converter and exact operator bundle contract without SQL exec
  assert.equal(validateBundle(bundle),bundle);
 });
 test("discarded auth session/token tables are structurally checked but never returned",()=>{
- const result=parse(fixture({extra:copy("auth","sessions",["id","refresh_token"],[{id:ID,refresh_token:PRIVATE}])}));
+ const result=parse(fixture({authRows:{sessions:[{id:PRIVATE}]}}));
  assert.equal(JSON.stringify(result).includes(PRIVATE),false);assert.equal(result.sessions,undefined);
 });
-test("nonempty MFA is retained for converter rejection, never silently omitted",()=>{
- const result=parse(fixture({mfa:[{id:ID,user_id:ID,factor_type:"totp",status:"verified"}]}));
- assert.equal(result.mfaFactors.length,1);
- assert.throws(()=>convertIdentityImport({users:result.users,identities:result.identities,mfaFactors:result.mfaFactors,targetUsers:[]}),error=>error.code==="mfa_present");
+test("nonempty MFA is rejected during archive parsing before any converter payload",()=>{
+ rejects(fixture({mfa:[{id:ID,user_id:ID,factor_type:"totp",status:"verified"}]}));
+ assert.deepEqual(parse(fixture()).mfaFactors,[]);
+});
+test("fixed inventory covers 27 tables with 18 empty-required tables",()=>{
+ assert.equal(Object.keys(AUTH_COLUMNS).length,27);assert.equal(UNSUPPORTED.length,18);
+});
+for(const table of UNSUPPORTED)test(`archive rejects any row in unsupported auth ${table}`,()=>{
+ const empty=copy("auth",table,AUTH_COLUMNS[table]);
+ for(const marker of [PRIVATE,null])rejects(fixture().replace(empty,copy("auth",table,AUTH_COLUMNS[table],
+  [Object.fromEntries(AUTH_COLUMNS[table].map(column=>[column,marker]))])));
+});
+for(const table of DISCARDED)test(`explicit archive-only auth ${table} may be nonempty but never returned`,()=>{
+ const parsed=parse(fixture({authRows:{[table]:[{id:PRIVATE},{id:null}]}}));
+ assert.equal(JSON.stringify(parsed).includes(PRIVATE),false);assert.equal(Object.hasOwn(parsed,table),false);
+});
+for(const [table,columns] of Object.entries(AUTH_COLUMNS)){
+ test(`archive requires auth ${table} COPY even when empty`,()=>{
+  const base=fixture({users:[],identities:[]});rejects(base.replace(copy("auth",table,columns),""));
+ });
+ test(`archive rejects duplicate auth ${table} COPY`,()=>rejects(fixture()+copy("auth",table,columns)));
+}
+test("unknown auth tables are refused whether empty or populated",()=>{
+ for(const table of ["future_credential","sso_sessions"]){
+  rejects(fixture()+copy("auth",table,["id"]));rejects(fixture()+copy("auth",table,["id"],[{id:PRIVATE}]));
+ }
+});
+test("nonzero transient and migration-history inventories do not imply unsupported credentials",()=>{
+ const counts={sessions:6,refresh_tokens:47,flow_state:12,mfa_amr_claims:6,schema_migrations:82};
+ const authRows=Object.fromEntries(Object.entries(counts).map(([table,count])=>[table,Array.from({length:count},()=>({id:PRIVATE}))]));
+ const parsed=parse(fixture({authRows}));
+ const converted=convertIdentityImport({users:parsed.users,identities:parsed.identities,mfaFactors:parsed.mfaFactors,targetUsers:[]});
+ assert.equal(converted.summary.users,1);assert.equal(JSON.stringify(parsed).includes(PRIVATE),false);
 });
 test("paired pg_dump restrict metadata is inert and matched",()=>{
  const result=parse("\\restrict Abc123\n"+fixture()+"\\unrestrict Abc123\n");assert.equal(result.users.length,1);
@@ -95,9 +133,9 @@ for(const [name,mutate] of [
  ["extra column",s=>s.replace(copy("public","profiles",COLUMNS.profiles),copy("public","profiles",[...COLUMNS.profiles,"secret"]))],
  ["missing column",s=>s.replace(copy("public","profiles",COLUMNS.profiles),copy("public","profiles",COLUMNS.profiles.slice(1)))],
  ["duplicate column",s=>s.replace(copy("public","profiles",COLUMNS.profiles),copy("public","profiles",[...COLUMNS.profiles.slice(1),"display_name"]))],
- ["missing copy end",s=>s+`COPY "auth"."sessions" ("id") FROM stdin;\n${PRIVATE}\n`],
- ["wrong field count",s=>s+`COPY "auth"."sessions" ("id") FROM stdin;\n${PRIVATE}\textra\n\\.\n`],
- ["escape out of copy",s=>s+`COPY "auth"."sessions" ("id") FROM stdin;\n\\.\nDROP TABLE ${PRIVATE};\n`],
+ ["missing copy end",s=>s.replace(copy("auth","sessions",["id"]),`COPY "auth"."sessions" ("id") FROM stdin;\n${PRIVATE}\n`)],
+ ["wrong field count",s=>s.replace(copy("auth","sessions",["id"]),`COPY "auth"."sessions" ("id") FROM stdin;\n${PRIVATE}\textra\n\\.\n`)],
+ ["escape out of copy",s=>s.replace(copy("auth","sessions",["id"]),`COPY "auth"."sessions" ("id") FROM stdin;\n\\.\nDROP TABLE ${PRIVATE};\n`)],
  ["wrong bool",s=>s.replace("t\tfrozen\tgcs","yes\tfrozen\tgcs")],
  ["wrong state",s=>s.replace("t\tfrozen\tgcs","t\tunknown\tgcs")],
  ["bad auth JSON",s=>s.replace(escape(user.raw_app_meta_data),"{"+PRIVATE)],
@@ -106,15 +144,15 @@ test("invalid UTF8, NUL, missing bytes and input overflow are rejected",()=>{
  for(const input of [Buffer.from([0xff]),Buffer.concat([Buffer.from(fixture()),Buffer.from([0])]),Buffer.alloc(0),Buffer.alloc(64*1024*1024+1)])rejects(input);
 });
 test("discarded rows still count against the 50000 row bound",()=>{
- rejects(fixture({extra:`COPY "auth"."sessions" ("id") FROM stdin;\n${"x\n".repeat(50000)}\\.\n`}));
+ rejects(fixture().replace(copy("auth","sessions",["id"]),`COPY "auth"."sessions" ("id") FROM stdin;\n${"x\n".repeat(50000)}\\.\n`));
 });
 
 test("the single ignored auth refresh-token sequence is inert, bounded and requires its COPY",()=>{
  const sequence='SELECT pg_catalog.setval(\'"auth"."refresh_tokens_id_seq"\', 9223372036854775807, true);\n';
- const ignored=copy("auth","refresh_tokens",["id","token"]);
- assert.equal(parse(fixture({extra:ignored+sequence})).users.length,1);
- for(const extra of [sequence,ignored+sequence+sequence,ignored+sequence.replace("refresh_tokens_id_seq","users_id_seq"),
-  ignored+sequence.replace("9223372036854775807","9223372036854775808"),ignored+sequence.replace("9223372036854775807","(SELECT 1)")])rejects(fixture({extra}));
+ assert.equal(parse(fixture({extra:sequence})).users.length,1);
+ rejects(sequence+fixture());
+ for(const extra of [sequence+sequence,sequence.replace("refresh_tokens_id_seq","users_id_seq"),
+  sequence.replace("9223372036854775807","9223372036854775808"),sequence.replace("9223372036854775807","(SELECT 1)")])rejects(fixture({extra}));
 });
 test("JSON numeric precision is preserved or explicitly refused",()=>{
  const base=fixture();

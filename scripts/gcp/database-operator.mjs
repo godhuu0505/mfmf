@@ -15,7 +15,7 @@ export const INSTANCE = `${PROJECT}:asia-northeast1:mfmf-db`;
 export const BUCKET = `${PROJECT}-db-migration`;
 export const SOURCE = "aqvmuhqkaqedtxuqwhoq";
 export const FORMAT = "mfmf-gcp-import-v1";
-export const OPERATIONS = Object.freeze(["bootstrap", "inspect", "migrate", "restore-test", "upgrade", "activate", "freeze"]);
+export const OPERATIONS = Object.freeze(["bootstrap", "inspect", "migrate", "restore-test", "verify-import", "upgrade", "activate", "freeze"]);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SOCKETS = "/tmp/mfmf-db-operator-sockets";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -24,9 +24,27 @@ const GENERATION = /^[1-9][0-9]{0,19}$/;
 const PASSWORD = /^[A-Za-z0-9_-]{32,128}$/;
 const LIMIT = 64 * 1024 * 1024;
 const BASE = Object.freeze({ PATH: "/usr/local/bin:/usr/bin:/bin", LANG: "C.UTF-8" });
-const STAGES = new Set(["context", "metadata", "source-contract", "connector", "credentials", "connect", "bootstrap", "bundle", "import", "inspect", "upgrade", "restore-test", "activate", "freeze", "cleanup"]);
+const STAGES = new Set(["context", "metadata", "source-contract", "connector", "credentials", "connect", "bootstrap", "bundle", "import", "inspect", "upgrade", "restore-test", "verify-import", "activate", "freeze", "cleanup"]);
+const BOOTSTRAP_SUBSTAGES = new Set(["catalog", "roles", "baseline", "ledger", "password", "commit"]);
+const CATALOG_REASONS = Object.freeze({database_owner:"database-owner",public_owner:"public-owner",schemas:"schemas",
+  public_objects:"public-objects",extensions:"extensions",event_triggers:"event-triggers",existing_app_roles:"existing-app-roles"});
+const DATABASE_OWNER_CLASSES = new Set(["postgres","cloudsqladmin","cloudsqlsuperuser","pg_database_owner","other","missing"]);
+const SQLSTATE = /^[0-9A-Z]{5}$/;
+function databaseDiagnostic(value) {
+  return value && typeof value==="object" && ["targetDatabase","adminUser","utf8"].every(key=>typeof value[key]==="boolean")
+    && DATABASE_OWNER_CLASSES.has(value.owner)
+    ? {targetDatabase:value.targetDatabase,adminUser:value.adminUser,owner:value.owner,utf8:value.utf8}:undefined;
+}
 export class OperatorError extends Error {
-  constructor(stage) { super("Database operator failed; details withheld."); this.stage = STAGES.has(stage) ? stage : "context"; }
+  constructor(stage,details={}) {
+    super("Database operator failed; details withheld."); this.stage = STAGES.has(stage) ? stage : "context";
+    if(this.stage==="bootstrap") {
+      if(BOOTSTRAP_SUBSTAGES.has(details.substage))this.substage=details.substage;
+      if(typeof details.sqlstate==="string" && SQLSTATE.test(details.sqlstate))this.sqlstate=details.sqlstate;
+      if(Array.isArray(details.reasons))this.reasons=Object.values(CATALOG_REASONS).filter(reason=>details.reasons.includes(reason));
+      if(this.substage==="catalog") {const database=databaseDiagnostic(details.database);if(database)this.database=database;}
+    }
+  }
 }
 const requireValue = (ok, stage) => { if (!ok) throw new OperatorError(stage); };
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -34,7 +52,19 @@ const object = (value) => value && typeof value === "object" && !Array.isArray(v
 function keys(value, expected) {
   return object(value) && Object.keys(value).sort().join("\0") === [...expected].sort().join("\0");
 }
-export function diagnostic(error) { return { status: "failed", stage: error instanceof OperatorError ? error.stage : "context" }; }
+export function diagnostic(error) {
+  const result={status:"failed",stage:error instanceof OperatorError && STAGES.has(error.stage)?error.stage:"context"};
+  if(result.stage==="bootstrap") {
+    if(BOOTSTRAP_SUBSTAGES.has(error.substage))result.substage=error.substage;
+    if(typeof error.sqlstate==="string" && SQLSTATE.test(error.sqlstate))result.sqlstate=error.sqlstate;
+    if(error.substage==="catalog" && Array.isArray(error.reasons)) {
+      const reasons=Object.values(CATALOG_REASONS).filter(reason=>error.reasons.includes(reason));
+      if(reasons.length)result.reasons=reasons;
+    }
+    if(error.substage==="catalog") {const database=databaseDiagnostic(error.database);if(database)result.database=database;}
+  }
+  return result;
+}
 
 // Every column must be present, including nulls. Missing columns cannot silently
 // receive a new timestamp/default. The runner compares this list to the baseline.
@@ -87,7 +117,7 @@ export function validateContext(env) {
   if (env.MFMF_DB_OPERATION === "bootstrap") requireValue(PASSWORD.test(env.MFMF_DATABASE_PASSWORD ?? ""), "credentials");
   if (env.MFMF_DB_OPERATION === "upgrade") requireValue(/^[0-9a-f]{40}$/.test(env.MFMF_DB_DEPLOY_SHA ?? ""), "context");
   if (["activate","freeze"].includes(env.MFMF_DB_OPERATION)) requireValue(SHA.test(env.MFMF_DB_BUNDLE_SHA256 ?? ""),"context");
-  if (["migrate", "restore-test"].includes(env.MFMF_DB_OPERATION)) {
+  if (["migrate", "restore-test", "verify-import"].includes(env.MFMF_DB_OPERATION)) {
     requireValue(SHA.test(env.MFMF_DB_BUNDLE_SHA256 ?? "") && GENERATION.test(env.MFMF_DB_BUNDLE_GENERATION ?? ""), "bundle");
     parseImportIdentity(env.MFMF_DB_IMPORT_IDENTITY);
   }
@@ -261,6 +291,44 @@ export async function importBundle(client,bundle,sha,contract) {
   });
 }
 
+// Counts reject missing/extra rows; typed equality catches changed cells even
+// when the row count and key remain unchanged. No row values are returned.
+async function compareBundleRows(client,bundle,stage) {
+  const actual=await counts(client);
+  requireValue(Object.keys(actual).every(name=>actual[name]===bundle.expected.counts[name]),stage);
+  for(const [name,columns,rows] of [["auth.users",AUTH_COLUMNS,bundle.authMirror],...TABLES.map(name=>[`public.${name}`,COLUMNS[name],bundle.tables[name]])]) {
+    for(const row of rows) {
+      const conditions=columns.map((column,index)=>`${column} IS NOT DISTINCT FROM $${index+1}`).join(" AND ");
+      const found=(await client.query(`SELECT count(*)::int n FROM ${name} WHERE ${conditions}`,columns.map(column=>row[column]))).rows[0].n;
+      requireValue(found===1,stage);
+    }
+  }
+  return actual;
+}
+
+export async function verifyImport(client,bundle,sha,contract) {
+  validateBundle(bundle);requireValue(SHA.test(sha),"bundle");
+  let locked=false;
+  try {
+    // Acquire before taking the repeatable-read snapshot. Otherwise a wait on
+    // another operation could leave verification using a pre-lock snapshot.
+    await client.query("SELECT pg_advisory_lock(1296451151,1)");locked=true;
+    await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL ROLE mfmf_owner; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='60s';");
+    try {
+      await baselineGate(client,contract);
+      const imports=(await client.query("SELECT sha256 FROM migration_admin.imports WHERE singleton")).rows;
+      requireValue(imports.length===1 && imports[0].sha256===sha,"verify-import");
+      const state=(await client.query("SELECT mode,read_backend FROM public.media_storage_state WHERE singleton")).rows;
+      requireValue(state.length===1 && state[0].mode==="frozen" && state[0].read_backend==="gcs" && (await writeGate(client)).frozen,"verify-import");
+      await verifyMedia(client);
+      const actual=await compareBundleRows(client,bundle,"verify-import");
+      await client.query("COMMIT");
+      return {comparison:"all-rows-compared",counts:actual,databaseWrites:"frozen",mediaWrites:"frozen",readBackend:"gcs",readOnly:true};
+    }catch(error){await client.query("ROLLBACK").catch(()=>{});throw error;}
+  }catch(error){throw error instanceof OperatorError?error:new OperatorError("verify-import");}
+  finally{if(locked){try{await client.query("SELECT pg_advisory_unlock(1296451151,1)");}catch{throw new OperatorError("verify-import");}}}
+}
+
 async function verifyMedia(client,allowPending=false) {
   const problems=(await client.query(`SELECT (
     (SELECT count(*) FROM public.record_photos p LEFT JOIN public.media_assets a ON a.id=p.media_asset_id
@@ -359,32 +427,67 @@ export async function setMediaMode(client,contract,sha,desired) {
 }
 
 export async function applyBaseline(admin,contract,root,credentials,runtimePassword) {
-  await admin.query("BEGIN; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='60s';");
+  let substage="catalog",databaseOwnerNormalized=false;
   try {
+    await admin.query("BEGIN; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='60s';");
     await admin.query(LOCK);
-    // SQLAdmin may have provisioned the fixed database already. Accept only a
-    // pristine postgres-owned database, never reset existing objects or roles.
-    const catalog=(await admin.query(`SELECT (
+    // Recheck the complete original gate after any narrowly authorized owner
+    // normalization. Never reset or reuse existing application objects/roles.
+    const readCatalog=async()=>(await admin.query(`WITH checks AS (SELECT
+      current_database()='mfmf' AS target_database_matches,
+      current_user='postgres' AS admin_user_matches,
+      EXISTS (SELECT 1 FROM pg_database WHERE datname=current_database()
+        AND pg_encoding_to_char(encoding)='UTF8') AS encoding_utf8,
+      COALESCE((SELECT CASE r.rolname WHEN 'postgres' THEN 'postgres' WHEN 'cloudsqladmin' THEN 'cloudsqladmin'
+        WHEN 'cloudsqlsuperuser' THEN 'cloudsqlsuperuser' WHEN 'pg_database_owner' THEN 'pg_database_owner' ELSE 'other' END
+        FROM pg_database d JOIN pg_roles r ON r.oid=d.datdba WHERE d.datname=current_database()),'missing') AS database_owner_class,
+      (
       current_database()='mfmf' AND current_user='postgres'
       AND EXISTS (SELECT 1 FROM pg_database d JOIN pg_roles r ON r.oid=d.datdba
         WHERE d.datname=current_database() AND r.rolname='postgres' AND pg_encoding_to_char(d.encoding)='UTF8')
-      AND EXISTS (SELECT 1 FROM pg_namespace n JOIN pg_roles r ON r.oid=n.nspowner
-        WHERE n.nspname='public' AND r.rolname IN ('postgres','pg_database_owner'))
-      AND NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname NOT IN ('public','information_schema') AND nspname !~ '^pg_')
-      AND NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public')
+      ) AS database_owner,
+      EXISTS (SELECT 1 FROM pg_namespace n JOIN pg_roles r ON r.oid=n.nspowner
+        WHERE n.nspname='public' AND r.rolname IN ('postgres','pg_database_owner')) AS public_owner,
+      NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname NOT IN ('public','information_schema') AND nspname !~ '^pg_') AS schemas,
+      (NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public')
       AND NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public')
-      AND NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public')
-      AND NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname<>'plpgsql')
-      AND NOT EXISTS (SELECT 1 FROM pg_event_trigger)
-      AND NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN
-        ('mfmf_owner','anon','authenticated','identity_sync','media_operator','authenticator','mfmf_migrator','mfmf_operator'))
-    ) AS pristine`)).rows;
-    requireValue(catalog.length===1 && catalog[0].pristine===true,"bootstrap");
+      AND NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public')) AS public_objects,
+      NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname<>'plpgsql') AS extensions,
+      NOT EXISTS (SELECT 1 FROM pg_event_trigger) AS event_triggers,
+      NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN
+        ('mfmf_owner','anon','authenticated','identity_sync','media_operator','authenticator','mfmf_migrator','mfmf_operator')) AS existing_app_roles
+    ) SELECT *, (database_owner AND public_owner AND schemas AND public_objects AND extensions AND event_triggers AND existing_app_roles) AS pristine FROM checks`)).rows;
+    let catalog=await readCatalog();
+    const managed=catalog.length===1&&catalog[0].pristine===false&&catalog[0].database_owner===false
+      &&catalog[0].target_database_matches===true&&catalog[0].admin_user_matches===true&&catalog[0].encoding_utf8===true
+      &&catalog[0].database_owner_class==="cloudsqlsuperuser"
+      &&Object.keys(CATALOG_REASONS).filter(key=>key!=="database_owner").every(key=>catalog[0][key]===true);
+    if(managed) {
+      const privileges=(await admin.query(`SELECT pg_has_role(current_user,'cloudsqlsuperuser','MEMBER') AS owner_member,
+        pg_has_role(current_user,'cloudsqlsuperuser','USAGE') AS owner_usage,
+        EXISTS(SELECT 1 FROM pg_roles WHERE rolname=current_user AND rolcreatedb) AS can_create_database`)).rows;
+      if(privileges.length===1&&privileges[0].owner_member===true&&privileges[0].owner_usage===true
+        &&privileges[0].can_create_database===true) {
+        await admin.query("ALTER DATABASE mfmf OWNER TO postgres");
+        databaseOwnerNormalized=true;catalog=await readCatalog();
+      }
+    }
+    if(catalog.length!==1 || catalog[0].pristine!==true
+      || Object.keys(CATALOG_REASONS).some(key=>catalog[0][key]!==true)) {
+      throw new OperatorError("bootstrap",{substage,reasons:catalog.length===1
+        ? Object.entries(CATALOG_REASONS).filter(([key])=>catalog[0][key]===false).map(([,reason])=>reason):[],
+        database:catalog.length===1?{targetDatabase:catalog[0].target_database_matches,adminUser:catalog[0].admin_user_matches,
+          owner:catalog[0].database_owner_class,utf8:catalog[0].encoding_utf8}:undefined});
+    }
+    substage="roles";
     await admin.query(await readFile(join(root,"db/gcp/000_roles.sql"),"utf8"));
+    substage="baseline";
     await admin.query("SET LOCAL ROLE mfmf_owner");
     await admin.query(contract.baseline);
+    substage="ledger";
     await admin.query(LEDGER_SQL);
     await admin.query("INSERT INTO migration_admin.history(name,sha256) VALUES('baseline',$1)",[contract.baselineHash]);
+    substage="password";
     await admin.query("RESET ROLE");
     // Values travel as parameters and transaction-local settings, never argv,
     // files or application logs. SQL identifiers are fixed, not input strings.
@@ -392,8 +495,14 @@ export async function applyBaseline(admin,contract,root,credentials,runtimePassw
       await admin.query("SELECT set_config('mfmf.bootstrap_password',$1,true)",[password]);
       await admin.query(`DO $$ BEGIN EXECUTE format('ALTER ROLE ${role} PASSWORD %L',current_setting('mfmf.bootstrap_password')); END $$;`);
     }
+    substage="commit";
     await admin.query("COMMIT");
-  } catch {await admin.query("ROLLBACK").catch(()=>{});throw new OperatorError("bootstrap");}
+    return {databaseOwnerNormalized};
+  } catch(error) {
+    await admin.query("ROLLBACK").catch(()=>{});
+    if(error instanceof OperatorError)throw error;
+    throw new OperatorError("bootstrap",{substage,sqlstate:error?.code});
+  }
 }
 
 async function restoredDatabase(admin,connect,contract,bundle,sha,root) {
@@ -448,17 +557,7 @@ async function restoredDatabase(admin,connect,contract,bundle,sha,root) {
     client=await connect("mfmf_migrator",database);
     await transaction(client,async()=>client.query("UPDATE migration_admin.write_state SET frozen=true WHERE singleton"));
     const restored=await importBundle(client,bundle,sha,contract);
-    // Compare source-preserving JSON values, not only row counts. PostgreSQL
-    // typed normalization is checked against the same input by IS NOT DISTINCT.
-    await transaction(client,async()=> {
-      for(const [name,columns,rows] of [["auth.users",AUTH_COLUMNS,bundle.authMirror],...TABLES.map(name=>[`public.${name}`,COLUMNS[name],bundle.tables[name]])]) {
-        for(const row of rows) {
-          const conditions=columns.map((column,index)=>`${column} IS NOT DISTINCT FROM $${index+1}`).join(" AND ");
-          const found=(await client.query(`SELECT count(*)::int n FROM ${name} WHERE ${conditions}`,columns.map(column=>row[column]))).rows[0].n;
-          requireValue(found===1,"restore-test");
-        }
-      }
-    });
+    await transaction(client,async()=>compareBundleRows(client,bundle,"restore-test"));
     await client.end();client=null;
     return {...restored,restore:"all-rows-compared",assertions,temporaryDatabaseRemoved:true};
   } finally {
@@ -508,8 +607,8 @@ export async function runOperator({env=process.env,fetchImpl=fetch,spawnImpl=spa
       if(databases===0)await client.query("CREATE DATABASE mfmf");
       await client.end();clients=clients.filter(item=>item!==client);
       client=await connect("postgres");
-      await applyBaseline(client,contract,root,credentials,env.MFMF_DATABASE_PASSWORD);
-      result={baseline:"applied",mediaWrites:"frozen",readBackend:"gcs"};
+      const owner=await applyBaseline(client,contract,root,credentials,env.MFMF_DATABASE_PASSWORD);
+      result={baseline:"applied",mediaWrites:"frozen",readBackend:"gcs",...owner};
     }else if(operation==="inspect")result=await inspect(client,contract);
     else if(operation==="activate"||operation==="freeze")result=await setMediaMode(client,contract,env.MFMF_DB_BUNDLE_SHA256,operation==="activate"?"gcs":"frozen");
     else if(operation==="upgrade") {
@@ -521,6 +620,7 @@ export async function runOperator({env=process.env,fetchImpl=fetch,spawnImpl=spa
       stage="bundle";const bundle=await bundleImpl(env,token,fetchImpl,spawnImpl);
       stage=operation;
       result=operation==="migrate"?await importBundle(client,bundle,env.MFMF_DB_BUNDLE_SHA256,contract)
+        :operation==="verify-import"?await verifyImport(client,bundle,env.MFMF_DB_BUNDLE_SHA256,contract)
         :await restoredDatabase(client,connect,contract,bundle,env.MFMF_DB_BUNDLE_SHA256,root);
     }
     return {status:"verified",operation,...result};

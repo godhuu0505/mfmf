@@ -1,7 +1,8 @@
 name: Deploy Production
 
 # main にマージ（push）されたら、CI 緑を確認したうえで
-# Supabase migration を本番に適用し、Vercel の Production 環境へデプロイする。
+# GCPモードではCloud SQLのupgrade後にCloud Runへ配信する。
+# 旧Supabase migration / Vercel配信はfalseモード限定。
 # 「merge = 本番リリース」。Release 公開ゲートは設けない。
 on:
   push:
@@ -158,7 +159,8 @@ jobs:
       - name: Deploy prebuilt to Vercel (production)
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
-  # 移行期間は Vercel も継続。未設定 / false の間は認証もビルドも実行しない。
+  # GCP_DEPLOY_ENABLED が未設定 / false の間は認証もビルドも実行しない。
+  # GCP_AUTH_ENABLED=true は旧Supabase/Vercelを経由せず、固定DB Jobを検証して配信する。
   deploy-cloud-run:
     name: Cloud Run Production (opt-in)
     needs: [verify, check-secrets, migrate]

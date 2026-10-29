@@ -63,7 +63,7 @@ test("a legacy running service cannot implicitly become GCP mode", async () => {
   assert.equal(calls, 1); assert.equal(prepared, false); assert.equal(upgraded, false);
 });
 
-function deploymentFixture({ upgradeFailure = false, servingLegacy = false } = {}) {
+function deploymentFixture({ upgradeFailure = false, servingLegacy = false, smokeFailure } = {}) {
   const API = `https://run.googleapis.com/v2/${SERVICE_NAME}`;
   const old = "mfmf-candidate-old";
   const next = `mfmf-candidate-${env.GITHUB_SHA.slice(0, 12)}-123-1`;
@@ -84,12 +84,17 @@ function deploymentFixture({ upgradeFailure = false, servingLegacy = false } = {
   const events = [];
   const fetchImpl = async (url, options = {}) => {
     if ([PUBLIC_ORIGIN, tagged].includes(new URL(url).origin)) {
+      const promoted = state.traffic.length === 1 && state.traffic[0].revision === next;
+      if (url.endsWith("/login") && ((smokeFailure === "staged" && new URL(url).origin === tagged)
+        || (smokeFailure === "promoted" && new URL(url).origin === PUBLIC_ORIGIN && promoted))) {
+        return new Response("fixture failure", { status: 503 });
+      }
       return url.endsWith("/login") ? new Response("fixture", { status: 200 }) : new Response(null, { status: 307, headers: { location: "/login" } });
     }
     if (options.method === "PATCH") {
       events.push("patch"); const patch = JSON.parse(options.body); assert.equal(patch.etag, state.etag);
       if (patch.template) { Object.assign(state.template, patch.template); state.latestCreatedRevision = `${SERVICE_NAME}/revisions/${next}`; }
-      else state.latestReadyRevision = `${SERVICE_NAME}/revisions/${next}`;
+      else state.latestReadyRevision = `${SERVICE_NAME}/revisions/${patch.traffic.find(item => item.percent === 100).revision}`;
       state.traffic = patch.traffic; state.trafficStatuses = patch.traffic.map((item) => item.tag ? { ...item, uri: tagged } : item);
       state.etag = `etag${events.length}`; return Response.json({ name: "accepted" });
     }
@@ -119,4 +124,13 @@ test("failed upgrade prevents all service writes", async () => {
 test("a GCP template with a legacy serving revision cannot trigger migration", async () => {
   const f = deploymentFixture({ servingLegacy: true }); await assert.rejects(f.run(), /cannot change authentication mode/);
   assert.deepEqual(f.events, []);
+});
+for (const smokeFailure of ["staged", "promoted"]) test(`GCP ${smokeFailure} smoke failure restores old traffic and removes the tag`, async () => {
+  const f = deploymentFixture({ smokeFailure });
+  await assert.rejects(f.run(), smokeFailure === "staged" ? /Staging failed; the previous healthy revision/ : /traffic was restored to the previous healthy revision/);
+  assert.deepEqual(f.state.traffic, [{ type: "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION", revision: "mfmf-candidate-old", percent: 100 }]);
+  assert.deepEqual(f.state.trafficStatuses, f.state.traffic);
+  assert.deepEqual(f.events, smokeFailure === "staged" ? ["prepare", "upgrade", "patch", "patch"] : ["prepare", "upgrade", "patch", "patch", "patch"]);
+  assert.deepEqual(f.state.template.vpcAccess, DATABASE_VPC);
+  assert.equal(f.state.template.containers[0].resources.limits.memory, "1Gi");
 });
