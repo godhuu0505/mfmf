@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import CareSummaryRangePreset from "@/components/CareSummaryRangePreset";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/household";
@@ -109,7 +110,7 @@ export default async function CareSummaryPage({ searchParams }: { searchParams: 
           <label className="space-y-2 text-sm font-medium">終了日<input className={inputClass} type="date" name="to" defaultValue={first(sp.to) ?? range.to} key={`to:${first(sp.to)}`} required /></label>
         </div>
         <div className="flex flex-wrap gap-3 text-sm">
-          {[7, 30].map((days) => <Link className="rounded-full border border-border px-3 py-2 hover:bg-surface-muted" href={`/care-summary?${new URLSearchParams({ pet: petId, from: shiftCareDate(today, 1 - days), to: shiftCareDate(today, 7) })}`} key={days}>直近{days}日＋今後7日</Link>)}
+          {[7, 30].map((days) => <CareSummaryRangePreset key={days} label={`直近${days}日＋今後7日`} from={shiftCareDate(today, 1 - days)} to={shiftCareDate(today, 7)} />)}
         </div>
         <p className="text-xs text-muted-foreground">日付は日本時間です。期間は62日以内で指定できます。</p>
         <button type="submit" className="min-h-12 w-full rounded-xl bg-primary px-4 font-semibold text-primary-foreground hover:bg-primary-hover">表示する</button>
