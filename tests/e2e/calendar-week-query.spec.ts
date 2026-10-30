@@ -63,3 +63,23 @@ test("UC-CWQ05: 週頭の年が3桁になる日付も表示月の週へ戻す", 
   await expect(page.getByRole("heading", { name: "2026年2月", exact: true })).toBeVisible();
   await expectWeek(page, "2/1 〜 2/7", [1, 2, 3, 4, 5, 6, 7], "2026-01-25", "2026-02-08");
 });
+
+test("UC-CWQ06: 表示月と重ならない過去・未来の週は表示月へ戻す", async ({ page }) => {
+  await login(page);
+  for (const anchor of ["2099-01-01", "2001-01-01"]) {
+    await page.goto(`/calendar?ym=2026-02&w=${anchor}&view=week`);
+    await expect(page.getByRole("heading", { name: "2026年2月", exact: true })).toBeVisible();
+    await expectWeek(page, "2/1 〜 2/7", [1, 2, 3, 4, 5, 6, 7], "2026-01-25", "2026-02-08");
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.screenshot({ path: "test-results/screenshots/calendar-week-month-mismatch.png", animations: "disabled" });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.screenshot({ path: "test-results/screenshots/calendar-week-month-mismatch-dark.png", animations: "disabled" });
+});
+
+test("UC-CWQ07: 起点が翌月でも表示月に重なる週はそのまま開く", async ({ page }) => {
+  await login(page);
+  await page.goto("/calendar?ym=2026-04&w=2026-05-01&view=week");
+  await expect(page.getByRole("heading", { name: "2026年4月", exact: true })).toBeVisible();
+  await expectWeek(page, "4/26 〜 5/2", [26, 27, 28, 29, 30, 1, 2], "2026-04-19", "2026-05-03");
+});

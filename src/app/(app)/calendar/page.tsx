@@ -126,7 +126,12 @@ export default async function CalendarPage({
   // 9999-12-31だけを検査すると週末が10000年になり、日付見出しを表示できない。
   const fallbackWeek = defaultWeek.every(isRealDate) ? defaultWeek : weekOf(addDays(firstDay, 7));
   const requestedWeek = w && isRealDate(w) ? weekOf(w) : null;
-  const weekDays = requestedWeek?.every(isRealDate) ? requestedWeek : fallbackWeek;
+  // 表示月に重ならない週は採用しない。年月と週が食い違うURLで、
+  // 後段の取得範囲が表示月から別年まで広がるのを防ぐ。月をまたぐ週は受け付ける。
+  const weekDays = requestedWeek?.every(isRealDate) &&
+    requestedWeek.some((date) => date >= firstDay && date <= lastDay)
+    ? requestedWeek
+    : fallbackWeek;
   const weekLabel = `${Number(weekDays[0].slice(5, 7))}/${Number(
     weekDays[0].slice(8),
   )} 〜 ${Number(weekDays[6].slice(5, 7))}/${Number(weekDays[6].slice(8))}`;
