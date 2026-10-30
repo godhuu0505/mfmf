@@ -1,38 +1,29 @@
 import * as Sentry from "@sentry/nextjs";
+import { errorType, privateErrorEvent, privateMetric, sentryEndpoint, telemetryRoute } from "@/lib/telemetry/privacy";
+import { privateTransport } from "@/lib/telemetry/transport";
 
-// Next.js が Node / Edge ランタイムの両方で起動時に呼ぶフック。
-// SENTRY_DSN が未設定なら Sentry.init は no-op になる。
-// Trace Metrics（Sentry.metrics.*）は SDK 既定で有効なので明示の opt-in は不要。
-// Web Vitals の p75 集計（/api/vitals → distribution）はこれを利用する。
 export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    Sentry.init({
-      dsn: process.env.SENTRY_DSN,
-      environment:
-        process.env.SENTRY_ENVIRONMENT ??
-        process.env.VERCEL_ENV ??
-        process.env.NODE_ENV,
-      // 夫婦運用で量は少ないので tracing は控えめ。必要なら env で上げる。
-      tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
-      sendDefaultPii: false,
-      debug: false,
-    });
-  }
-
-  if (process.env.NEXT_RUNTIME === "edge") {
-    Sentry.init({
-      dsn: process.env.SENTRY_DSN,
-      environment:
-        process.env.SENTRY_ENVIRONMENT ??
-        process.env.VERCEL_ENV ??
-        process.env.NODE_ENV,
-      tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
-      sendDefaultPii: false,
-      debug: false,
-    });
-  }
+  const dsn = process.env.SENTRY_DSN;
+  if (!sentryEndpoint(dsn) || !["nodejs", "edge"].includes(process.env.NEXT_RUNTIME ?? "")) return;
+  Sentry.init({
+    dsn, environment: "production", defaultIntegrations: false,
+    // No automatic HTTP/DB instrumentation, logs, replay, sessions or profiling.
+    skipOpenTelemetrySetup: true, enableLogs: false, enableMetrics: true,
+    sendDefaultPii: false, sendClientReports: false, maxBreadcrumbs: 0, debug: false,
+    beforeSend: (event) => privateErrorEvent(event),
+    beforeSendTransaction: () => null, beforeSendLog: () => null,
+    beforeSendMetric: privateMetric, beforeBreadcrumb: () => null,
+    transport: privateTransport(dsn!),
+  });
 }
 
-// App Router の Server Component / Route Handler / Server Action で
-// 投げられた例外を Sentry が拾えるようにする。
-export const onRequestError = Sentry.captureRequestError;
+// Do not pass Next's request/headers/error object to the SDK. Even the exception
+// message and stack can contain record text, credentials or signed image URLs.
+export const onRequestError: typeof Sentry.captureRequestError = async (error, _request, context) => {
+  if (!sentryEndpoint(process.env.SENTRY_DSN)) return;
+  try {
+    Sentry.captureEvent({ exception: { values: [{ type: errorType(error) }] },
+      tags: { category: "server", route: telemetryRoute(context.routePath) } });
+    await Sentry.flush(500);
+  } catch { /* Telemetry cannot replace the original application failure. */ }
+};

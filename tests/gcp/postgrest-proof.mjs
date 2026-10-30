@@ -39,7 +39,7 @@ async function main() {
     if (!ts.transpileModule) throw new Error("TypeScript is required.");
     const compiler = webpack({ mode: "none", target: "node22", devtool: false,
       entry: path.join(ROOT, "tests/gcp/postgrest-contract.mjs"), output: { path: temporary, filename: "contract.cjs" },
-      resolve: { extensions: [".ts", ".mjs", ".js", ".json"], alias: { "server-only": empty } },
+      resolve: { extensions: [".ts", ".mjs", ".js", ".json"], alias: { "server-only": empty, "@": path.join(ROOT, "src") } },
       module: { rules: [{ test: /\.ts$/, exclude: /node_modules/, use: loader }] },
     });
     await new Promise((resolve, reject) => compiler.run((error, stats) => {

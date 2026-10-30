@@ -1,0 +1,12 @@
+{
+  "indexes": [{
+    "collectionGroup": "mcpOAuthGrants",
+    "queryScope": "COLLECTION",
+    "fields": [
+      { "fieldPath": "uid", "order": "ASCENDING" },
+      { "fieldPath": "revoked", "order": "ASCENDING" },
+      { "fieldPath": "expiresAt", "order": "ASCENDING" }
+    ]
+  }],
+  "fieldOverrides": []
+}

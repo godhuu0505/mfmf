@@ -97,3 +97,14 @@ Official contracts:
 - https://firebase.google.com/docs/reference/rest/auth
 - https://firebase.google.com/docs/auth/admin/manage-sessions
 - https://firebase.google.com/docs/auth/custom-email-handler
+
+## Additional web domain
+
+`GCP_AUTH_WEB_ORIGIN=https://mfmf.sanba.net` enables the additional browser host.
+The server selects the callback and email continuation origin only from this
+explicit host and `GCP_AUTH_ORIGIN`, using the incoming Host header. Forwarded
+host headers cannot choose an origin. Cookies remain host bound. The original
+`GCP_AUTH_ORIGIN` remains the MCP issuer/resource origin, preserving existing
+OAuth clients and tokens. Both callback URIs and Identity Platform authorized
+domains must remain registered. Storage CORS includes the two exact origins.
+Continuous deployment preserves the validated additional web origin.

@@ -43,8 +43,8 @@ Auth session等の一時データを含む「全Auth状態の凍結」を意味�
 source凍結からactivationまでは47分21.116秒でした。この一回の実測であり、次回の停止時間や復旧時間を保証するものではありません。
 復旧の限界は [デプロイ手順](../guides/deploy.md#バックアップと復旧範囲)を参照します。
 Cloud SQL自動backup/PITR設定、同instance backup復元の実証、別instanceへのPITR実証は別です。
-IdPは手動暗号化exportと独立した復号・restore plan検証が成功し、4ユーザー・Google link4件・BCRYPT1件を保全しました。今回は再設定必須0件です。定期自動backupや実アカウントrestoreは未実施で、復旧点は最後に検証成功した手動export時点です。
-Standard on-demandは無期限のため、未適用SQLの通常upgradeは保持・削除手順を実証するまで停止します。
+IdPは手動暗号化exportと独立した復号・restore plan検証が成功し、4ユーザー・Google link4件・BCRYPT1件を保全しました。今回は再設定必須0件です。この切替時点では定期自動backupや実アカウントrestoreは未実施でした。継続運用は[D42の日次保全](../guides/gcp-backup-automation.md)へ拡張し、実Job・独立復号・復元・Schedulerの受入を別に確認します。復旧点は最後に検証成功したexport時点です。
+Standard on-demandは無期限です。通常upgradeは直前backupに加えて、日次保持Jobの新しい成功receiptと現在の固定instance・実装hashを要求します。保持Jobの未受入・失敗・証跡切れでSQL適用を停止します。
 
 ---
 
@@ -56,7 +56,7 @@ Standard on-demandは無期限のため、未適用SQLの通常upgradeは保持�
 | **守るもの** | `public` の **既存RLS・関数の認可契約・Storage非依存のpgTAP**を保ち、互換DBで検証する |
 | **作り直すもの** | Storageの認可、**`delete_own_household`**、**Storageを参照するpgTAP**（§4.2） |
 | **データAPI** | Supabaseの外部PostgREST接続をserver専用loopbackへ移す。`supabase-js`のクエリビルダとServer Action認可は維持 |
-| **費用** | 月3,000円は条件付き目標。31日・復元検証予備込み約2,851円、Run無料枠を使えなければ約3,128円。正価・税・使用量の前提は§6 |
+| **費用** | 月3,000円は条件付き目標。31日・復元予備と日次2Jobの最低課金例込み約2,897円、appのRun無料枠を使えなければ約3,174円。正価・税・使用量の前提は§6 |
 | **利用者影響** | P1 はまず別の `run.app` URL で検証。公開URLを変更する場合は再ログインとPWAの再インストールを確認する。P3 の停止時間は復元リハーサルの実測後に決め、30〜60分を保証しない |
 
 D38 は D18 の無料枠限定方針を移行後の構成について変更します。運用対象を絞る方針と
@@ -758,13 +758,16 @@ Cloud Run のリビジョンタグでプレビュー URL も出せます。
 | Cloud SQL | db-f1-micro×744h、SSD10GiB、保存backup総量10GiB | 2,363円/月 |
 | 付帯サービスと予備 | GCS保存10GiB/配信5GiB/操作、AR1GiB、Secret10versions/1,000access、Run送信1GiB、その他税別100円。Run計算無料枠利用可 | 411円/月 |
 | 復元検証の予備 | 24時間の追加検証instance等を月1回と仮定。実際の方式・時間・保持量で変動 | 76円/月 |
-| **合計** | Run 1CPU/1GiB、月3万request×2秒を共有無料枠内、IdP少人数のGoogle/email、SMSなし | **約2,851円/月** |
-| Run無料枠を利用できない場合 | 同じ負荷で計算・request分を約277円追加 | **約3,128円/月** |
+| 日次保全・保持 | Scheduler2件、Job2件×31日×60秒、1CPU/512MiB。追加分の無料枠は仮定しない | 47円/月 |
+| **合計** | Run app 1CPU/1GiB、月3万request×2秒を共有無料枠内、IdP少人数のGoogle/email、SMSなし | **約2,897円/月** |
+| appのRun無料枠を利用できない場合 | 同じ負荷で計算・request分を約277円追加 | **約3,174円/月** |
 
-合計は丸め前の約2,363.05＋411.39＋76.23＝2,850.67円から算出しています。
-無料枠を使えない場合は約277.01円を加え、3,127.68円です。単発の性能smokeから月間使用量は推定しません。
+従来の丸め前2,363.05＋411.39＋76.23＝2,850.67円に、日次2JobとSchedulerの例46.80円を加え、2,897.47円です。
+appの無料枠を使えない場合は約277.01円を加え、3,174.48円です。追加46.80円は現行USD単価に157.195円/USD・税10%を仮置きしたものです。
+両Jobが毎日900秒なら追加分は約217.91円となり、配信/probeでの追加実行・保存・通信等も別途増えます。
+最低課金例を費用上限とせず、[計算式と運用前提](../guides/gcp-backup-automation.md#月額の前提)を確認します。単発の性能smokeから月間使用量は推定しません。
 税別単価の例はmicro 2.20073円/時、SSD 34.740095円/GiB月、backup 16.34828円/GiB月です。
-[Cloud Billing Catalog](https://docs.cloud.google.com/billing/v1/how-tos/catalog-api)のJPY SKUで確認しており、USDを任意の為替で再換算していません。
+[Cloud Billing Catalog](https://docs.cloud.google.com/billing/v1/how-tos/catalog-api)のJPY SKUで確認しています。日次Job/Scheduler追加分は上記のUSD換算仮定を別に明記しています。
 [Cloud SQL](https://cloud.google.com/sql/pricing/)、[Cloud Run](https://cloud.google.com/run/pricing)、
 [Storage](https://cloud.google.com/storage/pricing)、[Identity Platform](https://cloud.google.com/identity-platform/pricing)、
 [Artifact Registry](https://cloud.google.com/artifact-registry/pricing)、[Secret Manager](https://cloud.google.com/secret-manager/pricing)の正価・適用税・実使用量が優先します。

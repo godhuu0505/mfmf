@@ -20,6 +20,7 @@ mfmf のドキュメントは [Diátaxis](https://diataxis.fr/) に倣い、読�
 - [guides/google-drive-setup.md](./guides/google-drive-setup.md) — Google ログイン / Drive 連携の設定（Google Cloud・Supabase・環境変数）。
 - [guides/deploy.md](./guides/deploy.md) — main→Cloud Run本番配信、DB更新・復旧の境界、旧構成の参照手順。
 - [guides/gcp-database-deployment.md](./guides/gcp-database-deployment.md) — GCP DB/Auth通常配信と、未適用SQLのbackup保持gate。
+- [guides/gcp-backup-automation.md](./guides/gcp-backup-automation.md) — 日次IdP暗号化保全、SQL保持receipt、復元と費用の境界。
 - [guides/database-auth-backup.md](./guides/database-auth-backup.md) — 元Supabaseのpublic/Auth原本保全と、明示的なfreeze/unfreeze。
 - [guides/cloud-run-candidate.md](./guides/cloud-run-candidate.md) — WIF で候補イメージと公開設定を準備し、サーバーの秘密を Secret Manager へ移す。
 - [guides/cloud-run-continuous.md](./guides/cloud-run-continuous.md) — 初期無効の Cloud Run 継続配信、固定 secret 参照、旧 traffic を維持した検証と切り替え。

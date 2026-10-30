@@ -17,6 +17,31 @@ afterEach(() => { vi.unstubAllEnvs(); });
 const request = (path: string, cookie = "") => new NextRequest(`https://0.0.0.0:8080${path}`, { headers: { host: "public.example", cookie } });
 
 describe("Managed identity middleware", () => {
+  it.each(["/api/oauth/consent", "/api/oauth/connections"])("returns private JSON401 for expired %s without consuming the browser destination", async path => {
+    mocks.create.mockImplementation((cookies: IdentityCookies) => {
+      cookies.set("__Host-mfmf-idp-id", "", { path: "/", httpOnly: true, secure: true, sameSite: "lax", maxAge: 0 });
+      return { verifiedIdentity: mocks.verified };
+    });
+    const response = await updateSession(request(path, `${POST_LOGIN_NEXT_COOKIE}=%2Foauth%2Fconsent%2F${"t".repeat(43)}`));
+    expect(response.status).toBe(401); expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("cache-control")).toContain("no-store"); expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.cookies.has(POST_LOGIN_NEXT_COOKIE)).toBe(false);
+    expect(response.cookies.get("__Host-mfmf-idp-id")?.maxAge).toBe(0);
+    expect(await response.json()).toEqual({ error: "UNAUTHENTICATED", message: "ログインしてください。" });
+    expect(mocks.verified).toHaveBeenCalledOnce();
+  });
+  it("keeps consent page login redirects while protocol requests never read the browser session", async () => {
+    const path = `/oauth/consent/${"t".repeat(43)}`;
+    const response = await updateSession(request(path));
+    expect(response.status).toBe(307); expect(response.cookies.get(POST_LOGIN_NEXT_COOKIE)?.value).toBe(path);
+    mocks.create.mockClear(); mocks.verified.mockClear();
+    for (const path of ["/mcp", "/oauth/token", "/oauth/authorize", "/oauth/register", "/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource/mcp"]) expect((await updateSession(request(path))).status).toBe(200);
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.verified).not.toHaveBeenCalled();
+  });
+  it("does not make other API routes anonymous or treat a similarly named route as the browser JSON endpoint", async () => {
+    expect((await updateSession(request("/api/oauth/consent/other"))).status).toBe(307);
+    expect((await updateSession(request("/api/records"))).status).toBe(307);
+  });
   it("protects an invite and ignores old Supabase sessions after cutover", async () => {
     const response = await updateSession(request("/invite/fixture", "sb-mfmf-auth-token=old-session"));
     expect(response.status).toBe(307); expect(response.headers.get("location")).toBe("https://0.0.0.0:8080/login?next=%2Finvite%2Ffixture");

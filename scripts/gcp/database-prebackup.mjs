@@ -1,3 +1,5 @@
+import { verifyRetentionReadiness, retentionApi, retentionInventory, retentionCapacity } from "./database-backup-retention.mjs";
+
 // Called only while the database advisory transaction lock is held, and only
 // when the checksum ledger reports pending SQL. Never reads database contents.
 const PROJECT = "mfmf-499612";
@@ -19,6 +21,9 @@ export async function ensurePreMigrationBackup({ env, accessToken, fetchImpl = f
   if (env.CLOUD_RUN_JOB !== "mfmf-db-operator" || env.MFMF_DB_OPERATION !== "upgrade"
     || !/^[a-f0-9]{40}$/.test(env.MFMF_DB_DEPLOY_SHA ?? "")
     || typeof accessToken !== "string" || !accessToken || /[\r\n]/.test(accessToken)) fail("context");
+  // A Standard backup has no provider-enforced expiry. Require a current,
+  // implementation-bound external cleanup contract BEFORE creating one.
+  const readiness = await verifyRetentionReadiness({ accessToken, fetchImpl, now });
   const description = `mfmf-managed-preupgrade-v1:${env.MFMF_DB_DEPLOY_SHA}`;
   const request = async (url, stage, body) => {
     let response;
@@ -39,47 +44,37 @@ export async function ensurePreMigrationBackup({ env, accessToken, fetchImpl = f
     } catch { fail(stage); }
   };
   let onDemandCount = 0; let onDemandBytes = 0n;
-  const verify = (backup, expectedName, replacedBytes = 0n, createdAfter) => {
+  const verify = async (backup, expectedName, replacedBytes = 0n, createdAfter) => {
     const expiry = Date.parse(backup?.expiryTime);
     const started = Date.parse(backup?.backupInterval?.startTime);
     const ended = Date.parse(backup?.backupInterval?.endTime);
     if (!backupName(backup?.name) || backup.name !== expectedName || backup.instance !== INSTANCE || backup.description !== description
       || backup.type !== "ON_DEMAND" || backup.state !== "SUCCESSFUL" || backup.location !== "asia-northeast1"
-      || !Number.isFinite(expiry) || expiry < now() + DAY || expiry > now() + 14 * DAY + 60_000
+      || (backup.expiryTime != null && (!Number.isFinite(expiry) || expiry < now() + DAY || expiry > now() + 14 * DAY + 60_000))
+      || started < Date.parse(readiness.instanceCreateTime)
       // startTime, not completion, bounds the writes guaranteed to be included.
       || !Number.isFinite(started) || started < now() - 15 * 60_000 || started > now() + 30_000
       || !Number.isFinite(ended) || ended < started || ended > now() + 30_000
       || (createdAfter !== undefined && started < createdAfter - 30_000)
       || backup.error) fail("verify-backup");
     if (onDemandBytes - replacedBytes + chargeableBytes(backup) > MAX_ON_DEMAND_BYTES) fail("backup-capacity");
-    return { verified: true, retentionDaysMaximum: 14 };
+    // Recheck after completion: a concurrent cleanup marks its receipt running,
+    // and a recreated instance or changed retention implementation cannot pass.
+    const finalReadiness = await verifyRetentionReadiness({ accessToken, fetchImpl, now });
+    if (JSON.stringify(finalReadiness) !== JSON.stringify(readiness)) fail("retention-drift");
+    const inventory = await retentionInventory(retentionApi({ accessToken, fetchImpl }));
+    retentionCapacity(inventory);
+    if (inventory.filter((row) => row.name === backup.name && row.type === "ON_DEMAND" && row.description === description).length !== 1) fail("verify-backup");
+    return { verified: true, retentionMode: "verified-external-cleanup", minimumRetentionDays: 14, cleanupReceiptMaximumAgeHours: 30 };
   };
   // A lost create response must not produce one indefinite duplicate per retry.
-  // Listing requires completeness, and a previous pending/failed/missing-TTL
-  // marker stops for operator inspection instead of silently creating another.
-  let pageToken; const matches = []; const seenTokens = new Set(); const seenBackups = new Set();
-  for (let page = 0; page < 10; page++) {
-    const url = new URL(`${API}/backups`);
-    url.searchParams.set("filter", `instance:${INSTANCE}`);
-    url.searchParams.set("pageSize", "1000");
-    if (pageToken) url.searchParams.set("pageToken", pageToken);
-    const result = await request(url.toString(), "list-backups");
-    if (!result || !Array.isArray(result.backups ?? []) || result.warnings?.length) fail("list-backups");
-    for (const backup of result.backups ?? []) {
-      if (!backupName(backup?.name) || backup.instance !== INSTANCE || seenBackups.has(backup.name)
-        || !["ON_DEMAND", "AUTOMATED", "FINAL"].includes(backup.type)) fail("list-backups");
-      seenBackups.add(backup.name);
-      if (backup.type === "ON_DEMAND") {
-        onDemandCount++; onDemandBytes += chargeableBytes(backup);
-      }
-      if (backup.description === description) matches.push(backup);
-    }
-    if (!result.nextPageToken) { pageToken = undefined; break; }
-    if (typeof result.nextPageToken !== "string" || result.nextPageToken.length > 4096 || seenTokens.has(result.nextPageToken)) fail("list-backups");
-    pageToken = result.nextPageToken; seenTokens.add(pageToken);
-  }
-  if (pageToken || matches.length > 1) fail("list-backups");
-  if (onDemandCount > MAX_ON_DEMAND_COUNT || onDemandBytes > MAX_ON_DEMAND_BYTES) fail("backup-capacity");
+  // Listing requires completeness. A prior pending/failed/stale marker stops
+  // for operator inspection instead of silently creating another backup.
+  const listed = await retentionInventory(retentionApi({ accessToken, fetchImpl }));
+  const capacity = retentionCapacity(listed);
+  onDemandCount = capacity.onDemandCount; onDemandBytes = BigInt(capacity.onDemandBytes);
+  const matches = listed.filter((backup) => backup.description === description);
+  if (matches.length > 1) fail("list-backups");
   if (matches.length === 1) {
     if (matches[0].type !== "ON_DEMAND") fail("verify-backup");
     return verify(await request(`https://sqladmin.googleapis.com/v1/${matches[0].name}`, "get-backup"),

@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { browserReporter } from "@/lib/telemetry/client";
 
 // アプリ全体のエラーバウンダリ。
 // これが無いと、Server Component / Server Action が投げた例外で画面全体が
 // Next の素の「Application error: a server-side exception has occurred」に
 // 置き換わり、ユーザーは何が起きたか分からないまま行き止まりになる
-// （招待受諾で実際に発生した）。サーバ側の詳細は Sentry（onRequestError）と
-// Vercel のログに残るので、ここでは digest だけ出して問い合わせに使えるようにする。
+// （招待受諾で実際に発生した）。Sentryには固定分類だけを送り、
+// ここでは digest だけ出して問い合わせに使えるようにする。
 export default function AppError({
   error,
   reset,
@@ -17,7 +18,7 @@ export default function AppError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    void browserReporter().error("render");
   }, [error]);
 
   return (
