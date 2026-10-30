@@ -73,6 +73,9 @@ ip_address
   metric IDは送りません。属性は`route/rating/navigation_type`だけです。
 - Metricsで`web_vital.lcp`等を`route`別に集計できます。ただし抽出・上限制限付きの標本なので、
   リクエスト数・利用者数・DAU・完全なエラー件数を表すものではありません。少数標本のp75は慎重に扱います。
+- metric envelopeは最終送信時に`version: 2`を固定し、`ingest_settings`のIP・User-Agent推測禁止を適用します。
+  version省略時はv1として扱われ、この指定が無視されるため、省略・呼出元のversion継承はしません。
+  SDK 10.78.0で`trace_metric`専用のrate-limitを処理し、metricsの制限をerrorsへ誤適用しません。
 
 ## 費用と送信量の制限
 
@@ -82,7 +85,12 @@ ip_address
 | API process | 有効な同一origin JSON要求を最大60回/分 |
 | 最終送信process | error最大3件/分・60件/日、metric最大30件/分・360件/日 |
 | 通信 | transport queue最大4、3秒timeout、redirect禁止、Sentryの429/rate-limitを尊重、独自retryなし |
-| accepted API | flush最大500ms。通知失敗で画面の操作は失敗させない |
+| accepted API / server error | transportの3秒を待てるようflushの全体を最大3.5秒に制限。完了時は直ちに返り、失敗・timeoutを再送しない |
+| browser request | 設定GETは2秒、送信POSTは本文読取2秒＋flush3.5秒を含め7秒以内 |
+
+Cloud Runのrequest-based CPUが応答後に停止しても送信を途中で切らないため、accepted APIとserver errorは
+共通の有界flushをawaitします。通知失敗でアプリの処理結果は変えません。204やflush成功だけでは保存完了を証明せず、
+本番受入では固有event IDやmetricの時刻・trace IDをSentry側の保存結果と照合します。
 
 processのcounterは再起動で消え、複数revision/instanceでは合算されません。
 **これらは無料枠・月額の上限保証ではありません。** Sentry管理画面で利用可能な無料プラン、Errors/Metricsの枠、
@@ -113,6 +121,8 @@ source mapやraw stackを後から有効にする場合は、別のprivacy設計
   [公式Options](https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/)と
   [Filtering](https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/filtering/)を参照。
   SDK更新時はeventだけでなくmetric envelope・rate limit・attachment除去の実SDK試験も維持する。
+- metricのバージョン契約は[公式Ingest Settings](https://develop.sentry.dev/sdk/foundations/envelopes/envelope-items/#ingest-settings)、
+  quota分類の修正は[SDK公式PR](https://github.com/getsentry/sentry-javascript/pull/25612)を参照。
 - IP推測の根拠: [Relayの固定SDK設定](https://github.com/getsentry/relay/blob/ac463005933167023fc03b229e8ced7de646f7bc/relay-event-schema/src/protocol/clientsdk.rs#L26)と
   [IP補完処理](https://github.com/getsentry/relay/blob/ac463005933167023fc03b229e8ced7de646f7bc/relay-event-normalization/src/event.rs#L423)。
   [geo補完](https://github.com/getsentry/relay/blob/ac463005933167023fc03b229e8ced7de646f7bc/relay-event-normalization/src/event.rs#L507)は別処理。

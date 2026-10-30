@@ -30,7 +30,7 @@ describe("telemetry route boundaries", () => {
   it("projects client exception and bounds flush", async () => {
     expect((await route.POST(request({ kind: "error", category: "render", route: "/records/private-token?secret=1" }))).status).toBe(204);
     expect(sentry.captureEvent).toHaveBeenCalledWith({ tags: { category: "render", route: "/records/[id]" }, exception: { values: [{ type: "Error" }] } });
-    expect(sentry.flush).toHaveBeenCalledWith(500);
+    expect(sentry.flush).toHaveBeenCalledWith(3_500);
   });
   it("bounds rating/navigation and does not flush rejected metrics", async () => {
     await route.POST(request({ kind: "vital", name: "LCP", value: 42, route: "/", rating: "secret", navigationType: "secret" }));

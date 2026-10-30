@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import { isSameOriginPost } from "@/lib/sameOriginPost";
 import { createBudget } from "@/lib/telemetry/limits";
 import { parseBrowserTelemetry, sentryEndpoint } from "@/lib/telemetry/privacy";
+import { flushTelemetry } from "@/lib/telemetry/flush";
 
 // Existing middleware verifies the session and drops anonymous GET/POST with 204.
 // No public DSN or secret is returned. A browser caches this decision per document.
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
       attributes: { route: payload.route, rating: payload.rating, navigation_type: payload.navigationType },
     });
     // One bounded flush for an accepted, sampled payload; failure never affects UI.
-    await Sentry.flush(500).catch(() => false);
+    await flushTelemetry();
     return finish();
   } catch { void reader.cancel().catch(() => undefined); return finish(400); }
   finally { clearTimeout(timer); }
