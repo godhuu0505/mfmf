@@ -24,17 +24,9 @@ function collectContext(): FeedbackContext {
     (window.navigator as unknown as { standalone?: boolean }).standalone ===
       true;
   return {
-    page_path: window.location.pathname + window.location.search,
-    page_url: window.location.href,
-    user_agent: window.navigator.userAgent,
-    language: window.navigator.language,
-    viewport: `${window.innerWidth}x${window.innerHeight}`,
-    screen: `${window.screen.width}x${window.screen.height}`,
-    pixel_ratio: window.devicePixelRatio,
+    page_path: window.location.pathname,
     online: window.navigator.onLine,
     standalone,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    client_time: new Date().toISOString(),
   };
 }
 

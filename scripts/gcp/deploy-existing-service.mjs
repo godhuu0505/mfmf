@@ -3,6 +3,8 @@ import { pathToFileURL } from "node:url";
 import { parsePreseededSecretVersions, prepareWithDocker, selectProductionConfig, SECRET_NAMES } from "./prepare-candidate.mjs";
 import { DATABASE_ENV_KEYS, DATABASE_SECRETS, databaseMode, databasePins, databaseSourceConfig, isDatabaseVpc } from "./database-deployment-config.mjs";
 import { deployDatabaseJob, operatorDigest, databaseJobDiagnostic } from "./deploy-database-job.mjs";
+import { deployBackupJobs } from "./deploy-backup-jobs.mjs";
+import { backupJobDiagnostic } from "./backup-job-config.mjs";
 import { PROJECT, PROJECT_NUMBER, REGION, SERVICE, RUNTIME, SERVICE_NAME, PUBLIC_ORIGIN, IMAGE_BASE, requireContinuousContext } from "./production-config.mjs";
 
 const API = `https://run.googleapis.com/v2/${SERVICE_NAME}`;
@@ -11,6 +13,8 @@ const LATEST_TYPE = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST";
 const PIN_KEYS = ["TOKEN_ENC_KEY", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
 const PUBLIC_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SIGNUP_ENABLED", "SENTRY_ENVIRONMENT", "SENTRY_TRACES_SAMPLE_RATE"];
 const RANKING_KEYS = ["MFMF_RANKING_ENABLED", "MFMF_RANKING_EXPIRES_AT"];
+const MCP_KEYS = ["MCP_ENABLED"];
+const WEB_ORIGIN_KEYS = ["GCP_AUTH_WEB_ORIGIN"];
 const RANKING_HARD_STOP = Date.parse("2027-06-24T00:00:00+09:00");
 class DeploymentError extends Error {}
 const fail = (message) => { throw new DeploymentError(message); };
@@ -40,9 +44,23 @@ export function preserveRankingEnv(items = []) {
   return selected.map(({ name, value }) => ({ name, value }));
 }
 
+export function preserveMcpEnv(items = []) {
+  const selected = items.filter((item) => MCP_KEYS.includes(item?.name));
+  if (selected.length > 1 || selected.some((item) => !exactKeys(item, ["name", "value"]) || !["true", "false"].includes(item.value))) fail("Existing MCP settings are invalid.");
+  return selected.map(({ name, value }) => ({ name, value }));
+}
+
+export function preserveWebOriginEnv(items = []) {
+  const selected = items.filter((item) => WEB_ORIGIN_KEYS.includes(item?.name));
+  if (selected.length > 1 || selected.some((item) => !exactKeys(item, ["name", "value"]) || item.value !== "https://mfmf.sanba.net")) fail("Existing web origin is invalid.");
+  return selected.map(({ name, value }) => ({ name, value }));
+}
+
 export function validateFixedVersions(text, env) {
   const refs = parsePreseededSecretVersions({ ...env, PRESEEDED_SECRET_VERSIONS: text });
-  if (!exactKeys(refs, [...PIN_KEYS, ...(databaseMode(env) ? Object.keys(DATABASE_SECRETS) : [])]) || Object.values(refs).some((ref) => !ref.startsWith(`projects/${PROJECT_NUMBER}/`))) {
+  const required = [...PIN_KEYS, ...(databaseMode(env) ? Object.keys(DATABASE_SECRETS) : [])];
+  const expected = [...required, ...(databaseMode(env) && Object.hasOwn(refs, "SENTRY_DSN") ? ["SENTRY_DSN"] : [])];
+  if (!exactKeys(refs, expected) || Object.values(refs).some((ref) => !ref.startsWith(`projects/${PROJECT_NUMBER}/`))) {
     fail("Committed secret references must match the authentication mode and fixed project-number references.");
   }
   return refs;
@@ -57,7 +75,7 @@ export function validateManifest(manifest, pins, env) {
       !manifest.secretVersions || typeof manifest.secretVersions !== "object" || Array.isArray(manifest.secretVersions)) {
     fail("Candidate public manifest is invalid; contents withheld.");
   }
-  for (const key of [...PIN_KEYS, ...(database ? Object.keys(DATABASE_SECRETS) : [])]) if (manifest.secretVersions[key] !== pins[key]) fail("Candidate changed a committed secret reference.");
+  for (const key of Object.keys(pins)) if (manifest.secretVersions[key] !== pins[key]) fail("Candidate changed a committed secret reference.");
   for (const [key, ref] of Object.entries(manifest.secretVersions)) {
     if (!Object.hasOwn(SECRET_NAMES, key) || (!database && Object.hasOwn(DATABASE_SECRETS, key)) || typeof ref !== "string" ||
         !new RegExp(`^projects/(${PROJECT}|${PROJECT_NUMBER})/secrets/${SECRET_NAMES[key]}/versions/[1-9][0-9]*$`).test(ref)) {
@@ -108,7 +126,7 @@ function validateService(service, database = false) {
   }
   const seen = new Set();
   for (const item of container.env ?? []) {
-    if (!item || seen.has(item.name) || ![...PUBLIC_KEYS, ...DATABASE_ENV_KEYS, ...RANKING_KEYS, ...Object.keys(SECRET_NAMES).filter((key) => database || !Object.hasOwn(DATABASE_SECRETS, key))].includes(item.name)) {
+    if (!item || seen.has(item.name) || ![...PUBLIC_KEYS, ...DATABASE_ENV_KEYS, ...RANKING_KEYS, ...MCP_KEYS, ...WEB_ORIGIN_KEYS, ...Object.keys(SECRET_NAMES).filter((key) => database || !Object.hasOwn(DATABASE_SECRETS, key))].includes(item.name)) {
       fail("Existing runtime has duplicate or unmanaged environment settings.");
     }
     seen.add(item.name);
@@ -117,6 +135,8 @@ function validateService(service, database = false) {
     }
   }
   preserveRankingEnv(container.env);
+  preserveMcpEnv(container.env);
+  preserveWebOriginEnv(container.env);
   assertRuntimeMode(container, database);
   return container;
 }
@@ -190,7 +210,7 @@ async function smoke(fetchImpl, origin = PUBLIC_ORIGIN) {
   }
 }
 
-export async function deployExistingService({ env, pins, prepare, fetchImpl = fetch, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = console.log, maxPolls = 60, upgrade = deployDatabaseJob }) {
+export async function deployExistingService({ env, pins, prepare, fetchImpl = fetch, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = console.log, maxPolls = 60, upgrade = deployDatabaseJob, backups = deployBackupJobs }) {
   requireContinuousContext(env);
   const database = databaseMode(env);
   if (!env.GCP_ACCESS_TOKEN || /[\r\n]/.test(env.GCP_ACCESS_TOKEN)) fail("Short-lived WIF token is missing or invalid.");
@@ -226,6 +246,7 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   if (current.uid !== initial.uid || current.etag !== initial.etag) fail("Service changed while building; refusing concurrent deployment.");
   if (database) {
     await verifyServing();
+    await backups({ env, image: manifest.migrationImage, fetchImpl, wait });
     await upgrade({ env, image: manifest.migrationImage, fetchImpl, wait });
     current = await get();
     validateService(current, database);
@@ -253,6 +274,8 @@ export async function deployExistingService({ env, pins, prepare, fetchImpl = fe
   const runtimeEnv = [
     ...Object.entries(manifest.env).map(([name, value]) => ({ name, value })),
     ...preserveRankingEnv(current.template.containers[0].env),
+    ...preserveMcpEnv(current.template.containers[0].env),
+    ...preserveWebOriginEnv(current.template.containers[0].env),
     ...Object.entries(manifest.secretVersions).map(([name, ref]) => {
       const parts = ref.split("/");
       return { name, valueSource: { secretKeyRef: { secret: parts[3], version: parts[5] } } };
@@ -361,7 +384,11 @@ async function main() {
     let refs;
     try { refs = databasePins(await readFile(new URL("./production-database-secret-versions.json", import.meta.url), "utf8")); }
     catch { fail("Committed database secret references are unreadable or invalid."); }
-    text = JSON.stringify({ ...JSON.parse(text), ...refs });
+    let sentry;
+    try { sentry = JSON.parse(await readFile(new URL("./production-sentry-secret-version.json", import.meta.url), "utf8")); }
+    catch { fail("Committed Sentry secret reference is unreadable or invalid."); }
+    if (sentry !== null && !exactKeys(sentry, ["SENTRY_DSN"])) fail("Committed Sentry secret reference is invalid.");
+    text = JSON.stringify({ ...JSON.parse(text), ...refs, ...(sentry ?? {}) });
   }
   const pins = validateFixedVersions(text, process.env);
   const env = { ...process.env, PRESEEDED_SECRET_VERSIONS: JSON.stringify(pins) };
@@ -372,6 +399,8 @@ async function main() {
 export function deploymentErrorMessage(error) {
   const database = databaseJobDiagnostic(error);
   if (database) return JSON.stringify(database);
+  const backup = backupJobDiagnostic(error);
+  if (backup) return JSON.stringify(backup);
   return error instanceof DeploymentError ? error.message : "Continuous deployment failed; credentials, input and API details withheld.";
 }
 

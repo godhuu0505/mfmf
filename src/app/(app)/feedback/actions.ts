@@ -4,31 +4,18 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getHouseholdIdForUser } from "@/lib/household";
+import { parseFeedbackContext } from "@/lib/feedbackContext";
 import {
   toFeedbackFrequency,
   toFeedbackKind,
   toFeedbackSeverity,
   toFeedbackStatus,
-  type FeedbackContext,
 } from "@/types/database";
 import type { FeedbackState } from "./types";
 
 function trimOrNull(value: FormDataEntryValue | null): string | null {
   const s = String(value ?? "").trim();
   return s === "" ? null : s;
-}
-
-// クライアントから送られてきた状況 JSON を安全にパースする。
-function parseContext(raw: FormDataEntryValue | null): FeedbackContext | null {
-  if (typeof raw !== "string" || raw.trim() === "") return null;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object"
-      ? (parsed as FeedbackContext)
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 // フォーム送信を受け取り、Supabase の feedback テーブルに保存する。
@@ -68,7 +55,7 @@ export async function submitFeedback(
   const expected = trimOrNull(formData.get("expected"));
   const actual = trimOrNull(formData.get("actual"));
   const reporter = trimOrNull(formData.get("reporter"));
-  const context = parseContext(formData.get("context"));
+  const context = parseFeedbackContext(formData.get("context"));
   // 所属世帯を解決し、書き込みに household_id をセットする（owner_id は従来どおり残す）。
   const householdId = await getHouseholdIdForUser(supabase, user.id);
 

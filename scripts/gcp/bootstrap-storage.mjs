@@ -28,7 +28,7 @@ export function storageBucketConfig(name, extraOrigins = []) {
   for (const origin of extraOrigins) {
     if (typeof origin !== "string" || !/^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$/.test(origin)) fail();
   }
-  const origins = sorted([...new Set([STORAGE_ORIGIN, ...extraOrigins])]);
+  const origins = sorted([...new Set([STORAGE_ORIGIN, "https://mfmf.sanba.net", ...extraOrigins])]);
   return {
     name, location: "ASIA-NORTHEAST1", storageClass: "STANDARD",
     iamConfiguration: { uniformBucketLevelAccess: { enabled: true }, publicAccessPrevention: "enforced" },

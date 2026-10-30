@@ -5,7 +5,7 @@ export const metadata = { title: "プライバシーポリシー" };
 // プライバシーポリシー（下書き・雛形）。
 // 正式な文言・同意台帳の整備は #50（法務）で行う。本ページは骨子を用意する足場であり、
 // 確定した法務文言ではない。公開（SIGNUP_ENABLED 開放）前に法務レビューを経て確定させること。
-const LAST_UPDATED = "2026-07-06";
+const LAST_UPDATED = "2026-10-29";
 
 const sectionClass = "space-y-2";
 const h2Class = "text-lg font-bold text-foreground";
@@ -65,7 +65,8 @@ export default function PrivacyPage() {
           <p className={pClass}>
             運営者は、法令に基づく場合を除き、利用者の同意なく個人情報を第三者に提供
             しません。本サービスの運営に必要な範囲で、認証・データ保存・配信などの
-            外部サービス（例: Supabase、Vercel）を利用します。
+            外部サービスとして Google Cloud を利用します。障害分析には、識別情報を
+            減らしたエラーの種類などを Sentry に送ることがあります。
           </p>
         </section>
 
