@@ -49,3 +49,17 @@ test("UC-CWQ03: 実在するうるう日は月をまたぐ正しい週を表示�
   await expect(page.getByRole("heading", { name: "2024年2月", exact: true })).toBeVisible();
   await expectWeek(page, "2/25 〜 3/2", [25, 26, 27, 28, 29, 1, 2], "2024-02-18", "2024-03-03");
 });
+
+test("UC-CWQ04: 週末が5桁の年になる日付は表示月の週へ戻す", async ({ page }) => {
+  await login(page);
+  await page.goto("/calendar?ym=2026-02&w=9999-12-31&view=week");
+  await expect(page.getByRole("heading", { name: "2026年2月", exact: true })).toBeVisible();
+  await expectWeek(page, "2/1 〜 2/7", [1, 2, 3, 4, 5, 6, 7], "2026-01-25", "2026-02-08");
+});
+
+test("UC-CWQ05: 週頭の年が3桁になる日付も表示月の週へ戻す", async ({ page }) => {
+  await login(page);
+  await page.goto("/calendar?ym=2026-02&w=1000-01-01&view=week");
+  await expect(page.getByRole("heading", { name: "2026年2月", exact: true })).toBeVisible();
+  await expectWeek(page, "2/1 〜 2/7", [1, 2, 3, 4, 5, 6, 7], "2026-01-25", "2026-02-08");
+});

@@ -120,12 +120,13 @@ export default async function CalendarPage({
 
   // 週表示の起点。?w= があればその日を含む週、無ければ「その月の今日」または
   // その月の 1 日の週（?w= が無いと 9 月の 15 日の週などを一生開けない）
-  const weekAnchor = w && isRealDate(w)
-    ? w
-    : year === todayYear && month === todayMonth
-      ? todayStr
-      : firstDay;
-  const weekDays = weekOf(weekAnchor);
+  const defaultAnchor = year === todayYear && month === todayMonth ? todayStr : firstDay;
+  const defaultWeek = weekOf(defaultAnchor);
+  // 年の境界でも、表示に使う7日すべてが4桁の実在日であることを確認する。
+  // 9999-12-31だけを検査すると週末が10000年になり、日付見出しを表示できない。
+  const fallbackWeek = defaultWeek.every(isRealDate) ? defaultWeek : weekOf(addDays(firstDay, 7));
+  const requestedWeek = w && isRealDate(w) ? weekOf(w) : null;
+  const weekDays = requestedWeek?.every(isRealDate) ? requestedWeek : fallbackWeek;
   const weekLabel = `${Number(weekDays[0].slice(5, 7))}/${Number(
     weekDays[0].slice(8),
   )} 〜 ${Number(weekDays[6].slice(5, 7))}/${Number(weekDays[6].slice(8))}`;
