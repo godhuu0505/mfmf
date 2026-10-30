@@ -216,7 +216,7 @@ describe("storage operator bootstrap", () => {
     expect(config.iamConfiguration).toEqual({ uniformBucketLevelAccess: { enabled: true }, publicAccessPrevention: "enforced" });
     expect(config.softDeletePolicy.retentionDurationSeconds).toBe("604800"); expect(config.versioning.enabled).toBe(false);
     expect(config.lifecycle.rule).toEqual([{ action: { type: "Delete" }, condition: { age: 1, matchesPrefix: ["_incoming/"] } }]);
-    expect(config.cors[0].origin).toContain(STORAGE_ORIGIN); expect(config.cors[0].method).not.toContain("OPTIONS");
+    expect(config.cors[0].origin).toContain(STORAGE_ORIGIN); expect(config.cors[0].origin).toContain("https://mfmf.sanba.net"); expect(config.cors[0].method).not.toContain("OPTIONS");
   });
   it.each(["*", "http://localhost:3000", "https://attacker.invalid", "https://mfmf.vercel.app/path", "https://user@mfmf.vercel.app"])("rejects unapproved CORS origin shape %s", (origin) => {
     expect(() => storageBucketConfig(GCS_BUCKETS.photos, [origin])).toThrow("details withheld");

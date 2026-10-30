@@ -92,4 +92,12 @@ describe("Cloud SQL data client identity boundary", () => {
     const result = await client.storage.from("daycare-photos").createSignedUrl("object", 60);
     expect(result.error).toBeTruthy(); expect(fetchImpl).not.toHaveBeenCalled();
   });
+  it("keeps MCP lookups read-only even while normal registration is open", async () => {
+    vi.stubEnv("SIGNUP_ENABLED", "true");
+    const fetchImpl = vi.fn<typeof fetch>(async (_input, init) => {
+      expect(JSON.parse(String(init?.body)).p_allow_create).toBe(false);
+      return Response.json(userId);
+    });
+    await createGcpDataClient(identity, { secret, fetchImpl, allowCreate: false });
+  });
 });

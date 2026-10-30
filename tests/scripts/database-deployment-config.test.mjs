@@ -154,3 +154,12 @@ for (const smokeFailure of ["staged", "promoted"]) test(`GCP ${smokeFailure} smo
   assert.deepEqual(f.state.template.vpcAccess, DATABASE_VPC);
   assert.equal(f.state.template.containers[0].resources.limits.memory, "1Gi");
 });
+
+test("continuous deployment preserves only the exact additional browser origin", async () => {
+  const { preserveWebOriginEnv } = await import("../../scripts/gcp/deploy-existing-service.mjs");
+  const item = { name: "GCP_AUTH_WEB_ORIGIN", value: "https://mfmf.sanba.net" };
+  assert.deepEqual(preserveWebOriginEnv([item]), [item]);
+  assert.deepEqual(preserveWebOriginEnv([]), []);
+  assert.throws(() => preserveWebOriginEnv([item, item]));
+  assert.throws(() => preserveWebOriginEnv([{ ...item, value: "https://evil.test" }]));
+});
