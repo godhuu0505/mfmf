@@ -39,7 +39,7 @@ export function parsePreseededSecretVersions(env) {
   if (!input.trim()) return {};
   let refs;
   try { refs = JSON.parse(input); } catch { throw new CandidateError("Preseeded secret references must be JSON; input withheld."); }
-  const allowed = [...PRESEEDED_KEYS, ...(databaseMode(env) ? Object.keys(DATABASE_SECRETS) : [])];
+  const allowed = [...PRESEEDED_KEYS, ...(databaseMode(env) ? [...Object.keys(DATABASE_SECRETS), "SENTRY_DSN"] : [])];
   if (!refs || typeof refs !== "object" || Array.isArray(refs) ||
       Object.entries(refs).some(([key, value]) => !allowed.includes(key) || !validSecretVersion(value, key, env))) {
     throw new CandidateError("Preseeded secret references must use fixed names, this project, and positive numeric versions.");

@@ -49,6 +49,8 @@ build も確認する（CI = `.github/workflows/ci.yml` と同じゲート）。
 - **秘密情報をコミット / 出力しない。** `.env.local` 等の実 env ファイルは読まない・編集しない（ガードフックがブロック）。
 - **`service_role` キーをクライアント・リポジトリに置かない**（このアプリでは使わない）。
 - **既存の RLS（世帯メンバーシップ + role、ゲストは `guest_grants`）を弱めない。**
+  MCPは専用OAuth grantが固定した1世帯だけを読み、IdP失効・内部UUID mapping・現在の正規roleを毎回確認する。
+  Cookieや他アプリの鍵をMCP資格情報として受け付けない。MCPではguest・不明role・現在世帯へのfallbackを認めない。
   Server Action は冒頭で必ず `getUser()`。認可は**操作に応じて使い分ける**（ひとつのヘルパーで
   代用しない）。**対応表は持たない** —— 正は `src/lib/household.ts` と各 `actions.ts`。
   取り違えやすい点だけ: **更新/削除は「現在世帯」ではなく「対象行の `household_id`」で判定する。**

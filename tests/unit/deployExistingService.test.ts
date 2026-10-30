@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deployExistingService, preserveRankingEnv, validateFixedVersions, validateManifest } from "../../scripts/gcp/deploy-existing-service.mjs";
+import { deployExistingService, preserveMcpEnv, preserveRankingEnv, validateFixedVersions, validateManifest } from "../../scripts/gcp/deploy-existing-service.mjs";
 import { IMAGE_BASE, PROJECT, PROJECT_NUMBER, PUBLIC_ORIGIN, REGION, RUNTIME, SERVICE, SERVICE_NAME } from "../../scripts/gcp/production-config.mjs";
 
 const env = {
@@ -139,6 +139,20 @@ function harness({ service = initial(), failure = "", candidate = manifest() } =
 }
 
 describe("existing Cloud Run continuous deployment", () => {
+  it("preserves a server-only MCP flag outside build/public manifests", async () => {
+    const service = initial(); service.template.containers[0].env.push({ name: "MCP_ENABLED", value: "true" });
+    const h = harness({ service }); await h.run();
+    const stage = JSON.parse(String(h.fetchImpl.mock.calls.find(([, options]) => options?.method === "PATCH")![1]?.body));
+    expect(stage.template.containers[0].env).toContainEqual({ name: "MCP_ENABLED", value: "true" });
+    expect(preserveMcpEnv([])).toEqual([]);
+    const candidate = manifest(); Object.assign(candidate.env, { MCP_ENABLED: "true" });
+    expect(() => validateManifest(candidate, pins, env)).toThrow();
+  });
+  it.each([
+    [{ name: "MCP_ENABLED", value: "TRUE" }],
+    [{ name: "MCP_ENABLED", valueSource: { secretKeyRef: { secret: "unreviewed", version: "1" } } }],
+    [{ name: "MCP_ENABLED", value: "true" }, { name: "MCP_ENABLED", value: "false" }],
+  ])("rejects invalid MCP settings before deployment", (...settings) => { expect(() => preserveMcpEnv(settings)).toThrow(); });
   it("preserves only the two reviewed server-side ranking settings, outside public/build manifests", async () => {
     const service = initial();
     const ranking = [

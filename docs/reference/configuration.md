@@ -33,14 +33,15 @@
 
 ### フィードバック Issue 化スクリプト（運用時のみ）
 
-`scripts/feedback-to-issues.mjs` を手元で実行するときだけ必要。詳細は
-[guides/feedback-to-issues.md](../guides/feedback-to-issues.md)。
+GCP本番の本人用JSONダウンロード → ローカルdry-run → 非公開repo確認 → 明示起票の順で使います。
+詳細は [guides/feedback-to-issues.md](../guides/feedback-to-issues.md)。追加のGCP権限やアプリ認証情報は不要です。
 
 | 変数 | 用途 |
 | --- | --- |
-| `FEEDBACK_USER_EMAIL` / `FEEDBACK_USER_PASSWORD` | フィードバック取得用アカウントの認証情報（RLS 経由で `feedback` を読む） |
-| `GITHUB_TOKEN` | Issues 書き込み権の Fine-grained PAT |
-| `GITHUB_FEEDBACK_REPO` | 登録先 `owner/repo`（★ 必ず非公開リポジトリ） |
+| `GITHUB_TOKEN` | `--check` / `--execute` でだけ使用。固定private repo `godhuu0505/app-operations` の Metadata read / Issues readまたはwriteに限定 |
+
+既定dry-runはtoken不要でネットワークへ接続しません。旧 `FEEDBACK_USER_EMAIL` / `FEEDBACK_USER_PASSWORD` /
+`GITHUB_FEEDBACK_REPO` は使用せず、Supabaseへ接続しません。実envファイルを読み書きせず、tokenを引数・ログ・diskへ残さないでください。
 
 ### デプロイ（GitHub Secrets）
 
@@ -69,7 +70,7 @@ CI/CD で使用。詳細は [guides/deploy.md](../guides/deploy.md)。`preview` 
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` による型チェック |
 | `npm run icons` | PWA アイコンを再生成（`scripts/generate-icons.mjs`） |
-| `npm run feedback:issues` | フィードバックをマスクして非公開リポに Issue 化 |
+| `npm run feedback:issues` | 本人の分類JSONから固定非公開リポへ手動Issue化（既定dry-run） |
 
 > 変更後は `npm run lint` と `npm run typecheck` を必ず通す。UI / ルーティング / ビルド構成を
 > 触ったときは `npm run build` も確認する（CI と同じゲート。`.github/workflows/ci.yml`）。

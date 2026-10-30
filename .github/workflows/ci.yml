@@ -18,6 +18,26 @@ permissions:
   contents: read
 
 jobs:
+  mcp-oauth-storage:
+    name: MCP OAuth storage isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - name: Test real OAuth library and disposable Firestore emulator
+        env:
+          CI: "true"
+          FIREBASE_SKIP_UPDATE_CHECK: "1"
+        run: npm run test:mcp
+
   cloudrun-container:
     name: Cloud Run container
     runs-on: ubuntu-latest
@@ -133,6 +153,7 @@ jobs:
           # The earlier offline-script gate may run before age is installed.
           # Re-run this focused suite to require the real synthetic encrypt/decrypt round trip.
           node --test tests/scripts/storage-backup.test.mjs
+          node --test tests/scripts/identity-backup.test.mjs
 
       - name: Test GCP bootstrap and failure handling
         run: python3 tests/scripts/gcp-bootstrap.test.py
@@ -261,6 +282,11 @@ jobs:
         env:
           TOKEN_ENC_KEY: e2e-local-dummy
         run: npm run test:e2e
+
+      # Production client components, fictional API fixtures, no app credentials.
+      # Screenshots join the existing ui-screenshots artifact without changing permissions.
+      - name: Test MCP consent and connection screens
+        run: npm run test:mcp-ui
 
       # 失敗テストの aria スナップショットをログに直接出す（アーティファクトの
       # 実体ホストへ到達できない環境からでも一次調査できるように）

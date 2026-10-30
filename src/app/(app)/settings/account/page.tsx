@@ -9,6 +9,7 @@ import { getOAuthAvatarUrl } from "@/lib/userAvatar";
 import AvatarUploader from "@/components/AvatarUploader";
 import { ProfileForm, PasswordForm } from "@/app/(app)/settings/SettingsForms";
 import { updateUserAvatar } from "@/app/(app)/settings/actions";
+import { isGcpAuthEnabled } from "@/lib/identity/config";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,12 @@ export default async function AccountSettingsPage() {
           />
 
           <PasswordForm />
+
+          {isGcpAuthEnabled() && process.env.MCP_ENABLED === "true" && <section className="space-y-3 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">
+            <h2 className="text-base font-bold text-foreground">AIとの接続</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">あなたが許可したAIサービスの接続先と有効期限を確認し、接続を解除できます。</p>
+            <Link href="/connections" className="inline-flex min-h-11 items-center rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted">AIとの接続を管理する</Link>
+          </section>}
 
           {/* アカウント情報・サインアウト */}
           <section className="space-y-4 rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-border">

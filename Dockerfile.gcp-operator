@@ -22,6 +22,8 @@ COPY db/gcp/ /app/db/gcp/
 COPY supabase/migrations/ /app/supabase/migrations/
 COPY tests/gcp/ /app/tests/gcp/
 COPY scripts/gcp/database-operator.mjs scripts/gcp/database-prebackup.mjs /app/scripts/gcp/
+COPY scripts/gcp/database-backup-retention.mjs scripts/gcp/bootstrap-database.mjs /app/scripts/gcp/
+COPY scripts/gcp/identity-backup.mjs scripts/gcp/backup-job-config.mjs scripts/gcp/publish-identity-backup.mjs scripts/gcp/run-backup-job.mjs /app/scripts/gcp/
 USER postgres
 ENTRYPOINT ["node", "/app/scripts/gcp/database-operator.mjs"]
 CMD ["--plan"]

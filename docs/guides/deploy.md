@@ -17,7 +17,7 @@ VercelのGit自動配信は引き続き無効です（D22）。
 
 1. PRで通常CIに加え、GCP baseline/RLS/復元・実PostgREST・operator・両モードbuildを通す。
 2. `GCP_AUTH_ENABLED=true` / `GCP_DEPLOY_ENABLED=true`、workflow有効、templateとserving revisionが同じGCPモードであることを確認する。
-3. mainへの新しいpushで、verify → WIF認証 → 同SHAのapp/operator image build → DB `upgrade` → tag付き0% stage → smoke →100% promoteを実行する。
+3. mainへの新しいpushで、verify → WIF認証 → 同SHAのapp/operator image build → 既存のIdP保全・SQL保持Jobの更新と成功確認 → DB `upgrade` → tag付き0% stage → smoke →100% promoteを実行する。
 4. Supabase `migrate` とVercel `deploy` はskipする。既存DB・認証モードの初回切替、freeze解除、Job作成、IAM変更は行わない。
 
 設定・固定secret参照・Job検証の正は [GCP DB通常配信](./gcp-database-deployment.md)。
@@ -32,9 +32,11 @@ workflowを有効化するだけでは配信されない。受入後の新しい
 source manifestでGCP baselineとの対応を検証する。元migrationを増やすだけでは本番へ反映されない。
 追加GCP SQLは `db/gcp/migrations/` のchecksum ledgerとadvisory lockで適用し、未対応の元migrationや履歴差異は停止する。
 
-**現時点では、未適用SQLがある通常配信はprebackupの期限検査で停止する。**
-Standard on-demand backupの実 `expiryTime` がNULLのためで、14日を要求しただけでは期限付きと扱わない。
-SQLが0件ならbackup作成・DDLなしで配信できる。SQL更新を開放するには、保持・削除方針と実検証を別途完了させる。
+**未適用SQLは、直前backupと日次保持Jobの成功receiptを確認してから適用する。**
+Standard on-demandのNULL expiryは、30時間以内の成功receipt・実装hash・instance作成時刻と現在の設定が一致する場合だけ許可する。
+作成後も同じreceipt世代・全件容量を再検証し、欠落・期限切れ・driftならSQL適用前に停止する。
+SQLが0件なら直前backup作成・DDLはない。日次Jobの初期受入・実削除・Scheduler有効化は
+[バックアップ運用](./gcp-backup-automation.md)で別に確認し、実装済みだけで運用開始済みとは扱わない。
 
 appのtraffic rollbackはDB、IdP、secret versionを戻さない。SQLは旧revisionとの互換を保つ。
 source Supabaseの凍結解除・逆同期やDB復元は、最新書込を失わないことを確認する別の運用判断であり、自動実行しない。
@@ -43,8 +45,8 @@ source Supabaseの凍結解除・逆同期やDB復元は、最新書込を失わ
 
 - Cloud SQLは日次18:00 UTC（翌03:00 JST）・14件保持、PITRログ7日、削除保護と最終backup30日を設定する。設定の存在と実復元成功は別に記録する。
 - 初回の同instance managed backup復元は18分47.589秒で成功。復元後の全行全列比較・frozen/gcsのinspect、backup設定一致・修復不要、新しいpost-restore backupまで確認済み。証跡は [移行記録](../explanation/gcp-migration.md#現在の実装と切替記録)に残す。PITRは常に別instanceを作るため、この試験で実PITRまで証明したとは扱わない。
-- Standard on-demand backupは明示削除まで無期限。日次14件保持と手動backupは別枠。全件容量を観測し、復旧点を費用だけで自動削除しない。
-- Identity Platformのアカウント・provider link・password hash設定はSQL backupに含まれない。手動暗号化exportと独立した復号・restore plan検証が成功し、4ユーザー・Google link4件・BCRYPT1件を保全した。今回はパスワード再設定必須0件で、原本とのhash同値も確認済み。実アカウントの全件restoreと定期自動backupは未実施。将来APIでhashを取得できない場合は再設定が必要で、旧hashを無条件補完しない。復旧点は最後に成功・復号検証した手動export時点であり、SQLの日次backup/PITRと同じRPOではない。復元時は全セッション失効を別gateにする。
+- Standard on-demandは明示削除まで無期限。専用の日次保持Jobが所有marker・14日経過・48時間以内の新しい復旧点等を満たす対象だけを削除する。自動backupの保持14件と手動backupは別枠。初回移行の既存手動backupは回収対象外で、復旧点を費用だけで削除しない。
+- Identity Platformのアカウント・provider link・password hash設定はSQL backupに含まれない。手動暗号化exportと独立した復号・restore plan検証が成功し、4ユーザー・Google link4件・BCRYPT1件を保全した。今回はパスワード再設定必須0件で、原本とのhash同値も確認済み。これは切替時の手動保全の証明で、実アカウントの全件restoreは別gate。継続保全は[日次Job](./gcp-backup-automation.md#identity-platform-の保全)へ拡張し、実Job・独立復号・Schedulerの受入を別に確認する。既知のBCRYPT移行とIdP生成SCRYPT以外のhash importは、backup/restore契約の追加検証かpassword再設定を必要とする。将来APIでhashを取得できない場合も再設定が必要で、旧hashを無条件補完しない。復旧点は最後に成功・独立復号検証したexport時点で、SQLの日次backup/PITRと同じRPOではない。復元時は全セッション失効を別gateにする。
 - GCS本体はSQL backupと別に保護する。[画像移送・隔離復元](./storage-migration-operator.md)の世代・binding・hash検証、soft delete、terminal cleanupを使う。DB復元だけで画像やIdPも巻き戻ったとは扱わない。
 - 元Supabaseのpublic＋credential Authは凍結し、暗号化した最終原本とともに保全する。Authの全session状態を凍結したものではない。解除は [専用手順](./database-auth-backup.md)で明示的に行い、通常配信から触れない。
 

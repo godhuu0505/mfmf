@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { databaseMode, databasePins, databasePublicEnv, DATABASE_VPC, isDatabaseVpc } from "../../scripts/gcp/database-deployment-config.mjs";
+import { databaseMode, databasePins, databasePublicEnv, databaseSourceConfig, DATABASE_VPC, isDatabaseVpc } from "../../scripts/gcp/database-deployment-config.mjs";
 import { prepareCandidate } from "../../scripts/gcp/prepare-candidate.mjs";
 import { validateFixedVersions, validateManifest, deployExistingService } from "../../scripts/gcp/deploy-existing-service.mjs";
 import { PROJECT, PROJECT_NUMBER, SERVICE_NAME, PUBLIC_ORIGIN, IMAGE_BASE } from "../../scripts/gcp/production-config.mjs";
@@ -27,6 +27,20 @@ test("mode and version pins reject ambiguous or floating configuration", () => {
   assert.deepEqual(databasePins(JSON.stringify(refs)), refs);
   assert.throws(() => databasePins(JSON.stringify({ ...refs, IDENTITY_PLATFORM_API_KEY: refs.IDENTITY_PLATFORM_API_KEY.replace("/1", "/latest") })));
   assert.ok(isDatabaseVpc(DATABASE_VPC)); assert.equal(isDatabaseVpc({ ...DATABASE_VPC, connector: "anything" }), false);
+});
+test("an explicitly pinned Sentry version is introduced only into the new GCP revision", () => {
+  const ref = `projects/${PROJECT_NUMBER}/secrets/mfmf-sentry-dsn/versions/1`;
+  const withSentry = { ...pins, SENTRY_DSN: ref };
+  assert.deepEqual(validateFixedVersions(JSON.stringify(withSentry), env), withSentry);
+  const service = { name: SERVICE_NAME, uri: PUBLIC_ORIGIN, template: { containers: [{ env: Object.entries(publicEnv).map(([name, value]) => ({ name, value })) }] } };
+  const selected = databaseSourceConfig(service, withSentry);
+  assert.equal(selected.features.sentryConfigured, true);
+  assert.equal(selected.secretVersions.SENTRY_DSN, ref);
+  const configured = { ...manifest(), features: { googleDriveConfigured: true, sentryConfigured: true }, secretVersions: withSentry };
+  validateManifest(configured, withSentry, env);
+  assert.throws(() => validateManifest({ ...configured, secretVersions: { ...withSentry, SENTRY_DSN: ref.replace('/1', '/2') } }, withSentry, env));
+  assert.throws(() => validateFixedVersions(JSON.stringify({ ...pins, SENTRY_DSN: ref.replace('/1', '/latest') }), env));
+  assert.throws(() => databaseSourceConfig({ ...service, template: { containers: [{ env: [{ name: 'SENTRY_DSN', valueSource: { secretKeyRef: { secret: 'mfmf-sentry-dsn', version: '2' } } }] }] } }, withSentry));
 });
 test("true manifest requires matching flags, fixed placeholders, both secret references and operator digest", () => {
   validateManifest(manifest(), pins, env);
@@ -63,7 +77,7 @@ test("a legacy running service cannot implicitly become GCP mode", async () => {
   assert.equal(calls, 1); assert.equal(prepared, false); assert.equal(upgraded, false);
 });
 
-function deploymentFixture({ upgradeFailure = false, servingLegacy = false, smokeFailure } = {}) {
+function deploymentFixture({ upgradeFailure = false, backupFailure = false, servingLegacy = false, smokeFailure } = {}) {
   const API = `https://run.googleapis.com/v2/${SERVICE_NAME}`;
   const old = "mfmf-candidate-old";
   const next = `mfmf-candidate-${env.GITHUB_SHA.slice(0, 12)}-123-1`;
@@ -108,18 +122,24 @@ function deploymentFixture({ upgradeFailure = false, servingLegacy = false, smok
   };
   return { events, state, run: () => deployExistingService({ env, pins, fetchImpl, log: () => {}, wait: async () => {}, maxPolls: 2,
     prepare: async (save) => { events.push("prepare"); save(manifest()); },
+    backups: async (options) => { events.push("backups"); assert.equal(options.image, migrationImage);
+      if (backupFailure) throw new Error("Fixed backup failure"); return { backupsVerified: true }; },
     upgrade: async (options) => { events.push("upgrade"); assert.equal(options.image, migrationImage);
       if (upgradeFailure) throw new Error("Fixed upgrade failure"); return { upgradeVerified: true }; } }) };
 }
 test("GCP deployment waits for exact-image database upgrade before staging or promotion", async () => {
   const f = deploymentFixture(); assert.deepEqual(await f.run(), manifest());
-  assert.deepEqual(f.events, ["prepare", "upgrade", "patch", "patch"]);
+  assert.deepEqual(f.events, ["prepare", "backups", "upgrade", "patch", "patch"]);
   assert.equal(f.state.template.maxInstanceRequestConcurrency, 2);
   assert.deepEqual(f.state.template.vpcAccess, DATABASE_VPC);
 });
 test("failed upgrade prevents all service writes", async () => {
   const f = deploymentFixture({ upgradeFailure: true }); await assert.rejects(f.run(), /Fixed upgrade failure/);
-  assert.deepEqual(f.events, ["prepare", "upgrade"]);
+  assert.deepEqual(f.events, ["prepare", "backups", "upgrade"]);
+});
+test("failed backup maintenance prevents SQL upgrade and all service writes", async () => {
+  const f = deploymentFixture({ backupFailure: true }); await assert.rejects(f.run(), /Fixed backup failure/);
+  assert.deepEqual(f.events, ["prepare", "backups"]);
 });
 test("a GCP template with a legacy serving revision cannot trigger migration", async () => {
   const f = deploymentFixture({ servingLegacy: true }); await assert.rejects(f.run(), /cannot change authentication mode/);
@@ -130,7 +150,16 @@ for (const smokeFailure of ["staged", "promoted"]) test(`GCP ${smokeFailure} smo
   await assert.rejects(f.run(), smokeFailure === "staged" ? /Staging failed; the previous healthy revision/ : /traffic was restored to the previous healthy revision/);
   assert.deepEqual(f.state.traffic, [{ type: "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION", revision: "mfmf-candidate-old", percent: 100 }]);
   assert.deepEqual(f.state.trafficStatuses, f.state.traffic);
-  assert.deepEqual(f.events, smokeFailure === "staged" ? ["prepare", "upgrade", "patch", "patch"] : ["prepare", "upgrade", "patch", "patch", "patch"]);
+  assert.deepEqual(f.events, smokeFailure === "staged" ? ["prepare", "backups", "upgrade", "patch", "patch"] : ["prepare", "backups", "upgrade", "patch", "patch", "patch"]);
   assert.deepEqual(f.state.template.vpcAccess, DATABASE_VPC);
   assert.equal(f.state.template.containers[0].resources.limits.memory, "1Gi");
+});
+
+test("continuous deployment preserves only the exact additional browser origin", async () => {
+  const { preserveWebOriginEnv } = await import("../../scripts/gcp/deploy-existing-service.mjs");
+  const item = { name: "GCP_AUTH_WEB_ORIGIN", value: "https://mfmf.sanba.net" };
+  assert.deepEqual(preserveWebOriginEnv([item]), [item]);
+  assert.deepEqual(preserveWebOriginEnv([]), []);
+  assert.throws(() => preserveWebOriginEnv([item, item]));
+  assert.throws(() => preserveWebOriginEnv([{ ...item, value: "https://evil.test" }]));
 });
