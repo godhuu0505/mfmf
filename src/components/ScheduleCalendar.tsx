@@ -713,13 +713,18 @@ export default function ScheduleCalendar({
                   const day = Number(ds.slice(-2));
                   const isToday = ds === todayStr;
                   return (
-                    <div
+                    <button
                       key={ds}
-                      className="border-l border-border py-1 text-center"
+                      type="button"
+                      data-day={ds}
+                      onClick={() => open(ds)}
+                      aria-haspopup="dialog"
+                      aria-label={`${formatDay(ds)} ${summaryOf(itemsByDate[ds] ?? [])}`}
+                      className="border-l border-border py-1 text-center transition hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
                     >
-                      <div
+                      <span
                         className={
-                          "text-[10px] " +
+                          "block text-[10px] " +
                           (i === 0
                             ? "text-rose-500"
                             : i === 6
@@ -728,8 +733,8 @@ export default function ScheduleCalendar({
                         }
                       >
                         {WEEKDAYS[i]}
-                      </div>
-                      <div
+                      </span>
+                      <span
                         className={
                           "mx-auto flex h-7 w-7 items-center justify-center rounded-full text-sm " +
                           (isToday
@@ -738,8 +743,8 @@ export default function ScheduleCalendar({
                         }
                       >
                         {day}
-                      </div>
-                    </div>
+                      </span>
+                    </button>
                   );
                 })}
               </div>
