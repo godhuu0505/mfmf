@@ -28,7 +28,7 @@ export function privateEnvelope(envelope: Envelope, budget = { error: () => true
           attributes: Object.fromEntries(Object.entries(metric.attributes).map(([key, value]) => [key, { type: "string" as const, value }])) });
       }
       if (metrics.length) items.push([{ type: "trace_metric", item_count: metrics.length, content_type: "application/vnd.sentry.items.trace-metric+json" },
-        { items: metrics, ingest_settings: { infer_ip: "never", infer_user_agent: "never" } }]);
+        { version: 2, items: metrics, ingest_settings: { infer_ip: "never", infer_user_agent: "never" } }]);
     }
   }
   const event = items.find(([header]) => header.type === "event")?.[1] as { event_id?: string } | undefined;

@@ -16,7 +16,7 @@ export function createBrowserReporter({ fetchImpl = fetch, random = Math.random,
     if (payload.kind === "error") errors++;
     if (!await enabled()) return;
     await fetchImpl("/api/vitals", { method: "POST", body: JSON.stringify(payload), headers: { "content-type": "application/json" },
-      credentials: "same-origin", cache: "no-store", keepalive: true, redirect: "error", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(2_000) }).catch(() => undefined);
+      credentials: "same-origin", cache: "no-store", keepalive: true, redirect: "error", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(7_000) }).catch(() => undefined);
   };
   return {
     error: (category: BrowserError["category"]) => send({ kind: "error", category, route: telemetryRoute(path()) }),

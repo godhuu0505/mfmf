@@ -20,7 +20,7 @@ describe("explicit capture only", () => {
     await onRequestError(error, { path: marker, method: marker, headers: { cookie: marker } }, { routerKind: marker, routePath: `/records/${marker}`, routeType: marker });
     expect(JSON.stringify(sdk.captureEvent.mock.calls)).not.toContain(marker);
     expect(sdk.captureEvent).toHaveBeenCalledWith({ exception: { values: [{ type: "TypeError" }] }, tags: { category: "server", route: "/records/[id]" } });
-    expect(sdk.flush).toHaveBeenCalledWith(500);
+    expect(sdk.flush).toHaveBeenCalledWith(3_500);
   });
   it("does not propagate telemetry failure", async () => {
     sdk.flush.mockRejectedValueOnce(new Error("private provider body"));

@@ -17,13 +17,13 @@ describe("last outbound privacy boundary", () => {
     expect(result[1][0][1]).toHaveProperty("sdk", { settings: { infer_ip: "never" } });
   });
   it("reprojects SDK serialized metrics and removes scope/trace identifiers", () => {
-    const envelope = [{ trace: marker }, [[{ type: "trace_metric" }, { ingest_settings: { infer_ip: "auto" }, items: [
+    const envelope = [{ trace: marker }, [[{ type: "trace_metric" }, { version: 999, ingest_settings: { infer_ip: "auto", infer_user_agent: "auto" }, items: [
       { name: "web_vital.lcp", type: "distribution", value: 10, trace_id: marker, span_id: marker, timestamp: marker,
         attributes: { route: { type: "string", value: `/records/${marker}` }, rating: { type: "string", value: "good" }, navigation_type: { type: "string", value: marker }, secret: { type: "string", value: marker } } },
       { name: marker, value: 1, type: "counter" },
     ] }]]] as unknown as Envelope;
     const result = privateEnvelope(envelope)!; expect(JSON.stringify(result)).not.toContain(marker);
-    expect(result[1]).toHaveLength(1); expect(result[1][0][1]).toMatchObject({ ingest_settings: { infer_ip: "never", infer_user_agent: "never" }, items: [{ attributes: { navigation_type: { value: "unknown" } } }] });
+    expect(result[1]).toHaveLength(1); expect(result[1][0][1]).toMatchObject({ version: 2, ingest_settings: { infer_ip: "never", infer_user_agent: "never" }, items: [{ attributes: { navigation_type: { value: "unknown" } } }] });
   });
   it("does not transmit dropped envelopes or exceeded budgets", () => {
     const envelope = [{}, [[{ type: "event" }, {}]]] as unknown as Envelope;
@@ -60,5 +60,21 @@ describe("last outbound privacy boundary", () => {
     expect(sentEvent.sdk).toEqual({ settings: { infer_ip: "never" } });
     expect(Object.keys(sentEvent.sdk)).toEqual(["settings"]);
     expect(sentEvent).not.toHaveProperty("user");
+    const metricBody = bodies.find((body) => JSON.parse(body.split("\n")[1]).type === "trace_metric")!;
+    const sentMetrics = JSON.parse(metricBody.split("\n")[2]);
+    expect(sentMetrics.version).toBe(2);
+    expect(sentMetrics.ingest_settings).toEqual({ infer_ip: "never", infer_user_agent: "never" });
+  });
+  it.each([200, 429])("honors trace_metric-specific limits at HTTP %s without blocking errors", async (status) => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(new Response(null, { status, headers: { "x-sentry-rate-limits": "60:trace_metric:organization" } })).mockResolvedValue(new Response(null, { status: 200 }));
+    const dropped = vi.fn();
+    const transport = privateTransport(dsn, fetchImpl)({ recordDroppedEvent: dropped, bufferSize: 4 });
+    const metric = [{}, [[{ type: "trace_metric" }, { items: [{ name: "web_vital.lcp", type: "distribution", value: 10,
+      attributes: { route: { type: "string", value: "/" }, rating: { type: "string", value: "good" }, navigation_type: { type: "string", value: "navigate" } } }] }]]] as unknown as Envelope;
+    await transport.send(metric); await transport.send(metric);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(dropped).toHaveBeenCalledWith("ratelimit_backoff", "trace_metric");
+    await transport.send([{}, [[{ type: "event" }, { event_id: "b".repeat(32), tags: { category: "server", route: "/" } }]]] as unknown as Envelope);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });
