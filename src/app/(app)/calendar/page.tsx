@@ -50,7 +50,8 @@ function addDays(iso: string, n: number): string {
 }
 
 /**
- * YYYY-MM-DD が**実在する日**か。?open= は日別シートの見出し（Intl の format）へ
+ * YYYY-MM-DD が**実在する日**か。?w= の週計算にも ?open= の日別シートにも使う。
+ * ?open= は日別シートの見出し（Intl の format）へ
  * そのまま渡るので、形だけの検査では足りない —— 2026-99-99 のような値を通すと
  * Invalid Date になり、カレンダーごと RangeError で落ちる。
  */
@@ -119,12 +120,18 @@ export default async function CalendarPage({
 
   // 週表示の起点。?w= があればその日を含む週、無ければ「その月の今日」または
   // その月の 1 日の週（?w= が無いと 9 月の 15 日の週などを一生開けない）
-  const weekAnchor = /^\d{4}-\d{2}-\d{2}$/.test(w ?? "")
-    ? (w as string)
-    : year === todayYear && month === todayMonth
-      ? todayStr
-      : firstDay;
-  const weekDays = weekOf(weekAnchor);
+  const defaultAnchor = year === todayYear && month === todayMonth ? todayStr : firstDay;
+  const defaultWeek = weekOf(defaultAnchor);
+  // 年の境界でも、表示に使う7日すべてが4桁の実在日であることを確認する。
+  // 9999-12-31だけを検査すると週末が10000年になり、日付見出しを表示できない。
+  const fallbackWeek = defaultWeek.every(isRealDate) ? defaultWeek : weekOf(addDays(firstDay, 7));
+  const requestedWeek = w && isRealDate(w) ? weekOf(w) : null;
+  // 表示月に重ならない週は採用しない。年月と週が食い違うURLで、
+  // 後段の取得範囲が表示月から別年まで広がるのを防ぐ。月をまたぐ週は受け付ける。
+  const weekDays = requestedWeek?.every(isRealDate) &&
+    requestedWeek.some((date) => date >= firstDay && date <= lastDay)
+    ? requestedWeek
+    : fallbackWeek;
   const weekLabel = `${Number(weekDays[0].slice(5, 7))}/${Number(
     weekDays[0].slice(8),
   )} 〜 ${Number(weekDays[6].slice(5, 7))}/${Number(weekDays[6].slice(8))}`;
