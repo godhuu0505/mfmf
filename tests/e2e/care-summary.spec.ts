@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { assertLocalSupabase } from "../localGuard";
 import { E2E_USER } from "./global-setup";
@@ -15,7 +15,7 @@ function dateOffset(days: number) {
 // 通常のE2E setupと同様、本番を指す設定は1リクエストも送る前に拒否する。
 const petA = crypto.randomUUID();
 const petB = crypto.randomUUID();
-const recordIds = Array.from({ length: 6 }, () => crypto.randomUUID());
+const recordIds = Array.from({ length: 8 }, () => crypto.randomUUID());
 const ruleId = crypto.randomUUID();
 let supabase: SupabaseClient;
 
@@ -44,6 +44,8 @@ test.beforeAll(async () => {
     { ...base, id: recordIds[3], record_date: dateOffset(-1), source: "salon", status: "skipped", body: "引き継ぎ見送り：サロン" },
     { ...base, id: recordIds[4], pet_id: petB, record_date: today, body: "別ペットの記録", weight_kg: 9.9 },
     { ...base, id: recordIds[5], record_date: dateOffset(3), body: "未来の実施済み記録", weight_kg: 99 },
+    { ...base, id: recordIds[6], record_date: dateOffset(-1), status: "planned", body: "引き継ぎ未完了：お世話" },
+    { ...base, id: recordIds[7], pet_id: null, record_date: today, body: "対象未設定の記録本文" },
   ]);
   expect(recordsError).toBeNull();
   const { error: assigneeError } = await supabase.from("record_assignees").insert({ record_id: recordIds[2], role: "care", user_id: userId });
@@ -71,6 +73,7 @@ test("UC-CS01: ペット別に実績・予定・見送りと体重を整理し�
   await login(page);
   await page.goto("/menu");
   await page.getByRole("link", { name: "お世話の引き継ぎ" }).click();
+  await expect(page.getByRole("button", { name: "テキストをコピー" })).not.toBeVisible();
   await page.getByRole("combobox", { name: "ペット", exact: true }).selectOption(petA);
   await page.getByRole("button", { name: "表示する", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`pet=${petA}`));
@@ -83,9 +86,39 @@ test("UC-CS01: ペット別に実績・予定・見送りと体重を整理し�
   await expect(page.getByRole("region", { name: "これまでの記録", exact: true })).not.toContainText("引き継ぎ見送り");
   await expect(sheet).not.toContainText("別ペットの記録");
   await expect(sheet).not.toContainText("未来の実施済み記録");
-  await page.screenshot({ path: "test-results/screenshots/care-summary.png", fullPage: true });
+  // OSのクリップボードには触れず、クリックするまで書き込みがないことも検証する。
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      writeText: async (text: string) => { document.documentElement.dataset.copiedSummary = text; },
+    } });
+  });
+  await expect(page.locator("html")).not.toHaveAttribute("data-copied-summary");
+  await page.getByRole("button", { name: "テキストをコピー" }).click();
+  await expect(page.getByRole("status")).toContainText("コピーしました。");
+  const copied = await page.locator("html").getAttribute("data-copied-summary");
+  expect(copied).toContain("お世話の引き継ぎ：引き継ぎテスト・むぎ（犬）");
+  expect(copied).toContain(`作成日：${today.replace(/-/g, "/")}（日本時間）`);
+  expect(copied).toContain(`${dateOffset(-10).replace(/-/g, "/")}の記録（対象期間より前）`);
+  expect(copied).toContain("最近の体重：4.20 kg");
+  expect(copied).toContain("引き継ぎ記録：朝ごはんを完食");
+  expect(copied).toContain("引き継ぎ予定：健診");
+  expect(copied).toContain("引き継ぎ見送り：サロン");
+  expect(copied).toContain("引き継ぎ未完了：お世話");
+  expect(copied).toContain("対象ペットが未設定の記録");
+  expect(copied).not.toContain("別ペットの記録");
+  expect(copied).not.toContain("未来の実施済み記録");
+  expect(copied).not.toContain("対象未設定の記録本文");
+  expect(copied).not.toContain(petA);
+  expect(copied).not.toContain(E2E_USER.email);
+  // コピー結果は実際のスマホの表示範囲でも残す（固定ナビが重ならない）。
+  await page.screenshot({ path: "test-results/screenshots/care-summary-copy.png", animations: "disabled" });
   await page.emulateMedia({ colorScheme: "dark" });
-  await page.screenshot({ path: "test-results/screenshots/care-summary-dark.png", fullPage: true });
+  await page.screenshot({ path: "test-results/screenshots/care-summary-copy-dark.png", animations: "disabled" });
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  await page.screenshot({ path: "test-results/screenshots/care-summary.png", fullPage: true, animations: "disabled" });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.screenshot({ path: "test-results/screenshots/care-summary-dark.png", fullPage: true, animations: "disabled" });
   await page.evaluate(() => { window.print = () => { document.documentElement.dataset.printRequested = "yes"; }; });
   await page.getByRole("button", { name: "印刷・PDF保存" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-print-requested", "yes");
@@ -94,6 +127,7 @@ test("UC-CS01: ペット別に実績・予定・見送りと体重を整理し�
   await expect(page.getByRole("form", { name: "表示条件" })).not.toBeVisible();
   await expect(page.getByRole("navigation", { name: "メインナビゲーション" })).not.toBeVisible();
   await expect(page.getByRole("button", { name: "印刷・PDF保存" })).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "テキストをコピー" })).not.toBeVisible();
   await expect(sheet).toContainText("作成日");
 });
 
@@ -106,12 +140,130 @@ test("UC-CS02: 毎週の予定は対象未設定の枠に出し、期間・ペ�
   await page.goto(`/care-summary?pet=${petA}&from=2026-02-30&to=2026-03-01`);
   await expect(page.getByRole("alert").filter({ hasText: "正しい日付" })).toBeVisible();
   await expect(page.getByRole("button", { name: "印刷・PDF保存" })).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "テキストをコピー" })).not.toBeVisible();
   await page.goto(`/care-summary?pet=${crypto.randomUUID()}`);
   await expect(page.getByRole("alert").filter({ hasText: "この世帯で確認できません" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "テキストをコピー" })).not.toBeVisible();
 });
 
 test("UC-CS03: 未ログインでは引き継ぎシートを開けない", async ({ page }) => {
   await page.goto(`/care-summary?pet=${petA}`);
   await expect(page).toHaveURL(/\/login/);
   await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "テキストをコピー" })).not.toBeVisible();
+});
+
+test("UC-CS04: コピーが拒否・非対応でも成功と表示せず、印刷を利用できる", async ({ page }) => {
+  await login(page);
+  await page.goto(`/care-summary?pet=${petA}`);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      writeText: async () => { throw new DOMException("Denied", "NotAllowedError"); },
+    } });
+  });
+  await page.getByRole("button", { name: "テキストをコピー" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "コピーできませんでした" })).toBeVisible();
+  await expect(page.getByText("コピーしました。", { exact: false })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "印刷・PDF保存" })).toBeEnabled();
+  await page.evaluate(() => { Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined }); });
+  await page.getByRole("button", { name: "テキストをコピー" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "印刷・PDF保存をご利用ください" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "テキストをコピー" })).toBeEnabled();
+});
+
+/** 最初のOS書き込みを保留する。実クリップボードも本番APIも使わない。 */
+async function pendingClipboard(page: Page, outcome: "resolve" | "reject") {
+  await page.evaluate((settlement) => {
+    let calls = 0;
+    document.documentElement.dataset.careCopyDocument = "original";
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      writeText: (text: string) => {
+        calls += 1;
+        document.documentElement.dataset.careCopyCount = String(calls);
+        if (calls === 1) return new Promise<void>((resolve, reject) => {
+          Object.assign(window, { settleCareSummaryCopy: () => {
+            if (settlement === "reject") reject(new DOMException("Denied", "NotAllowedError"));
+            else {
+              document.documentElement.dataset.careCopiedText = text;
+              resolve();
+            }
+          } });
+        });
+        document.documentElement.dataset.careCopiedText = text;
+        return Promise.resolve();
+      },
+    } });
+  }, outcome);
+}
+
+for (const outcome of ["resolve", "reject"] as const) {
+  test(`UC-CS05-${outcome}: 期間変更後に旧本文の結果を出さず、同じ文書ではコピーを排他する`, async ({ page }) => {
+    await login(page);
+    await page.goto(`/care-summary?pet=${petA}`);
+    await pendingClipboard(page, outcome);
+    await page.getByRole("button", { name: "テキストをコピー" }).click();
+    await expect(page.getByRole("button", { name: "コピー中…" })).toBeDisabled();
+    await expect(page.locator("html")).toHaveAttribute("data-care-copy-count", "1");
+
+    // 実際の期間操作を使う。Linkは同文書の遷移、期間フォームのボタンはnative GET。
+    const shortcut = page.getByRole("link", { name: "直近30日＋今後7日", exact: true })
+      .or(page.getByRole("button", { name: "直近30日＋今後7日", exact: true }));
+    await shortcut.click();
+    await expect(page).toHaveURL((url) => url.searchParams.get("from") === dateOffset(-29));
+    await expect(page.getByLabel("開始日", { exact: true })).toHaveValue(dateOffset(-29));
+    const clientNavigation = await page.locator("html").getAttribute("data-care-copy-document") === "original";
+    if (clientNavigation) {
+      await expect(page.locator("html")).toHaveAttribute("data-care-copy-document", "original");
+      await expect(page.getByRole("button", { name: "コピー中…" })).toBeDisabled();
+      await expect(page.getByRole("button", { name: "テキストをコピー" })).toHaveCount(0);
+      await expect(page.locator("html")).toHaveAttribute("data-care-copy-count", "1");
+      await page.evaluate(() => {
+        (window as unknown as { settleCareSummaryCopy: () => void }).settleCareSummaryCopy();
+      });
+    } else {
+      // PR182の期間ボタンと統合後は旧documentごと破棄される。新しい文書の状態を確認する。
+      await expect(page.locator("html")).not.toHaveAttribute("data-care-copy-document");
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+          writeText: async (text: string) => {
+            document.documentElement.dataset.careCopyCount = "1";
+            document.documentElement.dataset.careCopiedText = text;
+          },
+        } });
+      });
+    }
+    await expect(page.getByRole("button", { name: "テキストをコピー" })).toBeEnabled();
+    await expect(page.getByText("コピーしました。", { exact: false })).toHaveCount(0);
+    await expect(page.getByText("コピーできませんでした。", { exact: false })).toHaveCount(0);
+    await page.getByRole("button", { name: "テキストをコピー" }).click();
+    await expect(page.getByRole("status")).toContainText("コピーしました。");
+    await expect(page.locator("html")).toHaveAttribute("data-care-copy-count", clientNavigation ? "2" : "1");
+    const copied = await page.locator("html").getAttribute("data-care-copied-text");
+    expect(copied).toContain(`対象期間：${dateOffset(-29).replace(/-/g, "/")}〜${dateOffset(7).replace(/-/g, "/")}`);
+  });
+}
+
+test("UC-CS06: ペット変更のGET送信では文書が切り替わり、旧コピー状態を引き継がない", async ({ page }) => {
+  await login(page);
+  await page.goto(`/care-summary?pet=${petA}`);
+  await pendingClipboard(page, "resolve");
+  await page.getByRole("button", { name: "テキストをコピー" }).click();
+  await expect(page.getByRole("button", { name: "コピー中…" })).toBeDisabled();
+  await page.getByRole("combobox", { name: "ペット", exact: true }).selectOption(petB);
+  await page.getByRole("button", { name: "表示する", exact: true }).click();
+  await expect(page.getByRole("article", { name: "引き継ぎテスト・そらの引き継ぎシート" })).toBeVisible();
+  // native GETは旧documentごと破棄する。OSの保留操作がキャンセルされたとは主張しない。
+  await expect(page.locator("html")).not.toHaveAttribute("data-care-copy-document");
+  await expect(page.getByRole("button", { name: "テキストをコピー" })).toBeEnabled();
+  await expect(page.getByText("コピーしました。", { exact: false })).toHaveCount(0);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      writeText: async (text: string) => { document.documentElement.dataset.careCopiedText = text; },
+    } });
+  });
+  await page.getByRole("button", { name: "テキストをコピー" }).click();
+  await expect(page.getByRole("status")).toContainText("コピーしました。");
+  const copied = await page.locator("html").getAttribute("data-care-copied-text");
+  expect(copied).toContain("お世話の引き継ぎ：引き継ぎテスト・そら（猫）");
+  expect(copied).not.toContain("引き継ぎ記録：朝ごはんを完食");
 });
